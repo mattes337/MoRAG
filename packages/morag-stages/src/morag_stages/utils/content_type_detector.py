@@ -3,6 +3,7 @@
 import re
 from pathlib import Path
 from typing import Union
+
 import structlog
 
 logger = structlog.get_logger(__name__)
@@ -10,9 +11,11 @@ logger = structlog.get_logger(__name__)
 # Import services - these are optional for content type detection
 try:
     from morag_services import ContentType
+
     SERVICES_AVAILABLE = True
 except ImportError:
     SERVICES_AVAILABLE = False
+
     class ContentType:  # type: ignore
         pass
 
@@ -23,16 +26,40 @@ class ContentTypeDetector:
     def __init__(self):
         """Initialize content type detector."""
         # Define file extension mappings
-        self.video_extensions = {'.mp4', '.avi', '.mov', '.mkv', '.webm', '.flv', '.wmv'}
-        self.audio_extensions = {'.mp3', '.wav', '.flac', '.aac', '.ogg', '.m4a', '.wma'}
-        self.document_extensions = {'.pdf', '.doc', '.docx', '.ppt', '.pptx', '.xls', '.xlsx'}
-        self.text_extensions = {'.txt', '.md', '.rst', '.html', '.xml', '.json', '.csv'}
+        self.video_extensions = {
+            ".mp4",
+            ".avi",
+            ".mov",
+            ".mkv",
+            ".webm",
+            ".flv",
+            ".wmv",
+        }
+        self.audio_extensions = {
+            ".mp3",
+            ".wav",
+            ".flac",
+            ".aac",
+            ".ogg",
+            ".m4a",
+            ".wma",
+        }
+        self.document_extensions = {
+            ".pdf",
+            ".doc",
+            ".docx",
+            ".ppt",
+            ".pptx",
+            ".xls",
+            ".xlsx",
+        }
+        self.text_extensions = {".txt", ".md", ".rst", ".html", ".xml", ".json", ".csv"}
 
         # YouTube URL patterns
         self.youtube_patterns = [
-            r'(?:youtube\.com/watch\?v=|youtu\.be/|youtube\.com/embed/)([a-zA-Z0-9_-]{11})',
-            r'youtube\.com/v/([a-zA-Z0-9_-]{11})',
-            r'youtube\.com/watch\?.*v=([a-zA-Z0-9_-]{11})'
+            r"(?:youtube\.com/watch\?v=|youtu\.be/|youtube\.com/embed/)([a-zA-Z0-9_-]{11})",
+            r"youtube\.com/v/([a-zA-Z0-9_-]{11})",
+            r"youtube\.com/watch\?.*v=([a-zA-Z0-9_-]{11})",
         ]
 
     def detect_content_type(self, file_path: Union[str, Path]) -> Union[str, object]:
@@ -48,7 +75,7 @@ class ContentTypeDetector:
         logger.debug("Detecting content type", file_path=file_str)
 
         # Check if it's a URL
-        if file_str.startswith(('http://', 'https://')):
+        if file_str.startswith(("http://", "https://")):
             return self._detect_url_content_type(file_str)
 
         # Check file extension
@@ -66,9 +93,11 @@ class ContentTypeDetector:
         logger.debug("Analyzing URL", url=url)
 
         # Check for YouTube URLs
-        is_youtube = any(
-            re.search(pattern, url) for pattern in self.youtube_patterns
-        ) or 'youtube.com' in url or 'youtu.be' in url
+        is_youtube = (
+            any(re.search(pattern, url) for pattern in self.youtube_patterns)
+            or "youtube.com" in url
+            or "youtu.be" in url
+        )
 
         if is_youtube:
             logger.debug("Detected YouTube URL", url=url)
@@ -116,7 +145,9 @@ class ContentTypeDetector:
 
         # Document files
         if file_suffix in self.document_extensions:
-            logger.debug("Detected document file", file_path=file_str, suffix=file_suffix)
+            logger.debug(
+                "Detected document file", file_path=file_str, suffix=file_suffix
+            )
             if SERVICES_AVAILABLE:
                 return ContentType.DOCUMENT
             else:
@@ -131,14 +162,19 @@ class ContentTypeDetector:
                 return "TEXT"
 
         # Default to text for unknown types
-        logger.debug("Using default text type for unknown extension",
-                    file_path=file_str, suffix=file_suffix)
+        logger.debug(
+            "Using default text type for unknown extension",
+            file_path=file_str,
+            suffix=file_suffix,
+        )
         if SERVICES_AVAILABLE:
             return ContentType.TEXT
         else:
             return "TEXT"
 
-    def is_content_type(self, content_type: Union[str, object], expected_type: str) -> bool:
+    def is_content_type(
+        self, content_type: Union[str, object], expected_type: str
+    ) -> bool:
         """Check if content type matches expected type.
 
         Args:

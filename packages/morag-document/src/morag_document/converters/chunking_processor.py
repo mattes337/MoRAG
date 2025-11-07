@@ -1,14 +1,13 @@
 """Document chunking processor for various chunking strategies."""
 
 import re
-from typing import List
 from pathlib import Path
+from typing import List
 
 import structlog
-
+from morag_core.config import get_settings, validate_configuration_and_log
 from morag_core.interfaces.converter import ChunkingStrategy, ConversionOptions
 from morag_core.models.document import Document
-from morag_core.config import get_settings, validate_configuration_and_log
 
 logger = structlog.get_logger(__name__)
 
@@ -16,7 +15,9 @@ logger = structlog.get_logger(__name__)
 class ChunkingProcessor:
     """Handles document chunking with various strategies."""
 
-    async def chunk_document(self, document: Document, options: ConversionOptions) -> Document:
+    async def chunk_document(
+        self, document: Document, options: ConversionOptions
+    ) -> Document:
         """Chunk document text.
 
         Args:
@@ -38,17 +39,21 @@ class ChunkingProcessor:
         chunk_overlap = options.chunk_overlap or settings.default_chunk_overlap
 
         # Log chunking operation details
-        logger.info("Starting document chunking",
-                   strategy=strategy,
-                   chunk_size=chunk_size,
-                   chunk_overlap=chunk_overlap,
-                   text_length=len(text) if text else 0,
-                   enable_page_based_chunking=getattr(settings, 'enable_page_based_chunking', False))
+        logger.info(
+            "Starting document chunking",
+            strategy=strategy,
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
+            text_length=len(text) if text else 0,
+            enable_page_based_chunking=getattr(
+                settings, "enable_page_based_chunking", False
+            ),
+        )
 
         # Apply chunking strategy
         if strategy == ChunkingStrategy.PAGE:
             # Page-based chunking - use configuration settings
-            if getattr(settings, 'enable_page_based_chunking', False):
+            if getattr(settings, "enable_page_based_chunking", False):
                 await self._chunk_by_pages(document, options)
                 return document
             else:
@@ -62,7 +67,9 @@ class ChunkingProcessor:
 
                 # Find word boundary near the end position
                 if end_pos < len(text):
-                    end_pos = self._find_word_boundary(text, end_pos, direction="backward")
+                    end_pos = self._find_word_boundary(
+                        text, end_pos, direction="backward"
+                    )
 
                 chunk_text = text[i:end_pos]
                 if chunk_text.strip():
@@ -122,7 +129,9 @@ class ChunkingProcessor:
                 if not sentence:
                     continue
 
-                sentence_size = len(sentence) + (1 if current_chunk else 0)  # +1 for space if not first
+                sentence_size = len(sentence) + (
+                    1 if current_chunk else 0
+                )  # +1 for space if not first
 
                 # If single sentence is too long, split it at word boundaries
                 if len(sentence) > chunk_size:
@@ -135,7 +144,9 @@ class ChunkingProcessor:
                     for j in range(0, len(sentence), chunk_size - chunk_overlap):
                         end_pos = min(j + chunk_size, len(sentence))
                         if end_pos < len(sentence):
-                            end_pos = self._find_word_boundary(sentence, end_pos, direction="backward")
+                            end_pos = self._find_word_boundary(
+                                sentence, end_pos, direction="backward"
+                            )
 
                         sentence_chunk = sentence[j:end_pos].strip()
                         if sentence_chunk:
@@ -166,7 +177,7 @@ class ChunkingProcessor:
 
         elif strategy == ChunkingStrategy.PARAGRAPH:
             # Paragraph-based chunking
-            paragraphs = re.split(r'\n\s*\n', text)
+            paragraphs = re.split(r"\n\s*\n", text)
             current_chunk = []
             current_size = 0
 
@@ -189,7 +200,9 @@ class ChunkingProcessor:
 
                         # Find word boundary near the end position
                         if end_pos < len(paragraph):
-                            end_pos = self._find_word_boundary(paragraph, end_pos, direction="backward")
+                            end_pos = self._find_word_boundary(
+                                paragraph, end_pos, direction="backward"
+                            )
 
                         chunk_text = paragraph[i:end_pos]
                         if chunk_text.strip():
@@ -212,7 +225,9 @@ class ChunkingProcessor:
 
         return document
 
-    def _find_word_boundary(self, text: str, position: int, direction: str = "backward") -> int:
+    def _find_word_boundary(
+        self, text: str, position: int, direction: str = "backward"
+    ) -> int:
         """Find the nearest word boundary from a given position."""
         if position <= 0:
             return 0
@@ -231,11 +246,11 @@ class ChunkingProcessor:
                 if re.match(r'[\s.!?;:,\-\(\)\[\]{}"\'\n\r\t]', char):
                     # Found a boundary, but make sure we're not in the middle of punctuation
                     # Move to the end of the whitespace/punctuation sequence
-                    while i < len(text) and re.match(r'[\s\n\r\t]', text[i]):
+                    while i < len(text) and re.match(r"[\s\n\r\t]", text[i]):
                         i += 1
                     return i
                 # Also check for word boundaries using regex
-                if i > 0 and re.match(r'\w', text[i-1]) and not re.match(r'\w', char):
+                if i > 0 and re.match(r"\w", text[i - 1]) and not re.match(r"\w", char):
                     return i
             return 0
         else:  # forward
@@ -246,7 +261,7 @@ class ChunkingProcessor:
                 if re.match(r'[\s.!?;:,\-\(\)\[\]{}"\'\n\r\t]', char):
                     return i
                 # Also check for word boundaries using regex
-                if i > 0 and re.match(r'\w', text[i-1]) and not re.match(r'\w', char):
+                if i > 0 and re.match(r"\w", text[i - 1]) and not re.match(r"\w", char):
                     return i
             return len(text)
 
@@ -254,14 +269,14 @@ class ChunkingProcessor:
         """Detect sentence boundaries using improved regex patterns."""
         # Enhanced sentence boundary detection
         # Handles abbreviations, decimal numbers, and complex punctuation
-        sentence_pattern = r'''
+        sentence_pattern = r"""
             (?<!\w\.\w.)           # Not preceded by word.word.
             (?<![A-Z][a-z]\.)      # Not preceded by abbreviation like Mr.
             (?<!\d\.\d)            # Not preceded by decimal number
             (?<=\.|\!|\?)          # Preceded by sentence ending punctuation
             \s+                    # Followed by whitespace
             (?=[A-Z])              # Followed by capital letter
-        '''
+        """
 
         boundaries = [0]  # Start of text
         for match in re.finditer(sentence_pattern, text, re.VERBOSE):
@@ -270,7 +285,9 @@ class ChunkingProcessor:
 
         return boundaries
 
-    async def _chunk_by_chapters_fallback(self, document: Document, options: ConversionOptions) -> None:
+    async def _chunk_by_chapters_fallback(
+        self, document: Document, options: ConversionOptions
+    ) -> None:
         """Fallback chapter chunking for non-PDF documents."""
         if not document.raw_text:
             return
@@ -279,15 +296,15 @@ class ChunkingProcessor:
 
         # Chapter detection patterns for general text
         chapter_patterns = [
-            r'^Chapter\s+\d+.*$',  # "Chapter 1", "Chapter 2", etc.
-            r'^CHAPTER\s+\d+.*$',  # "CHAPTER 1", "CHAPTER 2", etc.
-            r'^\d+\.\s+[A-Z][^.]*$',  # "1. Introduction", "2. Methods", etc.
-            r'^[A-Z][A-Z\s]{3,}$',  # All caps titles like "INTRODUCTION"
-            r'^\d+\s+[A-Z][^.]*$',  # "1 Introduction", "2 Methods", etc.
-            r'^#{1,3}\s+.*$',  # Markdown headers "# Title", "## Title", "### Title"
+            r"^Chapter\s+\d+.*$",  # "Chapter 1", "Chapter 2", etc.
+            r"^CHAPTER\s+\d+.*$",  # "CHAPTER 1", "CHAPTER 2", etc.
+            r"^\d+\.\s+[A-Z][^.]*$",  # "1. Introduction", "2. Methods", etc.
+            r"^[A-Z][A-Z\s]{3,}$",  # All caps titles like "INTRODUCTION"
+            r"^\d+\s+[A-Z][^.]*$",  # "1 Introduction", "2 Methods", etc.
+            r"^#{1,3}\s+.*$",  # Markdown headers "# Title", "## Title", "### Title"
         ]
 
-        lines = text.split('\n')
+        lines = text.split("\n")
         current_chapter = ""
         current_chapter_title = ""
         chapter_count = 0
@@ -311,10 +328,7 @@ class ChunkingProcessor:
                     document.add_chunk(
                         content=current_chapter.strip(),
                         section=current_chapter_title,
-                        metadata={
-                            "chapter_number": chapter_count,
-                            "is_chapter": True
-                        }
+                        metadata={"chapter_number": chapter_count, "is_chapter": True},
                     )
 
                 # Start new chapter
@@ -335,26 +349,29 @@ class ChunkingProcessor:
             document.add_chunk(
                 content=current_chapter.strip(),
                 section=current_chapter_title,
-                metadata={
-                    "chapter_number": chapter_count,
-                    "is_chapter": True
-                }
+                metadata={"chapter_number": chapter_count, "is_chapter": True},
             )
 
         logger.info(f"Created {chapter_count} chapters using fallback method")
 
-    async def _chunk_by_pages(self, document: Document, options: ConversionOptions) -> None:
+    async def _chunk_by_pages(
+        self, document: Document, options: ConversionOptions
+    ) -> None:
         """Chunk document by pages using configuration settings."""
         settings = get_settings()
-        max_page_size = getattr(settings, 'max_page_chunk_size', 4000)
+        max_page_size = getattr(settings, "max_page_chunk_size", 4000)
 
         if not document.raw_text:
             return
 
         # For documents without page information, fall back to paragraph chunking
-        if not hasattr(document, 'pages') or not document.pages:
-            logger.info("No page information available, falling back to paragraph chunking")
-            await self._chunk_by_paragraphs_with_page_config(document, options, max_page_size)
+        if not hasattr(document, "pages") or not document.pages:
+            logger.info(
+                "No page information available, falling back to paragraph chunking"
+            )
+            await self._chunk_by_paragraphs_with_page_config(
+                document, options, max_page_size
+            )
             return
 
         # Process each page
@@ -370,17 +387,21 @@ class ChunkingProcessor:
                     metadata={
                         "page_based_chunking": True,
                         "chunk_type": "page",
-                        "page_number": page_num
-                    }
+                        "page_number": page_num,
+                    },
                 )
             else:
                 # Split large pages while preserving page context
-                await self._split_large_page(document, page_content, page_num, max_page_size)
+                await self._split_large_page(
+                    document, page_content, page_num, max_page_size
+                )
 
-    async def _chunk_by_paragraphs_with_page_config(self, document: Document, options: ConversionOptions, max_chunk_size: int) -> None:
+    async def _chunk_by_paragraphs_with_page_config(
+        self, document: Document, options: ConversionOptions, max_chunk_size: int
+    ) -> None:
         """Fallback chunking by paragraphs when page information is not available."""
         text = document.raw_text
-        paragraphs = [p for p in text.split('\n\n') if p.strip()]
+        paragraphs = [p for p in text.split("\n\n") if p.strip()]
 
         current_chunk = []
         current_size = 0
@@ -400,14 +421,16 @@ class ChunkingProcessor:
                         metadata={
                             "page_based_chunking": True,
                             "chunk_type": "paragraph_group",
-                            "fallback_chunking": True
-                        }
+                            "fallback_chunking": True,
+                        },
                     )
                     current_chunk = []
                     current_size = 0
 
                 # Split the long paragraph with word boundary preservation
-                await self._split_long_text(document, paragraph, max_chunk_size, chunk_overlap)
+                await self._split_long_text(
+                    document, paragraph, max_chunk_size, chunk_overlap
+                )
                 continue
 
             current_chunk.append(paragraph)
@@ -420,8 +443,8 @@ class ChunkingProcessor:
                     metadata={
                         "page_based_chunking": True,
                         "chunk_type": "paragraph_group",
-                        "fallback_chunking": True
-                    }
+                        "fallback_chunking": True,
+                    },
                 )
                 current_chunk = []
                 current_size = 0
@@ -434,14 +457,16 @@ class ChunkingProcessor:
                 metadata={
                     "page_based_chunking": True,
                     "chunk_type": "paragraph_group",
-                    "fallback_chunking": True
-                }
+                    "fallback_chunking": True,
+                },
             )
 
-    async def _split_large_page(self, document: Document, page_content: str, page_num: int, max_size: int) -> None:
+    async def _split_large_page(
+        self, document: Document, page_content: str, page_num: int, max_size: int
+    ) -> None:
         """Split a large page into smaller chunks while preserving page context."""
         # Try to split by paragraphs first
-        paragraphs = [p for p in page_content.split('\n\n') if p.strip()]
+        paragraphs = [p for p in page_content.split("\n\n") if p.strip()]
 
         current_chunk = []
         current_size = 0
@@ -465,15 +490,17 @@ class ChunkingProcessor:
                             "chunk_type": "page_split",
                             "page_number": page_num,
                             "chunk_index_on_page": chunk_index,
-                            "is_partial_page": True
-                        }
+                            "is_partial_page": True,
+                        },
                     )
                     current_chunk = []
                     current_size = 0
                     chunk_index += 1
 
                 # Split the long paragraph
-                await self._split_long_text_with_page_context(document, paragraph, page_num, max_size, chunk_index)
+                await self._split_long_text_with_page_context(
+                    document, paragraph, page_num, max_size, chunk_index
+                )
                 continue
 
             # Check if adding this paragraph would exceed size
@@ -487,8 +514,8 @@ class ChunkingProcessor:
                         "chunk_type": "page_split",
                         "page_number": page_num,
                         "chunk_index_on_page": chunk_index,
-                        "is_partial_page": True
-                    }
+                        "is_partial_page": True,
+                    },
                 )
                 current_chunk = []
                 current_size = 0
@@ -508,11 +535,13 @@ class ChunkingProcessor:
                     "chunk_type": "page_split",
                     "page_number": page_num,
                     "chunk_index_on_page": chunk_index,
-                    "is_partial_page": True
-                }
+                    "is_partial_page": True,
+                },
             )
 
-    async def _split_long_text(self, document: Document, text: str, max_size: int, overlap: int) -> None:
+    async def _split_long_text(
+        self, document: Document, text: str, max_size: int, overlap: int
+    ) -> None:
         """Split long text with word boundary preservation."""
         for i in range(0, len(text), max_size - overlap):
             end_pos = min(i + max_size, len(text))
@@ -528,11 +557,18 @@ class ChunkingProcessor:
                     metadata={
                         "page_based_chunking": True,
                         "chunk_type": "split_text",
-                        "fallback_chunking": True
-                    }
+                        "fallback_chunking": True,
+                    },
                 )
 
-    async def _split_long_text_with_page_context(self, document: Document, text: str, page_num: int, max_size: int, start_chunk_index: int) -> None:
+    async def _split_long_text_with_page_context(
+        self,
+        document: Document,
+        text: str,
+        page_num: int,
+        max_size: int,
+        start_chunk_index: int,
+    ) -> None:
         """Split long text with page context preservation."""
         chunk_index = start_chunk_index
         overlap = 200  # Fixed overlap for page splitting
@@ -554,8 +590,8 @@ class ChunkingProcessor:
                         "chunk_type": "page_split",
                         "page_number": page_num,
                         "chunk_index_on_page": chunk_index,
-                        "is_partial_page": True
-                    }
+                        "is_partial_page": True,
+                    },
                 )
                 chunk_index += 1
 

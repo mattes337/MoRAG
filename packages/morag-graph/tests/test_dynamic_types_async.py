@@ -4,24 +4,28 @@ These tests cover the async extraction methods with dynamic types,
 ensuring proper integration with LLM calls and response parsing.
 """
 
-import pytest
-from unittest.mock import Mock, AsyncMock, patch
-from typing import Dict, List, Optional
 import json
+from typing import Dict, List, Optional
+from unittest.mock import AsyncMock, Mock, patch
 
+import pytest
 from morag_graph.extraction import EntityExtractor, RelationExtractor
+
 # Import LLMConfig from morag-reasoning package
 try:
     from morag_reasoning.llm import LLMConfig
 except ImportError:
     # Fallback LLMConfig for compatibility
     from pydantic import BaseModel
+
     class LLMConfig(BaseModel):
         provider: str = "gemini"
         model: str = "gemini-1.5-flash"
         api_key: str = None
         temperature: float = 0.1
         max_tokens: int = 2000
+
+
 from morag_graph.models import Entity, Relation
 
 
@@ -36,14 +40,14 @@ class TestEntityExtractorAsyncDynamicTypes:
                 "name": "John Doe",
                 "type": "PERSON",
                 "confidence": 0.95,
-                "source_text": "John Doe is a researcher"
+                "source_text": "John Doe is a researcher",
             },
             {
                 "name": "COVID-19",
                 "type": "DISEASE",
                 "confidence": 0.98,
-                "source_text": "COVID-19 pandemic"
-            }
+                "source_text": "COVID-19 pandemic",
+            },
         ]
 
     @pytest.fixture
@@ -54,14 +58,14 @@ class TestEntityExtractorAsyncDynamicTypes:
                 "name": "Diabetes",
                 "type": "MEDICAL_CONDITION",
                 "confidence": 0.92,
-                "source_text": "Type 2 diabetes"
+                "source_text": "Type 2 diabetes",
             },
             {
                 "name": "Insulin",
                 "type": "MEDICATION",
                 "confidence": 0.89,
-                "source_text": "insulin therapy"
-            }
+                "source_text": "insulin therapy",
+            },
         ]
 
     @pytest.mark.asyncio
@@ -70,7 +74,7 @@ class TestEntityExtractorAsyncDynamicTypes:
         config = LLMConfig(provider="mock", model="test")
         extractor = EntityExtractor(config)
 
-        with patch.object(extractor, 'call_llm', new_callable=AsyncMock) as mock_llm:
+        with patch.object(extractor, "call_llm", new_callable=AsyncMock) as mock_llm:
             mock_llm.return_value = json.dumps(mock_llm_response_entities)
 
             text = "John Doe is researching COVID-19."
@@ -87,10 +91,15 @@ class TestEntityExtractorAsyncDynamicTypes:
             mock_llm.assert_called_once()
             call_args = mock_llm.call_args[0]
             messages = call_args[0]
-            system_prompt = messages[0]['content']  # Extract the actual system prompt content
+            system_prompt = messages[0][
+                "content"
+            ]  # Extract the actual system prompt content
 
             # Should use dynamic prompt without predefined types
-            assert "semantic meaning" in system_prompt or "not limit yourself" in system_prompt
+            assert (
+                "semantic meaning" in system_prompt
+                or "not limit yourself" in system_prompt
+            )
 
     @pytest.mark.asyncio
     async def test_extract_with_custom_types(self, mock_llm_response_custom_types):
@@ -98,11 +107,11 @@ class TestEntityExtractorAsyncDynamicTypes:
         config = LLMConfig(provider="mock", model="test")
         custom_types = {
             "MEDICAL_CONDITION": "Disease or health condition",
-            "MEDICATION": "Pharmaceutical drug or treatment"
+            "MEDICATION": "Pharmaceutical drug or treatment",
         }
         extractor = EntityExtractor(config, entity_types=custom_types)
 
-        with patch.object(extractor, 'call_llm', new_callable=AsyncMock) as mock_llm:
+        with patch.object(extractor, "call_llm", new_callable=AsyncMock) as mock_llm:
             mock_llm.return_value = json.dumps(mock_llm_response_custom_types)
 
             text = "Type 2 diabetes is treated with insulin therapy."
@@ -119,7 +128,9 @@ class TestEntityExtractorAsyncDynamicTypes:
             mock_llm.assert_called_once()
             call_args = mock_llm.call_args[0]
             messages = call_args[0]
-            system_prompt = messages[0]['content']  # Extract the actual system prompt content
+            system_prompt = messages[0][
+                "content"
+            ]  # Extract the actual system prompt content
 
             # Should contain custom types, not defaults
             assert "- MEDICAL_CONDITION: Disease or health condition" in system_prompt
@@ -134,7 +145,7 @@ class TestEntityExtractorAsyncDynamicTypes:
 
         mock_response = []
 
-        with patch.object(extractor, 'call_llm', new_callable=AsyncMock) as mock_llm:
+        with patch.object(extractor, "call_llm", new_callable=AsyncMock) as mock_llm:
             mock_llm.return_value = json.dumps(mock_response)
 
             text = "Some text to extract from."
@@ -147,7 +158,9 @@ class TestEntityExtractorAsyncDynamicTypes:
             mock_llm.assert_called_once()
             call_args = mock_llm.call_args[0]
             messages = call_args[0]
-            system_prompt = messages[0]['content']  # Extract the actual system prompt content
+            system_prompt = messages[0][
+                "content"
+            ]  # Extract the actual system prompt content
 
             # Should not contain any default types
             assert "- PERSON:" not in system_prompt
@@ -165,11 +178,11 @@ class TestEntityExtractorAsyncDynamicTypes:
                 "name": "fever",
                 "type": "SYMPTOM",
                 "confidence": 0.91,
-                "source_text": "patient has fever"
+                "source_text": "patient has fever",
             }
         ]
 
-        with patch.object(extractor, 'call_llm', new_callable=AsyncMock) as mock_llm:
+        with patch.object(extractor, "call_llm", new_callable=AsyncMock) as mock_llm:
             mock_llm.return_value = json.dumps(mock_response)
 
             text = "Patient presents with fever and fatigue."
@@ -185,8 +198,10 @@ class TestEntityExtractorAsyncDynamicTypes:
             mock_llm.assert_called_once()
             call_args = mock_llm.call_args[0]
             messages = call_args[0]
-            system_prompt = messages[0]['content']  # Extract the actual system prompt content
-            user_prompt = messages[1]['content']  # Extract the user prompt content
+            system_prompt = messages[0][
+                "content"
+            ]  # Extract the actual system prompt content
+            user_prompt = messages[1]["content"]  # Extract the user prompt content
 
             assert "- SYMPTOM: Observable sign of illness" in system_prompt
             assert "Additional context: Focus on medical symptoms" in user_prompt
@@ -203,14 +218,14 @@ class TestRelationExtractorAsyncDynamicTypes:
                 name="John Doe",
                 type="PERSON",
                 source_doc_id="doc_test_abc123",
-                confidence=0.95
+                confidence=0.95,
             ),
             Entity(
                 name="Acme Corp",
                 type="ORGANIZATION",
                 source_doc_id="doc_test_abc123",
-                confidence=0.92
-            )
+                confidence=0.92,
+            ),
         ]
         entities[0].attributes["source_text"] = "John Doe"
         entities[1].attributes["source_text"] = "Acme Corp"
@@ -225,7 +240,7 @@ class TestRelationExtractorAsyncDynamicTypes:
                 "target_entity": "Acme Corp",
                 "relation_type": "WORKS_FOR",
                 "confidence": 0.88,
-                "context": "John Doe works for Acme Corp"
+                "context": "John Doe works for Acme Corp",
             }
         ]
 
@@ -238,17 +253,19 @@ class TestRelationExtractorAsyncDynamicTypes:
                 "target_entity": "patient",
                 "relation_type": "TREATS_PATIENT",
                 "confidence": 0.94,
-                "context": "Dr. Smith treats patient"
+                "context": "Dr. Smith treats patient",
             }
         ]
 
     @pytest.mark.asyncio
-    async def test_extract_with_default_types(self, sample_entities, mock_llm_response_relations):
+    async def test_extract_with_default_types(
+        self, sample_entities, mock_llm_response_relations
+    ):
         """Test async relation extraction with default types."""
         config = LLMConfig(provider="mock", model="test")
         extractor = RelationExtractor(config)
 
-        with patch.object(extractor, 'call_llm', new_callable=AsyncMock) as mock_llm:
+        with patch.object(extractor, "call_llm", new_callable=AsyncMock) as mock_llm:
             mock_llm.return_value = json.dumps(mock_llm_response_relations)
 
             text = "John Doe works for Acme Corp."
@@ -264,22 +281,29 @@ class TestRelationExtractorAsyncDynamicTypes:
             mock_llm.assert_called_once()
             call_args = mock_llm.call_args[0]
             messages = call_args[0]
-            system_prompt = messages[0]['content']  # Extract the actual system prompt content
+            system_prompt = messages[0][
+                "content"
+            ]  # Extract the actual system prompt content
 
             # Should use dynamic prompt without predefined types
-            assert "semantic meaning" in system_prompt or "not limit yourself" in system_prompt
+            assert (
+                "semantic meaning" in system_prompt
+                or "not limit yourself" in system_prompt
+            )
 
     @pytest.mark.asyncio
-    async def test_extract_with_custom_types(self, sample_entities, mock_llm_response_custom_relations):
+    async def test_extract_with_custom_types(
+        self, sample_entities, mock_llm_response_custom_relations
+    ):
         """Test async relation extraction with custom types."""
         config = LLMConfig(provider="mock", model="test")
         custom_types = {
             "TREATS_PATIENT": "Medical professional treats patient",
-            "PRESCRIBES": "Doctor prescribes medication"
+            "PRESCRIBES": "Doctor prescribes medication",
         }
         extractor = RelationExtractor(config, relation_types=custom_types)
 
-        with patch.object(extractor, 'call_llm', new_callable=AsyncMock) as mock_llm:
+        with patch.object(extractor, "call_llm", new_callable=AsyncMock) as mock_llm:
             mock_llm.return_value = json.dumps(mock_llm_response_custom_relations)
 
             # Create entities that match the mock response
@@ -288,14 +312,14 @@ class TestRelationExtractorAsyncDynamicTypes:
                     name="Dr. Smith",
                     type="PERSON",
                     source_doc_id="doc_test_abc123",
-                    confidence=0.95
+                    confidence=0.95,
                 ),
                 Entity(
                     name="patient",
                     type="PERSON",
                     source_doc_id="doc_test_abc123",
-                    confidence=0.92
-                )
+                    confidence=0.92,
+                ),
             ]
             entities[0].attributes["source_text"] = "Dr. Smith"
             entities[1].attributes["source_text"] = "patient"
@@ -307,15 +331,21 @@ class TestRelationExtractorAsyncDynamicTypes:
             assert len(relations) == 1
             assert relations[0].attributes["source_entity_name"] == "Dr. Smith"
             assert relations[0].attributes["target_entity_name"] == "patient"
-            assert relations[0].type == "TREATS_PATIENT"  # Custom types are kept as strings
+            assert (
+                relations[0].type == "TREATS_PATIENT"
+            )  # Custom types are kept as strings
 
             # Verify LLM was called with custom types
             mock_llm.assert_called_once()
             call_args = mock_llm.call_args[0]
             messages = call_args[0]
-            system_prompt = messages[0]['content']  # Extract the actual system prompt content
+            system_prompt = messages[0][
+                "content"
+            ]  # Extract the actual system prompt content
 
-            assert "- TREATS_PATIENT: Medical professional treats patient" in system_prompt
+            assert (
+                "- TREATS_PATIENT: Medical professional treats patient" in system_prompt
+            )
             assert "- PRESCRIBES: Doctor prescribes medication" in system_prompt
             assert "- WORKS_FOR: Person works for" not in system_prompt
 
@@ -327,7 +357,7 @@ class TestRelationExtractorAsyncDynamicTypes:
 
         mock_response = {"relations": []}
 
-        with patch.object(extractor, 'call_llm', new_callable=AsyncMock) as mock_llm:
+        with patch.object(extractor, "call_llm", new_callable=AsyncMock) as mock_llm:
             mock_llm.return_value = json.dumps(mock_response)
 
             text = "Some text with entities."
@@ -340,7 +370,9 @@ class TestRelationExtractorAsyncDynamicTypes:
             mock_llm.assert_called_once()
             call_args = mock_llm.call_args[0]
             messages = call_args[0]
-            system_prompt = messages[0]['content']  # Extract the actual system prompt content
+            system_prompt = messages[0][
+                "content"
+            ]  # Extract the actual system prompt content
 
             # Should not contain default types
             assert "- WORKS_FOR:" not in system_prompt
@@ -359,11 +391,11 @@ class TestRelationExtractorAsyncDynamicTypes:
                 "target_entity": "Acme Corp",
                 "relation_type": "COLLABORATES_WITH",
                 "confidence": 0.87,
-                "context": "collaboration between entities"
+                "context": "collaboration between entities",
             }
         ]
 
-        with patch.object(extractor, 'call_llm', new_callable=AsyncMock) as mock_llm:
+        with patch.object(extractor, "call_llm", new_callable=AsyncMock) as mock_llm:
             mock_llm.return_value = json.dumps(mock_response)
 
             # Create entities that match the mock response
@@ -372,14 +404,14 @@ class TestRelationExtractorAsyncDynamicTypes:
                     name="John",
                     type="PERSON",
                     source_doc_id="doc_test_abc123",
-                    confidence=0.95
+                    confidence=0.95,
                 ),
                 Entity(
                     name="Acme Corp",
                     type="ORGANIZATION",
                     source_doc_id="doc_test_abc123",
-                    confidence=0.92
-                )
+                    confidence=0.92,
+                ),
             ]
             entities[0].attributes["source_text"] = "John"
             entities[1].attributes["source_text"] = "Acme Corp"
@@ -390,7 +422,9 @@ class TestRelationExtractorAsyncDynamicTypes:
 
             # Verify extraction worked
             assert len(relations) == 1
-            assert relations[0].type == "COLLABORATES_WITH"  # Custom types are kept as strings
+            assert (
+                relations[0].type == "COLLABORATES_WITH"
+            )  # Custom types are kept as strings
             assert relations[0].attributes["source_entity_name"] == "John"
             assert relations[0].attributes["target_entity_name"] == "Acme Corp"
 
@@ -398,11 +432,16 @@ class TestRelationExtractorAsyncDynamicTypes:
             mock_llm.assert_called_once()
             call_args = mock_llm.call_args[0]
             messages = call_args[0]
-            system_prompt = messages[0]['content']  # Extract the actual system prompt content
-            user_prompt = messages[1]['content']  # Extract the user prompt content
+            system_prompt = messages[0][
+                "content"
+            ]  # Extract the actual system prompt content
+            user_prompt = messages[1]["content"]  # Extract the user prompt content
 
             assert "- COLLABORATES_WITH: Professional collaboration" in system_prompt
-            assert "Additional context: Focus on professional relationships." in user_prompt
+            assert (
+                "Additional context: Focus on professional relationships."
+                in user_prompt
+            )
 
 
 class TestDynamicTypesErrorHandling:
@@ -415,7 +454,7 @@ class TestDynamicTypesErrorHandling:
         custom_types = {"CUSTOM_TYPE": "Custom entity type"}
         extractor = EntityExtractor(config, entity_types=custom_types)
 
-        with patch.object(extractor, 'call_llm', new_callable=AsyncMock) as mock_llm:
+        with patch.object(extractor, "call_llm", new_callable=AsyncMock) as mock_llm:
             mock_llm.return_value = "Invalid JSON response"
 
             text = "Some text to extract from."
@@ -431,7 +470,7 @@ class TestDynamicTypesErrorHandling:
         custom_types = {"CUSTOM_TYPE": "Custom entity type"}
         extractor = EntityExtractor(config, entity_types=custom_types)
 
-        with patch.object(extractor, 'call_llm', new_callable=AsyncMock) as mock_llm:
+        with patch.object(extractor, "call_llm", new_callable=AsyncMock) as mock_llm:
             mock_llm.return_value = json.dumps({"wrong_field": []})
 
             text = "Some text to extract from."
@@ -450,18 +489,26 @@ class TestDynamicTypesErrorHandling:
         malformed_response = [
             {"name": "Valid Entity", "type": "CUSTOM_TYPE", "confidence": 0.9},
             {"missing_name": "Invalid", "type": "CUSTOM_TYPE"},  # Missing name
-            {"name": "Another Valid", "type": "CUSTOM_TYPE", "confidence": "invalid"}  # Invalid confidence
+            {
+                "name": "Another Valid",
+                "type": "CUSTOM_TYPE",
+                "confidence": "invalid",
+            },  # Invalid confidence
         ]
 
-        with patch.object(extractor, 'call_llm', new_callable=AsyncMock) as mock_llm:
+        with patch.object(extractor, "call_llm", new_callable=AsyncMock) as mock_llm:
             mock_llm.return_value = json.dumps(malformed_response)
 
             text = "Some text to extract from."
             entities = await extractor.extract(text)
 
             # Should extract valid entities and skip malformed ones
-            valid_entities = [e for e in entities if e.name in ["Valid Entity", "Another Valid"]]
-            assert len(valid_entities) >= 1  # At least one valid entity should be extracted
+            valid_entities = [
+                e for e in entities if e.name in ["Valid Entity", "Another Valid"]
+            ]
+            assert (
+                len(valid_entities) >= 1
+            )  # At least one valid entity should be extracted
 
     @pytest.mark.asyncio
     async def test_llm_call_failure_with_custom_types(self):
@@ -470,7 +517,7 @@ class TestDynamicTypesErrorHandling:
         custom_types = {"CUSTOM_TYPE": "Custom entity type"}
         extractor = EntityExtractor(config, entity_types=custom_types)
 
-        with patch.object(extractor, 'call_llm', new_callable=AsyncMock) as mock_llm:
+        with patch.object(extractor, "call_llm", new_callable=AsyncMock) as mock_llm:
             mock_llm.side_effect = Exception("LLM call failed")
 
             text = "Some text to extract from."
@@ -519,7 +566,9 @@ class TestDynamicTypesPerformance:
 
         # Should handle large type sets without errors
         entity_extractor = EntityExtractor(config, entity_types=large_entity_types)
-        relation_extractor = RelationExtractor(config, relation_types=large_relation_types)
+        relation_extractor = RelationExtractor(
+            config, relation_types=large_relation_types
+        )
 
         assert len(entity_extractor.entity_types) == 200
         assert len(relation_extractor.relation_types) == 200

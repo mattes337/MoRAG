@@ -1,12 +1,14 @@
 """LangExtract-based relation extraction that replaces PydanticAI implementation."""
 
-import structlog
-from typing import List, Optional, Dict, Any
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
+from typing import Any, Dict, List, Optional
+
+import structlog
 
 try:
     import langextract as lx
+
     LANGEXTRACT_AVAILABLE = True
 except ImportError:
     LANGEXTRACT_AVAILABLE = False
@@ -32,7 +34,7 @@ class RelationExtractor:
         api_key: Optional[str] = None,
         max_workers: int = 15,  # More workers for parallel processing
         extraction_passes: int = 3,  # More passes for better coverage
-        domain: str = "general"  # Default to general domain, configurable by user
+        domain: str = "general",  # Default to general domain, configurable by user
     ):
         """Initialize the LangExtract relation extractor.
 
@@ -49,7 +51,9 @@ class RelationExtractor:
             domain: Domain for specialized extraction (general, medical, technical, etc.)
         """
         if not LANGEXTRACT_AVAILABLE:
-            raise ImportError("LangExtract is not available. Please install it with: pip install langextract")
+            raise ImportError(
+                "LangExtract is not available. Please install it with: pip install langextract"
+            )
 
         self.min_confidence = min_confidence
         self.chunk_size = chunk_size
@@ -73,6 +77,7 @@ class RelationExtractor:
     def _get_api_key(self) -> Optional[str]:
         """Get API key from environment variables."""
         import os
+
         return os.getenv("LANGEXTRACT_API_KEY") or os.getenv("GOOGLE_API_KEY")
 
     def _get_domain_relation_types(self, domain: str) -> Dict[str, str]:
@@ -84,7 +89,7 @@ class RelationExtractor:
             "part_of": "Membership or component relationship",
             "related_to": "General association or connection",
             "created_by": "Authorship or creation relationship",
-            "used_for": "Purpose or function relationship"
+            "used_for": "Purpose or function relationship",
         }
 
     def _create_relation_prompt(self) -> str:
@@ -112,7 +117,9 @@ class RelationExtractor:
         5. Express the relationship from source to target entity clearly"""
 
         if self.relation_types:
-            type_descriptions = "\n".join([f"- {name}: {desc}" for name, desc in self.relation_types.items()])
+            type_descriptions = "\n".join(
+                [f"- {name}: {desc}" for name, desc in self.relation_types.items()]
+            )
             base_prompt += f"\n\nConsider these domain-specific relationship types as inspiration (but create more specific types as needed):\n{type_descriptions}"
 
         if self.domain and self.domain != "general":
@@ -140,18 +147,18 @@ class RelationExtractor:
                             "source_entity": "person",
                             "target_entity": "organization",
                             "relationship_type": "WORKS_AT",
-                            "role": "employee"
-                        }
-                        ),
-                    ]
-                )
-            ]
+                            "role": "employee",
+                        },
+                    ),
+                ],
+            )
+        ]
 
     async def extract(
         self,
         text: str,
         entities: Optional[List[Entity]] = None,
-        source_doc_id: Optional[str] = None
+        source_doc_id: Optional[str] = None,
     ) -> List[Relation]:
         """Extract relations from text using LangExtract.
 
@@ -168,22 +175,25 @@ class RelationExtractor:
             return []
 
         if not self.api_key:
-            self.logger.warning("No API key found for LangExtract. Set LANGEXTRACT_API_KEY or GOOGLE_API_KEY.")
+            self.logger.warning(
+                "No API key found for LangExtract. Set LANGEXTRACT_API_KEY or GOOGLE_API_KEY."
+            )
             return []
 
         # Define the main extraction function
         async def main_extraction():
             return await asyncio.get_event_loop().run_in_executor(
-                self._executor,
-                self._extract_sync,
-                text,
-                source_doc_id
+                self._executor, self._extract_sync, text, source_doc_id
             )
 
         # Define fallback strategies that don't require API calls
         fallback_strategies = [
-            lambda: self._create_basic_relations_from_entities(entities, text, source_doc_id),
-            lambda: self._create_minimal_relations_from_text(text, entities, source_doc_id)
+            lambda: self._create_basic_relations_from_entities(
+                entities, text, source_doc_id
+            ),
+            lambda: self._create_minimal_relations_from_text(
+                text, entities, source_doc_id
+            ),
         ]
 
         try:
@@ -191,19 +201,21 @@ class RelationExtractor:
             result = await never_fail_extraction(
                 main_extraction,
                 fallback_strategies,
-                operation_name="relation extraction"
+                operation_name="relation extraction",
             )
 
             # Handle empty result case
-            if not result or not hasattr(result, 'extractions'):
+            if not result or not hasattr(result, "extractions"):
                 self.logger.warning(
                     "Relation extraction returned empty result, using fallback relations",
                     text_length=len(text),
                     num_entities=len(entities) if entities else 0,
-                    source_doc_id=source_doc_id
+                    source_doc_id=source_doc_id,
                 )
                 # Return basic relations from entities
-                return self._create_basic_relations_from_entities(entities, text, source_doc_id)
+                return self._create_basic_relations_from_entities(
+                    entities, text, source_doc_id
+                )
 
             # Convert LangExtract results to MoRAG Relation objects
             relations = self._convert_to_relations(result, entities, source_doc_id)
@@ -218,7 +230,7 @@ class RelationExtractor:
                 relations_found=len(relations),
                 source_doc_id=source_doc_id,
                 langextract_extractions=len(result.extractions) if result else 0,
-                domain=self.domain
+                domain=self.domain,
             )
 
             return relations
@@ -231,10 +243,12 @@ class RelationExtractor:
                 error_type=type(e).__name__,
                 text_length=len(text),
                 domain=self.domain,
-                component="langextract_relation_extractor"
+                component="langextract_relation_extractor",
             )
             # Return basic relations as last resort
-            return self._create_basic_relations_from_entities(entities, text, source_doc_id)
+            return self._create_basic_relations_from_entities(
+                entities, text, source_doc_id
+            )
 
     def _extract_sync(self, text: str, source_doc_id: Optional[str]) -> Any:
         """Synchronous extraction using LangExtract with robust error handling."""
@@ -247,40 +261,47 @@ class RelationExtractor:
                 api_key=self.api_key,
                 max_workers=self.max_workers,
                 extraction_passes=self.extraction_passes,
-                max_char_buffer=self.chunk_size
+                max_char_buffer=self.chunk_size,
             )
         except Exception as e:
             error_msg = str(e).lower()
 
             # Check if this is a JSON parsing error from langextract
-            if any(keyword in error_msg for keyword in [
-                'failed to parse content',
-                'expecting value',
-                'expecting \',\' delimiter',
-                'json.decoder.jsondecodeerror',
-                'invalid json'
-            ]):
+            if any(
+                keyword in error_msg
+                for keyword in [
+                    "failed to parse content",
+                    "expecting value",
+                    "expecting ',' delimiter",
+                    "json.decoder.jsondecodeerror",
+                    "invalid json",
+                ]
+            ):
                 self.logger.warning(
                     "LangExtract JSON parsing error, attempting fallback strategies",
                     error=str(e),
                     error_type=type(e).__name__,
                     text_length=len(text),
-                    source_doc_id=source_doc_id
+                    source_doc_id=source_doc_id,
                 )
 
                 # Try fallback strategies
-                return self._extract_with_fallback(text, source_doc_id, original_error=e)
+                return self._extract_with_fallback(
+                    text, source_doc_id, original_error=e
+                )
             else:
                 # Re-raise non-JSON parsing errors
                 raise
 
-    def _extract_with_fallback(self, text: str, source_doc_id: Optional[str], original_error: Exception) -> Any:
+    def _extract_with_fallback(
+        self, text: str, source_doc_id: Optional[str], original_error: Exception
+    ) -> Any:
         """Implement fallback strategies when LangExtract JSON parsing fails."""
         fallback_strategies = [
             self._fallback_smaller_chunks,
             self._fallback_reduced_workers,
             self._fallback_single_pass,
-            self._fallback_minimal_config
+            self._fallback_minimal_config,
         ]
 
         for i, strategy in enumerate(fallback_strategies):
@@ -289,7 +310,7 @@ class RelationExtractor:
                     f"Attempting fallback strategy {i+1}/{len(fallback_strategies)}",
                     strategy=strategy.__name__,
                     text_length=len(text),
-                    source_doc_id=source_doc_id
+                    source_doc_id=source_doc_id,
                 )
 
                 result = strategy(text)
@@ -297,7 +318,9 @@ class RelationExtractor:
                 self.logger.info(
                     f"Fallback strategy {i+1} succeeded",
                     strategy=strategy.__name__,
-                    extractions_found=len(result.extractions) if result and hasattr(result, 'extractions') else 0
+                    extractions_found=len(result.extractions)
+                    if result and hasattr(result, "extractions")
+                    else 0,
                 )
 
                 return result
@@ -307,7 +330,7 @@ class RelationExtractor:
                     f"Fallback strategy {i+1} failed",
                     strategy=strategy.__name__,
                     error=str(e),
-                    error_type=type(e).__name__
+                    error_type=type(e).__name__,
                 )
                 continue
 
@@ -316,7 +339,7 @@ class RelationExtractor:
             "All fallback strategies failed, returning empty result",
             original_error=str(original_error),
             text_length=len(text),
-            source_doc_id=source_doc_id
+            source_doc_id=source_doc_id,
         )
 
         # Create a minimal result object that matches LangExtract's structure
@@ -337,7 +360,9 @@ class RelationExtractor:
             api_key=self.api_key,
             max_workers=self.max_workers,
             extraction_passes=self.extraction_passes,
-            max_char_buffer=min(400, self.chunk_size // 2)  # Halve chunk size, minimum 400
+            max_char_buffer=min(
+                400, self.chunk_size // 2
+            ),  # Halve chunk size, minimum 400
         )
 
     def _fallback_reduced_workers(self, text: str) -> Any:
@@ -350,7 +375,7 @@ class RelationExtractor:
             api_key=self.api_key,
             max_workers=min(3, self.max_workers),  # Reduce to max 3 workers
             extraction_passes=self.extraction_passes,
-            max_char_buffer=self.chunk_size
+            max_char_buffer=self.chunk_size,
         )
 
     def _fallback_single_pass(self, text: str) -> Any:
@@ -363,7 +388,7 @@ class RelationExtractor:
             api_key=self.api_key,
             max_workers=1,  # Single worker
             extraction_passes=1,  # Single pass
-            max_char_buffer=min(600, self.chunk_size)
+            max_char_buffer=min(600, self.chunk_size),
         )
 
     def _fallback_minimal_config(self, text: str) -> Any:
@@ -376,19 +401,19 @@ class RelationExtractor:
             api_key=self.api_key,
             max_workers=1,
             extraction_passes=1,
-            max_char_buffer=300  # Very small chunks
+            max_char_buffer=300,  # Very small chunks
         )
 
     def _convert_to_relations(
         self,
         result: Any,
         entities: Optional[List[Entity]],
-        source_doc_id: Optional[str]
+        source_doc_id: Optional[str],
     ) -> List[Relation]:
         """Convert LangExtract results to MoRAG Relation objects."""
         relations = []
 
-        if not result or not hasattr(result, 'extractions'):
+        if not result or not hasattr(result, "extractions"):
             return relations
 
         # Create comprehensive entity lookup for ID resolution
@@ -400,13 +425,13 @@ class RelationExtractor:
                 entity_lookup[entity.name.lower()] = entity.id
 
                 # Add original name if available from normalization
-                if hasattr(entity, 'attributes') and entity.attributes:
-                    original_name = entity.attributes.get('original_name')
+                if hasattr(entity, "attributes") and entity.attributes:
+                    original_name = entity.attributes.get("original_name")
                     if original_name and original_name.lower() != entity.name.lower():
                         entity_lookup[original_name.lower()] = entity.id
                         self.logger.debug(
                             f"Added entity lookup mapping: '{original_name}' -> '{entity.name}' (ID: {entity.id})",
-                            component="langextract_relation_extractor"
+                            component="langextract_relation_extractor",
                         )
 
         for extraction in result.extractions:
@@ -414,9 +439,11 @@ class RelationExtractor:
                 attrs = extraction.attributes or {}
 
                 # Extract source and target entities from attributes
-                source_entity_name = attrs.get('source_entity', '')
-                target_entity_name = attrs.get('target_entity', '')
-                relationship_type = attrs.get('relationship_type', extraction.extraction_class.upper())
+                source_entity_name = attrs.get("source_entity", "")
+                target_entity_name = attrs.get("target_entity", "")
+                relationship_type = attrs.get(
+                    "relationship_type", extraction.extraction_class.upper()
+                )
 
                 if not source_entity_name or not target_entity_name:
                     continue
@@ -429,22 +456,28 @@ class RelationExtractor:
                 for source_name in source_entities:
                     for target_name in target_entities:
                         # Try to resolve entity IDs with multiple strategies
-                        source_entity_id = self._resolve_entity_id(source_name, entity_lookup)
-                        target_entity_id = self._resolve_entity_id(target_name, entity_lookup)
+                        source_entity_id = self._resolve_entity_id(
+                            source_name, entity_lookup
+                        )
+                        target_entity_id = self._resolve_entity_id(
+                            target_name, entity_lookup
+                        )
 
                         # Skip relation if we can't resolve entity IDs properly
                         if not source_entity_id or not target_entity_id:
                             self.logger.debug(
                                 f"Skipping relation - could not resolve entity IDs for '{source_name}' -> '{target_name}'",
-                                available_entities=list(entity_lookup.keys())[:10],  # Show first 10 for debugging
-                                component="langextract_relation_extractor"
+                                available_entities=list(entity_lookup.keys())[
+                                    :10
+                                ],  # Show first 10 for debugging
+                                component="langextract_relation_extractor",
                             )
                             continue
 
                         # Create updated attributes for this specific relation
                         relation_attrs = attrs.copy()
-                        relation_attrs['source_entity'] = source_name
-                        relation_attrs['target_entity'] = target_name
+                        relation_attrs["source_entity"] = source_name
+                        relation_attrs["target_entity"] = target_name
 
                         # Create relation
                         relation = Relation(
@@ -454,21 +487,23 @@ class RelationExtractor:
                             context=extraction.extraction_text,
                             attributes=relation_attrs,
                             source_doc_id=source_doc_id,
-                            confidence=getattr(extraction, 'confidence', 1.0)
+                            confidence=getattr(extraction, "confidence", 1.0),
                         )
                         relations.append(relation)
 
             except Exception as e:
                 self.logger.warning(
                     "Failed to convert extraction to relation",
-                    extraction_text=getattr(extraction, 'extraction_text', 'unknown'),
-                    error=str(e)
+                    extraction_text=getattr(extraction, "extraction_text", "unknown"),
+                    error=str(e),
                 )
                 continue
 
         return relations
 
-    def _resolve_entity_id(self, entity_name: str, entity_lookup: Dict[str, str]) -> Optional[str]:
+    def _resolve_entity_id(
+        self, entity_name: str, entity_lookup: Dict[str, str]
+    ) -> Optional[str]:
         """Resolve entity ID with multiple strategies to handle normalization."""
         if not entity_name:
             return None
@@ -484,7 +519,7 @@ class RelationExtractor:
         if entity_id:
             self.logger.debug(
                 f"Resolved entity via basic normalization: '{entity_name}' -> '{normalized_name}'",
-                component="langextract_relation_extractor"
+                component="langextract_relation_extractor",
             )
             return entity_id
 
@@ -492,11 +527,12 @@ class RelationExtractor:
         entity_name_lower = entity_name.lower()
         for lookup_name, lookup_id in entity_lookup.items():
             # Check if entity name is contained in lookup name or vice versa
-            if (entity_name_lower in lookup_name and len(entity_name_lower) > 3) or \
-               (lookup_name in entity_name_lower and len(lookup_name) > 3):
+            if (entity_name_lower in lookup_name and len(entity_name_lower) > 3) or (
+                lookup_name in entity_name_lower and len(lookup_name) > 3
+            ):
                 self.logger.debug(
                     f"Resolved entity via partial matching: '{entity_name}' -> '{lookup_name}'",
-                    component="langextract_relation_extractor"
+                    component="langextract_relation_extractor",
                 )
                 return lookup_id
 
@@ -512,7 +548,7 @@ class RelationExtractor:
         filtered_words = words
 
         if filtered_words:
-            normalized = ' '.join(filtered_words)
+            normalized = " ".join(filtered_words)
 
         return normalized
 
@@ -530,7 +566,7 @@ class RelationExtractor:
 
         # Split by comma and clean up each entity name
         entities = []
-        for name in entity_name.split(','):
+        for name in entity_name.split(","):
             cleaned_name = name.strip()
             if cleaned_name:  # Only add non-empty names
                 entities.append(cleaned_name)
@@ -542,10 +578,7 @@ class RelationExtractor:
         return entities
 
     def _create_basic_relations_from_entities(
-        self,
-        entities: Optional[List[Entity]],
-        text: str,
-        source_doc_id: Optional[str]
+        self, entities: Optional[List[Entity]], text: str, source_doc_id: Optional[str]
     ) -> List[Relation]:
         """Create basic relations from entities using simple patterns (no API calls).
 
@@ -562,12 +595,27 @@ class RelationExtractor:
 
             # Basic relation patterns
             relation_patterns = [
-                (r'(\w+(?:\s+\w+)*)\s+(?:works?\s+(?:at|for)|is\s+employed\s+by)\s+(\w+(?:\s+\w+)*)', 'WORKS_FOR'),
-                (r'(\w+(?:\s+\w+)*)\s+(?:founded|established|created)\s+(\w+(?:\s+\w+)*)', 'FOUNDED'),
-                (r'(\w+(?:\s+\w+)*)\s+(?:owns|possesses)\s+(\w+(?:\s+\w+)*)', 'OWNS'),
-                (r'(\w+(?:\s+\w+)*)\s+(?:manages|leads|heads)\s+(\w+(?:\s+\w+)*)', 'MANAGES'),
-                (r'(\w+(?:\s+\w+)*)\s+(?:is\s+located\s+in|is\s+based\s+in)\s+(\w+(?:\s+\w+)*)', 'LOCATED_IN'),
-                (r'(\w+(?:\s+\w+)*)\s+(?:collaborates?\s+with|partners?\s+with)\s+(\w+(?:\s+\w+)*)', 'COLLABORATES_WITH'),
+                (
+                    r"(\w+(?:\s+\w+)*)\s+(?:works?\s+(?:at|for)|is\s+employed\s+by)\s+(\w+(?:\s+\w+)*)",
+                    "WORKS_FOR",
+                ),
+                (
+                    r"(\w+(?:\s+\w+)*)\s+(?:founded|established|created)\s+(\w+(?:\s+\w+)*)",
+                    "FOUNDED",
+                ),
+                (r"(\w+(?:\s+\w+)*)\s+(?:owns|possesses)\s+(\w+(?:\s+\w+)*)", "OWNS"),
+                (
+                    r"(\w+(?:\s+\w+)*)\s+(?:manages|leads|heads)\s+(\w+(?:\s+\w+)*)",
+                    "MANAGES",
+                ),
+                (
+                    r"(\w+(?:\s+\w+)*)\s+(?:is\s+located\s+in|is\s+based\s+in)\s+(\w+(?:\s+\w+)*)",
+                    "LOCATED_IN",
+                ),
+                (
+                    r"(\w+(?:\s+\w+)*)\s+(?:collaborates?\s+with|partners?\s+with)\s+(\w+(?:\s+\w+)*)",
+                    "COLLABORATES_WITH",
+                ),
             ]
 
             # Create entity name lookup
@@ -594,8 +642,8 @@ class RelationExtractor:
                             attributes={
                                 "extraction_method": "pattern_fallback",
                                 "pattern": pattern,
-                                "position": match.start()
-                            }
+                                "position": match.start(),
+                            },
                         )
                         relations.append(relation)
 
@@ -603,7 +651,9 @@ class RelationExtractor:
             if not relations and len(entities) >= 2:
                 # Create relations between entities that appear close to each other
                 for i, entity1 in enumerate(entities[:5]):  # Limit to first 5 entities
-                    for entity2 in entities[i+1:i+3]:  # Connect to next 2 entities
+                    for entity2 in entities[
+                        i + 1 : i + 3
+                    ]:  # Connect to next 2 entities
                         relation = Relation(
                             source_entity_id=entity1.id,
                             target_entity_id=entity2.id,
@@ -613,8 +663,8 @@ class RelationExtractor:
                             source_doc_id=source_doc_id,
                             attributes={
                                 "extraction_method": "proximity_fallback",
-                                "note": "Entities mentioned in proximity"
-                            }
+                                "note": "Entities mentioned in proximity",
+                            },
                         )
                         relations.append(relation)
 
@@ -623,7 +673,7 @@ class RelationExtractor:
                 relations_found=len(relations),
                 num_entities=len(entities),
                 text_length=len(text),
-                source_doc_id=source_doc_id
+                source_doc_id=source_doc_id,
             )
 
             return relations[:10]  # Limit to 10 relations
@@ -632,15 +682,12 @@ class RelationExtractor:
             self.logger.warning(
                 "Pattern-based relation extraction failed",
                 error=str(e),
-                text_length=len(text)
+                text_length=len(text),
             )
             return []
 
     def _create_minimal_relations_from_text(
-        self,
-        text: str,
-        entities: Optional[List[Entity]],
-        source_doc_id: Optional[str]
+        self, text: str, entities: Optional[List[Entity]], source_doc_id: Optional[str]
     ) -> List[Relation]:
         """Create minimal relations from text (absolute fallback).
 
@@ -654,7 +701,7 @@ class RelationExtractor:
         try:
             # Create simple co-occurrence relations between first few entities
             for i, entity1 in enumerate(entities[:3]):  # Limit to first 3 entities
-                for entity2 in entities[i+1:i+2]:  # Connect to next entity only
+                for entity2 in entities[i + 1 : i + 2]:  # Connect to next entity only
                     relation = Relation(
                         source_entity_id=entity1.id,
                         target_entity_id=entity2.id,
@@ -664,8 +711,8 @@ class RelationExtractor:
                         source_doc_id=source_doc_id,
                         attributes={
                             "extraction_method": "minimal_fallback",
-                            "note": "Basic co-occurrence relation"
-                        }
+                            "note": "Basic co-occurrence relation",
+                        },
                     )
                     relations.append(relation)
 
@@ -674,7 +721,7 @@ class RelationExtractor:
                 relations_found=len(relations),
                 num_entities=len(entities),
                 text_length=len(text),
-                source_doc_id=source_doc_id
+                source_doc_id=source_doc_id,
             )
 
             return relations
@@ -683,10 +730,9 @@ class RelationExtractor:
             self.logger.warning(
                 "Minimal relation extraction failed",
                 error=str(e),
-                text_length=len(text)
+                text_length=len(text),
             )
             return []
-
 
     def get_system_prompt(self) -> str:
         """Get the system prompt used by LangExtract."""
@@ -698,5 +744,5 @@ class RelationExtractor:
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """Async context manager exit."""
-        if hasattr(self, '_executor'):
+        if hasattr(self, "_executor"):
             self._executor.shutdown(wait=True)

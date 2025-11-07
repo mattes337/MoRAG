@@ -34,14 +34,14 @@ class DataFileWriter:
         """
         try:
             return {
-                "id": getattr(entity, 'id', None),
-                "name": getattr(entity, 'name', ''),
-                "type": getattr(entity, 'type', 'UNKNOWN'),
-                "confidence": getattr(entity, 'confidence', 0.0),
-                "source_doc_id": getattr(entity, 'source_doc_id', ''),
-                "metadata": getattr(entity, 'metadata', {}),
-                "created_at": getattr(entity, 'created_at', None),
-                "updated_at": getattr(entity, 'updated_at', None)
+                "id": getattr(entity, "id", None),
+                "name": getattr(entity, "name", ""),
+                "type": getattr(entity, "type", "UNKNOWN"),
+                "confidence": getattr(entity, "confidence", 0.0),
+                "source_doc_id": getattr(entity, "source_doc_id", ""),
+                "metadata": getattr(entity, "metadata", {}),
+                "created_at": getattr(entity, "created_at", None),
+                "updated_at": getattr(entity, "updated_at", None),
             }
         except Exception as e:
             logger.warning(f"Failed to serialize entity: {str(e)}")
@@ -58,15 +58,15 @@ class DataFileWriter:
         """
         try:
             return {
-                "id": getattr(relation, 'id', None),
-                "source_entity_id": getattr(relation, 'source_entity_id', ''),
-                "target_entity_id": getattr(relation, 'target_entity_id', ''),
-                "type": getattr(relation, 'type', 'RELATED_TO'),
-                "confidence": getattr(relation, 'confidence', 0.0),
-                "source_doc_id": getattr(relation, 'source_doc_id', ''),
-                "metadata": getattr(relation, 'metadata', {}),
-                "created_at": getattr(relation, 'created_at', None),
-                "updated_at": getattr(relation, 'updated_at', None)
+                "id": getattr(relation, "id", None),
+                "source_entity_id": getattr(relation, "source_entity_id", ""),
+                "target_entity_id": getattr(relation, "target_entity_id", ""),
+                "type": getattr(relation, "type", "RELATED_TO"),
+                "confidence": getattr(relation, "confidence", 0.0),
+                "source_doc_id": getattr(relation, "source_doc_id", ""),
+                "metadata": getattr(relation, "metadata", {}),
+                "created_at": getattr(relation, "created_at", None),
+                "updated_at": getattr(relation, "updated_at", None),
             }
         except Exception as e:
             logger.warning(f"Failed to serialize relation: {str(e)}")
@@ -85,19 +85,16 @@ class DataFileWriter:
             if isinstance(chunk, tuple) and len(chunk) == 2:
                 # Handle (content, metadata) tuple format
                 content, metadata = chunk
-                return {
-                    "content": content,
-                    "metadata": metadata or {}
-                }
+                return {"content": content, "metadata": metadata or {}}
             else:
                 # Handle object format
                 return {
-                    "id": getattr(chunk, 'id', None),
-                    "content": getattr(chunk, 'content', getattr(chunk, 'text', '')),
-                    "metadata": getattr(chunk, 'metadata', {}),
-                    "chunk_index": getattr(chunk, 'chunk_index', None),
-                    "start_char": getattr(chunk, 'start_char', None),
-                    "end_char": getattr(chunk, 'end_char', None)
+                    "id": getattr(chunk, "id", None),
+                    "content": getattr(chunk, "content", getattr(chunk, "text", "")),
+                    "metadata": getattr(chunk, "metadata", {}),
+                    "chunk_index": getattr(chunk, "chunk_index", None),
+                    "start_char": getattr(chunk, "start_char", None),
+                    "end_char": getattr(chunk, "end_char", None),
                 }
         except Exception as e:
             logger.warning(f"Failed to serialize chunk: {str(e)}")
@@ -112,7 +109,7 @@ class DataFileWriter:
         summary: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
         processing_result: Optional[ProcessingResult] = None,
-        graph_result: Optional[Any] = None
+        graph_result: Optional[Any] = None,
     ) -> Path:
         """Write processing data to a JSON file.
 
@@ -146,17 +143,21 @@ class DataFileWriter:
                 "summary": summary or "",
                 "metadata": metadata or {},
                 "processing_result": None,
-                "graph_result": None
+                "graph_result": None,
             }
 
             # Serialize entities
             if entities:
-                data["entities"] = [self._serialize_entity(entity) for entity in entities]
+                data["entities"] = [
+                    self._serialize_entity(entity) for entity in entities
+                ]
                 logger.info(f"Serialized {len(entities)} entities")
 
             # Serialize relations
             if relations:
-                data["relations"] = [self._serialize_relation(relation) for relation in relations]
+                data["relations"] = [
+                    self._serialize_relation(relation) for relation in relations
+                ]
                 logger.info(f"Serialized {len(relations)} relations")
 
             # Serialize chunks
@@ -168,7 +169,9 @@ class DataFileWriter:
             if processing_result:
                 try:
                     data["processing_result"] = {
-                        "content_type": str(processing_result.content_type) if processing_result.content_type else None,
+                        "content_type": str(processing_result.content_type)
+                        if processing_result.content_type
+                        else None,
                         "content_path": processing_result.content_path,
                         "content_url": processing_result.content_url,
                         "text_content": processing_result.text_content,
@@ -177,29 +180,35 @@ class DataFileWriter:
                         "processing_time": processing_result.processing_time,
                         "success": processing_result.success,
                         "error_message": processing_result.error_message,
-                        "raw_result": processing_result.raw_result
+                        "raw_result": processing_result.raw_result,
                     }
                 except Exception as e:
                     logger.warning(f"Failed to serialize processing result: {str(e)}")
-                    data["processing_result"] = {"error": f"Failed to serialize: {str(e)}"}
+                    data["processing_result"] = {
+                        "error": f"Failed to serialize: {str(e)}"
+                    }
 
             # Serialize graph result
             if graph_result:
                 try:
                     data["graph_result"] = {
-                        "success": getattr(graph_result, 'success', False),
-                        "entities_count": getattr(graph_result, 'entities_count', 0),
-                        "relations_count": getattr(graph_result, 'relations_count', 0),
-                        "processing_time": getattr(graph_result, 'processing_time', 0.0),
-                        "error_message": getattr(graph_result, 'error_message', None),
-                        "database_results": getattr(graph_result, 'database_results', [])
+                        "success": getattr(graph_result, "success", False),
+                        "entities_count": getattr(graph_result, "entities_count", 0),
+                        "relations_count": getattr(graph_result, "relations_count", 0),
+                        "processing_time": getattr(
+                            graph_result, "processing_time", 0.0
+                        ),
+                        "error_message": getattr(graph_result, "error_message", None),
+                        "database_results": getattr(
+                            graph_result, "database_results", []
+                        ),
                     }
                 except Exception as e:
                     logger.warning(f"Failed to serialize graph result: {str(e)}")
                     data["graph_result"] = {"error": f"Failed to serialize: {str(e)}"}
 
             # Write to file
-            with open(output_path, 'w', encoding='utf-8') as f:
+            with open(output_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, ensure_ascii=False, default=str)
 
             logger.info(f"Data file written successfully: {output_path}")
@@ -219,7 +228,7 @@ class DataFileWriter:
             Dictionary containing the processing data
         """
         try:
-            with open(data_file_path, 'r', encoding='utf-8') as f:
+            with open(data_file_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
 
             logger.info(f"Data file read successfully: {data_file_path}")
@@ -229,7 +238,9 @@ class DataFileWriter:
             logger.error(f"Failed to read data file {data_file_path}: {str(e)}")
             raise
 
-    def generate_filename_for_source(self, source_path: str, suffix: str = "data") -> str:
+    def generate_filename_for_source(
+        self, source_path: str, suffix: str = "data"
+    ) -> str:
         """Generate a data filename for a given source path.
 
         Args:

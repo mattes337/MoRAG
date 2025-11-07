@@ -1,7 +1,8 @@
 """Base operations class for Neo4j storage operations."""
 
 import logging
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
+
 from neo4j import AsyncDriver, AsyncSession
 
 logger = logging.getLogger(__name__)
@@ -21,9 +22,7 @@ class BaseOperations:
         self.database = database
 
     async def _execute_query(
-        self,
-        query: str,
-        parameters: Optional[Dict[str, Any]] = None
+        self, query: str, parameters: Optional[Dict[str, Any]] = None
     ) -> List[Dict[str, Any]]:
         """Execute a Cypher query.
 

@@ -3,18 +3,19 @@
 import asyncio
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
 
-import aiohttp
 import aiofiles
+import aiohttp
 
-from .models import AudioSegment, AudioConfig
+from .models import AudioConfig, AudioSegment
 
 logger = logging.getLogger(__name__)
 
 
 class RestTranscriptionError(Exception):
     """Exception raised for REST transcription errors."""
+
     pass
 
 
@@ -29,9 +30,13 @@ class RestTranscriptionService:
         """
         self.config = config
         if not config.openai_api_key:
-            raise RestTranscriptionError("OpenAI API key is required for REST transcription")
+            raise RestTranscriptionError(
+                "OpenAI API key is required for REST transcription"
+            )
 
-    async def transcribe_audio(self, audio_path: Path) -> tuple[str, List[AudioSegment], str]:
+    async def transcribe_audio(
+        self, audio_path: Path
+    ) -> tuple[str, List[AudioSegment], str]:
         """Transcribe audio file using OpenAI Whisper API.
 
         Args:
@@ -47,27 +52,28 @@ class RestTranscriptionService:
         try:
             # Prepare the API request
             url = f"{self.config.api_base_url}/audio/transcriptions"
-            headers = {
-                "Authorization": f"Bearer {self.config.openai_api_key}"
-            }
+            headers = {"Authorization": f"Bearer {self.config.openai_api_key}"}
 
             # Prepare form data
             data = aiohttp.FormData()
 
             # Read and add the audio file
-            async with aiofiles.open(audio_path, 'rb') as audio_file:
+            async with aiofiles.open(audio_path, "rb") as audio_file:
                 audio_content = await audio_file.read()
-                data.add_field('file', audio_content,
-                             filename=audio_path.name,
-                             content_type='audio/mpeg')
+                data.add_field(
+                    "file",
+                    audio_content,
+                    filename=audio_path.name,
+                    content_type="audio/mpeg",
+                )
 
             # Add other parameters
-            data.add_field('model', 'whisper-1')
-            data.add_field('response_format', 'verbose_json')
-            data.add_field('timestamp_granularities[]', 'segment')
+            data.add_field("model", "whisper-1")
+            data.add_field("response_format", "verbose_json")
+            data.add_field("timestamp_granularities[]", "segment")
 
             if self.config.language:
-                data.add_field('language', self.config.language)
+                data.add_field("language", self.config.language)
 
             # Make the API request
             timeout = aiohttp.ClientTimeout(total=self.config.timeout)
@@ -82,9 +88,9 @@ class RestTranscriptionService:
                     result = await response.json()
 
             # Parse the response
-            transcript_text = result.get('text', '')
-            detected_language = result.get('language', 'unknown')
-            segments = self._parse_segments(result.get('segments', []))
+            transcript_text = result.get("text", "")
+            detected_language = result.get("language", "unknown")
+            segments = self._parse_segments(result.get("segments", []))
 
             logger.info(f"Successfully transcribed audio with {len(segments)} segments")
             return transcript_text, segments, detected_language
@@ -108,13 +114,13 @@ class RestTranscriptionService:
 
         for segment in api_segments:
             audio_segment = AudioSegment(
-                start=float(segment.get('start', 0.0)),
-                end=float(segment.get('end', 0.0)),
-                text=segment.get('text', '').strip(),
+                start=float(segment.get("start", 0.0)),
+                end=float(segment.get("end", 0.0)),
+                text=segment.get("text", "").strip(),
                 speaker=None,  # OpenAI API doesn't provide speaker info
                 confidence=None,  # OpenAI API doesn't provide confidence scores
                 topic_id=None,
-                topic_label=None
+                topic_label=None,
             )
             segments.append(audio_segment)
 
@@ -175,6 +181,7 @@ class RestTranscriptionService:
             Confidence score between 0 and 1
         """
         import math
+
         if logprob == 0.0:
             return 1.0
         # Convert log probability to confidence using exponential

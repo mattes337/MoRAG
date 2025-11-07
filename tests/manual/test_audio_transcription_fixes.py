@@ -10,9 +10,9 @@ This script tests the following fixes:
 """
 
 import asyncio
+import os
 import sys
 import tempfile
-import os
 from pathlib import Path
 
 # Add the project root to the Python path
@@ -20,11 +20,11 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 from src.morag.converters.audio import AudioConverter
-from src.morag.converters.video import VideoConverter
 from src.morag.converters.base import ConversionOptions
-from src.morag.processors.audio import AudioProcessor, AudioConfig
-from src.morag.processors.video import VideoProcessor, VideoConfig
+from src.morag.converters.video import VideoConverter
 from src.morag.core.config import settings
+from src.morag.processors.audio import AudioConfig, AudioProcessor
+from src.morag.processors.video import VideoConfig, VideoProcessor
 
 
 async def test_audio_transcription_fixes():
@@ -44,7 +44,7 @@ async def test_audio_transcription_fixes():
     audio_config = AudioConfig(
         model_size="large-v3",  # Use best quality model
         enable_diarization=True,
-        language=None  # Auto-detect
+        language=None,  # Auto-detect
     )
 
     audio_processor = AudioProcessor(config=audio_config)
@@ -70,28 +70,41 @@ async def test_mock_audio_processing():
 
     # Create mock audio processing result
     from src.morag.processors.audio import AudioProcessingResult, AudioTranscriptSegment
-    from src.morag.services.speaker_diarization import DiarizationResult, SpeakerInfo, SpeakerSegment
-    from src.morag.services.topic_segmentation import TopicSegmentationResult, TopicSegment
+    from src.morag.services.speaker_diarization import (
+        DiarizationResult,
+        SpeakerInfo,
+        SpeakerSegment,
+    )
+    from src.morag.services.topic_segmentation import (
+        TopicSegment,
+        TopicSegmentationResult,
+    )
 
     # Mock transcript segments
     segments = [
-        AudioTranscriptSegment("Hello, welcome to our discussion.", 0.0, 3.0, 0.95, "en"),
-        AudioTranscriptSegment("Thank you for having me here today.", 3.5, 6.0, 0.92, "en"),
-        AudioTranscriptSegment("Let's talk about the main topic.", 6.5, 9.0, 0.88, "en"),
+        AudioTranscriptSegment(
+            "Hello, welcome to our discussion.", 0.0, 3.0, 0.95, "en"
+        ),
+        AudioTranscriptSegment(
+            "Thank you for having me here today.", 3.5, 6.0, 0.92, "en"
+        ),
+        AudioTranscriptSegment(
+            "Let's talk about the main topic.", 6.5, 9.0, 0.88, "en"
+        ),
         AudioTranscriptSegment("That sounds like a great idea.", 9.5, 12.0, 0.90, "en"),
     ]
 
     # Mock speaker diarization
     speakers = [
         SpeakerInfo("SPEAKER_00", 15.0, 2, 15.0, [0.95, 0.88], 0.0, 15.0),
-        SpeakerInfo("SPEAKER_01", 9.0, 2, 9.0, [0.92, 0.90], 3.5, 12.0)
+        SpeakerInfo("SPEAKER_01", 9.0, 2, 9.0, [0.92, 0.90], 3.5, 12.0),
     ]
 
     speaker_segments = [
         SpeakerSegment("SPEAKER_00", 0.0, 3.0, 3.0, 0.95),
         SpeakerSegment("SPEAKER_01", 3.5, 6.0, 2.5, 0.92),
         SpeakerSegment("SPEAKER_00", 6.5, 9.0, 2.5, 0.88),
-        SpeakerSegment("SPEAKER_01", 9.5, 12.0, 2.5, 0.90)
+        SpeakerSegment("SPEAKER_01", 9.5, 12.0, 2.5, 0.90),
     ]
 
     diarization_result = DiarizationResult(
@@ -102,7 +115,7 @@ async def test_mock_audio_processing():
         speaker_overlap_time=0.0,
         processing_time=1.5,
         model_used="pyannote/speaker-diarization-3.1",
-        confidence_threshold=0.5
+        confidence_threshold=0.5,
     )
 
     # Mock topic segmentation
@@ -111,26 +124,32 @@ async def test_mock_audio_processing():
             topic_id="topic_1",
             title="Introduction",
             summary="",  # No summary as requested
-            sentences=["Hello, welcome to our discussion.", "Thank you for having me here today."],
+            sentences=[
+                "Hello, welcome to our discussion.",
+                "Thank you for having me here today.",
+            ],
             start_time=0.0,
             end_time=6.0,
             duration=6.0,
             confidence=0.8,
             keywords=["hello", "welcome", "discussion"],
-            speaker_distribution={"SPEAKER_00": 50.0, "SPEAKER_01": 50.0}
+            speaker_distribution={"SPEAKER_00": 50.0, "SPEAKER_01": 50.0},
         ),
         TopicSegment(
             topic_id="topic_2",
             title="Main Discussion",
             summary="",  # No summary as requested
-            sentences=["Let's talk about the main topic.", "That sounds like a great idea."],
+            sentences=[
+                "Let's talk about the main topic.",
+                "That sounds like a great idea.",
+            ],
             start_time=6.5,
             end_time=12.0,
             duration=5.5,
             confidence=0.8,
             keywords=["talk", "topic", "idea"],
-            speaker_distribution={"SPEAKER_00": 45.5, "SPEAKER_01": 54.5}
-        )
+            speaker_distribution={"SPEAKER_00": 45.5, "SPEAKER_01": 54.5},
+        ),
     ]
 
     topic_result = TopicSegmentationResult(
@@ -139,7 +158,7 @@ async def test_mock_audio_processing():
         processing_time=0.8,
         model_used="all-MiniLM-L6-v2",
         similarity_threshold=0.7,
-        segmentation_method="semantic_embedding"
+        segmentation_method="semantic_embedding",
     )
 
     # Mock audio processing result
@@ -150,31 +169,36 @@ async def test_mock_audio_processing():
         duration=12.0,
         segments=segments,
         metadata={
-            'filename': 'test_audio.mp3',
-            'model_used': 'large-v3',
-            'processor_used': 'Enhanced Audio Processor'
+            "filename": "test_audio.mp3",
+            "model_used": "large-v3",
+            "processor_used": "Enhanced Audio Processor",
         },
         processing_time=2.5,
-        model_used='large-v3',
+        model_used="large-v3",
         speaker_diarization=diarization_result,
-        topic_segmentation=topic_result
+        topic_segmentation=topic_result,
     )
 
     # Test conversion
     from src.morag.converters.audio import AudioConverter
+
     converter = AudioConverter()
     options = ConversionOptions()
 
     # Create temporary file for testing
-    with tempfile.NamedTemporaryFile(suffix='.mp3', delete=False) as tmp_file:
+    with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as tmp_file:
         tmp_path = Path(tmp_file.name)
 
     try:
         # Create enhanced result structure first
-        enhanced_result = await converter._create_enhanced_result_structure(audio_result, options)
+        enhanced_result = await converter._create_enhanced_result_structure(
+            audio_result, options
+        )
 
         # Test enhanced markdown creation
-        markdown = await converter._create_enhanced_structured_markdown(enhanced_result, options)
+        markdown = await converter._create_enhanced_structured_markdown(
+            enhanced_result, options
+        )
 
         print("📝 Generated Markdown:")
         print("-" * 60)
@@ -228,19 +252,23 @@ async def test_real_audio_processing(audio_path: Path, converter: AudioConverter
         options = ConversionOptions(
             include_metadata=True,
             format_specific={
-                'audio': {
-                    'enable_diarization': True,
-                    'include_timestamps': True,
-                    'model': 'large-v3'
+                "audio": {
+                    "enable_diarization": True,
+                    "include_timestamps": True,
+                    "model": "large-v3",
                 }
-            }
+            },
         )
 
         result = await converter.convert(audio_path, options)
 
         print("📝 Generated Markdown:")
         print("-" * 60)
-        print(result.content[:1000] + "..." if len(result.content) > 1000 else result.content)
+        print(
+            result.content[:1000] + "..."
+            if len(result.content) > 1000
+            else result.content
+        )
         print("-" * 60)
         print()
 
@@ -269,7 +297,9 @@ if __name__ == "__main__":
     asyncio.run(test_video_transcription_fixes())
 
     print("\n🎯 Summary of Fixes Applied:")
-    print("1. ✅ Topic timestamps now show single start seconds: # Discussion Topic 2 [123]")
+    print(
+        "1. ✅ Topic timestamps now show single start seconds: # Discussion Topic 2 [123]"
+    )
     print("2. ✅ Speaker diarization shows actual speaker IDs (SPEAKER_00, SPEAKER_01)")
     print("3. ✅ Topic summaries removed from output")
     print("4. ✅ Improved STT quality with large-v3 model and enhanced settings")

@@ -1,40 +1,52 @@
 """Key fact extraction service for intelligent retrieval."""
 
-import structlog
-from typing import List, Optional, Dict, Any
-from pydantic_ai import Agent
-from pydantic import BaseModel, Field
+from typing import Any, Dict, List, Optional
 
+import structlog
+from morag_reasoning.intelligent_retrieval_models import (
+    FactExtractionRequest,
+    KeyFact,
+    SourceInfo,
+)
 from morag_reasoning.llm import LLMClient
-from morag_reasoning.intelligent_retrieval_models import KeyFact, SourceInfo, FactExtractionRequest
+from pydantic import BaseModel, Field
+from pydantic_ai import Agent
 
 
 class ExtractedFacts(BaseModel):
     """Result of fact extraction from chunks."""
+
     facts: List[KeyFact] = Field(..., description="Extracted key facts")
 
 
 class FactSourceMapping(BaseModel):
     """Mapping of facts to their supporting chunks."""
+
     fact_index: int = Field(..., description="Index of the fact in the facts list")
-    supporting_chunk_indices: List[int] = Field(..., description="Indices of chunks that support this fact")
-    confidence: float = Field(ge=0.0, le=1.0, description="Confidence in the source mapping")
-    reasoning: str = Field(..., description="Reasoning for why these chunks support the fact")
+    supporting_chunk_indices: List[int] = Field(
+        ..., description="Indices of chunks that support this fact"
+    )
+    confidence: float = Field(
+        ge=0.0, le=1.0, description="Confidence in the source mapping"
+    )
+    reasoning: str = Field(
+        ..., description="Reasoning for why these chunks support the fact"
+    )
 
 
 class SourceMappingResult(BaseModel):
     """Result of source mapping analysis."""
-    mappings: List[FactSourceMapping] = Field(..., description="Fact to source mappings")
+
+    mappings: List[FactSourceMapping] = Field(
+        ..., description="Fact to source mappings"
+    )
 
 
 class FactExtractionService:
     """Service for extracting key facts from retrieved chunks."""
 
     def __init__(
-        self,
-        llm_client: LLMClient,
-        min_confidence: float = 0.5,
-        max_facts: int = 10000
+        self, llm_client: LLMClient, min_confidence: float = 0.5, max_facts: int = 10000
     ):
         """Initialize the fact extraction service.
 
@@ -52,14 +64,14 @@ class FactExtractionService:
         self.agent = Agent(
             model=llm_client.get_model(),
             result_type=ExtractedFacts,
-            system_prompt=self._get_system_prompt()
+            system_prompt=self._get_system_prompt(),
         )
 
         # Create PydanticAI agent for source mapping
         self.source_mapping_agent = Agent(
             model=llm_client.get_model(),
             result_type=SourceMappingResult,
-            system_prompt=self._get_source_mapping_prompt()
+            system_prompt=self._get_source_mapping_prompt(),
         )
 
     def _get_system_prompt(self) -> str:
@@ -100,7 +112,7 @@ Return only the most relevant and well-supported facts."""
         query: str,
         chunks: List[Dict[str, Any]],
         max_facts: Optional[int] = None,
-        min_confidence: Optional[float] = None
+        min_confidence: Optional[float] = None,
     ) -> List[KeyFact]:
         """Extract key facts from retrieved chunks.
 
@@ -123,7 +135,7 @@ Return only the most relevant and well-supported facts."""
             "Starting fact extraction",
             query=query,
             num_chunks=len(chunks),
-            max_facts=max_facts_limit
+            max_facts=max_facts_limit,
         )
 
         try:
@@ -137,13 +149,13 @@ Return only the most relevant and well-supported facts."""
                     chunk_text = chunk
                     # Create minimal metadata for string chunks
                     chunk_dict = {
-                        'text': chunk,
-                        'content': chunk,
-                        'chunk_id': f'chunk_{i}',
-                        'document_name': f'Document {i+1}'
+                        "text": chunk,
+                        "content": chunk,
+                        "chunk_id": f"chunk_{i}",
+                        "document_name": f"Document {i+1}",
                     }
                 else:
-                    chunk_text = chunk.get('text', chunk.get('content', ''))
+                    chunk_text = chunk.get("text", chunk.get("content", ""))
                     chunk_dict = chunk
 
                 if chunk_text:
@@ -175,15 +187,14 @@ Return only the most relevant and well-supported facts."""
 
             # Sort by relevance and confidence, then limit
             enhanced_facts.sort(
-                key=lambda f: (f.relevance_to_query, f.confidence),
-                reverse=True
+                key=lambda f: (f.relevance_to_query, f.confidence), reverse=True
             )
             enhanced_facts = enhanced_facts[:max_facts_limit]
 
             self.logger.info(
                 "Fact extraction completed",
                 total_facts=len(enhanced_facts),
-                query=query
+                query=query,
             )
 
             return enhanced_facts
@@ -193,7 +204,7 @@ Return only the most relevant and well-supported facts."""
                 "Fact extraction failed",
                 error=str(e),
                 error_type=type(e).__name__,
-                query=query
+                query=query,
             )
             raise
 
@@ -254,10 +265,7 @@ Guidelines:
 Return mappings with high confidence only for clear, direct support."""
 
     async def _map_facts_to_sources(
-        self,
-        facts: List[KeyFact],
-        chunk_metadata: List[Dict[str, Any]],
-        query: str
+        self, facts: List[KeyFact], chunk_metadata: List[Dict[str, Any]], query: str
     ) -> List[KeyFact]:
         """Map facts to their supporting source chunks using LLM analysis.
 
@@ -274,15 +282,19 @@ Return mappings with high confidence only for clear, direct support."""
 
         try:
             # Create prompt for source mapping
-            facts_text = "\n".join([
-                f"Fact {i}: {fact.fact} (Type: {fact.fact_type}, Confidence: {fact.confidence:.2f})"
-                for i, fact in enumerate(facts)
-            ])
+            facts_text = "\n".join(
+                [
+                    f"Fact {i}: {fact.fact} (Type: {fact.fact_type}, Confidence: {fact.confidence:.2f})"
+                    for i, fact in enumerate(facts)
+                ]
+            )
 
-            chunks_text = "\n".join([
-                f"Chunk {i}: {chunk.get('text', chunk.get('content', ''))[:500]}..."
-                for i, chunk in enumerate(chunk_metadata)
-            ])
+            chunks_text = "\n".join(
+                [
+                    f"Chunk {i}: {chunk.get('text', chunk.get('content', ''))[:500]}..."
+                    for i, chunk in enumerate(chunk_metadata)
+                ]
+            )
 
             prompt = f"""Original Query: {query}
 
@@ -308,14 +320,23 @@ Analyze which chunks support each fact. For each fact, identify the chunk indice
                         if 0 <= chunk_idx < len(chunk_metadata):
                             chunk = chunk_metadata[chunk_idx]
                             source = SourceInfo(
-                                document_id=chunk.get('document_id', f"doc_{chunk_idx}"),
-                                chunk_id=chunk.get('chunk_id', chunk.get('id', f"chunk_{chunk_idx}")),
-                                document_name=chunk.get('document_name', chunk.get('source', f"Document {chunk_idx+1}")),
-                                chunk_text=chunk.get('text', chunk.get('content', '')),
-                                relevance_score=chunk.get('score', chunk.get('relevance_score', 0.5)),
-                                page_number=chunk.get('page_number'),
-                                section=chunk.get('section'),
-                                metadata=chunk.get('metadata', {})
+                                document_id=chunk.get(
+                                    "document_id", f"doc_{chunk_idx}"
+                                ),
+                                chunk_id=chunk.get(
+                                    "chunk_id", chunk.get("id", f"chunk_{chunk_idx}")
+                                ),
+                                document_name=chunk.get(
+                                    "document_name",
+                                    chunk.get("source", f"Document {chunk_idx+1}"),
+                                ),
+                                chunk_text=chunk.get("text", chunk.get("content", "")),
+                                relevance_score=chunk.get(
+                                    "score", chunk.get("relevance_score", 0.5)
+                                ),
+                                page_number=chunk.get("page_number"),
+                                section=chunk.get("section"),
+                                metadata=chunk.get("metadata", {}),
                             )
                             supporting_sources.append(source)
 
@@ -323,15 +344,14 @@ Analyze which chunks support each fact. For each fact, identify the chunk indice
 
             # For facts without mapped sources, provide fallback
             for fact in facts:
-                if not hasattr(fact, 'sources') or not fact.sources:
+                if not hasattr(fact, "sources") or not fact.sources:
                     fact.sources = []
 
             return facts
 
         except Exception as e:
             self.logger.warning(
-                "Source mapping failed, falling back to basic source info",
-                error=str(e)
+                "Source mapping failed, falling back to basic source info", error=str(e)
             )
             # Fallback to original method
             for fact in facts:
@@ -339,9 +359,7 @@ Analyze which chunks support each fact. For each fact, identify the chunk indice
             return facts
 
     def _create_source_info(
-        self,
-        fact: KeyFact,
-        chunk_metadata: List[Dict[str, Any]]
+        self, fact: KeyFact, chunk_metadata: List[Dict[str, Any]]
     ) -> List[SourceInfo]:
         """Create source information for a fact.
 
@@ -359,22 +377,23 @@ Analyze which chunks support each fact. For each fact, identify the chunk indice
         # which specific chunks support each fact
         for i, chunk in enumerate(chunk_metadata):
             source = SourceInfo(
-                document_id=chunk.get('document_id', f"doc_{i}"),
-                chunk_id=chunk.get('chunk_id', chunk.get('id', f"chunk_{i}")),
-                document_name=chunk.get('document_name', chunk.get('source', f"Document {i+1}")),
-                chunk_text=chunk.get('content', chunk.get('text', '')),
-                relevance_score=chunk.get('score', chunk.get('relevance_score', 0.5)),
-                page_number=chunk.get('page_number'),
-                section=chunk.get('section'),
-                metadata=chunk.get('metadata', {})
+                document_id=chunk.get("document_id", f"doc_{i}"),
+                chunk_id=chunk.get("chunk_id", chunk.get("id", f"chunk_{i}")),
+                document_name=chunk.get(
+                    "document_name", chunk.get("source", f"Document {i+1}")
+                ),
+                chunk_text=chunk.get("content", chunk.get("text", "")),
+                relevance_score=chunk.get("score", chunk.get("relevance_score", 0.5)),
+                page_number=chunk.get("page_number"),
+                section=chunk.get("section"),
+                metadata=chunk.get("metadata", {}),
             )
             sources.append(source)
 
         return sources
 
     async def extract_facts_from_request(
-        self,
-        request: FactExtractionRequest
+        self, request: FactExtractionRequest
     ) -> List[KeyFact]:
         """Extract facts from a fact extraction request.
 
@@ -388,5 +407,5 @@ Analyze which chunks support each fact. For each fact, identify the chunk indice
             query=request.query,
             chunks=request.chunks,
             max_facts=request.max_facts,
-            min_confidence=request.min_confidence
+            min_confidence=request.min_confidence,
         )

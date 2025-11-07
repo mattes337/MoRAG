@@ -10,6 +10,7 @@ from ..exceptions import ExternalServiceError
 
 class ServiceStatus(str, Enum):
     """Service status enum."""
+
     INITIALIZING = "initializing"
     READY = "ready"
     BUSY = "busy"
@@ -20,6 +21,7 @@ class ServiceStatus(str, Enum):
 @dataclass
 class ServiceConfig:
     """Base configuration for services."""
+
     enabled: bool = True
     timeout: float = 300.0
     retry_attempts: int = 3
@@ -62,7 +64,7 @@ class CircuitBreaker:
         self,
         failure_threshold: int = 5,
         reset_timeout: float = 60.0,
-        half_open_timeout: float = 30.0
+        half_open_timeout: float = 30.0,
     ):
         """Initialize circuit breaker.
 
@@ -87,6 +89,7 @@ class CircuitBreaker:
     def record_failure(self) -> None:
         """Record failed operation."""
         import time
+
         self.failures += 1
         self.last_failure_time = time.time()
 
@@ -96,6 +99,7 @@ class CircuitBreaker:
     def is_closed(self) -> bool:
         """Check if circuit is closed."""
         import time
+
         current_time = time.time()
 
         if self.state == "open":

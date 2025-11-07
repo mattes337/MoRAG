@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Generate a simple test audio file for testing transcription fixes."""
 
-import numpy as np
-import wave
 import sys
+import wave
 from pathlib import Path
+
+import numpy as np
+
 
 def generate_test_audio(filename: str = "test_audio.wav", duration: int = 10):
     """Generate a simple test audio file with speech-like patterns.
@@ -27,22 +29,38 @@ def generate_test_audio(filename: str = "test_audio.wav", duration: int = 10):
         # Speaker 1 (first half) - lower pitch
         speaker1_end = len(t) // 2
         fundamental1 = 120  # Hz
-        audio[:speaker1_end] += 0.3 * np.sin(2 * np.pi * fundamental1 * t[:speaker1_end])
-        audio[:speaker1_end] += 0.2 * np.sin(2 * np.pi * fundamental1 * 2 * t[:speaker1_end])
-        audio[:speaker1_end] += 0.1 * np.sin(2 * np.pi * fundamental1 * 3 * t[:speaker1_end])
+        audio[:speaker1_end] += 0.3 * np.sin(
+            2 * np.pi * fundamental1 * t[:speaker1_end]
+        )
+        audio[:speaker1_end] += 0.2 * np.sin(
+            2 * np.pi * fundamental1 * 2 * t[:speaker1_end]
+        )
+        audio[:speaker1_end] += 0.1 * np.sin(
+            2 * np.pi * fundamental1 * 3 * t[:speaker1_end]
+        )
 
         # Add some modulation to make it more speech-like
-        modulation1 = 1 + 0.3 * np.sin(2 * np.pi * 5 * t[:speaker1_end])  # 5Hz modulation
+        modulation1 = 1 + 0.3 * np.sin(
+            2 * np.pi * 5 * t[:speaker1_end]
+        )  # 5Hz modulation
         audio[:speaker1_end] *= modulation1
 
         # Speaker 2 (second half) - higher pitch
         fundamental2 = 180  # Hz
-        audio[speaker1_end:] += 0.3 * np.sin(2 * np.pi * fundamental2 * t[speaker1_end:])
-        audio[speaker1_end:] += 0.2 * np.sin(2 * np.pi * fundamental2 * 2 * t[speaker1_end:])
-        audio[speaker1_end:] += 0.1 * np.sin(2 * np.pi * fundamental2 * 3 * t[speaker1_end:])
+        audio[speaker1_end:] += 0.3 * np.sin(
+            2 * np.pi * fundamental2 * t[speaker1_end:]
+        )
+        audio[speaker1_end:] += 0.2 * np.sin(
+            2 * np.pi * fundamental2 * 2 * t[speaker1_end:]
+        )
+        audio[speaker1_end:] += 0.1 * np.sin(
+            2 * np.pi * fundamental2 * 3 * t[speaker1_end:]
+        )
 
         # Add modulation for speaker 2
-        modulation2 = 1 + 0.4 * np.sin(2 * np.pi * 7 * t[speaker1_end:])  # 7Hz modulation
+        modulation2 = 1 + 0.4 * np.sin(
+            2 * np.pi * 7 * t[speaker1_end:]
+        )  # 7Hz modulation
         audio[speaker1_end:] *= modulation2
 
         # Add some pauses to simulate natural speech
@@ -64,7 +82,7 @@ def generate_test_audio(filename: str = "test_audio.wav", duration: int = 10):
         audio_int = (audio * 32767).astype(np.int16)
 
         # Write WAV file
-        with wave.open(filename, 'w') as wav_file:
+        with wave.open(filename, "w") as wav_file:
             wav_file.setnchannels(1)  # Mono
             wav_file.setsampwidth(2)  # 2 bytes per sample (16-bit)
             wav_file.setframerate(sample_rate)
@@ -81,6 +99,7 @@ def generate_test_audio(filename: str = "test_audio.wav", duration: int = 10):
     except Exception as e:
         print(f"❌ Failed to generate test audio: {e}")
         return False
+
 
 def main():
     """Main function."""
@@ -100,7 +119,7 @@ def main():
     # Check if file already exists
     if Path(output_file).exists():
         response = input(f"⚠️  {output_file} already exists. Overwrite? (y/N): ")
-        if response.lower() != 'y':
+        if response.lower() != "y":
             print("❌ Cancelled")
             return False
 
@@ -112,6 +131,7 @@ def main():
         print("   Example: python tests/manual/test_transcription_fixes.py")
 
     return success
+
 
 if __name__ == "__main__":
     success = main()

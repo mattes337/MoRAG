@@ -6,4 +6,4 @@ using checksums and other metadata.
 
 from .file_ingestion import FileIngestion, FileMetadata
 
-__all__ = ['FileIngestion', 'FileMetadata']
+__all__ = ["FileIngestion", "FileMetadata"]

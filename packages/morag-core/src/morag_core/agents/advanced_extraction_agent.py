@@ -1,10 +1,11 @@
 """Advanced extraction agent with regex constraints and structured formats."""
 
-from typing import Type, List, Optional, Dict, Any, Union
+from typing import Any, Dict, List, Optional, Type, Union
+
 import structlog
 from pydantic import BaseModel, Field
 
-from ..ai.base_agent import MoRAGBaseAgent, AgentConfig
+from ..ai.base_agent import AgentConfig, MoRAGBaseAgent
 from ..ai.models import ConfidenceLevel
 
 logger = structlog.get_logger(__name__)
@@ -15,12 +16,14 @@ class StructuredEntity(BaseModel):
 
     entity_id: str = Field(
         description="Unique entity ID in format: ent_[name]_[8-char-hex]",
-        pattern=r"^ent_[a-zA-Z0-9_]+_[a-f0-9]{8}$"
+        pattern=r"^ent_[a-zA-Z0-9_]+_[a-f0-9]{8}$",
     )
     name: str = Field(description="Entity name")
     type: str = Field(description="Entity type")
     confidence: float = Field(ge=0.0, le=1.0, description="Confidence score")
-    attributes: Dict[str, Any] = Field(default_factory=dict, description="Additional attributes")
+    attributes: Dict[str, Any] = Field(
+        default_factory=dict, description="Additional attributes"
+    )
 
 
 class StructuredRelation(BaseModel):
@@ -28,15 +31,13 @@ class StructuredRelation(BaseModel):
 
     relation_id: str = Field(
         description="Unique relation ID in format: rel_[type]_[8-char-hex]",
-        pattern=r"^rel_[a-zA-Z0-9_]+_[a-f0-9]{8}$"
+        pattern=r"^rel_[a-zA-Z0-9_]+_[a-f0-9]{8}$",
     )
     source_entity_id: str = Field(
-        description="Source entity ID",
-        pattern=r"^ent_[a-zA-Z0-9_]+_[a-f0-9]{8}$"
+        description="Source entity ID", pattern=r"^ent_[a-zA-Z0-9_]+_[a-f0-9]{8}$"
     )
     target_entity_id: str = Field(
-        description="Target entity ID",
-        pattern=r"^ent_[a-zA-Z0-9_]+_[a-f0-9]{8}$"
+        description="Target entity ID", pattern=r"^ent_[a-zA-Z0-9_]+_[a-f0-9]{8}$"
     )
     relation_type: str = Field(description="Type of relation")
     confidence: float = Field(ge=0.0, le=1.0, description="Confidence score")
@@ -46,13 +47,21 @@ class StructuredRelation(BaseModel):
 class AdvancedExtractionResult(BaseModel):
     """Result from advanced extraction with structured IDs."""
 
-    entities: List[StructuredEntity] = Field(description="Extracted entities with structured IDs")
-    relations: List[StructuredRelation] = Field(description="Extracted relations with structured IDs")
+    entities: List[StructuredEntity] = Field(
+        description="Extracted entities with structured IDs"
+    )
+    relations: List[StructuredRelation] = Field(
+        description="Extracted relations with structured IDs"
+    )
     total_entities: int = Field(description="Total number of entities")
     total_relations: int = Field(description="Total number of relations")
     confidence: ConfidenceLevel = Field(description="Overall confidence level")
-    processing_time: Optional[float] = Field(default=None, description="Processing time in seconds")
-    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
+    processing_time: Optional[float] = Field(
+        default=None, description="Processing time in seconds"
+    )
+    metadata: Dict[str, Any] = Field(
+        default_factory=dict, description="Additional metadata"
+    )
 
 
 class AdvancedExtractionAgent(MoRAGBaseAgent[AdvancedExtractionResult]):
@@ -68,20 +77,38 @@ class AdvancedExtractionAgent(MoRAGBaseAgent[AdvancedExtractionResult]):
             config = AgentConfig(
                 model="google-gla:gemini-1.5-flash",
                 temperature=0.1,
-                outlines_provider="gemini"
+                outlines_provider="gemini",
             )
 
         super().__init__(config)
 
         # Advanced extraction configuration
         self.entity_types = [
-            "PERSON", "ORGANIZATION", "LOCATION", "CONCEPT", "PRODUCT",
-            "EVENT", "DATE", "QUANTITY", "TECHNOLOGY", "PROCESS"
+            "PERSON",
+            "ORGANIZATION",
+            "LOCATION",
+            "CONCEPT",
+            "PRODUCT",
+            "EVENT",
+            "DATE",
+            "QUANTITY",
+            "TECHNOLOGY",
+            "PROCESS",
         ]
         self.relation_types = [
-            "SUPPORTS", "ELABORATES", "CONTRADICTS", "SEQUENCE", "COMPARISON",
-            "CAUSATION", "PREREQUISITE", "ALTERNATIVE", "HIERARCHY", "LOCATED_IN",
-            "PART_OF", "CREATED_BY", "RELATED_TO"
+            "SUPPORTS",
+            "ELABORATES",
+            "CONTRADICTS",
+            "SEQUENCE",
+            "COMPARISON",
+            "CAUSATION",
+            "PREREQUISITE",
+            "ALTERNATIVE",
+            "HIERARCHY",
+            "LOCATED_IN",
+            "PART_OF",
+            "CREATED_BY",
+            "RELATED_TO",
         ]
         self.min_confidence = 0.6
 
@@ -144,10 +171,7 @@ IMPORTANT CONSTRAINTS:
 - Ensure ID uniqueness within the extraction"""
 
     async def extract_with_structured_ids(
-        self,
-        text: str,
-        domain: str = "general",
-        min_confidence: Optional[float] = None
+        self, text: str, domain: str = "general", min_confidence: Optional[float] = None
     ) -> AdvancedExtractionResult:
         """Extract entities and relations with structured IDs using regex constraints.
 
@@ -166,7 +190,7 @@ IMPORTANT CONSTRAINTS:
                 total_entities=0,
                 total_relations=0,
                 confidence=ConfidenceLevel.HIGH,
-                metadata={"error": "Empty text", "domain": domain}
+                metadata={"error": "Empty text", "domain": domain},
             )
 
         # Update configuration for this extraction
@@ -177,7 +201,7 @@ IMPORTANT CONSTRAINTS:
             "Starting advanced extraction with structured IDs",
             text_length=len(text),
             domain=domain,
-            structured_generation=self.is_outlines_available()
+            structured_generation=self.is_outlines_available(),
         )
 
         # Prepare the extraction prompt
@@ -195,7 +219,7 @@ IMPORTANT CONSTRAINTS:
                 entities_extracted=result.total_entities,
                 relations_extracted=result.total_relations,
                 confidence=result.confidence,
-                used_outlines=self.is_outlines_available()
+                used_outlines=self.is_outlines_available(),
             )
 
             return result
@@ -209,11 +233,7 @@ IMPORTANT CONSTRAINTS:
                 total_entities=0,
                 total_relations=0,
                 confidence=ConfidenceLevel.LOW,
-                metadata={
-                    "error": str(e),
-                    "domain": domain,
-                    "fallback": True
-                }
+                metadata={"error": str(e), "domain": domain, "fallback": True},
             )
 
     def _create_extraction_prompt(self, text: str, domain: str) -> str:
@@ -240,10 +260,7 @@ EXTRACTION PARAMETERS:
 Extract high-quality entities and relations with properly formatted structured IDs."""
 
     def _post_process_result(
-        self,
-        result: AdvancedExtractionResult,
-        original_text: str,
-        domain: str
+        self, result: AdvancedExtractionResult, original_text: str, domain: str
     ) -> AdvancedExtractionResult:
         """Post-process and validate the extraction result.
 
@@ -263,14 +280,17 @@ Extract high-quality entities and relations with properly formatted structured I
         valid_entity_ids = set()
 
         for entity in result.entities:
-            if entity_id_pattern.match(entity.entity_id) and entity.confidence >= self.min_confidence:
+            if (
+                entity_id_pattern.match(entity.entity_id)
+                and entity.confidence >= self.min_confidence
+            ):
                 valid_entities.append(entity)
                 valid_entity_ids.add(entity.entity_id)
             else:
                 self.logger.warning(
                     "Invalid entity ID or low confidence",
                     entity_id=entity.entity_id,
-                    confidence=entity.confidence
+                    confidence=entity.confidence,
                 )
 
         # Validate relation IDs and references
@@ -278,10 +298,12 @@ Extract high-quality entities and relations with properly formatted structured I
         valid_relations = []
 
         for relation in result.relations:
-            if (relation_id_pattern.match(relation.relation_id) and
-                relation.source_entity_id in valid_entity_ids and
-                relation.target_entity_id in valid_entity_ids and
-                relation.confidence >= self.min_confidence):
+            if (
+                relation_id_pattern.match(relation.relation_id)
+                and relation.source_entity_id in valid_entity_ids
+                and relation.target_entity_id in valid_entity_ids
+                and relation.confidence >= self.min_confidence
+            ):
                 valid_relations.append(relation)
             else:
                 self.logger.warning(
@@ -289,22 +311,26 @@ Extract high-quality entities and relations with properly formatted structured I
                     relation_id=relation.relation_id,
                     source_id=relation.source_entity_id,
                     target_id=relation.target_entity_id,
-                    confidence=relation.confidence
+                    confidence=relation.confidence,
                 )
 
         # Update metadata
         metadata = result.metadata or {}
-        metadata.update({
-            "domain": domain,
-            "original_entity_count": len(result.entities),
-            "valid_entity_count": len(valid_entities),
-            "original_relation_count": len(result.relations),
-            "valid_relation_count": len(valid_relations),
-            "text_length": len(original_text),
-            "min_confidence_threshold": self.min_confidence,
-            "extraction_method": "outlines" if self.is_outlines_available() else "fallback",
-            "id_validation": "regex_enforced"
-        })
+        metadata.update(
+            {
+                "domain": domain,
+                "original_entity_count": len(result.entities),
+                "valid_entity_count": len(valid_entities),
+                "original_relation_count": len(result.relations),
+                "valid_relation_count": len(valid_relations),
+                "text_length": len(original_text),
+                "min_confidence_threshold": self.min_confidence,
+                "extraction_method": "outlines"
+                if self.is_outlines_available()
+                else "fallback",
+                "id_validation": "regex_enforced",
+            }
+        )
 
         # Create updated result
         return AdvancedExtractionResult(
@@ -314,5 +340,5 @@ Extract high-quality entities and relations with properly formatted structured I
             total_relations=len(valid_relations),
             confidence=result.confidence,
             processing_time=result.processing_time,
-            metadata=metadata
+            metadata=metadata,
         )

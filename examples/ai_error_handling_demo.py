@@ -2,12 +2,13 @@
 
 import asyncio
 import time
-from typing import Dict, Any
+from typing import Any, Dict
+
 import structlog
+from morag_core.exceptions import ExternalServiceError, RateLimitError
 
 # Note: AI error handlers not yet implemented - using mock functions for demo
 from morag_services.embedding import GeminiEmbeddingService
-from morag_core.exceptions import RateLimitError, ExternalServiceError
 
 # Configure logging for demo
 structlog.configure(
@@ -20,7 +21,7 @@ structlog.configure(
         structlog.processors.StackInfoRenderer(),
         structlog.processors.format_exc_info,
         structlog.processors.UnicodeDecoder(),
-        structlog.processors.JSONRenderer()
+        structlog.processors.JSONRenderer(),
     ],
     context_class=dict,
     logger_factory=structlog.stdlib.LoggerFactory(),
@@ -46,7 +47,7 @@ async def demo_successful_operations():
         summary = await gemini_service.generate_summary(
             "This is a test document that needs to be summarized. "
             "It contains important information that should be condensed.",
-            max_length=30
+            max_length=30,
         )
         print(f"✓ Summary generated: {summary.summary[:50]}...")
 
@@ -75,9 +76,7 @@ async def demo_retry_mechanism():
 
     try:
         result = await execute_with_ai_resilience(
-            "demo_service",
-            flaky_operation,
-            timeout=5.0
+            "demo_service", flaky_operation, timeout=5.0
         )
         print(f"✓ Operation succeeded: {result}")
 
@@ -102,9 +101,7 @@ async def demo_circuit_breaker():
     for i in range(6):
         try:
             await execute_with_ai_resilience(
-                "circuit_demo",
-                always_failing_operation,
-                timeout=1.0
+                "circuit_demo", always_failing_operation, timeout=1.0
             )
         except Exception as e:
             print(f"  Attempt {i+1}: {type(e).__name__}")
@@ -120,9 +117,7 @@ async def demo_circuit_breaker():
     print("\nTrying operation with open circuit breaker...")
     try:
         await execute_with_ai_resilience(
-            "circuit_demo",
-            always_failing_operation,
-            timeout=1.0
+            "circuit_demo", always_failing_operation, timeout=1.0
         )
     except Exception as e:
         print(f"✓ Circuit breaker blocked call: {type(e).__name__}")
@@ -140,10 +135,7 @@ async def demo_fallback_mechanism():
 
     try:
         result = await execute_with_ai_resilience(
-            "fallback_demo",
-            primary_operation,
-            fallback=fallback_operation,
-            timeout=5.0
+            "fallback_demo", primary_operation, fallback=fallback_operation, timeout=5.0
         )
         print(f"✓ Fallback succeeded: {result}")
 
@@ -156,19 +148,26 @@ async def demo_error_classification():
     print("\n=== Demo: Error Classification ===")
 
     error_scenarios = [
-        ("Rate limit", lambda: (_ for _ in ()).throw(Exception("429 Too Many Requests"))),
+        (
+            "Rate limit",
+            lambda: (_ for _ in ()).throw(Exception("429 Too Many Requests")),
+        ),
         ("Quota exceeded", lambda: (_ for _ in ()).throw(Exception("quota exceeded"))),
-        ("Authentication", lambda: (_ for _ in ()).throw(Exception("401 Unauthorized"))),
+        (
+            "Authentication",
+            lambda: (_ for _ in ()).throw(Exception("401 Unauthorized")),
+        ),
         ("Timeout", lambda: (_ for _ in ()).throw(Exception("timeout occurred"))),
-        ("Content policy", lambda: (_ for _ in ()).throw(Exception("safety filter triggered"))),
+        (
+            "Content policy",
+            lambda: (_ for _ in ()).throw(Exception("safety filter triggered")),
+        ),
     ]
 
     for error_name, error_operation in error_scenarios:
         try:
             await execute_with_ai_resilience(
-                "classification_demo",
-                error_operation,
-                timeout=1.0
+                "classification_demo", error_operation, timeout=1.0
             )
         except Exception as e:
             print(f"  {error_name}: {type(e).__name__} - {str(e)[:50]}...")
@@ -191,14 +190,12 @@ async def demo_health_monitoring():
                 await execute_with_ai_resilience(
                     "health_demo",
                     lambda: (_ for _ in ()).throw(Exception("Simulated failure")),
-                    timeout=1.0
+                    timeout=1.0,
                 )
             else:
                 # Simulate success
                 await execute_with_ai_resilience(
-                    "health_demo",
-                    lambda: f"Success {i}",
-                    timeout=1.0
+                    "health_demo", lambda: f"Success {i}", timeout=1.0
                 )
         except Exception:
             pass
@@ -227,9 +224,7 @@ async def demo_performance_impact():
     start_time = time.time()
     for _ in range(100):
         await execute_with_ai_resilience(
-            "performance_demo",
-            fast_operation,
-            timeout=1.0
+            "performance_demo", fast_operation, timeout=1.0
         )
     resilience_time = time.time() - start_time
 
@@ -239,7 +234,9 @@ async def demo_performance_impact():
         await fast_operation()
     direct_time = time.time() - start_time
 
-    overhead = ((resilience_time - direct_time) / direct_time * 100) if direct_time > 0 else 0
+    overhead = (
+        ((resilience_time - direct_time) / direct_time * 100) if direct_time > 0 else 0
+    )
     print(f"Direct execution: {direct_time:.3f}s")
     print(f"With resilience: {resilience_time:.3f}s")
     print(f"Overhead: {overhead:.1f}%")

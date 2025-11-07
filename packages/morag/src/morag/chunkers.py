@@ -1,7 +1,7 @@
 """Content chunking strategies for different content types."""
 
 import re
-from typing import Dict, List, Any
+from typing import Any, Dict, List
 
 from morag_core.utils.logging import get_logger
 
@@ -11,18 +11,24 @@ logger = get_logger(__name__)
 class ContentChunkers:
     """Handles different content chunking strategies."""
 
-    def create_topic_based_chunks(self, content: str, chunk_size: int, chunk_overlap: int, metadata: Dict[str, Any]) -> List[str]:
+    def create_topic_based_chunks(
+        self,
+        content: str,
+        chunk_size: int,
+        chunk_overlap: int,
+        metadata: Dict[str, Any],
+    ) -> List[str]:
         """Create chunks based on topic boundaries in audio/video content."""
         # Extract topics from metadata if available
-        topics = metadata.get('topics', [])
+        topics = metadata.get("topics", [])
         if not topics:
             return self._create_timestamp_chunks(content, chunk_size, chunk_overlap)
 
         chunks = []
         for topic in topics:
-            topic_start = topic.get('start_time', 0)
-            topic_end = topic.get('end_time', len(content))
-            topic_title = topic.get('title', 'Topic')
+            topic_start = topic.get("start_time", 0)
+            topic_end = topic.get("end_time", len(content))
+            topic_title = topic.get("title", "Topic")
 
             # Find content for this topic based on timestamps
             topic_content = self._extract_topic_content(content, topic_start, topic_end)
@@ -32,7 +38,9 @@ class ContentChunkers:
                 chunks.append(f"## {topic_title}\n\n{topic_content}")
             else:
                 # Split topic into multiple chunks
-                topic_chunks = self._split_topic_at_timestamps(topic_content, chunk_size, chunk_overlap)
+                topic_chunks = self._split_topic_at_timestamps(
+                    topic_content, chunk_size, chunk_overlap
+                )
                 for i, chunk in enumerate(topic_chunks):
                     if i == 0:
                         chunks.append(f"## {topic_title}\n\n{chunk}")
@@ -41,14 +49,16 @@ class ContentChunkers:
 
         return chunks
 
-    def _extract_topic_content(self, content: str, start_time: float, end_time: float) -> str:
+    def _extract_topic_content(
+        self, content: str, start_time: float, end_time: float
+    ) -> str:
         """Extract content between timestamp markers."""
-        lines = content.split('\n')
+        lines = content.split("\n")
         topic_lines = []
 
         for line in lines:
             # Look for timestamp patterns in transcription
-            timestamp_match = re.search(r'\[?(\d{1,2}):(\d{2}):(\d{2})\]?', line)
+            timestamp_match = re.search(r"\[?(\d{1,2}):(\d{2}):(\d{2})\]?", line)
             if timestamp_match:
                 hours, minutes, seconds = map(int, timestamp_match.groups())
                 line_time = hours * 3600 + minutes * 60 + seconds
@@ -60,18 +70,20 @@ class ContentChunkers:
                 if topic_lines:  # We've started collecting for this topic
                     topic_lines.append(line)
 
-        return '\n'.join(topic_lines)
+        return "\n".join(topic_lines)
 
-    def create_timestamp_chunks(self, content: str, chunk_size: int, chunk_overlap: int) -> List[str]:
+    def create_timestamp_chunks(
+        self, content: str, chunk_size: int, chunk_overlap: int
+    ) -> List[str]:
         """Create chunks based on timestamp boundaries in transcribed content."""
-        lines = content.split('\n')
+        lines = content.split("\n")
         current_chunk = []
         current_size = 0
         chunks = []
 
         for line in lines:
             # Check if this line contains a timestamp
-            has_timestamp = re.search(r'\[?(\d{1,2}):(\d{2}):(\d{2})\]?', line)
+            has_timestamp = re.search(r"\[?(\d{1,2}):(\d{2}):(\d{2})\]?", line)
 
             # Calculate potential new size
             line_size = len(line) + 1  # +1 for newline
@@ -80,7 +92,7 @@ class ContentChunkers:
             if current_size + line_size > chunk_size and current_chunk:
                 # If this line has a timestamp, it's a good breaking point
                 if has_timestamp:
-                    chunks.append('\n'.join(current_chunk))
+                    chunks.append("\n".join(current_chunk))
                     current_chunk = [line]
                     current_size = line_size
                 else:
@@ -93,26 +105,34 @@ class ContentChunkers:
 
         # Add final chunk
         if current_chunk:
-            chunks.append('\n'.join(current_chunk))
+            chunks.append("\n".join(current_chunk))
 
         return chunks
 
-    def _split_topic_at_timestamps(self, topic_content: str, chunk_size: int, chunk_overlap: int) -> List[str]:
+    def _split_topic_at_timestamps(
+        self, topic_content: str, chunk_size: int, chunk_overlap: int
+    ) -> List[str]:
         """Split a long topic at natural timestamp boundaries."""
         # First try to split at timestamp boundaries
-        timestamp_chunks = self.create_timestamp_chunks(topic_content, chunk_size, chunk_overlap)
+        timestamp_chunks = self.create_timestamp_chunks(
+            topic_content, chunk_size, chunk_overlap
+        )
 
         # If we only got one chunk back, the topic is still too long
         if len(timestamp_chunks) == 1 and len(timestamp_chunks[0]) > chunk_size:
             # Fall back to paragraph splitting
-            return self._create_character_chunks(topic_content, chunk_size, chunk_overlap)
+            return self._create_character_chunks(
+                topic_content, chunk_size, chunk_overlap
+            )
 
         return timestamp_chunks
 
-    def create_image_section_chunks(self, content: str, chunk_size: int, chunk_overlap: int) -> List[str]:
+    def create_image_section_chunks(
+        self, content: str, chunk_size: int, chunk_overlap: int
+    ) -> List[str]:
         """Create chunks for image content with OCR results."""
         # Look for image section markers
-        sections = re.split(r'\n## Image \d+:', content)
+        sections = re.split(r"\n## Image \d+:", content)
 
         if len(sections) <= 1:
             # No clear image sections, use semantic chunking
@@ -138,19 +158,23 @@ class ContentChunkers:
                 chunks.append(full_section)
             else:
                 # Split long sections
-                section_chunks = self._process_sections_into_chunks([full_section], chunk_size, chunk_overlap)
+                section_chunks = self._process_sections_into_chunks(
+                    [full_section], chunk_size, chunk_overlap
+                )
                 chunks.extend(section_chunks)
 
         return chunks
 
-    def create_web_article_chunks(self, content: str, chunk_size: int, chunk_overlap: int) -> List[str]:
+    def create_web_article_chunks(
+        self, content: str, chunk_size: int, chunk_overlap: int
+    ) -> List[str]:
         """Create chunks for web article content."""
         # Look for article structure markers
         structure_patterns = [
-            r'\n## [A-Z].*?:',  # Section headers like "## Introduction:"
-            r'\n### .*?$',      # Subsection headers
-            r'\n\*\*[A-Z].*?\*\*',  # Bold section titles
-            r'\n[A-Z][A-Z\s]{10,}\n',  # All caps section titles
+            r"\n## [A-Z].*?:",  # Section headers like "## Introduction:"
+            r"\n### .*?$",  # Subsection headers
+            r"\n\*\*[A-Z].*?\*\*",  # Bold section titles
+            r"\n[A-Z][A-Z\s]{10,}\n",  # All caps section titles
         ]
 
         # Find all structural boundaries
@@ -183,10 +207,12 @@ class ContentChunkers:
 
         return self._process_sections_into_chunks(sections, chunk_size, chunk_overlap)
 
-    def create_text_semantic_chunks(self, content: str, chunk_size: int, chunk_overlap: int) -> List[str]:
+    def create_text_semantic_chunks(
+        self, content: str, chunk_size: int, chunk_overlap: int
+    ) -> List[str]:
         """Create semantically meaningful chunks for text content."""
         # Split by double newlines (paragraphs) first
-        paragraphs = [p.strip() for p in re.split(r'\n\s*\n', content) if p.strip()]
+        paragraphs = [p.strip() for p in re.split(r"\n\s*\n", content) if p.strip()]
 
         if not paragraphs:
             return self._create_character_chunks(content, chunk_size, chunk_overlap)
@@ -202,7 +228,7 @@ class ContentChunkers:
             if paragraph_size > chunk_size:
                 # Add current chunk if exists
                 if current_chunk:
-                    chunks.append('\n\n'.join(current_chunk))
+                    chunks.append("\n\n".join(current_chunk))
                     current_chunk = []
                     current_size = 0
 
@@ -215,7 +241,7 @@ class ContentChunkers:
                     sentence_size = len(sentence) + 1  # +1 for space
 
                     if temp_size + sentence_size > chunk_size and temp_chunk:
-                        chunks.append(' '.join(temp_chunk))
+                        chunks.append(" ".join(temp_chunk))
                         temp_chunk = [sentence]
                         temp_size = len(sentence)
                     else:
@@ -223,14 +249,16 @@ class ContentChunkers:
                         temp_size += sentence_size
 
                 if temp_chunk:
-                    chunks.append(' '.join(temp_chunk))
+                    chunks.append(" ".join(temp_chunk))
                 continue
 
             # Check if adding this paragraph would exceed chunk size
-            additional_size = paragraph_size + (2 if current_chunk else 0)  # +2 for \n\n
+            additional_size = paragraph_size + (
+                2 if current_chunk else 0
+            )  # +2 for \n\n
 
             if current_size + additional_size > chunk_size and current_chunk:
-                chunks.append('\n\n'.join(current_chunk))
+                chunks.append("\n\n".join(current_chunk))
                 current_chunk = [paragraph]
                 current_size = paragraph_size
             else:
@@ -239,14 +267,16 @@ class ContentChunkers:
 
         # Add final chunk
         if current_chunk:
-            chunks.append('\n\n'.join(current_chunk))
+            chunks.append("\n\n".join(current_chunk))
 
         return chunks
 
-    def create_code_structural_chunks(self, content: str, chunk_size: int, chunk_overlap: int) -> List[str]:
+    def create_code_structural_chunks(
+        self, content: str, chunk_size: int, chunk_overlap: int
+    ) -> List[str]:
         """Create chunks for code content preserving structure."""
         # Look for code block patterns
-        code_blocks = list(re.finditer(r'```[\s\S]*?```', content))
+        code_blocks = list(re.finditer(r"```[\s\S]*?```", content))
 
         if not code_blocks:
             # No code blocks found, treat as regular text
@@ -265,7 +295,9 @@ class ContentChunkers:
                 text_before = content[last_end:block_start].strip()
                 if text_before:
                     if len(text_before) > chunk_size:
-                        text_chunks = self._create_text_semantic_chunks(text_before, chunk_size, chunk_overlap)
+                        text_chunks = self._create_text_semantic_chunks(
+                            text_before, chunk_size, chunk_overlap
+                        )
                         chunks.extend(text_chunks)
                     else:
                         chunks.append(text_before)
@@ -275,7 +307,9 @@ class ContentChunkers:
                 chunks.append(block_content)
             else:
                 # Split large code blocks by preserving function/class boundaries
-                code_chunks = self._split_code_block(block_content, chunk_size, chunk_overlap)
+                code_chunks = self._split_code_block(
+                    block_content, chunk_size, chunk_overlap
+                )
                 chunks.extend(code_chunks)
 
             last_end = block_end
@@ -285,21 +319,27 @@ class ContentChunkers:
             remaining = content[last_end:].strip()
             if remaining:
                 if len(remaining) > chunk_size:
-                    remaining_chunks = self._create_text_semantic_chunks(remaining, chunk_size, chunk_overlap)
+                    remaining_chunks = self._create_text_semantic_chunks(
+                        remaining, chunk_size, chunk_overlap
+                    )
                     chunks.extend(remaining_chunks)
                 else:
                     chunks.append(remaining)
 
         return chunks
 
-    def _split_code_block(self, code_block: str, chunk_size: int, chunk_overlap: int) -> List[str]:
+    def _split_code_block(
+        self, code_block: str, chunk_size: int, chunk_overlap: int
+    ) -> List[str]:
         """Split large code blocks preserving structure."""
-        lines = code_block.split('\n')
+        lines = code_block.split("\n")
 
         # Find function/class boundaries
         boundaries = []
         for i, line in enumerate(lines):
-            if re.match(r'^\s*(def|class|function|var|const|let)\s+\w+', line, re.IGNORECASE):
+            if re.match(
+                r"^\s*(def|class|function|var|const|let)\s+\w+", line, re.IGNORECASE
+            ):
                 boundaries.append(i)
 
         if not boundaries:
@@ -311,32 +351,38 @@ class ContentChunkers:
 
         for boundary in boundaries[1:]:  # Skip first boundary
             section_lines = lines[start:boundary]
-            section = '\n'.join(section_lines)
+            section = "\n".join(section_lines)
 
             if len(section) <= chunk_size:
                 chunks.append(section)
             else:
                 # Still too large, split by character
-                char_chunks = self._create_character_chunks(section, chunk_size, chunk_overlap)
+                char_chunks = self._create_character_chunks(
+                    section, chunk_size, chunk_overlap
+                )
                 chunks.extend(char_chunks)
 
             start = boundary
 
         # Handle final section
         if start < len(lines):
-            final_section = '\n'.join(lines[start:])
+            final_section = "\n".join(lines[start:])
             if len(final_section) <= chunk_size:
                 chunks.append(final_section)
             else:
-                char_chunks = self._create_character_chunks(final_section, chunk_size, chunk_overlap)
+                char_chunks = self._create_character_chunks(
+                    final_section, chunk_size, chunk_overlap
+                )
                 chunks.extend(char_chunks)
 
         return chunks
 
-    def create_archive_file_chunks(self, content: str, chunk_size: int, chunk_overlap: int) -> List[str]:
+    def create_archive_file_chunks(
+        self, content: str, chunk_size: int, chunk_overlap: int
+    ) -> List[str]:
         """Create chunks for archive file listings."""
         # Archive content typically has file listings
-        lines = content.split('\n')
+        lines = content.split("\n")
 
         chunks = []
         current_chunk = []
@@ -350,22 +396,24 @@ class ContentChunkers:
             line_size = len(line) + 1  # +1 for newline
 
             # Check if this looks like a directory separator or file header
-            is_separator = any([
-                line.startswith('====='),
-                line.startswith('-----'),
-                line.endswith('/') and len(line.split()) == 1,  # Directory path
-                re.match(r'^\w+/.*:', line),  # Path with colon
-            ])
+            is_separator = any(
+                [
+                    line.startswith("====="),
+                    line.startswith("-----"),
+                    line.endswith("/") and len(line.split()) == 1,  # Directory path
+                    re.match(r"^\w+/.*:", line),  # Path with colon
+                ]
+            )
 
             if current_size + line_size > chunk_size and current_chunk:
                 # If this is a separator, it's a good place to break
                 if is_separator:
-                    chunks.append('\n'.join(current_chunk))
+                    chunks.append("\n".join(current_chunk))
                     current_chunk = [line]
                     current_size = line_size
                 else:
                     # Not a separator, but we need to break anyway
-                    chunks.append('\n'.join(current_chunk))
+                    chunks.append("\n".join(current_chunk))
                     current_chunk = [line]
                     current_size = line_size
             else:
@@ -373,19 +421,21 @@ class ContentChunkers:
                 current_size += line_size
 
         if current_chunk:
-            chunks.append('\n'.join(current_chunk))
+            chunks.append("\n".join(current_chunk))
 
         return chunks
 
-    def create_document_chunks(self, content: str, chunk_size: int, chunk_overlap: int) -> List[str]:
+    def create_document_chunks(
+        self, content: str, chunk_size: int, chunk_overlap: int
+    ) -> List[str]:
         """Create chunks for document content (PDF, Word, etc.)."""
         # Look for document structure
         structure_patterns = [
-            r'\n## .*$',           # Level 2 headers
-            r'\n### .*$',          # Level 3 headers
-            r'\n\d+\.\s+[A-Z]',    # Numbered sections like "1. Introduction"
-            r'\nChapter\s+\d+',    # Chapter markers
-            r'\nSection\s+\d+',    # Section markers
+            r"\n## .*$",  # Level 2 headers
+            r"\n### .*$",  # Level 3 headers
+            r"\n\d+\.\s+[A-Z]",  # Numbered sections like "1. Introduction"
+            r"\nChapter\s+\d+",  # Chapter markers
+            r"\nSection\s+\d+",  # Section markers
         ]
 
         # Find structural boundaries
@@ -399,7 +449,7 @@ class ContentChunkers:
 
         sections = []
         for i in range(len(boundaries) - 1):
-            section = content[boundaries[i]:boundaries[i+1]].strip()
+            section = content[boundaries[i] : boundaries[i + 1]].strip()
             if section:
                 sections.append(section)
 
@@ -409,7 +459,9 @@ class ContentChunkers:
 
         return self._process_sections_into_chunks(sections, chunk_size, chunk_overlap)
 
-    def create_character_chunks(self, content: str, chunk_size: int, chunk_overlap: int) -> List[str]:
+    def create_character_chunks(
+        self, content: str, chunk_size: int, chunk_overlap: int
+    ) -> List[str]:
         """Create chunks based on character count with word boundary preservation."""
         if len(content) <= chunk_size:
             return [content]
@@ -424,7 +476,7 @@ class ContentChunkers:
             # Find word boundary if we're not at the end
             if end < len(content):
                 # Look backwards for word boundary
-                while end > start and content[end] not in ' \n\t.!?;:,-':
+                while end > start and content[end] not in " \n\t.!?;:,-":
                     end -= 1
 
                 # If we couldn't find a good boundary, use the original end
@@ -444,7 +496,9 @@ class ContentChunkers:
 
         return chunks
 
-    def _process_sections_into_chunks(self, sections: List[str], chunk_size: int, chunk_overlap: int) -> List[str]:
+    def _process_sections_into_chunks(
+        self, sections: List[str], chunk_size: int, chunk_overlap: int
+    ) -> List[str]:
         """Process sections into appropriately sized chunks."""
         chunks = []
 
@@ -453,7 +507,9 @@ class ContentChunkers:
                 chunks.append(section)
             else:
                 # Section is too large, split it
-                section_chunks = self._create_text_semantic_chunks(section, chunk_size, chunk_overlap)
+                section_chunks = self._create_text_semantic_chunks(
+                    section, chunk_size, chunk_overlap
+                )
                 chunks.extend(section_chunks)
 
         return chunks
@@ -468,7 +524,7 @@ class ContentChunkers:
 
         # Find the first word boundary to avoid cutting words
         for i, char in enumerate(overlap):
-            if char in ' \n\t':
+            if char in " \n\t":
                 return overlap[i:].strip()
 
         # If no word boundary found, return the full overlap
@@ -477,7 +533,7 @@ class ContentChunkers:
     def _split_into_sentences(self, text: str) -> List[str]:
         """Split text into sentences."""
         # Simple sentence splitting - can be enhanced
-        sentences = re.split(r'[.!?]+\s+', text)
+        sentences = re.split(r"[.!?]+\s+", text)
         return [s.strip() for s in sentences if s.strip()]
 
 

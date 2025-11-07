@@ -1,11 +1,11 @@
 """FastAPI dependencies for MoRAG API."""
 
 import os
-from typing import Optional, List, Dict, Any
 from functools import lru_cache
+from typing import Any, Dict, List, Optional
+
 import structlog
 from fastapi import HTTPException
-
 from morag.api import MoRAGAPI
 from morag_services import ServiceConfig
 
@@ -14,10 +14,16 @@ logger = structlog.get_logger(__name__)
 # Try to import graph components, but handle gracefully if not available
 try:
     # Import components directly to avoid circular import issues
-    from morag_graph.retrieval import HybridRetrievalCoordinator, ContextExpansionEngine
+    from morag_graph.operations import GraphAnalytics, GraphCRUD, GraphTraversal
     from morag_graph.query import QueryEntityExtractor
-    from morag_graph.storage import Neo4jStorage, QdrantStorage, Neo4jConfig, QdrantConfig
-    from morag_graph.operations import GraphCRUD, GraphTraversal, GraphAnalytics
+    from morag_graph.retrieval import ContextExpansionEngine, HybridRetrievalCoordinator
+    from morag_graph.storage import (
+        Neo4jConfig,
+        Neo4jStorage,
+        QdrantConfig,
+        QdrantStorage,
+    )
+
     GRAPH_AVAILABLE = True
 except ImportError as e:
     logger.warning("Graph components not available", error=str(e))
@@ -37,9 +43,15 @@ except ImportError as e:
 # Try to import reasoning components, but handle gracefully if not available
 try:
     from morag_reasoning import (
-        LLMClient, LLMConfig, PathSelectionAgent, ReasoningPathFinder,
-        IterativeRetriever, RetrievalContext, RecursiveFactRetrievalService
+        IterativeRetriever,
+        LLMClient,
+        LLMConfig,
+        PathSelectionAgent,
+        ReasoningPathFinder,
+        RecursiveFactRetrievalService,
+        RetrievalContext,
     )
+
     REASONING_AVAILABLE = True
 except ImportError as e:
     logger.warning("Reasoning components not available", error=str(e))
@@ -99,7 +111,10 @@ def get_neo4j_storage() -> Optional[Neo4jStorage]:
             password=os.getenv("NEO4J_PASSWORD", "password"),
             database=os.getenv("NEO4J_DATABASE", "neo4j"),
             verify_ssl=os.getenv("NEO4J_VERIFY_SSL", "true").lower() == "true",
-            trust_all_certificates=os.getenv("NEO4J_TRUST_ALL_CERTIFICATES", "false").lower() == "true"
+            trust_all_certificates=os.getenv(
+                "NEO4J_TRUST_ALL_CERTIFICATES", "false"
+            ).lower()
+            == "true",
         )
         return Neo4jStorage(config)
     except Exception as e:
@@ -118,10 +133,11 @@ def get_qdrant_storage() -> Optional[QdrantStorage]:
         if qdrant_url:
             # Parse URL to extract components
             from urllib.parse import urlparse
+
             parsed = urlparse(qdrant_url)
             host = parsed.hostname or "localhost"
-            port = parsed.port or (443 if parsed.scheme == 'https' else 6333)
-            https = parsed.scheme == 'https'
+            port = parsed.port or (443 if parsed.scheme == "https" else 6333)
+            https = parsed.scheme == "https"
         else:
             # Fall back to host/port configuration
             host = os.getenv("QDRANT_HOST", "localhost")
@@ -133,7 +149,7 @@ def get_qdrant_storage() -> Optional[QdrantStorage]:
             port=port,
             https=https,
             api_key=os.getenv("QDRANT_API_KEY"),
-            collection_name=os.getenv("QDRANT_COLLECTION", "morag_vectors")
+            collection_name=os.getenv("QDRANT_COLLECTION", "morag_vectors"),
         )
         return QdrantStorage(config)
     except Exception as e:
@@ -233,13 +249,15 @@ def get_hybrid_retrieval_coordinator() -> Optional[HybridRetrievalCoordinator]:
 
         # If graph components are not available, create a fallback coordinator
         if context_expansion_engine is None or query_entity_extractor is None:
-            logger.warning("Graph components not available, creating fallback coordinator")
+            logger.warning(
+                "Graph components not available, creating fallback coordinator"
+            )
             return FallbackHybridRetrievalCoordinator(vector_retriever)
 
         return HybridRetrievalCoordinator(
             vector_retriever=vector_retriever,
             context_expansion_engine=context_expansion_engine,
-            query_entity_extractor=query_entity_extractor
+            query_entity_extractor=query_entity_extractor,
         )
     except Exception as e:
         logger.error("Failed to create hybrid retrieval coordinator", error=str(e))
@@ -284,7 +302,7 @@ class GraphEngine:
             raise HTTPException(status_code=503, detail="Graph engine not available")
 
         # Check if the method exists, if not, provide a fallback
-        if hasattr(self.crud, 'find_entities_by_name'):
+        if hasattr(self.crud, "find_entities_by_name"):
             return await self.crud.find_entities_by_name(name, entity_type)
         else:
             # Fallback: search for entities with similar names
@@ -292,34 +310,56 @@ class GraphEngine:
             # Return empty list as fallback
             return []
 
-    async def get_entity_relations(self, entity_id: str, depth: int = 1, max_relations: int = 50):
+    async def get_entity_relations(
+        self, entity_id: str, depth: int = 1, max_relations: int = 50
+    ):
         """Get entity relations."""
         if not self.available:
             raise HTTPException(status_code=503, detail="Graph engine not available")
         return await self.traversal.find_neighbors(entity_id, max_distance=depth)
 
-    async def find_shortest_paths(self, start_id: str, end_id: str, max_paths: int = 10, relation_filters: Optional[list] = None):
+    async def find_shortest_paths(
+        self,
+        start_id: str,
+        end_id: str,
+        max_paths: int = 10,
+        relation_filters: Optional[list] = None,
+    ):
         """Find shortest paths between entities."""
         if not self.available:
             raise HTTPException(status_code=503, detail="Graph engine not available")
-        path = await self.traversal.find_shortest_path(start_id, end_id, relation_filters)
+        path = await self.traversal.find_shortest_path(
+            start_id, end_id, relation_filters
+        )
         return [path] if path else []
 
-    async def explore_from_entity(self, entity_id: str, max_depth: int = 3, max_paths: int = 10,
-                                entity_filters: Optional[list] = None, relation_filters: Optional[list] = None):
+    async def explore_from_entity(
+        self,
+        entity_id: str,
+        max_depth: int = 3,
+        max_paths: int = 10,
+        entity_filters: Optional[list] = None,
+        relation_filters: Optional[list] = None,
+    ):
         """Explore from entity."""
         if not self.available:
             raise HTTPException(status_code=503, detail="Graph engine not available")
-        neighbors = await self.traversal.find_neighbors(entity_id, max_distance=max_depth, relation_types=relation_filters)
+        neighbors = await self.traversal.find_neighbors(
+            entity_id, max_distance=max_depth, relation_types=relation_filters
+        )
         # Convert to paths format (simplified)
         paths = []
         for neighbor in neighbors[:max_paths]:
-            path = type('Path', (), {
-                'entities': [entity_id, neighbor.id],
-                'relations': [],
-                'total_weight': 1.0,
-                'confidence': 0.8
-            })()
+            path = type(
+                "Path",
+                (),
+                {
+                    "entities": [entity_id, neighbor.id],
+                    "relations": [],
+                    "total_weight": 1.0,
+                    "confidence": 0.8,
+                },
+            )()
             paths.append(path)
         return paths
 
@@ -355,6 +395,7 @@ def get_llm_client() -> Optional[LLMClient]:
         return None
     try:
         from morag_core.config import LLMConfig as UnifiedLLMConfig
+
         config = UnifiedLLMConfig.from_env_and_overrides()
 
         # Convert to reasoning LLMConfig format
@@ -372,7 +413,9 @@ def get_llm_client() -> Optional[LLMClient]:
         return None
 
 
-async def get_recursive_fact_retrieval_service() -> Optional[RecursiveFactRetrievalService]:
+async def get_recursive_fact_retrieval_service() -> Optional[
+    RecursiveFactRetrievalService
+]:
     """Get recursive fact retrieval service instance."""
     if not REASONING_AVAILABLE:
         return None
@@ -388,13 +431,18 @@ async def get_recursive_fact_retrieval_service() -> Optional[RecursiveFactRetrie
         qdrant_storage = await get_connected_default_qdrant_storage()
 
         if not neo4j_storage or not qdrant_storage:
-            logger.warning("Storage instances not available for recursive fact retrieval")
+            logger.warning(
+                "Storage instances not available for recursive fact retrieval"
+            )
             return None
 
         # Create stronger LLM client for final synthesis (could use a different model)
         stronger_llm_config = LLMConfig(
             provider=os.getenv("MORAG_LLM_PROVIDER", "gemini"),
-            model=os.getenv("MORAG_GEMINI_MODEL_STRONG", os.getenv("MORAG_GEMINI_MODEL", "gemini-1.5-flash")),
+            model=os.getenv(
+                "MORAG_GEMINI_MODEL_STRONG",
+                os.getenv("MORAG_GEMINI_MODEL", "gemini-1.5-flash"),
+            ),
             api_key=os.getenv("GEMINI_API_KEY"),
             temperature=float(os.getenv("MORAG_LLM_TEMPERATURE", "0.1")),
             max_tokens=int(os.getenv("MORAG_LLM_MAX_TOKENS", "4000")),
@@ -406,7 +454,8 @@ async def get_recursive_fact_retrieval_service() -> Optional[RecursiveFactRetrie
         embedding_service = None
         try:
             from morag_services.embedding import GeminiEmbeddingService
-            api_key = os.getenv('GEMINI_API_KEY')
+
+            api_key = os.getenv("GEMINI_API_KEY")
             if api_key:
                 embedding_service = GeminiEmbeddingService(api_key=api_key)
                 logger.info("Embedding service initialized for enhanced retrieval")
@@ -420,7 +469,7 @@ async def get_recursive_fact_retrieval_service() -> Optional[RecursiveFactRetrie
             neo4j_storage=neo4j_storage,
             qdrant_storage=qdrant_storage,
             embedding_service=embedding_service,
-            stronger_llm_client=stronger_llm_client
+            stronger_llm_client=stronger_llm_client,
         )
     except Exception as e:
         logger.warning("Recursive fact retrieval service not available", error=str(e))
@@ -493,24 +542,29 @@ def get_iterative_retriever() -> Optional[IterativeRetriever]:
             return None
 
         max_iterations = int(os.getenv("MORAG_REASONING_MAX_ITERATIONS", "5"))
-        sufficiency_threshold = float(os.getenv("MORAG_REASONING_SUFFICIENCY_THRESHOLD", "0.8"))
+        sufficiency_threshold = float(
+            os.getenv("MORAG_REASONING_SUFFICIENCY_THRESHOLD", "0.8")
+        )
 
         return IterativeRetriever(
             llm_client=llm_client,
             graph_engine=graph_engine,
             vector_retriever=vector_retriever,
             max_iterations=max_iterations,
-            sufficiency_threshold=sufficiency_threshold
+            sufficiency_threshold=sufficiency_threshold,
         )
     except Exception as e:
         logger.warning("Iterative retriever not available", error=str(e))
         return None
 
 
-def create_dynamic_graph_engine(database_servers: Optional[List[Dict[str, Any]]] = None) -> GraphEngine:
+def create_dynamic_graph_engine(
+    database_servers: Optional[List[Dict[str, Any]]] = None
+) -> GraphEngine:
     """Create a graph engine with dynamic database connections."""
     if database_servers:
         from morag.database_factory import get_neo4j_storages
+
         neo4j_storages = get_neo4j_storages(database_servers)
 
         if neo4j_storages:
@@ -523,12 +577,20 @@ def create_dynamic_graph_engine(database_servers: Optional[List[Dict[str, Any]]]
                     self.available = True
                     # Initialize components with custom storage
                     try:
-                        from morag_graph.operations import GraphCRUD, GraphTraversal, GraphAnalytics
+                        from morag_graph.operations import (
+                            GraphAnalytics,
+                            GraphCRUD,
+                            GraphTraversal,
+                        )
+
                         self.crud = GraphCRUD(storage)
                         self.traversal = GraphTraversal(storage)
                         self.analytics = GraphAnalytics(storage)
                     except Exception as e:
-                        logger.error("Failed to initialize dynamic graph engine components", error=str(e))
+                        logger.error(
+                            "Failed to initialize dynamic graph engine components",
+                            error=str(e),
+                        )
                         self.available = False
 
             return DynamicGraphEngine(storage)
@@ -537,16 +599,19 @@ def create_dynamic_graph_engine(database_servers: Optional[List[Dict[str, Any]]]
     return get_graph_engine()
 
 
-def create_dynamic_hybrid_retrieval_coordinator(database_servers: Optional[List[Dict[str, Any]]] = None):
+def create_dynamic_hybrid_retrieval_coordinator(
+    database_servers: Optional[List[Dict[str, Any]]] = None
+):
     """Create a hybrid retrieval coordinator with dynamic database connections."""
     if database_servers:
-        from morag.database_factory import get_qdrant_storages, get_neo4j_storages
+        from morag.database_factory import get_neo4j_storages, get_qdrant_storages
 
         qdrant_storages = get_qdrant_storages(database_servers)
         neo4j_storages = get_neo4j_storages(database_servers)
 
         # Create custom vector retriever if Qdrant storages are available
         if qdrant_storages:
+
             class DynamicVectorRetriever:
                 def __init__(self, qdrant_storage):
                     self.storage = qdrant_storage
@@ -566,20 +631,25 @@ def create_dynamic_hybrid_retrieval_coordinator(database_servers: Optional[List[
             if neo4j_storages:
                 try:
                     from morag_graph.retrieval import ContextExpansionEngine
+
                     context_expansion_engine = ContextExpansionEngine(neo4j_storages[0])
 
                     # Create query entity extractor
                     from morag_graph.query import QueryEntityExtractor
+
                     query_entity_extractor = QueryEntityExtractor()
 
                     from morag_graph.retrieval import HybridRetrievalCoordinator
+
                     return HybridRetrievalCoordinator(
                         vector_retriever=vector_retriever,
                         context_expansion_engine=context_expansion_engine,
-                        query_entity_extractor=query_entity_extractor
+                        query_entity_extractor=query_entity_extractor,
                     )
                 except Exception as e:
-                    logger.error("Failed to create dynamic hybrid coordinator", error=str(e))
+                    logger.error(
+                        "Failed to create dynamic hybrid coordinator", error=str(e)
+                    )
 
     # Fall back to default coordinator
     return get_hybrid_retrieval_coordinator()

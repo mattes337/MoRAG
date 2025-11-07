@@ -1,14 +1,15 @@
 """Document models for MoRAG."""
 
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union
-import uuid
 
 
 class DocumentType(str, Enum):
     """Document type enum."""
+
     TEXT = "text"
     PDF = "pdf"
     WORD = "word"
@@ -31,6 +32,7 @@ class DocumentType(str, Enum):
 @dataclass
 class DocumentMetadata:
     """Document metadata."""
+
     source_type: DocumentType
     source_name: str
     source_path: Optional[str] = None
@@ -75,6 +77,7 @@ class DocumentMetadata:
 @dataclass
 class DocumentChunk:
     """Document chunk."""
+
     document_id: str
     content: str
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
@@ -104,6 +107,7 @@ class DocumentChunk:
 @dataclass
 class Document:
     """Document model."""
+
     metadata: DocumentMetadata
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     chunks: List[DocumentChunk] = field(default_factory=list)
@@ -121,10 +125,7 @@ class Document:
             Created document chunk
         """
         chunk = DocumentChunk(
-            document_id=self.id,
-            content=content,
-            chunk_index=len(self.chunks),
-            **kwargs
+            document_id=self.id, content=content, chunk_index=len(self.chunks), **kwargs
         )
         self.chunks.append(chunk)
         return chunk
@@ -145,8 +146,12 @@ class Document:
                 "mime_type": self.metadata.mime_type,
                 "file_size": self.metadata.file_size,
                 "checksum": self.metadata.checksum,
-                "created_at": self.metadata.created_at.isoformat() if self.metadata.created_at else None,
-                "modified_at": self.metadata.modified_at.isoformat() if self.metadata.modified_at else None,
+                "created_at": self.metadata.created_at.isoformat()
+                if self.metadata.created_at
+                else None,
+                "modified_at": self.metadata.modified_at.isoformat()
+                if self.metadata.modified_at
+                else None,
                 "author": self.metadata.author,
                 "title": self.metadata.title,
                 "language": self.metadata.language,

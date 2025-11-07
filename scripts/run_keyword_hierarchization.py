@@ -27,7 +27,10 @@ def parse_env_overrides() -> Dict[str, Any]:
         "MORAG_KWH_SHARE": ("cooccurrence_min_share", float),
         "MORAG_KWH_BATCH_SIZE": ("batch_size", int),
         "MORAG_KWH_DETACH_MOVED": ("detach_moved", lambda v: v.lower() == "true"),
-        "MORAG_KWH_APPLY": ("dry_run", lambda v: not (v.lower() == "true")),  # APPLY true -> dry_run False
+        "MORAG_KWH_APPLY": (
+            "dry_run",
+            lambda v: not (v.lower() == "true"),
+        ),  # APPLY true -> dry_run False
         "MORAG_KWH_JOB_TAG": ("job_tag", str),
         "MORAG_KWH_LIMIT_KEYWORDS": ("limit_keywords", int),
     }
@@ -38,17 +41,25 @@ def parse_env_overrides() -> Dict[str, Any]:
             try:
                 overrides[param_key] = caster(val)
             except Exception:
-                logger.warning("Invalid env value for maintenance override", key=env_key, value=val)
+                logger.warning(
+                    "Invalid env value for maintenance override", key=env_key, value=val
+                )
     return overrides
 
 
 async def main_async() -> int:
-    from morag_graph.maintenance.keyword_hierarchization import run_keyword_hierarchization
+    from morag_graph.maintenance.keyword_hierarchization import (
+        run_keyword_hierarchization,
+    )
 
     overrides = parse_env_overrides()
     limit_keywords = int(overrides.pop("limit_keywords", 5))
 
-    logger.info("Starting Keyword Hierarchization", overrides=overrides, limit_keywords=limit_keywords)
+    logger.info(
+        "Starting Keyword Hierarchization",
+        overrides=overrides,
+        limit_keywords=limit_keywords,
+    )
     result = await run_keyword_hierarchization(overrides, limit_keywords=limit_keywords)
     print(json.dumps(result, indent=2))
     return 0

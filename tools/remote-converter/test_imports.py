@@ -4,6 +4,7 @@
 import sys
 from pathlib import Path
 
+
 def test_imports():
     """Test importing MoRAG packages step by step."""
 
@@ -22,6 +23,7 @@ def test_imports():
     # Test core imports
     try:
         from morag_core.interfaces.processor import ProcessingResult
+
         print("✅ ProcessingResult imported")
     except Exception as e:
         print(f"❌ ProcessingResult import failed: {e}")
@@ -31,6 +33,7 @@ def test_imports():
     try:
         from morag_audio import AudioProcessor
         from morag_audio.processor import AudioProcessingResult
+
         print("✅ Audio imports successful")
     except Exception as e:
         print(f"❌ Audio imports failed: {e}")
@@ -40,6 +43,7 @@ def test_imports():
     try:
         from morag_video import VideoProcessor
         from morag_video.processor import VideoProcessingResult
+
         print("✅ Video imports successful")
     except Exception as e:
         print(f"❌ Video imports failed: {e}")
@@ -48,6 +52,7 @@ def test_imports():
     # Test document imports
     try:
         from morag_document import DocumentProcessor
+
         print("✅ Document imports successful")
     except Exception as e:
         print(f"❌ Document imports failed: {e}")
@@ -57,6 +62,7 @@ def test_imports():
     try:
         from morag_image import ImageProcessor
         from morag_image.processor import ImageProcessingResult
+
         print("✅ Image imports successful")
     except Exception as e:
         print(f"❌ Image imports failed: {e}")
@@ -66,6 +72,7 @@ def test_imports():
     try:
         from morag_web import WebProcessor
         from morag_web.processor import WebScrapingResult
+
         print("✅ Web imports successful")
     except Exception as e:
         print(f"❌ Web imports failed: {e}")
@@ -75,6 +82,7 @@ def test_imports():
     try:
         from morag_youtube import YouTubeProcessor
         from morag_youtube.processor import YouTubeDownloadResult
+
         print("✅ YouTube imports successful")
     except Exception as e:
         print(f"❌ YouTube imports failed: {e}")
@@ -82,6 +90,7 @@ def test_imports():
 
     print("✅ All imports successful!")
     return True
+
 
 if __name__ == "__main__":
     success = test_imports()

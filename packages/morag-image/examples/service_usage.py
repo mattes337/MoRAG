@@ -1,18 +1,21 @@
 """Example of using the morag-image service interface."""
 
 import asyncio
+import json
 import os
 from pathlib import Path
-import json
 
 from morag_image.service import ImageService
+
 
 async def main():
     """Demonstrate the use of ImageService."""
     # Get API key from environment variable
     api_key = os.environ.get("GOOGLE_API_KEY")
     if not api_key:
-        print("Warning: GOOGLE_API_KEY environment variable not set. Captioning will not work.")
+        print(
+            "Warning: GOOGLE_API_KEY environment variable not set. Captioning will not work."
+        )
 
     # Create service
     service = ImageService(api_key=api_key)
@@ -30,7 +33,7 @@ async def main():
             "generate_caption": True,
             "extract_text": True,
             "extract_metadata": True,
-            "ocr_engine": "tesseract"
+            "ocr_engine": "tesseract",
         }
 
         # Process image
@@ -40,7 +43,9 @@ async def main():
             # Print results
             print(f"Caption: {result['caption']}")
             print(f"Extracted Text: {result['extracted_text']}")
-            print(f"Image Size: {result['metadata']['width']}x{result['metadata']['height']}")
+            print(
+                f"Image Size: {result['metadata']['width']}x{result['metadata']['height']}"
+            )
             print(f"Format: {result['metadata']['format']}")
             print(f"Processing Time: {result['processing_time']:.2f} seconds")
         except Exception as e:
@@ -72,21 +77,21 @@ async def main():
                     "extract_text": True,
                     "extract_metadata": True,
                     "ocr_engine": "tesseract",
-                    "resize_max_dimension": 1024
+                    "resize_max_dimension": 1024,
                 },
                 # Config 2: Metadata only
                 {
                     "generate_caption": False,
                     "extract_text": False,
-                    "extract_metadata": True
+                    "extract_metadata": True,
                 },
                 # Config 3: OCR only with EasyOCR
                 {
                     "generate_caption": False,
                     "extract_text": True,
                     "extract_metadata": False,
-                    "ocr_engine": "easyocr"
-                }
+                    "ocr_engine": "easyocr",
+                },
             ]
 
             # Process each image with each configuration
@@ -97,7 +102,9 @@ async def main():
 
                 # Use a different config for each image (cycling through configs)
                 config = configs[i % len(configs)]
-                config_type = ["Full processing", "Metadata only", "OCR only"][i % len(configs)]
+                config_type = ["Full processing", "Metadata only", "OCR only"][
+                    i % len(configs)
+                ]
 
                 print(f"Using configuration: {config_type}")
 
@@ -112,11 +119,15 @@ async def main():
                     if config["generate_caption"]:
                         print(f"Caption: {result['caption']}")
                     if config["extract_text"]:
-                        print(f"Extracted Text: {result['extracted_text'][:100]}..."
-                              if len(result['extracted_text']) > 100
-                              else f"Extracted Text: {result['extracted_text']}")
+                        print(
+                            f"Extracted Text: {result['extracted_text'][:100]}..."
+                            if len(result["extracted_text"]) > 100
+                            else f"Extracted Text: {result['extracted_text']}"
+                        )
                     if config["extract_metadata"]:
-                        print(f"Image Size: {result['metadata']['width']}x{result['metadata']['height']}")
+                        print(
+                            f"Image Size: {result['metadata']['width']}x{result['metadata']['height']}"
+                        )
 
                     all_results.append(result)
                 except Exception as e:
@@ -134,7 +145,9 @@ async def main():
 
     # Skip if directory doesn't exist or no images were found
     if not image_dir.is_dir() or not image_files:
-        print(f"Directory {image_dir} does not exist or no images found. Skipping Example 3.")
+        print(
+            f"Directory {image_dir} does not exist or no images found. Skipping Example 3."
+        )
     else:
         # Use a single configuration for all images
         config = {
@@ -142,16 +155,14 @@ async def main():
             "extract_text": True,
             "extract_metadata": True,
             "ocr_engine": "tesseract",
-            "resize_max_dimension": 800
+            "resize_max_dimension": 800,
         }
 
         try:
             # Process all images in batch
             print(f"Processing {len(image_files)} images in batch...")
             results = await service.process_batch(
-                image_files,
-                config,
-                max_concurrency=3
+                image_files, config, max_concurrency=3
             )
 
             # Print summary
@@ -164,6 +175,7 @@ async def main():
             print(f"Results saved to {output_file}")
         except Exception as e:
             print(f"Error in batch processing: {e}")
+
 
 if __name__ == "__main__":
     asyncio.run(main())

@@ -5,10 +5,10 @@ graph_agent_framework_with_gemini_marktechpost_comparison.md
 """
 
 import asyncio
-import structlog
-from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
 
+import structlog
 from morag_core.exceptions import ProcessingError
 
 logger = structlog.get_logger(__name__)
@@ -21,6 +21,7 @@ class ToolCallError(Exception):
 @dataclass
 class ToolCall:
     """Represents a function call from Gemini."""
+
     name: str
     args: Dict[str, Any]
     call_id: Optional[str] = None
@@ -29,6 +30,7 @@ class ToolCall:
 @dataclass
 class ToolResult:
     """Result of a tool call execution."""
+
     call_id: Optional[str]
     result: Any
     error: Optional[str] = None
@@ -38,6 +40,7 @@ class ToolResult:
 @dataclass
 class ActionTrace:
     """Trace of tool call execution for auditability."""
+
     tool_name: str
     args: Dict[str, Any]
     result: Any
@@ -59,7 +62,7 @@ class GraphToolController:
         "match_entity",
         "expand_neighbors",
         "fetch_chunk",
-        "extract_facts"
+        "extract_facts",
     }
 
     def __init__(
@@ -68,7 +71,7 @@ class GraphToolController:
         score_threshold: float = 0.7,
         max_entities_per_call: int = 10,
         max_neighbors_per_entity: int = 5,
-        max_chunks_per_entity: int = 3
+        max_chunks_per_entity: int = 3,
     ):
         """Initialize the graph tool controller.
 
@@ -98,9 +101,9 @@ class GraphToolController:
         """Initialize required services."""
         # Import here to avoid circular dependencies
         try:
+            from morag_embedding.service import EmbeddingService
             from morag_graph.storage import get_neo4j_storage
             from morag_reasoning.graph_fact_extractor import GraphFactExtractor
-            from morag_embedding.service import EmbeddingService
 
             self.graph_store = get_neo4j_storage()
             self.fact_extractor = GraphFactExtractor()
@@ -126,11 +129,11 @@ class GraphToolController:
                     "properties": {
                         "text": {
                             "type": "string",
-                            "description": "Text to extract entities from"
+                            "description": "Text to extract entities from",
                         }
                     },
-                    "required": ["text"]
-                }
+                    "required": ["text"],
+                },
             },
             {
                 "name": "match_entity",
@@ -140,11 +143,11 @@ class GraphToolController:
                     "properties": {
                         "name": {
                             "type": "string",
-                            "description": "Entity name to resolve"
+                            "description": "Entity name to resolve",
                         }
                     },
-                    "required": ["name"]
-                }
+                    "required": ["name"],
+                },
             },
             {
                 "name": "expand_neighbors",
@@ -154,17 +157,17 @@ class GraphToolController:
                     "properties": {
                         "entity_id": {
                             "type": "string",
-                            "description": "Entity ID to expand neighbors for"
+                            "description": "Entity ID to expand neighbors for",
                         },
                         "depth": {
                             "type": "integer",
                             "description": "Maximum depth to expand (default: 1)",
                             "minimum": 1,
-                            "maximum": 3
-                        }
+                            "maximum": 3,
+                        },
                     },
-                    "required": ["entity_id"]
-                }
+                    "required": ["entity_id"],
+                },
             },
             {
                 "name": "fetch_chunk",
@@ -174,11 +177,11 @@ class GraphToolController:
                     "properties": {
                         "entity_id": {
                             "type": "string",
-                            "description": "Entity ID to fetch chunks for"
+                            "description": "Entity ID to fetch chunks for",
                         }
                     },
-                    "required": ["entity_id"]
-                }
+                    "required": ["entity_id"],
+                },
             },
             {
                 "name": "extract_facts",
@@ -188,12 +191,12 @@ class GraphToolController:
                     "properties": {
                         "text": {
                             "type": "string",
-                            "description": "Text to extract facts from"
+                            "description": "Text to extract facts from",
                         }
                     },
-                    "required": ["text"]
-                }
-            }
+                    "required": ["text"],
+                },
+            },
         ]
 
     async def handle_tool_call(self, call: ToolCall) -> ToolResult:
@@ -212,7 +215,9 @@ class GraphToolController:
 
         # Validate tool name
         if call.name not in self.ALLOWED_TOOLS:
-            error_msg = f"Tool '{call.name}' not allowed. Allowed tools: {self.ALLOWED_TOOLS}"
+            error_msg = (
+                f"Tool '{call.name}' not allowed. Allowed tools: {self.ALLOWED_TOOLS}"
+            )
             logger.warning("Unauthorized tool call attempted", tool=call.name)
             raise ToolCallError(error_msg)
 
@@ -239,20 +244,18 @@ class GraphToolController:
                 args=call.args,
                 result=result,
                 execution_time=execution_time,
-                timestamp=str(asyncio.get_event_loop().time())
+                timestamp=str(asyncio.get_event_loop().time()),
             )
             self.action_traces.append(trace)
 
             logger.info(
                 "Tool call executed successfully",
                 tool=call.name,
-                execution_time=execution_time
+                execution_time=execution_time,
             )
 
             return ToolResult(
-                call_id=call.call_id,
-                result=result,
-                execution_time=execution_time
+                call_id=call.call_id, result=result, execution_time=execution_time
             )
 
         except Exception as e:
@@ -266,7 +269,7 @@ class GraphToolController:
                 result=None,
                 execution_time=execution_time,
                 timestamp=str(asyncio.get_event_loop().time()),
-                error=error_msg
+                error=error_msg,
             )
             self.action_traces.append(trace)
 
@@ -274,14 +277,14 @@ class GraphToolController:
                 "Tool call failed",
                 tool=call.name,
                 error=error_msg,
-                execution_time=execution_time
+                execution_time=execution_time,
             )
 
             return ToolResult(
                 call_id=call.call_id,
                 result=None,
                 error=error_msg,
-                execution_time=execution_time
+                execution_time=execution_time,
             )
 
     async def _extract_entities(self, args: Dict[str, Any]) -> Dict[str, Any]:
@@ -298,16 +301,17 @@ class GraphToolController:
 
         # Extract unique entities from facts
         entities = set()
-        for fact in facts[:self.max_entities_per_call]:
-            if hasattr(fact, 'structured_metadata') and fact.structured_metadata and fact.structured_metadata.primary_entities:
+        for fact in facts[: self.max_entities_per_call]:
+            if (
+                hasattr(fact, "structured_metadata")
+                and fact.structured_metadata
+                and fact.structured_metadata.primary_entities
+            ):
                 for entity in fact.structured_metadata.primary_entities:
                     if entity and entity.strip():
                         entities.add(entity.strip())
 
-        return {
-            "entities": list(entities),
-            "count": len(entities)
-        }
+        return {"entities": list(entities), "count": len(entities)}
 
     async def _match_entity(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """Resolve entity mention to canonical entity in graph."""
@@ -327,22 +331,21 @@ class GraphToolController:
                     "entity_id": None,
                     "canonical_name": name,
                     "confidence": 0.0,
-                    "alternatives": []
+                    "alternatives": [],
                 }
 
             # Return best match
             best_match = entities[0]
-            alternatives = [{
-                "id": e.id,
-                "name": e.name,
-                "type": getattr(e, 'type', 'unknown')
-            } for e in entities[1:]]
+            alternatives = [
+                {"id": e.id, "name": e.name, "type": getattr(e, "type", "unknown")}
+                for e in entities[1:]
+            ]
 
             return {
                 "entity_id": best_match.id,
                 "canonical_name": best_match.name,
                 "confidence": 1.0,  # Could implement similarity scoring
-                "alternatives": alternatives
+                "alternatives": alternatives,
             }
 
         except Exception as e:
@@ -352,7 +355,7 @@ class GraphToolController:
                 "canonical_name": name,
                 "confidence": 0.0,
                 "alternatives": [],
-                "error": str(e)
+                "error": str(e),
             }
 
     async def _expand_neighbors(self, args: Dict[str, Any]) -> Dict[str, Any]:
@@ -370,27 +373,26 @@ class GraphToolController:
             await self.initialize_services()
 
         try:
-            neighbors = await self.graph_store.get_neighbors(
-                entity_id,
-                max_depth=depth
-            )
+            neighbors = await self.graph_store.get_neighbors(entity_id, max_depth=depth)
 
             # Limit results
-            neighbors = neighbors[:self.max_neighbors_per_entity]
+            neighbors = neighbors[: self.max_neighbors_per_entity]
 
             neighbor_data = []
             for neighbor in neighbors:
-                neighbor_data.append({
-                    "id": neighbor.id,
-                    "name": neighbor.name,
-                    "type": getattr(neighbor, 'type', 'unknown'),
-                    "properties": getattr(neighbor, 'properties', {})
-                })
+                neighbor_data.append(
+                    {
+                        "id": neighbor.id,
+                        "name": neighbor.name,
+                        "type": getattr(neighbor, "type", "unknown"),
+                        "properties": getattr(neighbor, "properties", {}),
+                    }
+                )
 
             return {
                 "neighbors": neighbor_data,
                 "count": len(neighbor_data),
-                "depth_used": depth
+                "depth_used": depth,
             }
 
         except Exception as e:
@@ -410,11 +412,7 @@ class GraphToolController:
             # Get entity first
             entity = await self.graph_store.get_entity(entity_id)
             if not entity:
-                return {
-                    "chunks": [],
-                    "count": 0,
-                    "error": "Entity not found"
-                }
+                return {"chunks": [], "count": 0, "error": "Entity not found"}
 
             # For now, return mock chunks - this would need integration with chunk storage
             chunks = []
@@ -423,28 +421,30 @@ class GraphToolController:
             # chunks = await self.chunk_store.get_chunks_by_entity(entity_id)
 
             chunk_data = []
-            for i, chunk in enumerate(chunks[:self.max_chunks_per_entity]):
+            for i, chunk in enumerate(chunks[: self.max_chunks_per_entity]):
                 # Extract filename from document_id or document_title
                 filename = "unknown"
-                if hasattr(chunk, 'document_title') and chunk.document_title:
+                if hasattr(chunk, "document_title") and chunk.document_title:
                     filename = chunk.document_title
-                elif hasattr(chunk, 'document_id') and chunk.document_id:
+                elif hasattr(chunk, "document_id") and chunk.document_id:
                     filename = chunk.document_id
 
                 # Format structured citation
                 source_tag = f"[document:{filename}:{i}:entity_id={entity_id}]"
 
-                chunk_data.append({
-                    "text": getattr(chunk, 'text', ''),
-                    "source": source_tag,
-                    "chunk_id": getattr(chunk, 'id', f"chunk_{i}"),
-                    "metadata": getattr(chunk, 'metadata', {})
-                })
+                chunk_data.append(
+                    {
+                        "text": getattr(chunk, "text", ""),
+                        "source": source_tag,
+                        "chunk_id": getattr(chunk, "id", f"chunk_{i}"),
+                        "metadata": getattr(chunk, "metadata", {}),
+                    }
+                )
 
             return {
                 "chunks": chunk_data,
                 "count": len(chunk_data),
-                "entity_name": entity.name
+                "entity_name": entity.name,
             }
 
         except Exception as e:
@@ -468,27 +468,28 @@ class GraphToolController:
                 # Ensure structured citation format
                 source_tag = f"[document:extracted_text:{i}:fact_id={fact.fact_id}]"
 
-                fact_data.append({
-                    "fact_id": fact.fact_id,
-                    "subject": getattr(fact, 'subject', ''),
-                    "predicate": getattr(fact, 'predicate', ''),
-                    "object": getattr(fact, 'object', ''),
-                    "confidence": getattr(fact, 'confidence', 0.0),
-                    "source": source_tag,
-                    "metadata": getattr(fact, 'metadata', {})
-                })
+                fact_data.append(
+                    {
+                        "fact_id": fact.fact_id,
+                        "subject": getattr(fact, "subject", ""),
+                        "predicate": getattr(fact, "predicate", ""),
+                        "object": getattr(fact, "object", ""),
+                        "confidence": getattr(fact, "confidence", 0.0),
+                        "source": source_tag,
+                        "metadata": getattr(fact, "metadata", {}),
+                    }
+                )
 
             # Filter by confidence threshold
             filtered_facts = [
-                f for f in fact_data
-                if f['confidence'] >= self.score_threshold
+                f for f in fact_data if f["confidence"] >= self.score_threshold
             ]
 
             return {
                 "facts": filtered_facts,
                 "total_extracted": len(fact_data),
                 "filtered_count": len(filtered_facts),
-                "score_threshold": self.score_threshold
+                "score_threshold": self.score_threshold,
             }
 
         except Exception as e:
@@ -520,5 +521,6 @@ class GraphToolController:
             "tool_counts": tool_counts,
             "total_execution_time": total_time,
             "error_count": error_count,
-            "success_rate": (len(self.action_traces) - error_count) / max(len(self.action_traces), 1)
+            "success_rate": (len(self.action_traces) - error_count)
+            / max(len(self.action_traces), 1),
         }

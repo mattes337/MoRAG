@@ -1,21 +1,22 @@
 """Batch processing utilities for LLM operations."""
 
 import logging
-from typing import List, Dict, Any, Optional, Callable, TypeVar, Generic
-from dataclasses import dataclass
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from typing import Any, Callable, Dict, Generic, List, Optional, TypeVar
 
 from .llm import LLMClient
 
 logger = logging.getLogger(__name__)
 
-T = TypeVar('T')
-R = TypeVar('R')
+T = TypeVar("T")
+R = TypeVar("R")
 
 
 @dataclass
 class BatchItem(Generic[T]):
     """Represents an item to be processed in a batch."""
+
     data: T
     prompt: str
     metadata: Optional[Dict[str, Any]] = None
@@ -24,6 +25,7 @@ class BatchItem(Generic[T]):
 @dataclass
 class BatchResult(Generic[T, R]):
     """Represents the result of batch processing."""
+
     item: T
     result: R
     success: bool
@@ -72,7 +74,7 @@ class BatchProcessor(ABC, Generic[T, R]):
         self,
         items: List[T],
         max_tokens: Optional[int] = None,
-        temperature: Optional[float] = None
+        temperature: Optional[float] = None,
     ) -> List[BatchResult[T, R]]:
         """Process a batch of items using LLM with memory-aware streaming.
 
@@ -96,7 +98,7 @@ class BatchProcessor(ABC, Generic[T, R]):
         chunk_size = min(self.batch_size, 50)  # Conservative chunk size
 
         for i in range(0, len(items), chunk_size):
-            chunk = items[i:i + chunk_size]
+            chunk = items[i : i + chunk_size]
             chunk_memory = sum(len(str(item)) for item in chunk) / (1024 * 1024)
 
             # If memory threshold exceeded, flush accumulated results
@@ -113,11 +115,11 @@ class BatchProcessor(ABC, Generic[T, R]):
                 except Exception as e:
                     self.logger.error(f"Failed to create prompt for item: {str(e)}")
                     # Add error result
-                    batch_items.append(BatchItem(
-                        data=item,
-                        prompt="",
-                        metadata={"prompt_error": str(e)}
-                    ))
+                    batch_items.append(
+                        BatchItem(
+                            data=item, prompt="", metadata={"prompt_error": str(e)}
+                        )
+                    )
 
             # Extract prompts for LLM processing
             prompts = [item.prompt for item in batch_items if item.prompt]
@@ -129,7 +131,9 @@ class BatchProcessor(ABC, Generic[T, R]):
                         item=batch_item.data,
                         result=None,
                         success=False,
-                        error_message=batch_item.metadata.get("prompt_error", "Failed to create prompt")
+                        error_message=batch_item.metadata.get(
+                            "prompt_error", "Failed to create prompt"
+                        ),
                     )
                     for batch_item in batch_items
                 ]
@@ -147,40 +151,56 @@ class BatchProcessor(ABC, Generic[T, R]):
                 for i, batch_item in enumerate(batch_items):
                     if not batch_item.prompt:
                         # This item had a prompt creation error
-                        chunk_results.append(BatchResult(
-                            item=batch_item.data,
-                            result=None,
-                            success=False,
-                            error_message=batch_item.metadata.get("prompt_error", "Failed to create prompt")
-                        ))
+                        chunk_results.append(
+                            BatchResult(
+                                item=batch_item.data,
+                                result=None,
+                                success=False,
+                                error_message=batch_item.metadata.get(
+                                    "prompt_error", "Failed to create prompt"
+                                ),
+                            )
+                        )
                         continue
 
                     try:
                         # Find corresponding response
-                        response_index = len([item for item in batch_items[:i] if item.prompt])
+                        response_index = len(
+                            [item for item in batch_items[:i] if item.prompt]
+                        )
                         if response_index < len(responses):
                             response = responses[response_index]
-                            parsed_result = self.parse_response(response, batch_item.data)
-                            chunk_results.append(BatchResult(
-                                item=batch_item.data,
-                                result=parsed_result,
-                                success=True
-                            ))
+                            parsed_result = self.parse_response(
+                                response, batch_item.data
+                            )
+                            chunk_results.append(
+                                BatchResult(
+                                    item=batch_item.data,
+                                    result=parsed_result,
+                                    success=True,
+                                )
+                            )
                         else:
-                            chunk_results.append(BatchResult(
+                            chunk_results.append(
+                                BatchResult(
+                                    item=batch_item.data,
+                                    result=None,
+                                    success=False,
+                                    error_message="No response received from LLM",
+                                )
+                            )
+                    except Exception as e:
+                        self.logger.error(
+                            f"Failed to parse response for item: {str(e)}"
+                        )
+                        chunk_results.append(
+                            BatchResult(
                                 item=batch_item.data,
                                 result=None,
                                 success=False,
-                                error_message="No response received from LLM"
-                            ))
-                    except Exception as e:
-                        self.logger.error(f"Failed to parse response for item: {str(e)}")
-                        chunk_results.append(BatchResult(
-                            item=batch_item.data,
-                            result=None,
-                            success=False,
-                            error_message=f"Failed to parse response: {str(e)}"
-                        ))
+                                error_message=f"Failed to parse response: {str(e)}",
+                            )
+                        )
 
                 all_results.extend(chunk_results)
                 current_memory_usage += chunk_memory
@@ -193,7 +213,7 @@ class BatchProcessor(ABC, Generic[T, R]):
                         item=batch_item.data,
                         result=None,
                         success=False,
-                        error_message=f"Batch processing failed: {str(e)}"
+                        error_message=f"Batch processing failed: {str(e)}",
                     )
                     for batch_item in batch_items
                 ]
@@ -211,7 +231,9 @@ class BatchProcessor(ABC, Generic[T, R]):
             results: List of accumulated results to flush
         """
         if results:
-            self.logger.debug(f"Flushing {len(results)} accumulated batch results to free memory")
+            self.logger.debug(
+                f"Flushing {len(results)} accumulated batch results to free memory"
+            )
             # In a more advanced implementation, results could be written to disk
             # or streamed to a database here to prevent memory accumulation
             # For now, we rely on the caller to handle the cleared results
@@ -220,7 +242,12 @@ class BatchProcessor(ABC, Generic[T, R]):
 class TextAnalysisBatchProcessor(BatchProcessor[str, Dict[str, Any]]):
     """Batch processor for text analysis tasks."""
 
-    def __init__(self, llm_client: LLMClient, analysis_type: str = "general", batch_size: Optional[int] = None):
+    def __init__(
+        self,
+        llm_client: LLMClient,
+        analysis_type: str = "general",
+        batch_size: Optional[int] = None,
+    ):
         """Initialize text analysis batch processor.
 
         Args:
@@ -267,18 +294,30 @@ Analysis:"""
             if self.analysis_type in ["entity_extraction", "relation_extraction"]:
                 # Try to parse as JSON
                 import json
+
                 return {"analysis": json.loads(response.strip()), "original_text": text}
             else:
                 return {"analysis": response.strip(), "original_text": text}
         except Exception as e:
-            self.logger.warning(f"Failed to parse JSON response, returning as text: {str(e)}")
-            return {"analysis": response.strip(), "original_text": text, "parse_error": str(e)}
+            self.logger.warning(
+                f"Failed to parse JSON response, returning as text: {str(e)}"
+            )
+            return {
+                "analysis": response.strip(),
+                "original_text": text,
+                "parse_error": str(e),
+            }
 
 
 class DocumentChunkBatchProcessor(BatchProcessor[Dict[str, Any], Dict[str, Any]]):
     """Batch processor for document chunks."""
 
-    def __init__(self, llm_client: LLMClient, processing_type: str = "extraction", batch_size: Optional[int] = None):
+    def __init__(
+        self,
+        llm_client: LLMClient,
+        processing_type: str = "extraction",
+        batch_size: Optional[int] = None,
+    ):
         """Initialize document chunk batch processor.
 
         Args:
@@ -328,29 +367,32 @@ Analysis:"""
         try:
             if self.processing_type == "extraction":
                 import json
+
                 parsed = json.loads(response.strip())
                 return {
                     "chunk_id": chunk.get("id"),
                     "document_id": chunk.get("document_id"),
                     "entities": parsed.get("entities", []),
                     "relations": parsed.get("relations", []),
-                    "original_chunk": chunk
+                    "original_chunk": chunk,
                 }
             else:
                 return {
                     "chunk_id": chunk.get("id"),
                     "document_id": chunk.get("document_id"),
                     "result": response.strip(),
-                    "original_chunk": chunk
+                    "original_chunk": chunk,
                 }
         except Exception as e:
-            self.logger.warning(f"Failed to parse response, returning as text: {str(e)}")
+            self.logger.warning(
+                f"Failed to parse response, returning as text: {str(e)}"
+            )
             return {
                 "chunk_id": chunk.get("id"),
                 "document_id": chunk.get("document_id"),
                 "result": response.strip(),
                 "original_chunk": chunk,
-                "parse_error": str(e)
+                "parse_error": str(e),
             }
 
 
@@ -361,7 +403,7 @@ async def batch_llm_calls(
     response_parser: Callable[[str, T], R],
     max_tokens: Optional[int] = None,
     temperature: Optional[float] = None,
-    batch_size: Optional[int] = None
+    batch_size: Optional[int] = None,
 ) -> List[BatchResult[T, R]]:
     """Utility function to easily batch LLM calls.
 
@@ -377,6 +419,7 @@ async def batch_llm_calls(
     Returns:
         List of batch results
     """
+
     class CustomBatchProcessor(BatchProcessor[T, R]):
         def create_prompt(self, item: T) -> str:
             return prompt_creator(item)
@@ -394,7 +437,7 @@ async def batch_text_analysis(
     analysis_type: str = "general",
     max_tokens: Optional[int] = None,
     temperature: Optional[float] = None,
-    batch_size: Optional[int] = None
+    batch_size: Optional[int] = None,
 ) -> List[BatchResult[str, Dict[str, Any]]]:
     """Convenience function for batch text analysis.
 
@@ -419,7 +462,7 @@ async def batch_document_chunks(
     processing_type: str = "extraction",
     max_tokens: Optional[int] = None,
     temperature: Optional[float] = None,
-    batch_size: Optional[int] = None
+    batch_size: Optional[int] = None,
 ) -> List[BatchResult[Dict[str, Any], Dict[str, Any]]]:
     """Convenience function for batch document chunk processing.
 

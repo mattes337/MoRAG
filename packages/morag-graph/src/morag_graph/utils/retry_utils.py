@@ -2,9 +2,10 @@
 
 import asyncio
 import random
-import structlog
-from typing import Callable, Any, Optional
 from functools import wraps
+from typing import Any, Callable, Optional
+
+import structlog
 
 logger = structlog.get_logger(__name__)
 
@@ -26,7 +27,7 @@ def is_retryable_error(error: Exception) -> bool:
         "server error",
         "resource_exhausted",
         "resource exhausted",
-        "unavailable"
+        "unavailable",
     ]
 
     return any(pattern in error_str for pattern in retryable_patterns)
@@ -39,7 +40,7 @@ async def retry_with_exponential_backoff(
     max_delay: float = 300.0,
     exponential_base: float = 2.0,
     jitter: bool = True,
-    operation_name: str = "operation"
+    operation_name: str = "operation",
 ) -> Any:
     """
     Retry a function with exponential backoff for retryable errors.
@@ -78,7 +79,7 @@ async def retry_with_exponential_backoff(
                     f"{operation_name} failed with non-retryable error",
                     attempt=attempt,
                     error=str(e),
-                    error_type=type(e).__name__
+                    error_type=type(e).__name__,
                 )
                 raise e
 
@@ -87,19 +88,16 @@ async def retry_with_exponential_backoff(
                 logger.error(
                     f"{operation_name} failed after {max_retries} attempts",
                     error=str(e),
-                    error_type=type(e).__name__
+                    error_type=type(e).__name__,
                 )
                 break
 
             # Calculate delay with exponential backoff
-            delay = min(
-                base_delay * (exponential_base ** (attempt - 1)),
-                max_delay
-            )
+            delay = min(base_delay * (exponential_base ** (attempt - 1)), max_delay)
 
             # Add jitter to prevent thundering herd
             if jitter:
-                delay *= (0.5 + random.random() * 0.5)  # Add 0-50% jitter
+                delay *= 0.5 + random.random() * 0.5  # Add 0-50% jitter
 
             logger.warning(
                 f"{operation_name} failed with retryable error, retrying with exponential backoff",
@@ -107,7 +105,7 @@ async def retry_with_exponential_backoff(
                 max_retries=max_retries,
                 delay=delay,
                 error=str(e),
-                error_type=type(e).__name__
+                error_type=type(e).__name__,
             )
 
             await asyncio.sleep(delay)
@@ -120,7 +118,7 @@ def retry_on_api_errors(
     max_retries: Optional[int] = None,
     base_delay: Optional[float] = None,
     max_delay: Optional[float] = None,
-    operation_name: str = "API operation"
+    operation_name: str = "API operation",
 ):
     """
     Decorator for retrying functions on API errors with exponential backoff.
@@ -131,15 +129,28 @@ def retry_on_api_errors(
         max_delay: Maximum delay in seconds (uses config default if None)
         operation_name: Name of the operation for logging
     """
+
     def decorator(func):
         @wraps(func)
         async def wrapper(*args, **kwargs):
             # Get retry configuration from settings
             from morag_core.config import settings
 
-            effective_max_retries = max_retries if max_retries is not None else settings.entity_extraction_max_retries
-            effective_base_delay = base_delay if base_delay is not None else settings.entity_extraction_retry_base_delay
-            effective_max_delay = max_delay if max_delay is not None else settings.entity_extraction_retry_max_delay
+            effective_max_retries = (
+                max_retries
+                if max_retries is not None
+                else settings.entity_extraction_max_retries
+            )
+            effective_base_delay = (
+                base_delay
+                if base_delay is not None
+                else settings.entity_extraction_retry_base_delay
+            )
+            effective_max_delay = (
+                max_delay
+                if max_delay is not None
+                else settings.entity_extraction_retry_max_delay
+            )
 
             return await retry_with_exponential_backoff(
                 lambda: func(*args, **kwargs),
@@ -147,7 +158,9 @@ def retry_on_api_errors(
                 base_delay=effective_base_delay,
                 max_delay=effective_max_delay,
                 jitter=settings.retry_jitter,
-                operation_name=operation_name
+                operation_name=operation_name,
             )
+
         return wrapper
+
     return decorator

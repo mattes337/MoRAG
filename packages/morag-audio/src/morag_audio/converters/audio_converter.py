@@ -1,20 +1,21 @@
 """Audio document converter using markitdown framework."""
 
 import time
-from pathlib import Path
-from typing import Union, List, Dict, Any, Optional, Set, TYPE_CHECKING
 from dataclasses import dataclass, field
-import structlog
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Union
 
+import structlog
 from morag_core.interfaces.converter import (
-    ConversionResult,
-    ConversionOptions,
-    QualityScore,
     ConversionError,
+    ConversionOptions,
+    ConversionResult,
+    QualityScore,
     UnsupportedFormatError,
 )
 from morag_core.models.document import Document, DocumentType
 from morag_document.services.markitdown_service import MarkitdownService
+
 if TYPE_CHECKING:
     from morag_audio.processor import AudioProcessingResult, AudioSegment
 
@@ -24,21 +25,31 @@ logger = structlog.get_logger(__name__)
 @dataclass
 class AudioConversionOptions:
     """Options for audio conversion to markdown."""
+
     include_timestamps: bool = True
     include_speakers: bool = True
     include_topics: bool = True
-    timestamp_format: str = "[%H:%M:%S]"  # Format for timestamps (legacy, now using dynamic format)
+    timestamp_format: str = (
+        "[%H:%M:%S]"  # Format for timestamps (legacy, now using dynamic format)
+    )
     group_by_speaker: bool = False  # Group consecutive segments by the same speaker (disabled for per-line timestamps)
     group_by_topic: bool = True  # Group segments by topic
     include_metadata: bool = True  # Include metadata section in markdown
-    metadata_fields: List[str] = field(default_factory=lambda: [
-        "duration", "num_speakers", "speakers", "num_topics", "word_count"
-    ])
+    metadata_fields: List[str] = field(
+        default_factory=lambda: [
+            "duration",
+            "num_speakers",
+            "speakers",
+            "num_topics",
+            "word_count",
+        ]
+    )
 
 
 @dataclass
 class AudioConversionResult:
     """Result of audio conversion to markdown."""
+
     content: str
     metadata: Dict[str, Any]
     processing_time: float
@@ -53,7 +64,18 @@ class AudioConverter:
         """Initialize Audio converter."""
         self.name = "MoRAG Audio Converter"
         self.supported_formats: Set[str] = {
-            "audio", "mp3", "wav", "m4a", "flac", "aac", "ogg", "wma", "mp4", "avi", "mov", "mkv"
+            "audio",
+            "mp3",
+            "wav",
+            "m4a",
+            "flac",
+            "aac",
+            "ogg",
+            "wma",
+            "mp4",
+            "avi",
+            "mov",
+            "mkv",
         }
         self.markitdown_service = MarkitdownService()
 
@@ -67,7 +89,18 @@ class AudioConverter:
             True if format is supported, False otherwise
         """
         return format_type.lower() in {
-            "audio", "mp3", "wav", "m4a", "flac", "aac", "ogg", "wma", "mp4", "avi", "mov", "mkv"
+            "audio",
+            "mp3",
+            "wav",
+            "m4a",
+            "flac",
+            "aac",
+            "ogg",
+            "wma",
+            "mp4",
+            "avi",
+            "mov",
+            "mkv",
         }
 
     async def convert(
@@ -94,15 +127,19 @@ class AudioConverter:
             raise ConversionError(f"Audio file not found: {file_path}")
 
         # Detect format if not specified
-        format_type = options.format_type or file_path.suffix.lower().lstrip('.')
+        format_type = options.format_type or file_path.suffix.lower().lstrip(".")
 
         # Check if format is supported
         if not await self.supports_format(format_type):
-            raise UnsupportedFormatError(f"Format '{format_type}' is not supported by audio converter")
+            raise UnsupportedFormatError(
+                f"Format '{format_type}' is not supported by audio converter"
+            )
 
         try:
             # Use markitdown for audio transcription
-            logger.info("Converting audio file with markitdown", file_path=str(file_path))
+            logger.info(
+                "Converting audio file with markitdown", file_path=str(file_path)
+            )
 
             result = await self.markitdown_service.convert_file(file_path)
 
@@ -117,8 +154,8 @@ class AudioConverter:
                     "file_size": file_path.stat().st_size,
                     "format": format_type,
                     "conversion_method": "markitdown",
-                    **result.metadata
-                }
+                    **result.metadata,
+                },
             )
 
             # Calculate quality score
@@ -127,22 +164,24 @@ class AudioConverter:
                 text_extraction_score=0.9,
                 structure_preservation_score=0.8,
                 metadata_extraction_score=0.9,
-                issues_detected=[]
+                issues_detected=[],
             )
 
             return ConversionResult(
-                document=document,
-                quality_score=quality_score,
-                warnings=[]
+                document=document, quality_score=quality_score, warnings=[]
             )
 
         except Exception as e:
-            logger.error("Audio conversion failed", error=str(e), file_path=str(file_path))
+            logger.error(
+                "Audio conversion failed", error=str(e), file_path=str(file_path)
+            )
             raise ConversionError(f"Failed to convert audio file: {e}") from e
 
-    async def convert_to_json(self,
-                             result: "AudioProcessingResult",
-                             options: Optional[AudioConversionOptions] = None) -> Dict[str, Any]:
+    async def convert_to_json(
+        self,
+        result: "AudioProcessingResult",
+        options: Optional[AudioConversionOptions] = None,
+    ) -> Dict[str, Any]:
         """Convert audio processing result to structured JSON.
 
         Args:
@@ -161,16 +200,21 @@ class AudioConverter:
                     "filename": result.file_path,
                     "metadata": result.metadata,
                     "topics": [],
-                    "error": result.error_message
+                    "error": result.error_message,
                 }
 
             # Group segments by topic if topic segmentation is enabled
             topics = []
-            if options.include_topics and any(hasattr(segment, 'topic') and segment.topic is not None for segment in result.segments):
+            if options.include_topics and any(
+                hasattr(segment, "topic") and segment.topic is not None
+                for segment in result.segments
+            ):
                 # Group by topic
                 topic_groups = {}
                 for segment in result.segments:
-                    topic_id = getattr(segment, 'topic', 0) if hasattr(segment, 'topic') else 0
+                    topic_id = (
+                        getattr(segment, "topic", 0) if hasattr(segment, "topic") else 0
+                    )
                     if topic_id not in topic_groups:
                         topic_groups[topic_id] = []
                     topic_groups[topic_id].append(segment)
@@ -179,14 +223,16 @@ class AudioConverter:
                 for topic_id, segments in sorted(topic_groups.items()):
                     topic_data = {
                         "timestamp": int(segments[0].start) if segments else 0,
-                        "sentences": []
+                        "sentences": [],
                     }
 
                     for segment in segments:
                         sentence = {
                             "timestamp": int(segment.start),
-                            "speaker": getattr(segment, 'speaker', 1) if hasattr(segment, 'speaker') else 1,
-                            "text": segment.text
+                            "speaker": getattr(segment, "speaker", 1)
+                            if hasattr(segment, "speaker")
+                            else 1,
+                            "text": segment.text,
                         }
                         topic_data["sentences"].append(sentence)
 
@@ -194,15 +240,19 @@ class AudioConverter:
             else:
                 # Single topic with all segments
                 topic_data = {
-                    "timestamp": int(result.segments[0].start) if result.segments else 0,
-                    "sentences": []
+                    "timestamp": int(result.segments[0].start)
+                    if result.segments
+                    else 0,
+                    "sentences": [],
                 }
 
                 for segment in result.segments:
                     sentence = {
                         "timestamp": int(segment.start),
-                        "speaker": getattr(segment, 'speaker', 1) if hasattr(segment, 'speaker') else 1,
-                        "text": segment.text
+                        "speaker": getattr(segment, "speaker", 1)
+                        if hasattr(segment, "speaker")
+                        else 1,
+                        "text": segment.text,
                     }
                     topic_data["sentences"].append(sentence)
 
@@ -216,7 +266,7 @@ class AudioConverter:
                 "title": title,
                 "filename": filename,
                 "metadata": result.metadata,
-                "topics": topics
+                "topics": topics,
             }
 
         except Exception as e:
@@ -226,12 +276,14 @@ class AudioConverter:
                 "filename": result.file_path,
                 "metadata": result.metadata,
                 "topics": [],
-                "error": str(e)
+                "error": str(e),
             }
 
-    async def convert_to_markdown(self,
-                                result: "AudioProcessingResult",
-                                options: Optional[AudioConversionOptions] = None) -> AudioConversionResult:
+    async def convert_to_markdown(
+        self,
+        result: "AudioProcessingResult",
+        options: Optional[AudioConversionOptions] = None,
+    ) -> AudioConversionResult:
         """Convert audio processing result to structured markdown.
 
         Args:
@@ -246,11 +298,15 @@ class AudioConverter:
 
         try:
             if not result.success:
-                raise ConversionError(f"Cannot convert unsuccessful processing result: {result.error_message}")
+                raise ConversionError(
+                    f"Cannot convert unsuccessful processing result: {result.error_message}"
+                )
 
             # Check if we have either segments or transcript
             if not result.segments and not result.transcript:
-                raise ConversionError("Cannot convert result: no segments or transcript available")
+                raise ConversionError(
+                    "Cannot convert result: no segments or transcript available"
+                )
 
             markdown_content = []
 
@@ -269,7 +325,9 @@ class AudioConverter:
                             hours, remainder = divmod(int(value), 3600)
                             minutes, seconds = divmod(remainder, 60)
                             value = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
-                        markdown_content.append(f"- **{field.replace('_', ' ').title()}**: {value}")
+                        markdown_content.append(
+                            f"- **{field.replace('_', ' ').title()}**: {value}"
+                        )
                 markdown_content.append("\n")
 
             # Choose between Full Transcript and Detailed Transcript (mutually exclusive)
@@ -280,10 +338,17 @@ class AudioConverter:
                 markdown_content.append("")
 
                 # Group segments by topic if both topic grouping and topic inclusion are enabled, and topic information is available
-                if options.group_by_topic and options.include_topics and any(hasattr(segment, 'topic_id') and segment.topic_id is not None for segment in result.segments):
+                if (
+                    options.group_by_topic
+                    and options.include_topics
+                    and any(
+                        hasattr(segment, "topic_id") and segment.topic_id is not None
+                        for segment in result.segments
+                    )
+                ):
                     topic_groups = {}
                     for segment in result.segments:
-                        topic_id = getattr(segment, 'topic_id', None)
+                        topic_id = getattr(segment, "topic_id", None)
                         if topic_id is not None:
                             if topic_id not in topic_groups:
                                 topic_groups[topic_id] = []
@@ -296,10 +361,16 @@ class AudioConverter:
 
                     # Get topic information from result metadata if available
                     topic_info_map = {}
-                    if hasattr(result, 'topic_segmentation') and result.topic_segmentation:
+                    if (
+                        hasattr(result, "topic_segmentation")
+                        and result.topic_segmentation
+                    ):
                         for topic_segment in result.topic_segmentation.segments:
                             # Extract topic ID from topic_segment.topic_id (e.g., "TOPIC_00" -> 0)
-                            if hasattr(topic_segment, 'topic_id') and topic_segment.topic_id:
+                            if (
+                                hasattr(topic_segment, "topic_id")
+                                and topic_segment.topic_id
+                            ):
                                 topic_id_str = topic_segment.topic_id
                                 if topic_id_str.startswith("TOPIC_"):
                                     try:
@@ -317,8 +388,10 @@ class AudioConverter:
                             topic_start_seconds = None
 
                             if topic_segment:
-                                topic_title = getattr(topic_segment, 'title', None)
-                                topic_start_seconds = int(getattr(topic_segment, 'start_time', 0))
+                                topic_title = getattr(topic_segment, "title", None)
+                                topic_start_seconds = int(
+                                    getattr(topic_segment, "start_time", 0)
+                                )
 
                             # Fallback to calculating from segments if no topic info
                             if not topic_title or topic_start_seconds is None:
@@ -331,7 +404,9 @@ class AudioConverter:
                                     topic_title = topic_title or f"Topic {topic_id + 1}"
 
                             # Format topic header: # Topic Name [timestamp_in_seconds]
-                            markdown_content.append(f"# {topic_title} [{topic_start_seconds}]")
+                            markdown_content.append(
+                                f"# {topic_title} [{topic_start_seconds}]"
+                            )
                         else:
                             markdown_content.append("# Ungrouped Content [0]")
 
@@ -357,7 +432,8 @@ class AudioConverter:
             content = "\n".join(markdown_content)
             # Clean up multiple consecutive empty lines
             import re
-            content = re.sub(r'\n\s*\n\s*\n+', '\n\n', content)
+
+            content = re.sub(r"\n\s*\n\s*\n+", "\n\n", content)
 
             processing_time = time.time() - start_time
 
@@ -365,7 +441,7 @@ class AudioConverter:
                 content=content,
                 metadata=result.metadata,
                 processing_time=processing_time,
-                success=True
+                success=True,
             )
 
         except Exception as e:
@@ -377,10 +453,12 @@ class AudioConverter:
                 metadata={"error": str(e)},
                 processing_time=processing_time,
                 success=False,
-                error_message=str(e)
+                error_message=str(e),
             )
 
-    def _format_segments(self, segments: List["AudioSegment"], options: AudioConversionOptions) -> List[str]:
+    def _format_segments(
+        self, segments: List["AudioSegment"], options: AudioConversionOptions
+    ) -> List[str]:
         """Format segments into markdown lines."""
         markdown_lines = []
 
@@ -410,7 +488,9 @@ class AudioConverter:
 
                                 # Use MM:SS format for content under 1 hour, HH:MM:SS for longer content
                                 if hours > 0:
-                                    timestamp = f"[{hours:02d}:{minutes:02d}:{seconds:02d}]"
+                                    timestamp = (
+                                        f"[{hours:02d}:{minutes:02d}:{seconds:02d}]"
+                                    )
                                 else:
                                     timestamp = f"[{minutes:02d}:{seconds:02d}]"
                                 line_content += timestamp

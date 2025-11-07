@@ -1,12 +1,18 @@
 """Unit tests for audio processor."""
 
-import pytest
 import tempfile
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from morag_audio import AudioProcessor, AudioConfig, AudioProcessingResult, AudioTranscriptSegment
-from morag_core.exceptions import ProcessingError, ExternalServiceError
+import pytest
+from morag_audio import (
+    AudioConfig,
+    AudioProcessingResult,
+    AudioProcessor,
+    AudioTranscriptSegment,
+)
+from morag_core.exceptions import ExternalServiceError, ProcessingError
+
 
 class TestAudioProcessor:
     """Test cases for AudioProcessor."""
@@ -22,7 +28,7 @@ class TestAudioProcessor:
         return AudioConfig(
             model_size="tiny",  # Use smallest model for tests
             device="cpu",
-            compute_type="int8"
+            compute_type="int8",
         )
 
     @pytest.fixture
@@ -30,20 +36,20 @@ class TestAudioProcessor:
         """Create mock audio file."""
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
             # Create a simple WAV file header (minimal)
-            f.write(b'RIFF')
-            f.write((44).to_bytes(4, 'little'))  # File size
-            f.write(b'WAVE')
-            f.write(b'fmt ')
-            f.write((16).to_bytes(4, 'little'))  # Format chunk size
-            f.write((1).to_bytes(2, 'little'))   # Audio format (PCM)
-            f.write((1).to_bytes(2, 'little'))   # Number of channels
-            f.write((44100).to_bytes(4, 'little'))  # Sample rate
-            f.write((88200).to_bytes(4, 'little'))  # Byte rate
-            f.write((2).to_bytes(2, 'little'))   # Block align
-            f.write((16).to_bytes(2, 'little'))  # Bits per sample
-            f.write(b'data')
-            f.write((8).to_bytes(4, 'little'))   # Data chunk size
-            f.write(b'\x00' * 8)  # Audio data (silence)
+            f.write(b"RIFF")
+            f.write((44).to_bytes(4, "little"))  # File size
+            f.write(b"WAVE")
+            f.write(b"fmt ")
+            f.write((16).to_bytes(4, "little"))  # Format chunk size
+            f.write((1).to_bytes(2, "little"))  # Audio format (PCM)
+            f.write((1).to_bytes(2, "little"))  # Number of channels
+            f.write((44100).to_bytes(4, "little"))  # Sample rate
+            f.write((88200).to_bytes(4, "little"))  # Byte rate
+            f.write((2).to_bytes(2, "little"))  # Block align
+            f.write((16).to_bytes(2, "little"))  # Bits per sample
+            f.write(b"data")
+            f.write((8).to_bytes(4, "little"))  # Data chunk size
+            f.write(b"\x00" * 8)  # Audio data (silence)
 
             return Path(f.name)
 
@@ -138,7 +144,7 @@ class TestAudioProcessor:
         assert result_path == mock_audio_file
 
     @pytest.mark.asyncio
-    @patch('morag.processors.audio.PydubAudioSegment')
+    @patch("morag.processors.audio.PydubAudioSegment")
     async def test_convert_to_wav_conversion(self, mock_audio_segment, audio_processor):
         """Test audio format conversion."""
         # Create mock MP3 file
@@ -169,7 +175,7 @@ class TestAudioProcessor:
                 result_path.unlink()
 
     @pytest.mark.asyncio
-    @patch('morag.processors.audio.PydubAudioSegment')
+    @patch("morag.processors.audio.PydubAudioSegment")
     async def test_convert_to_wav_failure(self, mock_audio_segment, audio_processor):
         """Test audio conversion failure."""
         with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
@@ -186,8 +192,10 @@ class TestAudioProcessor:
             mp3_path.unlink()  # Clean up
 
     @pytest.mark.asyncio
-    @patch('morag.processors.audio.WhisperModel')
-    async def test_transcribe_audio_success(self, mock_whisper_model, audio_processor, mock_audio_file, audio_config):
+    @patch("morag.processors.audio.WhisperModel")
+    async def test_transcribe_audio_success(
+        self, mock_whisper_model, audio_processor, mock_audio_file, audio_config
+    ):
         """Test successful audio transcription."""
         # Mock Whisper model and results
         mock_model = Mock()
@@ -220,8 +228,10 @@ class TestAudioProcessor:
         assert result.segments[0].end_time == 2.0
 
     @pytest.mark.asyncio
-    @patch('morag.processors.audio.WhisperModel')
-    async def test_transcribe_audio_failure(self, mock_whisper_model, audio_processor, mock_audio_file, audio_config):
+    @patch("morag.processors.audio.WhisperModel")
+    async def test_transcribe_audio_failure(
+        self, mock_whisper_model, audio_processor, mock_audio_file, audio_config
+    ):
         """Test audio transcription failure."""
         # Mock Whisper model to raise exception
         mock_model = Mock()
@@ -232,10 +242,10 @@ class TestAudioProcessor:
             await audio_processor._transcribe_audio(mock_audio_file, audio_config)
 
     @pytest.mark.asyncio
-    @patch('morag.processors.audio.AudioProcessor._transcribe_audio')
-    @patch('morag.processors.audio.AudioProcessor._convert_to_wav')
-    @patch('morag.processors.audio.AudioProcessor._extract_metadata')
-    @patch('morag.processors.audio.AudioProcessor._validate_audio_file')
+    @patch("morag.processors.audio.AudioProcessor._transcribe_audio")
+    @patch("morag.processors.audio.AudioProcessor._convert_to_wav")
+    @patch("morag.processors.audio.AudioProcessor._extract_metadata")
+    @patch("morag.processors.audio.AudioProcessor._validate_audio_file")
     async def test_process_audio_file_success(
         self,
         mock_validate,
@@ -244,7 +254,7 @@ class TestAudioProcessor:
         mock_transcribe,
         audio_processor,
         mock_audio_file,
-        audio_config
+        audio_config,
     ):
         """Test successful audio file processing."""
         # Mock all the methods
@@ -256,10 +266,12 @@ class TestAudioProcessor:
             language="en",
             confidence=0.9,
             duration=2.0,
-            segments=[AudioTranscriptSegment("Hello world", 0.0, 2.0, 0.9, language="en")],
+            segments=[
+                AudioTranscriptSegment("Hello world", 0.0, 2.0, 0.9, language="en")
+            ],
             metadata={},
             processing_time=1.0,
-            model_used="tiny"
+            model_used="tiny",
         )
         mock_transcribe.return_value = mock_transcribe_result
 
@@ -295,7 +307,7 @@ class TestAudioProcessor:
             end_time=2.0,
             confidence=0.9,
             speaker_id="speaker_1",
-            language="en"
+            language="en",
         )
 
         assert segment.text == "Hello world"
@@ -318,7 +330,7 @@ class TestAudioProcessor:
             segments=segments,
             metadata=metadata,
             processing_time=1.5,
-            model_used="base"
+            model_used="base",
         )
 
         assert result.text == "Hello world"

@@ -5,7 +5,8 @@ import random
 import re
 import time
 from functools import wraps
-from typing import Callable, Any, Optional, Dict, Union
+from typing import Any, Callable, Dict, Optional, Union
+
 import structlog
 
 logger = structlog.get_logger(__name__)
@@ -14,7 +15,12 @@ logger = structlog.get_logger(__name__)
 class QuotaExhaustionError(Exception):
     """Exception raised when API quota is exhausted."""
 
-    def __init__(self, message: str, retry_after: Optional[int] = None, quota_type: Optional[str] = None):
+    def __init__(
+        self,
+        message: str,
+        retry_after: Optional[int] = None,
+        quota_type: Optional[str] = None,
+    ):
         super().__init__(message)
         self.retry_after = retry_after
         self.quota_type = quota_type
@@ -38,7 +44,7 @@ def parse_quota_error(error: Exception) -> Optional[Dict[str, Any]]:
         "resource exhausted",
         "quota",
         "rate limit",
-        "too many requests"
+        "too many requests",
     ]
 
     if not any(pattern in error_str.lower() for pattern in quota_patterns):
@@ -48,15 +54,15 @@ def parse_quota_error(error: Exception) -> Optional[Dict[str, Any]]:
         "is_quota_error": True,
         "retry_after": None,
         "quota_type": "unknown",
-        "quota_limit": None
+        "quota_limit": None,
     }
 
     # Extract retry delay from error message
     retry_patterns = [
         r"retry.*?(\d+)\s*s",  # "retry in 20s"
         r"retrydelay.*?(\d+)",  # "retryDelay: 20s"
-        r"wait.*?(\d+)\s*s",   # "wait 20s"
-        r"(\d+)\s*second",     # "20 seconds"
+        r"wait.*?(\d+)\s*s",  # "wait 20s"
+        r"(\d+)\s*second",  # "20 seconds"
     ]
 
     for pattern in retry_patterns:
@@ -94,7 +100,7 @@ async def retry_with_quota_handling(
     max_delay: float = 300.0,
     quota_wait_multiplier: float = 1.2,
     max_quota_wait: float = 600.0,
-    operation_name: str = "operation"
+    operation_name: str = "operation",
 ) -> Any:
     """
     Retry a function with intelligent quota exhaustion handling.
@@ -147,7 +153,7 @@ async def retry_with_quota_handling(
                     retry_after=retry_after,
                     actual_wait=actual_wait,
                     quota_wait_count=quota_wait_count,
-                    error=str(e)
+                    error=str(e),
                 )
 
                 # Wait for quota to reset
@@ -158,16 +164,23 @@ async def retry_with_quota_handling(
 
             # Check if this is a retryable non-quota error
             error_str = str(e).lower()
-            is_retryable = any(pattern in error_str for pattern in [
-                "503", "overload", "service unavailable", "temporarily unavailable", "server error"
-            ])
+            is_retryable = any(
+                pattern in error_str
+                for pattern in [
+                    "503",
+                    "overload",
+                    "service unavailable",
+                    "temporarily unavailable",
+                    "server error",
+                ]
+            )
 
             if not is_retryable:
                 logger.error(
                     f"{operation_name} failed with non-retryable error",
                     attempt=attempt,
                     error=str(e),
-                    error_type=type(e).__name__
+                    error_type=type(e).__name__,
                 )
                 raise e
 
@@ -177,7 +190,7 @@ async def retry_with_quota_handling(
                     f"{operation_name} failed after {max_retries} attempts",
                     error=str(e),
                     error_type=type(e).__name__,
-                    quota_waits=quota_wait_count
+                    quota_waits=quota_wait_count,
                 )
                 break
 
@@ -185,7 +198,7 @@ async def retry_with_quota_handling(
             delay = min(base_delay * (2 ** (attempt - 1)), max_delay)
 
             # Add jitter to prevent thundering herd
-            delay *= (0.5 + random.random() * 0.5)
+            delay *= 0.5 + random.random() * 0.5
 
             logger.warning(
                 f"{operation_name} failed with retryable error, retrying with exponential backoff",
@@ -193,7 +206,7 @@ async def retry_with_quota_handling(
                 max_retries=max_retries,
                 delay=delay,
                 error=str(e),
-                error_type=type(e).__name__
+                error_type=type(e).__name__,
             )
 
             await asyncio.sleep(delay)
@@ -205,7 +218,7 @@ async def retry_with_quota_handling(
 async def never_fail_extraction(
     extraction_func: Callable,
     fallback_strategies: Optional[list] = None,
-    operation_name: str = "extraction"
+    operation_name: str = "extraction",
 ) -> Any:
     """
     Wrapper that ensures extraction never completely fails.
@@ -226,13 +239,13 @@ async def never_fail_extraction(
         return await retry_with_quota_handling(
             extraction_func,
             max_retries=15,  # More retries for quota issues
-            operation_name=f"{operation_name} (main)"
+            operation_name=f"{operation_name} (main)",
         )
     except Exception as main_error:
         logger.warning(
             f"Main {operation_name} failed, trying fallback strategies",
             error=str(main_error),
-            error_type=type(main_error).__name__
+            error_type=type(main_error).__name__,
         )
 
     # Try fallback strategies
@@ -241,28 +254,28 @@ async def never_fail_extraction(
             try:
                 logger.info(
                     f"Trying {operation_name} fallback strategy {i+1}/{len(fallback_strategies)}",
-                    strategy=getattr(strategy, '__name__', str(strategy))
+                    strategy=getattr(strategy, "__name__", str(strategy)),
                 )
 
                 return await retry_with_quota_handling(
                     strategy,
                     max_retries=10,  # Fewer retries for fallbacks
-                    operation_name=f"{operation_name} (fallback {i+1})"
+                    operation_name=f"{operation_name} (fallback {i+1})",
                 )
 
             except Exception as fallback_error:
                 logger.warning(
                     f"{operation_name} fallback strategy {i+1} failed",
-                    strategy=getattr(strategy, '__name__', str(strategy)),
+                    strategy=getattr(strategy, "__name__", str(strategy)),
                     error=str(fallback_error),
-                    error_type=type(fallback_error).__name__
+                    error_type=type(fallback_error).__name__,
                 )
                 continue
 
     # If everything fails, return empty result
     logger.error(
         f"All {operation_name} strategies failed, returning empty result",
-        operation_name=operation_name
+        operation_name=operation_name,
     )
 
     # Return appropriate empty result based on operation type
@@ -294,23 +307,30 @@ def quota_aware_retry(
     max_retries: Optional[int] = None,
     base_delay: Optional[float] = None,
     quota_wait_multiplier: float = 1.2,
-    operation_name: str = "operation"
+    operation_name: str = "operation",
 ):
     """Decorator for quota-aware retry logic."""
+
     def decorator(func):
         @wraps(func)
         async def wrapper(*args, **kwargs):
             from morag_core.config import settings
 
-            effective_max_retries = max_retries or getattr(settings, 'entity_extraction_max_retries', 15)
-            effective_base_delay = base_delay or getattr(settings, 'entity_extraction_retry_base_delay', 2.0)
+            effective_max_retries = max_retries or getattr(
+                settings, "entity_extraction_max_retries", 15
+            )
+            effective_base_delay = base_delay or getattr(
+                settings, "entity_extraction_retry_base_delay", 2.0
+            )
 
             return await retry_with_quota_handling(
                 lambda: func(*args, **kwargs),
                 max_retries=effective_max_retries,
                 base_delay=effective_base_delay,
                 quota_wait_multiplier=quota_wait_multiplier,
-                operation_name=operation_name
+                operation_name=operation_name,
             )
+
         return wrapper
+
     return decorator

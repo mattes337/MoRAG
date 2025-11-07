@@ -1,7 +1,8 @@
 """Fact filtering system for domain-specific relevance."""
 
-from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
+
 import structlog
 
 from ..models.fact import Fact
@@ -43,7 +44,7 @@ class FactFilter:
                 excluded_keywords=["advertisement", "promotion", "marketing"],
                 confidence_threshold=0.5,
                 relevance_threshold=4.0,
-                enable_llm_scoring=False
+                enable_llm_scoring=False,
             )
         }
 
@@ -59,14 +60,14 @@ class FactFilter:
             excluded_keywords=["advertisement", "promotion", "marketing"],
             confidence_threshold=0.5,
             relevance_threshold=4.0,
-            enable_llm_scoring=False
+            enable_llm_scoring=False,
         )
 
     def filter_facts(
         self,
         facts: List[Fact],
         domain: str = "general",
-        document_context: Optional[Dict[str, Any]] = None
+        document_context: Optional[Dict[str, Any]] = None,
     ) -> List[Fact]:
         """Filter facts using multi-stage approach.
 
@@ -81,23 +82,29 @@ class FactFilter:
         if not facts:
             return []
 
-        config = self.domain_configs.get(domain, self.domain_configs.get("general", self._get_default_config()))
+        config = self.domain_configs.get(
+            domain, self.domain_configs.get("general", self._get_default_config())
+        )
 
         self.logger.info(
             "Starting fact filtering",
             total_facts=len(facts),
             domain=domain,
-            config_threshold=config.confidence_threshold
+            config_threshold=config.confidence_threshold,
         )
 
         # Stage 1: Keyword filtering
         keyword_filtered = self._filter_by_keywords(facts, config)
 
         # Stage 2: Confidence adjustment and filtering
-        confidence_filtered = self._filter_by_adjusted_confidence(keyword_filtered, config, domain)
+        confidence_filtered = self._filter_by_adjusted_confidence(
+            keyword_filtered, config, domain
+        )
 
         # Stage 3: Content relevance filtering
-        final_filtered = self._filter_by_content_relevance(confidence_filtered, config, document_context)
+        final_filtered = self._filter_by_content_relevance(
+            confidence_filtered, config, document_context
+        )
 
         self.logger.info(
             "Fact filtering completed",
@@ -105,12 +112,14 @@ class FactFilter:
             keyword_filtered=len(keyword_filtered),
             confidence_filtered=len(confidence_filtered),
             final_count=len(final_filtered),
-            filter_ratio=len(final_filtered) / len(facts) if facts else 0
+            filter_ratio=len(final_filtered) / len(facts) if facts else 0,
         )
 
         return final_filtered
 
-    def _filter_by_keywords(self, facts: List[Fact], config: DomainFilterConfig) -> List[Fact]:
+    def _filter_by_keywords(
+        self, facts: List[Fact], config: DomainFilterConfig
+    ) -> List[Fact]:
         """Filter facts based on required and excluded keywords."""
         filtered_facts = []
 
@@ -120,15 +129,29 @@ class FactFilter:
             fact_text_lower = fact_text.lower()
 
             # Check excluded keywords first (immediate rejection)
-            if any(excluded.lower() in fact_text_lower for excluded in config.excluded_keywords):
-                self.logger.debug("Fact excluded by keyword", fact_id=fact.id, reason="excluded_keyword")
+            if any(
+                excluded.lower() in fact_text_lower
+                for excluded in config.excluded_keywords
+            ):
+                self.logger.debug(
+                    "Fact excluded by keyword",
+                    fact_id=fact.id,
+                    reason="excluded_keyword",
+                )
                 continue
 
             # Check required keywords (if any specified)
             if config.required_keywords:
-                has_required = any(required.lower() in fact_text_lower for required in config.required_keywords)
+                has_required = any(
+                    required.lower() in fact_text_lower
+                    for required in config.required_keywords
+                )
                 if not has_required:
-                    self.logger.debug("Fact excluded by keyword", fact_id=fact.id, reason="missing_required_keyword")
+                    self.logger.debug(
+                        "Fact excluded by keyword",
+                        fact_id=fact.id,
+                        reason="missing_required_keyword",
+                    )
                     continue
 
             filtered_facts.append(fact)
@@ -136,17 +159,16 @@ class FactFilter:
         return filtered_facts
 
     def _filter_by_adjusted_confidence(
-        self,
-        facts: List[Fact],
-        config: DomainFilterConfig,
-        domain: str
+        self, facts: List[Fact], config: DomainFilterConfig, domain: str
     ) -> List[Fact]:
         """Filter facts by domain-adjusted confidence scores."""
         filtered_facts = []
 
         for fact in facts:
             # Calculate domain-adjusted confidence
-            adjusted_confidence = self._calculate_domain_adjusted_confidence(fact, config, domain)
+            adjusted_confidence = self._calculate_domain_adjusted_confidence(
+                fact, config, domain
+            )
 
             if adjusted_confidence >= config.confidence_threshold:
                 # Update fact confidence with adjusted value
@@ -158,16 +180,13 @@ class FactFilter:
                     fact_id=fact.id,
                     original_confidence=fact.extraction_confidence,
                     adjusted_confidence=adjusted_confidence,
-                    threshold=config.confidence_threshold
+                    threshold=config.confidence_threshold,
                 )
 
         return filtered_facts
 
     def _calculate_domain_adjusted_confidence(
-        self,
-        fact: Fact,
-        config: DomainFilterConfig,
-        domain: str
+        self, fact: Fact, config: DomainFilterConfig, domain: str
     ) -> float:
         """Calculate domain-adjusted confidence score."""
         base_confidence = fact.extraction_confidence
@@ -189,7 +208,7 @@ class FactFilter:
         self,
         facts: List[Fact],
         config: DomainFilterConfig,
-        document_context: Optional[Dict[str, Any]]
+        document_context: Optional[Dict[str, Any]],
     ) -> List[Fact]:
         """Filter facts by content relevance (placeholder for future LLM integration)."""
         # For now, just return all facts that passed previous stages
@@ -199,7 +218,7 @@ class FactFilter:
             return facts
 
         # Simple heuristic: prefer facts that mention document topics
-        document_topics = document_context.get('topics', [])
+        document_topics = document_context.get("topics", [])
         if not document_topics:
             return facts
 
@@ -212,12 +231,14 @@ class FactFilter:
                 self.logger.debug(
                     "Fact excluded by topic relevance",
                     fact_id=fact.id,
-                    relevance_score=relevance_score
+                    relevance_score=relevance_score,
                 )
 
         return scored_facts
 
-    def _calculate_topic_relevance(self, fact: Fact, document_topics: List[str]) -> float:
+    def _calculate_topic_relevance(
+        self, fact: Fact, document_topics: List[str]
+    ) -> float:
         """Calculate simple topic relevance score."""
         fact_text = fact.fact_text.lower()
         fact_keywords = [kw.lower() for kw in fact.keywords]
@@ -232,20 +253,32 @@ class FactFilter:
             elif any(topic_lower in keyword for keyword in fact_keywords):
                 matches += 1
             # Partial matches for related terms
-            elif topic_lower == 'adhd' and any(term in fact_text for term in ['attention', 'focus', 'concentration', 'hyperactivity']):
+            elif topic_lower == "adhd" and any(
+                term in fact_text
+                for term in ["attention", "focus", "concentration", "hyperactivity"]
+            ):
                 matches += 0.8
-            elif topic_lower == 'herbs' and any(term in fact_text for term in ['herbal', 'plant', 'extract', 'natural']):
+            elif topic_lower == "herbs" and any(
+                term in fact_text for term in ["herbal", "plant", "extract", "natural"]
+            ):
                 matches += 0.8
-            elif 'treatment' in topic_lower and any(term in fact_text for term in ['therapy', 'medication', 'remedy', 'approach']):
+            elif "treatment" in topic_lower and any(
+                term in fact_text
+                for term in ["therapy", "medication", "remedy", "approach"]
+            ):
                 matches += 0.6
 
         return min(1.0, matches / len(document_topics)) if document_topics else 0.0
 
-    def get_filtering_stats(self, original_facts: List[Fact], filtered_facts: List[Fact]) -> Dict[str, Any]:
+    def get_filtering_stats(
+        self, original_facts: List[Fact], filtered_facts: List[Fact]
+    ) -> Dict[str, Any]:
         """Get filtering statistics."""
         return {
             "original_count": len(original_facts),
             "filtered_count": len(filtered_facts),
-            "retention_rate": len(filtered_facts) / len(original_facts) if original_facts else 0,
-            "filtered_out": len(original_facts) - len(filtered_facts)
+            "retention_rate": len(filtered_facts) / len(original_facts)
+            if original_facts
+            else 0,
+            "filtered_out": len(original_facts) - len(filtered_facts),
         }

@@ -1,9 +1,9 @@
 """Entity extraction agent using Outlines for guaranteed structured output."""
 
-from typing import Type, List, Optional, Dict, Any
+from typing import Any, Dict, List, Optional, Type
 
-from ..ai.base_agent import MoRAGBaseAgent, AgentConfig
-from ..ai.models import EntityExtractionResult, Entity, ConfidenceLevel
+from ..ai.base_agent import AgentConfig, MoRAGBaseAgent
+from ..ai.models import ConfidenceLevel, Entity, EntityExtractionResult
 from ..utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -22,15 +22,23 @@ class EntityExtractionAgent(MoRAGBaseAgent[EntityExtractionResult]):
             config = AgentConfig(
                 model="google-gla:gemini-1.5-flash",
                 temperature=0.1,
-                outlines_provider="gemini"
+                outlines_provider="gemini",
             )
 
         super().__init__(config)
 
         # Entity extraction specific configuration
         self.entity_types = [
-            "PERSON", "ORGANIZATION", "LOCATION", "CONCEPT", "PRODUCT",
-            "EVENT", "DATE", "QUANTITY", "TECHNOLOGY", "PROCESS"
+            "PERSON",
+            "ORGANIZATION",
+            "LOCATION",
+            "CONCEPT",
+            "PRODUCT",
+            "EVENT",
+            "DATE",
+            "QUANTITY",
+            "TECHNOLOGY",
+            "PROCESS",
         ]
         self.min_confidence = 0.4
         self.include_offsets = True
@@ -92,7 +100,7 @@ IMPORTANT:
         text: str,
         domain: str = "general",
         entity_types: Optional[List[str]] = None,
-        min_confidence: Optional[float] = None
+        min_confidence: Optional[float] = None,
     ) -> EntityExtractionResult:
         """Extract entities from text with guaranteed structured output.
 
@@ -110,7 +118,7 @@ IMPORTANT:
                 entities=[],
                 total_entities=0,
                 confidence=ConfidenceLevel.HIGH,
-                metadata={"error": "Empty text", "domain": domain}
+                metadata={"error": "Empty text", "domain": domain},
             )
 
         # Update configuration for this extraction
@@ -124,7 +132,7 @@ IMPORTANT:
             text_length=len(text),
             domain=domain,
             entity_types=len(self.entity_types),
-            structured_generation=self.is_outlines_available()
+            structured_generation=self.is_outlines_available(),
         )
 
         # Prepare the extraction prompt
@@ -141,7 +149,7 @@ IMPORTANT:
                 "Entity extraction completed",
                 entities_extracted=result.total_entities,
                 confidence=result.confidence,
-                used_outlines=self.is_outlines_available()
+                used_outlines=self.is_outlines_available(),
             )
 
             return result
@@ -153,18 +161,14 @@ IMPORTANT:
                 entities=[],
                 total_entities=0,
                 confidence=ConfidenceLevel.LOW,
-                metadata={
-                    "error": str(e),
-                    "domain": domain,
-                    "fallback": True
-                }
+                metadata={"error": str(e), "domain": domain, "fallback": True},
             )
 
     async def extract_entities_batch(
         self,
         texts: List[str],
         domain: str = "general",
-        entity_types: Optional[List[str]] = None
+        entity_types: Optional[List[str]] = None,
     ) -> List[EntityExtractionResult]:
         """Extract entities from multiple texts.
 
@@ -180,9 +184,7 @@ IMPORTANT:
             return []
 
         self.logger.info(
-            "Starting batch entity extraction",
-            batch_size=len(texts),
-            domain=domain
+            "Starting batch entity extraction", batch_size=len(texts), domain=domain
         )
 
         results = []
@@ -196,17 +198,17 @@ IMPORTANT:
 
             except Exception as e:
                 self.logger.warning(
-                    "Failed to extract entities from text",
-                    text_index=i,
-                    error=str(e)
+                    "Failed to extract entities from text", text_index=i, error=str(e)
                 )
                 # Add fallback result
-                results.append(EntityExtractionResult(
-                    entities=[],
-                    total_entities=0,
-                    confidence=ConfidenceLevel.LOW,
-                    metadata={"error": str(e), "text_index": i}
-                ))
+                results.append(
+                    EntityExtractionResult(
+                        entities=[],
+                        total_entities=0,
+                        confidence=ConfidenceLevel.LOW,
+                        metadata={"error": str(e), "text_index": i},
+                    )
+                )
 
         self.logger.info(f"Batch entity extraction completed for {len(results)} texts")
         return results
@@ -234,10 +236,7 @@ FOCUS ON:
 Extract all relevant entities with their types, confidence scores, and any relevant attributes."""
 
     def _post_process_result(
-        self,
-        result: EntityExtractionResult,
-        original_text: str,
-        domain: str
+        self, result: EntityExtractionResult, original_text: str, domain: str
     ) -> EntityExtractionResult:
         """Post-process the extraction result.
 
@@ -251,25 +250,30 @@ Extract all relevant entities with their types, confidence scores, and any relev
         """
         # Filter entities by confidence threshold
         filtered_entities = [
-            entity for entity in result.entities
+            entity
+            for entity in result.entities
             if entity.confidence >= self.min_confidence
         ]
 
         # Update metadata
         metadata = result.metadata or {}
-        metadata.update({
-            "domain": domain,
-            "original_entity_count": len(result.entities),
-            "filtered_entity_count": len(filtered_entities),
-            "text_length": len(original_text),
-            "min_confidence_threshold": self.min_confidence,
-            "extraction_method": "outlines" if self.is_outlines_available() else "fallback"
-        })
+        metadata.update(
+            {
+                "domain": domain,
+                "original_entity_count": len(result.entities),
+                "filtered_entity_count": len(filtered_entities),
+                "text_length": len(original_text),
+                "min_confidence_threshold": self.min_confidence,
+                "extraction_method": "outlines"
+                if self.is_outlines_available()
+                else "fallback",
+            }
+        )
 
         # Create updated result
         return EntityExtractionResult(
             entities=filtered_entities,
             total_entities=len(filtered_entities),
             confidence=result.confidence,
-            metadata=metadata
+            metadata=metadata,
         )

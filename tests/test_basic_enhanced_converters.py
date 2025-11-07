@@ -1,14 +1,18 @@
 """Basic tests for enhanced document converters (Tasks 25-29)."""
 
-import pytest
 from pathlib import Path
 
-from src.morag.converters.pdf import PDFConverter
+import pytest
 from src.morag.converters.audio import AudioConverter
-from src.morag.converters.video import VideoConverter
+from src.morag.converters.base import (
+    ChunkingStrategy,
+    ConversionError,
+    ConversionOptions,
+)
 from src.morag.converters.office import OfficeConverter
+from src.morag.converters.pdf import PDFConverter
+from src.morag.converters.video import VideoConverter
 from src.morag.converters.web import WebConverter
-from src.morag.converters.base import ConversionOptions, ChunkingStrategy, ConversionError
 
 
 @pytest.fixture
@@ -20,7 +24,7 @@ def basic_conversion_options():
         include_toc=False,
         extract_images=False,
         min_quality_threshold=0.5,
-        format_options={}
+        format_options={},
     )
 
 
@@ -31,38 +35,38 @@ class TestBasicConverterInitialization:
         """Test PDF converter initialization."""
         converter = PDFConverter()
         assert converter.name == "Enhanced MoRAG PDF Converter"
-        assert 'pdf' in converter.supported_formats
+        assert "pdf" in converter.supported_formats
         assert converter.quality_validator is not None
 
     def test_audio_converter_initialization(self):
         """Test audio converter initialization."""
         converter = AudioConverter()
         assert converter.name == "Enhanced MoRAG Audio Converter"
-        assert 'audio' in converter.supported_formats
-        assert 'mp3' in converter.supported_formats
+        assert "audio" in converter.supported_formats
+        assert "mp3" in converter.supported_formats
 
     def test_video_converter_initialization(self):
         """Test video converter initialization."""
         converter = VideoConverter()
         assert converter.name == "MoRAG Video Converter"
-        assert 'video' in converter.supported_formats
-        assert 'mp4' in converter.supported_formats
+        assert "video" in converter.supported_formats
+        assert "mp4" in converter.supported_formats
 
     def test_office_converter_initialization(self):
         """Test office converter initialization."""
         converter = OfficeConverter()
         assert converter.name == "Enhanced MoRAG Office Converter"
-        assert 'docx' in converter.supported_formats
-        assert 'xlsx' in converter.supported_formats
-        assert 'pptx' in converter.supported_formats
+        assert "docx" in converter.supported_formats
+        assert "xlsx" in converter.supported_formats
+        assert "pptx" in converter.supported_formats
 
     def test_web_converter_initialization(self):
         """Test web converter initialization."""
         converter = WebConverter()
         assert converter.name == "Enhanced MoRAG Web Converter"
-        assert 'web' in converter.supported_formats
-        assert 'url' in converter.supported_formats
-        assert 'html' in converter.supported_formats
+        assert "web" in converter.supported_formats
+        assert "url" in converter.supported_formats
+        assert "html" in converter.supported_formats
 
 
 class TestConverterFormatSupport:
@@ -71,43 +75,43 @@ class TestConverterFormatSupport:
     def test_pdf_format_support(self):
         """Test PDF format support."""
         converter = PDFConverter()
-        assert converter.supports_format('pdf')
-        assert not converter.supports_format('docx')
+        assert converter.supports_format("pdf")
+        assert not converter.supports_format("docx")
 
     def test_audio_format_support(self):
         """Test audio format support."""
         converter = AudioConverter()
-        assert converter.supports_format('audio')
-        assert converter.supports_format('mp3')
-        assert converter.supports_format('wav')
-        assert not converter.supports_format('pdf')
+        assert converter.supports_format("audio")
+        assert converter.supports_format("mp3")
+        assert converter.supports_format("wav")
+        assert not converter.supports_format("pdf")
 
     def test_video_format_support(self):
         """Test video format support."""
         converter = VideoConverter()
-        assert converter.supports_format('video')
-        assert converter.supports_format('mp4')
-        assert converter.supports_format('avi')
-        assert not converter.supports_format('pdf')
+        assert converter.supports_format("video")
+        assert converter.supports_format("mp4")
+        assert converter.supports_format("avi")
+        assert not converter.supports_format("pdf")
 
     def test_office_format_support(self):
         """Test office format support."""
         converter = OfficeConverter()
-        assert converter.supports_format('docx')
-        assert converter.supports_format('xlsx')
-        assert converter.supports_format('pptx')
-        assert converter.supports_format('word')
-        assert converter.supports_format('excel')
-        assert converter.supports_format('powerpoint')
-        assert not converter.supports_format('pdf')
+        assert converter.supports_format("docx")
+        assert converter.supports_format("xlsx")
+        assert converter.supports_format("pptx")
+        assert converter.supports_format("word")
+        assert converter.supports_format("excel")
+        assert converter.supports_format("powerpoint")
+        assert not converter.supports_format("pdf")
 
     def test_web_format_support(self):
         """Test web format support."""
         converter = WebConverter()
-        assert converter.supports_format('web')
-        assert converter.supports_format('url')
-        assert converter.supports_format('html')
-        assert not converter.supports_format('pdf')
+        assert converter.supports_format("web")
+        assert converter.supports_format("url")
+        assert converter.supports_format("html")
+        assert not converter.supports_format("pdf")
 
 
 class TestConverterValidation:
@@ -174,7 +178,9 @@ class TestConverterFeatures:
         has_topic_segmentation = converter.topic_segmenter is not None
 
         # These might be None if dependencies aren't installed, which is fine
-        assert converter.diarization_pipeline is None or hasattr(converter.diarization_pipeline, '__call__')
+        assert converter.diarization_pipeline is None or hasattr(
+            converter.diarization_pipeline, "__call__"
+        )
 
     def test_office_converter_features(self):
         """Test office converter features."""
@@ -200,7 +206,7 @@ class TestConverterFeatures:
         assert len(converter.extraction_methods) > 0
 
         # Basic web processor should always be available
-        assert 'basic_web_processor' in converter.extraction_methods
+        assert "basic_web_processor" in converter.extraction_methods
 
         # Check web processor
         assert converter.web_processor is not None

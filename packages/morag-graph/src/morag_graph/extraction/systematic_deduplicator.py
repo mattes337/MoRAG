@@ -1,15 +1,17 @@
 """Systematic entity and relation deduplication across document chunks."""
 
-import structlog
 import asyncio
 import time
-from typing import List, Dict, Tuple, Optional
-from dataclasses import dataclass
-from pydantic import BaseModel, Field
 from collections import defaultdict
+from dataclasses import dataclass
+from typing import Dict, List, Optional, Tuple
+
+import structlog
+from pydantic import BaseModel, Field
 
 try:
     import numpy as np
+
     NUMPY_AVAILABLE = True
 except ImportError:
     NUMPY_AVAILABLE = False
@@ -23,6 +25,7 @@ logger = structlog.get_logger(__name__)
 
 class MergeDecision(BaseModel):
     """Structured merge decision from LLM."""
+
     should_merge: bool = Field(description="Whether entities should be merged")
     confidence: float = Field(ge=0.0, le=1.0, description="Confidence in the decision")
     reasoning: str = Field(description="Explanation for the decision")
@@ -31,6 +34,7 @@ class MergeDecision(BaseModel):
 @dataclass
 class MergeCandidate:
     """Candidate entities for merging."""
+
     primary_entity: Entity
     duplicate_entities: List[Entity]
     similarity_score: float
@@ -41,6 +45,7 @@ class MergeCandidate:
 @dataclass
 class DeduplicationResult:
     """Result of deduplication process."""
+
     original_count: int
     deduplicated_count: int
     merges_performed: int
@@ -66,11 +71,7 @@ class EntitySimilarityCalculator:
         context_sim = self._calculate_context_similarity(entity1, entity2)
 
         # Weighted combination
-        similarity = (
-            name_sim * 0.6 +
-            type_sim * 0.3 +
-            context_sim * 0.1
-        )
+        similarity = name_sim * 0.6 + type_sim * 0.3 + context_sim * 0.1
 
         return min(1.0, max(0.0, similarity))
 
@@ -124,13 +125,13 @@ class EntitySimilarityCalculator:
         # Fill matrix
         for i in range(1, len(str1) + 1):
             for j in range(1, len(str2) + 1):
-                if str1[i-1] == str2[j-1]:
-                    matrix[i][j] = matrix[i-1][j-1]
+                if str1[i - 1] == str2[j - 1]:
+                    matrix[i][j] = matrix[i - 1][j - 1]
                 else:
                     matrix[i][j] = min(
-                        matrix[i-1][j] + 1,      # deletion
-                        matrix[i][j-1] + 1,      # insertion
-                        matrix[i-1][j-1] + 1     # substitution
+                        matrix[i - 1][j] + 1,  # deletion
+                        matrix[i][j - 1] + 1,  # insertion
+                        matrix[i - 1][j - 1] + 1,  # substitution
                     )
 
         # Convert to similarity score
@@ -152,17 +153,19 @@ class EntitySimilarityCalculator:
 
         # Check for related types
         related_types = {
-            'person': ['individual', 'human', 'people'],
-            'organization': ['company', 'institution', 'org', 'business'],
-            'location': ['place', 'city', 'country', 'region'],
-            'concept': ['idea', 'theory', 'principle', 'notion'],
-            'technology': ['tech', 'tool', 'system', 'platform']
+            "person": ["individual", "human", "people"],
+            "organization": ["company", "institution", "org", "business"],
+            "location": ["place", "city", "country", "region"],
+            "concept": ["idea", "theory", "principle", "notion"],
+            "technology": ["tech", "tool", "system", "platform"],
         }
 
         for main_type, related in related_types.items():
-            if ((type1_lower == main_type and type2_lower in related) or
-                (type2_lower == main_type and type1_lower in related) or
-                (type1_lower in related and type2_lower in related)):
+            if (
+                (type1_lower == main_type and type2_lower in related)
+                or (type2_lower == main_type and type1_lower in related)
+                or (type1_lower in related and type2_lower in related)
+            ):
                 return 0.8
 
         return 0.0
@@ -170,8 +173,11 @@ class EntitySimilarityCalculator:
     def _calculate_context_similarity(self, entity1: Entity, entity2: Entity) -> float:
         """Calculate context similarity based on source documents."""
         # Same document bonus
-        if (entity1.source_doc_id and entity2.source_doc_id and
-            entity1.source_doc_id == entity2.source_doc_id):
+        if (
+            entity1.source_doc_id
+            and entity2.source_doc_id
+            and entity1.source_doc_id == entity2.source_doc_id
+        ):
             return 1.0
 
         # Different documents penalty
@@ -186,10 +192,7 @@ class LLMMergeValidator:
         self.logger = logger.bind(component="llm_merge_validator")
 
     async def confirm_merge(
-        self,
-        primary: Entity,
-        candidates: List[Entity],
-        similarity_score: float
+        self, primary: Entity, candidates: List[Entity], similarity_score: float
     ) -> Tuple[bool, float, str]:
         """Confirm if entities should be merged using LLM."""
         if not self.normalizer or not self.normalizer.model:
@@ -211,16 +214,15 @@ class LLMMergeValidator:
             return self._rule_based_confirmation(primary, candidates, similarity_score)
 
     def _create_merge_prompt(
-        self,
-        primary: Entity,
-        candidates: List[Entity],
-        similarity_score: float
+        self, primary: Entity, candidates: List[Entity], similarity_score: float
     ) -> str:
         """Create prompt for merge confirmation."""
-        candidate_info = "\n".join([
-            f"- {entity.name} (Type: {entity.type}, Source: {entity.source_doc_id})"
-            for entity in candidates
-        ])
+        candidate_info = "\n".join(
+            [
+                f"- {entity.name} (Type: {entity.type}, Source: {entity.source_doc_id})"
+                for entity in candidates
+            ]
+        )
 
         return f"""
         Determine if these entities should be merged:
@@ -252,8 +254,7 @@ class LLMMergeValidator:
 
         try:
             response = await asyncio.to_thread(
-                self.normalizer.model.generate_content,
-                prompt
+                self.normalizer.model.generate_content, prompt
             )
             return response.text if response.text else ""
         except Exception as e:
@@ -267,6 +268,7 @@ class LLMMergeValidator:
         try:
             # Try to parse as JSON for backwards compatibility
             import json
+
             response_clean = response.strip()
             if response_clean.startswith("```json"):
                 response_clean = response_clean[7:]
@@ -286,10 +288,7 @@ class LLMMergeValidator:
             return False, 0.3, f"parse_error: {str(e)}"
 
     def _rule_based_confirmation(
-        self,
-        primary: Entity,
-        candidates: List[Entity],
-        similarity_score: float
+        self, primary: Entity, candidates: List[Entity], similarity_score: float
     ) -> Tuple[bool, float, str]:
         """Rule-based merge confirmation fallback."""
         # High similarity threshold for automatic merge
@@ -300,8 +299,10 @@ class LLMMergeValidator:
         if similarity_score >= 0.7:
             # Check if names are very similar and types match
             for candidate in candidates:
-                if (primary.type.lower() == candidate.type.lower() and
-                    self._names_are_variations(primary.name, candidate.name)):
+                if (
+                    primary.type.lower() == candidate.type.lower()
+                    and self._names_are_variations(primary.name, candidate.name)
+                ):
                     return True, 0.8, "name_variation_type_match"
 
         # Conservative approach for lower similarities
@@ -330,7 +331,7 @@ class SystematicDeduplicator:
         self,
         similarity_threshold: float = 0.7,
         merge_confidence_threshold: float = 0.8,
-        enable_llm_validation: bool = True
+        enable_llm_validation: bool = True,
     ):
         """Initialize systematic deduplicator.
 
@@ -349,8 +350,7 @@ class SystematicDeduplicator:
         self.logger = logger.bind(component="systematic_deduplicator")
 
     async def deduplicate_across_chunks(
-        self,
-        entities_by_chunk: Dict[str, List[Entity]]
+        self, entities_by_chunk: Dict[str, List[Entity]]
     ) -> Tuple[Dict[str, List[Entity]], DeduplicationResult]:
         """Systematically deduplicate entities across all chunks."""
         start_time = time.time()
@@ -369,7 +369,7 @@ class SystematicDeduplicator:
         self.logger.info(
             "Starting systematic deduplication",
             total_entities=original_count,
-            chunks=len(entities_by_chunk)
+            chunks=len(entities_by_chunk),
         )
 
         # Step 1: Build similarity matrix
@@ -395,7 +395,7 @@ class SystematicDeduplicator:
             deduplicated_count=len(deduplicated_entities),
             merges_performed=len(confirmed_merges),
             processing_time=processing_time,
-            merge_details=confirmed_merges
+            merge_details=confirmed_merges,
         )
 
         self.logger.info(
@@ -403,14 +403,13 @@ class SystematicDeduplicator:
             original_entities=original_count,
             deduplicated_entities=len(deduplicated_entities),
             merges_performed=len(confirmed_merges),
-            processing_time=f"{processing_time:.2f}s"
+            processing_time=f"{processing_time:.2f}s",
         )
 
         return deduplicated_by_chunk, result
 
     async def _find_merge_candidates(
-        self,
-        entities: List[Entity]
+        self, entities: List[Entity]
     ) -> List[MergeCandidate]:
         """Find potential merge candidates using similarity analysis."""
         candidates = []
@@ -422,7 +421,7 @@ class SystematicDeduplicator:
 
             duplicates = []
 
-            for j, entity2 in enumerate(entities[i+1:], i+1):
+            for j, entity2 in enumerate(entities[i + 1 :], i + 1):
                 if entity2.id in processed:
                     continue
 
@@ -441,13 +440,15 @@ class SystematicDeduplicator:
                     for dup in duplicates
                 ) / len(duplicates)
 
-                candidates.append(MergeCandidate(
-                    primary_entity=entity1,
-                    duplicate_entities=duplicates,
-                    similarity_score=avg_similarity,
-                    merge_confidence=0.0,  # Will be set by LLM validation
-                    merge_reason="similarity_analysis"
-                ))
+                candidates.append(
+                    MergeCandidate(
+                        primary_entity=entity1,
+                        duplicate_entities=duplicates,
+                        similarity_score=avg_similarity,
+                        merge_confidence=0.0,  # Will be set by LLM validation
+                        merge_reason="similarity_analysis",
+                    )
+                )
 
                 processed.add(entity1.id)
 
@@ -455,8 +456,7 @@ class SystematicDeduplicator:
         return candidates
 
     async def _confirm_merges_with_llm(
-        self,
-        candidates: List[MergeCandidate]
+        self, candidates: List[MergeCandidate]
     ) -> List[MergeCandidate]:
         """Confirm merges using LLM validation."""
         if not self.merge_validator:
@@ -467,10 +467,14 @@ class SystematicDeduplicator:
 
         for candidate in candidates:
             try:
-                should_merge, confidence, reasoning = await self.merge_validator.confirm_merge(
+                (
+                    should_merge,
+                    confidence,
+                    reasoning,
+                ) = await self.merge_validator.confirm_merge(
                     candidate.primary_entity,
                     candidate.duplicate_entities,
-                    candidate.similarity_score
+                    candidate.similarity_score,
                 )
 
                 if should_merge and confidence >= self.merge_confidence_threshold:
@@ -481,15 +485,16 @@ class SystematicDeduplicator:
             except Exception as e:
                 self.logger.warning(
                     f"Merge validation failed for candidate: {e}",
-                    primary_entity=candidate.primary_entity.name
+                    primary_entity=candidate.primary_entity.name,
                 )
 
-        self.logger.info(f"Confirmed {len(confirmed)} merges out of {len(candidates)} candidates")
+        self.logger.info(
+            f"Confirmed {len(confirmed)} merges out of {len(candidates)} candidates"
+        )
         return confirmed
 
     def _rule_based_merge_confirmation(
-        self,
-        candidates: List[MergeCandidate]
+        self, candidates: List[MergeCandidate]
     ) -> List[MergeCandidate]:
         """Rule-based merge confirmation fallback."""
         confirmed = []
@@ -518,9 +523,7 @@ class SystematicDeduplicator:
         return confirmed
 
     def _apply_merges(
-        self,
-        entities: List[Entity],
-        confirmed_merges: List[MergeCandidate]
+        self, entities: List[Entity], confirmed_merges: List[MergeCandidate]
     ) -> Tuple[List[Entity], Dict[str, str]]:
         """Apply confirmed merges to entity list."""
         # Create mapping from duplicate IDs to primary IDs
@@ -536,8 +539,7 @@ class SystematicDeduplicator:
 
         # Filter out merged entities
         deduplicated = [
-            entity for entity in entities
-            if entity.id not in entities_to_remove
+            entity for entity in entities if entity.id not in entities_to_remove
         ]
 
         return deduplicated, merge_mapping
@@ -546,7 +548,7 @@ class SystematicDeduplicator:
         self,
         deduplicated_entities: List[Entity],
         original_chunk_mapping: Dict[str, str],
-        merge_mapping: Dict[str, str]
+        merge_mapping: Dict[str, str],
     ) -> Dict[str, List[Entity]]:
         """Rebuild chunk mapping after deduplication."""
         chunk_entities = defaultdict(list)
@@ -563,7 +565,7 @@ class SystematicDeduplicator:
     async def deduplicate_relations(
         self,
         relations_by_chunk: Dict[str, List[Relation]],
-        entity_merge_mapping: Dict[str, str]
+        entity_merge_mapping: Dict[str, str],
     ) -> Dict[str, List[Relation]]:
         """Deduplicate relations after entity deduplication."""
         all_relations = []
@@ -587,7 +589,7 @@ class SystematicDeduplicator:
                     type=relation.type,
                     description=relation.description,
                     confidence=relation.confidence,
-                    source_doc_id=relation.source_doc_id
+                    source_doc_id=relation.source_doc_id,
                 )
 
                 all_relations.append(updated_relation)
@@ -615,7 +617,7 @@ class SystematicDeduplicator:
             key = (
                 relation.source_entity_id,
                 relation.target_entity_id,
-                relation.type.lower()
+                relation.type.lower(),
             )
 
             if key not in seen:

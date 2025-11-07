@@ -1,9 +1,9 @@
 """Extraction agents for MoRAG."""
 
-from .fact_extraction import FactExtractionAgent
 from .entity_extraction import EntityExtractionAgent
-from .relation_extraction import RelationExtractionAgent
+from .fact_extraction import FactExtractionAgent
 from .keyword_extraction import KeywordExtractionAgent
+from .relation_extraction import RelationExtractionAgent
 
 __all__ = [
     "FactExtractionAgent",

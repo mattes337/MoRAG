@@ -7,15 +7,16 @@ used across all CLI scripts for consistent processing and ingestion pipelines.
 """
 
 import json
+from dataclasses import asdict, dataclass
 from datetime import datetime
-from pathlib import Path
-from typing import Dict, List, Any, Optional, Union
-from dataclasses import dataclass, asdict
 from enum import Enum
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Union
 
 
 class ContentType(Enum):
     """Supported content types."""
+
     AUDIO = "audio"
     VIDEO = "video"
     DOCUMENT = "document"
@@ -26,13 +27,15 @@ class ContentType(Enum):
 
 class ProcessingMode(Enum):
     """Processing modes."""
+
     PROCESSING = "processing"  # Immediate results only
-    INGESTION = "ingestion"    # Background processing + storage
+    INGESTION = "ingestion"  # Background processing + storage
 
 
 @dataclass
 class Entity:
     """Extracted entity."""
+
     id: str
     name: str
     type: str
@@ -44,6 +47,7 @@ class Entity:
 @dataclass
 class Relation:
     """Extracted relation."""
+
     id: str
     source_entity_id: str
     target_entity_id: str
@@ -56,6 +60,7 @@ class Relation:
 @dataclass
 class ProcessingMetadata:
     """Processing metadata."""
+
     timestamp: str
     processing_time: float
     content_type: str
@@ -69,6 +74,7 @@ class ProcessingMetadata:
 @dataclass
 class IntermediateJSON:
     """Standardized intermediate JSON schema."""
+
     # Core content
     content_type: str
     source_path: str
@@ -84,9 +90,9 @@ class IntermediateJSON:
 
     # Content-specific data
     segments: Optional[List[Dict[str, Any]]] = None  # For audio/video
-    pages: Optional[List[Dict[str, Any]]] = None     # For documents
-    frames: Optional[List[Dict[str, Any]]] = None    # For video/images
-    links: Optional[List[Dict[str, Any]]] = None     # For web content
+    pages: Optional[List[Dict[str, Any]]] = None  # For documents
+    frames: Optional[List[Dict[str, Any]]] = None  # For video/images
+    links: Optional[List[Dict[str, Any]]] = None  # For web content
 
     # Additional metadata
     custom_metadata: Optional[Dict[str, Any]] = None
@@ -97,24 +103,24 @@ class IntermediateJSON:
 
     def to_json(self, file_path: Union[str, Path], indent: int = 2) -> None:
         """Save to JSON file."""
-        with open(file_path, 'w', encoding='utf-8') as f:
+        with open(file_path, "w", encoding="utf-8") as f:
             json.dump(self.to_dict(), f, indent=indent, ensure_ascii=False, default=str)
 
     @classmethod
-    def from_json(cls, file_path: Union[str, Path]) -> 'IntermediateJSON':
+    def from_json(cls, file_path: Union[str, Path]) -> "IntermediateJSON":
         """Load from JSON file."""
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
         # Convert nested dictionaries back to dataclasses
-        if 'metadata' in data:
-            data['metadata'] = ProcessingMetadata(**data['metadata'])
+        if "metadata" in data:
+            data["metadata"] = ProcessingMetadata(**data["metadata"])
 
-        if 'entities' in data:
-            data['entities'] = [Entity(**entity) for entity in data['entities']]
+        if "entities" in data:
+            data["entities"] = [Entity(**entity) for entity in data["entities"]]
 
-        if 'relations' in data:
-            data['relations'] = [Relation(**relation) for relation in data['relations']]
+        if "relations" in data:
+            data["relations"] = [Relation(**relation) for relation in data["relations"]]
 
         return cls(**data)
 
@@ -137,7 +143,9 @@ class MarkdownGenerator:
         lines.append(f"- **Content Type**: {intermediate.content_type}")
         lines.append(f"- **Source**: {intermediate.source_path}")
         lines.append(f"- **Processed**: {intermediate.metadata.timestamp}")
-        lines.append(f"- **Processing Time**: {intermediate.metadata.processing_time:.2f}s")
+        lines.append(
+            f"- **Processing Time**: {intermediate.metadata.processing_time:.2f}s"
+        )
         lines.append(f"- **Mode**: {intermediate.metadata.mode}")
         lines.append("")
 
@@ -152,7 +160,9 @@ class MarkdownGenerator:
             lines.append("## Extracted Entities")
             lines.append("")
             for entity in intermediate.entities:
-                lines.append(f"- **{entity.name}** ({entity.type}) - Confidence: {entity.confidence:.2f}")
+                lines.append(
+                    f"- **{entity.name}** ({entity.type}) - Confidence: {entity.confidence:.2f}"
+                )
                 if entity.properties:
                     for key, value in entity.properties.items():
                         lines.append(f"  - {key}: {value}")
@@ -166,7 +176,9 @@ class MarkdownGenerator:
             for relation in intermediate.relations:
                 source_name = entity_map.get(relation.source_entity_id, "Unknown")
                 target_name = entity_map.get(relation.target_entity_id, "Unknown")
-                lines.append(f"- **{source_name}** --[{relation.type}]--> **{target_name}** (Confidence: {relation.confidence:.2f})")
+                lines.append(
+                    f"- **{source_name}** --[{relation.type}]--> **{target_name}** (Confidence: {relation.confidence:.2f})"
+                )
                 if relation.properties:
                     for key, value in relation.properties.items():
                         lines.append(f"  - {key}: {value}")
@@ -178,11 +190,13 @@ class MarkdownGenerator:
             lines.append("")
             for i, segment in enumerate(intermediate.segments[:5]):  # Show first 5
                 lines.append(f"### Segment {i+1}")
-                if 'start' in segment and 'end' in segment:
-                    lines.append(f"**Time**: {segment['start']:.2f}s - {segment['end']:.2f}s")
-                if 'text' in segment:
+                if "start" in segment and "end" in segment:
+                    lines.append(
+                        f"**Time**: {segment['start']:.2f}s - {segment['end']:.2f}s"
+                    )
+                if "text" in segment:
                     lines.append(f"**Text**: {segment['text']}")
-                if 'speaker' in segment:
+                if "speaker" in segment:
                     lines.append(f"**Speaker**: {segment['speaker']}")
                 lines.append("")
 
@@ -191,8 +205,12 @@ class MarkdownGenerator:
             lines.append("")
             for i, page in enumerate(intermediate.pages[:3]):  # Show first 3
                 lines.append(f"### Page {i+1}")
-                if 'text' in page:
-                    preview = page['text'][:200] + "..." if len(page['text']) > 200 else page['text']
+                if "text" in page:
+                    preview = (
+                        page["text"][:200] + "..."
+                        if len(page["text"]) > 200
+                        else page["text"]
+                    )
                     lines.append(preview)
                 lines.append("")
 
@@ -200,7 +218,7 @@ class MarkdownGenerator:
             lines.append("## Links")
             lines.append("")
             for link in intermediate.links[:10]:  # Show first 10
-                if 'url' in link and 'text' in link:
+                if "url" in link and "text" in link:
                     lines.append(f"- [{link['text']}]({link['url']})")
             lines.append("")
 
@@ -215,10 +233,12 @@ class MarkdownGenerator:
         return "\n".join(lines)
 
     @staticmethod
-    def save_markdown(intermediate: IntermediateJSON, file_path: Union[str, Path]) -> None:
+    def save_markdown(
+        intermediate: IntermediateJSON, file_path: Union[str, Path]
+    ) -> None:
         """Save markdown to file."""
         markdown_content = MarkdownGenerator.generate(intermediate)
-        with open(file_path, 'w', encoding='utf-8') as f:
+        with open(file_path, "w", encoding="utf-8") as f:
             f.write(markdown_content)
 
 
@@ -228,7 +248,7 @@ def create_processing_metadata(
     processing_time: float,
     mode: ProcessingMode,
     model_info: Dict[str, Any],
-    options: Dict[str, Any]
+    options: Dict[str, Any],
 ) -> ProcessingMetadata:
     """Create processing metadata."""
     source_path_obj = Path(source_path)
@@ -240,11 +260,13 @@ def create_processing_metadata(
         source_path=str(source_path),
         source_size=source_path_obj.stat().st_size if source_path_obj.exists() else 0,
         model_info=model_info,
-        options=options
+        options=options,
     )
 
 
-def get_output_paths(input_path: Union[str, Path], mode: ProcessingMode) -> Dict[str, Path]:
+def get_output_paths(
+    input_path: Union[str, Path], mode: ProcessingMode
+) -> Dict[str, Path]:
     """Get standardized output file paths."""
     input_path = Path(input_path)
     stem = input_path.stem
@@ -252,12 +274,12 @@ def get_output_paths(input_path: Union[str, Path], mode: ProcessingMode) -> Dict
 
     if mode == ProcessingMode.PROCESSING:
         return {
-            'intermediate_json': parent / f"{stem}_intermediate.json",
-            'result_json': parent / f"{stem}_processing_result.json"
+            "intermediate_json": parent / f"{stem}_intermediate.json",
+            "result_json": parent / f"{stem}_processing_result.json",
         }
     else:  # INGESTION
         return {
-            'intermediate_json': parent / f"{stem}_intermediate.json",
-            'intermediate_md': parent / f"{stem}_intermediate.md",
-            'result_json': parent / f"{stem}_ingestion_result.json"
+            "intermediate_json": parent / f"{stem}_intermediate.json",
+            "intermediate_md": parent / f"{stem}_intermediate.md",
+            "result_json": parent / f"{stem}_ingestion_result.json",
         }

@@ -1,20 +1,18 @@
 """Integration tests for enhanced audio processing pipeline."""
 
-import pytest
 import asyncio
-from pathlib import Path
-import tempfile
 import os
-import wave
 import struct
-import numpy as np
+import tempfile
+import wave
+from pathlib import Path
 
-from morag_audio import AudioProcessor, AudioConfig
-from morag_audio.services import speaker_diarization_service
-from morag_audio.services import topic_segmentation_service
-from morag_audio import AudioConverter
-from morag_core.interfaces.converter import ConversionOptions
+import numpy as np
+import pytest
+from morag_audio import AudioConfig, AudioConverter, AudioProcessor
+from morag_audio.services import speaker_diarization_service, topic_segmentation_service
 from morag_core.config import settings
+from morag_core.interfaces.converter import ConversionOptions
 
 
 class TestEnhancedAudioPipeline:
@@ -40,8 +38,8 @@ class TestEnhancedAudioPipeline:
         wave_data = (wave_data * 32767).astype(np.int16)
 
         # Create temporary WAV file
-        with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as f:
-            with wave.open(f.name, 'wb') as wav_file:
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
+            with wave.open(f.name, "wb") as wav_file:
                 wav_file.setnchannels(1)  # Mono
                 wav_file.setsampwidth(2)  # 2 bytes per sample
                 wav_file.setframerate(sample_rate)
@@ -58,7 +56,7 @@ class TestEnhancedAudioPipeline:
         config = AudioConfig(
             model_size="tiny",  # Use smallest model for faster testing
             device="cpu",
-            compute_type="int8"
+            compute_type="int8",
         )
         return AudioProcessor(config)
 
@@ -69,12 +67,12 @@ class TestEnhancedAudioPipeline:
 
     @pytest.mark.asyncio
     @pytest.mark.integration
-    async def test_basic_audio_processing_pipeline(self, audio_processor, sample_audio_file):
+    async def test_basic_audio_processing_pipeline(
+        self, audio_processor, sample_audio_file
+    ):
         """Test basic audio processing without enhanced features."""
         result = await audio_processor.process_audio_file(
-            sample_audio_file,
-            enable_diarization=False,
-            enable_topic_segmentation=False
+            sample_audio_file, enable_diarization=False, enable_topic_segmentation=False
         )
 
         assert result is not None
@@ -149,13 +147,13 @@ class TestEnhancedAudioPipeline:
 
     @pytest.mark.asyncio
     @pytest.mark.integration
-    async def test_enhanced_audio_processing_pipeline(self, audio_processor, sample_audio_file):
+    async def test_enhanced_audio_processing_pipeline(
+        self, audio_processor, sample_audio_file
+    ):
         """Test complete enhanced audio processing pipeline."""
         # Test with enhanced features enabled
         result = await audio_processor.process_audio_file(
-            sample_audio_file,
-            enable_diarization=True,
-            enable_topic_segmentation=True
+            sample_audio_file, enable_diarization=True, enable_topic_segmentation=True
         )
 
         assert result is not None
@@ -178,17 +176,19 @@ class TestEnhancedAudioPipeline:
 
     @pytest.mark.asyncio
     @pytest.mark.integration
-    async def test_audio_converter_integration(self, audio_converter, sample_audio_file):
+    async def test_audio_converter_integration(
+        self, audio_converter, sample_audio_file
+    ):
         """Test complete audio converter with enhanced features."""
         options = ConversionOptions(
             include_metadata=True,
             format_options={
-                'enable_diarization': True,
-                'enable_topic_segmentation': True,
-                'include_timestamps': True,
-                'include_speaker_info': True,
-                'include_topic_info': True
-            }
+                "enable_diarization": True,
+                "enable_topic_segmentation": True,
+                "include_timestamps": True,
+                "include_speaker_info": True,
+                "include_topic_info": True,
+            },
         )
 
         result = await audio_converter.convert(sample_audio_file, options)
@@ -207,15 +207,15 @@ class TestEnhancedAudioPipeline:
         assert "# Topic" in content or "# Main Content" in content
 
         # Check metadata
-        assert 'diarization_used' in result.metadata
-        assert 'topic_segmentation_used' in result.metadata
+        assert "diarization_used" in result.metadata
+        assert "topic_segmentation_used" in result.metadata
 
         # Should have speaker labels in content
         assert "Speaker_00:" in content or "SPEAKER_" in content
 
-        if result.metadata.get('topic_segmentation_used'):
+        if result.metadata.get("topic_segmentation_used"):
             # Topics are now main headers, not under a "## Topics" section
-            assert result.metadata.get('num_topics', 0) >= 1
+            assert result.metadata.get("num_topics", 0) >= 1
 
     @pytest.mark.asyncio
     @pytest.mark.integration
@@ -239,7 +239,7 @@ class TestEnhancedAudioPipeline:
             result_disabled = await audio_processor.process_audio_file(
                 sample_audio_file,
                 enable_diarization=False,
-                enable_topic_segmentation=False
+                enable_topic_segmentation=False,
             )
 
             assert result_disabled.speaker_diarization is None
@@ -259,8 +259,8 @@ class TestEnhancedAudioPipeline:
             await audio_processor.process_audio_file("non_existent_file.wav")
 
         # Test with invalid file
-        with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as f:
-            f.write(b'invalid audio data')
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
+            f.write(b"invalid audio data")
             invalid_file = Path(f.name)
 
         try:
@@ -284,18 +284,14 @@ class TestEnhancedAudioPipeline:
         # Basic processing
         start_time = asyncio.get_event_loop().time()
         result_basic = await audio_processor.process_audio_file(
-            sample_audio_file,
-            enable_diarization=False,
-            enable_topic_segmentation=False
+            sample_audio_file, enable_diarization=False, enable_topic_segmentation=False
         )
         basic_time = asyncio.get_event_loop().time() - start_time
 
         # Enhanced processing
         start_time = asyncio.get_event_loop().time()
         result_enhanced = await audio_processor.process_audio_file(
-            sample_audio_file,
-            enable_diarization=True,
-            enable_topic_segmentation=True
+            sample_audio_file, enable_diarization=True, enable_topic_segmentation=True
         )
         enhanced_time = asyncio.get_event_loop().time() - start_time
 

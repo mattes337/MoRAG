@@ -18,9 +18,9 @@ from pathlib import Path
 # Add the src directory to the path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from morag_core.config import detect_device, get_safe_device, Settings
-from morag_audio import AudioProcessor, AudioConfig
 import structlog
+from morag_audio import AudioConfig, AudioProcessor
+from morag_core.config import Settings, detect_device, get_safe_device
 
 # Configure logging
 structlog.configure(
@@ -33,7 +33,7 @@ structlog.configure(
         structlog.processors.StackInfoRenderer(),
         structlog.processors.format_exc_info,
         structlog.processors.UnicodeDecoder(),
-        structlog.processors.JSONRenderer()
+        structlog.processors.JSONRenderer(),
     ],
     context_class=dict,
     logger_factory=structlog.stdlib.LoggerFactory(),
@@ -111,7 +111,7 @@ def test_video_processing_gpu():
     print_section("Video Processing GPU Tests")
 
     try:
-        from morag_video import VideoProcessor, VideoConfig
+        from morag_video import VideoConfig, VideoProcessor
 
         print("1. VideoProcessor initialization:")
         video_processor = VideoProcessor()
@@ -121,13 +121,15 @@ def test_video_processing_gpu():
         video_config = VideoConfig(
             enable_enhanced_audio=True,
             enable_speaker_diarization=True,
-            enable_topic_segmentation=True
+            enable_topic_segmentation=True,
         )
         print(f"   Enhanced audio enabled: {video_config.enable_enhanced_audio}")
         print(f"   Audio model size: {video_config.audio_model_size}")
 
         # Note: We can't easily test the actual audio processing without a video file
-        print("   (Audio processing device will be determined when processing actual video)")
+        print(
+            "   (Audio processing device will be determined when processing actual video)"
+        )
 
     except Exception as e:
         print(f"   Error testing video processing: {e}")
@@ -172,6 +174,7 @@ def main():
     except Exception as e:
         print(f"\n❌ Test failed with error: {e}")
         import traceback
+
         traceback.print_exc()
         return 1
 

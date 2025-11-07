@@ -8,19 +8,26 @@ import sys
 from typing import Optional
 
 # Add the packages to the path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'packages', 'morag-reasoning', 'src'))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'packages', 'morag-core', 'src'))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'packages', 'morag-graph', 'src'))
+sys.path.insert(
+    0,
+    os.path.join(os.path.dirname(__file__), "..", "packages", "morag-reasoning", "src"),
+)
+sys.path.insert(
+    0, os.path.join(os.path.dirname(__file__), "..", "packages", "morag-core", "src")
+)
+sys.path.insert(
+    0, os.path.join(os.path.dirname(__file__), "..", "packages", "morag-graph", "src")
+)
 
-from morag_reasoning.intelligent_retrieval_models import IntelligentRetrievalRequest
 from morag_graph.models.database_config import DatabaseServerConfig, DatabaseType
+from morag_reasoning.intelligent_retrieval_models import IntelligentRetrievalRequest
 
 
 def create_custom_neo4j_config(
     hostname: str = "neo4j://localhost:7687",
     username: str = "neo4j",
     password: str = "password",
-    database: str = "neo4j"
+    database: str = "neo4j",
 ) -> DatabaseServerConfig:
     """Create a custom Neo4j server configuration."""
     return DatabaseServerConfig(
@@ -29,10 +36,7 @@ def create_custom_neo4j_config(
         username=username,
         password=password,
         database_name=database,
-        config_options={
-            "verify_ssl": True,
-            "trust_all_certificates": False
-        }
+        config_options={"verify_ssl": True, "trust_all_certificates": False},
     )
 
 
@@ -41,7 +45,7 @@ def create_custom_qdrant_config(
     port: int = 6333,
     api_key: Optional[str] = None,
     collection: str = "morag_vectors",
-    https: bool = False
+    https: bool = False,
 ) -> DatabaseServerConfig:
     """Create a custom Qdrant server configuration."""
     return DatabaseServerConfig(
@@ -50,10 +54,7 @@ def create_custom_qdrant_config(
         port=port,
         password=api_key,  # API key goes in password field
         database_name=collection,
-        config_options={
-            "https": https,
-            "verify_ssl": True
-        }
+        config_options={"https": https, "verify_ssl": True},
     )
 
 
@@ -65,7 +66,7 @@ def create_test_request_with_custom_databases() -> IntelligentRetrievalRequest:
         hostname="https://graph.adhs.morag.drydev.de",
         username="neo4j",
         password="your-password-here",
-        database="neo4j"
+        database="neo4j",
     )
 
     # Custom Qdrant configuration (example with external server)
@@ -74,7 +75,7 @@ def create_test_request_with_custom_databases() -> IntelligentRetrievalRequest:
         port=6333,
         api_key="your-api-key-here",
         collection="custom_collection",
-        https=True
+        https=True,
     )
 
     return IntelligentRetrievalRequest(
@@ -88,7 +89,7 @@ def create_test_request_with_custom_databases() -> IntelligentRetrievalRequest:
         language="en",
         # Custom database server configurations
         neo4j_server=neo4j_config,
-        qdrant_server=qdrant_config
+        qdrant_server=qdrant_config,
     )
 
 
@@ -120,7 +121,7 @@ def create_test_request_with_named_databases() -> IntelligentRetrievalRequest:
         language="en",
         # Use pre-configured databases by name
         neo4j_database="production",
-        qdrant_collection="documents_v2"
+        qdrant_collection="documents_v2",
     )
 
 
@@ -142,11 +143,13 @@ async def test_rest_api_with_custom_databases():
             async with session.post(
                 "http://localhost:8000/api/v2/intelligent-query",
                 json=request_data,
-                headers={"Content-Type": "application/json"}
+                headers={"Content-Type": "application/json"},
             ) as response:
                 if response.status == 200:
                     result = await response.json()
-                    print(f"Success! Retrieved {len(result.get('key_facts', []))} key facts")
+                    print(
+                        f"Success! Retrieved {len(result.get('key_facts', []))} key facts"
+                    )
                     print(f"Response: {json.dumps(result, indent=2)}")
                 else:
                     error_text = await response.text()
@@ -190,8 +193,12 @@ def main():
     print("with the intelligent retrieval REST API.")
     print()
     print("Usage:")
-    print("  python test-custom-database-retrieval.py examples    # Show example configurations")
-    print("  python test-custom-database-retrieval.py test-api    # Test REST API with custom config")
+    print(
+        "  python test-custom-database-retrieval.py examples    # Show example configurations"
+    )
+    print(
+        "  python test-custom-database-retrieval.py test-api    # Test REST API with custom config"
+    )
     print()
     print("The REST API now supports three ways to specify databases:")
     print("1. Custom server configurations (neo4j_server, qdrant_server)")

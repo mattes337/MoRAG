@@ -1,8 +1,8 @@
 """Generic deduplication utilities for MoRAG."""
 
-from typing import List, Dict, Any, Callable, TypeVar, Optional
+from typing import Any, Callable, Dict, List, Optional, TypeVar
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 class Deduplicator:
@@ -12,7 +12,7 @@ class Deduplicator:
     def deduplicate_by_key(
         items: List[T],
         key_func: Callable[[T], Any],
-        merge_func: Optional[Callable[[T, T], T]] = None
+        merge_func: Optional[Callable[[T, T], T]] = None,
     ) -> List[T]:
         """
         Deduplicate items by a key function.
@@ -47,7 +47,7 @@ class Deduplicator:
     def deduplicate_by_multiple_keys(
         items: List[T],
         key_funcs: List[Callable[[T], Any]],
-        merge_func: Optional[Callable[[T, T], T]] = None
+        merge_func: Optional[Callable[[T, T], T]] = None,
     ) -> List[T]:
         """
         Deduplicate items by multiple key functions (composite key).
@@ -60,6 +60,7 @@ class Deduplicator:
         Returns:
             List of deduplicated items
         """
+
         def composite_key(item: T) -> tuple:
             return tuple(func(item) for func in key_funcs)
 
@@ -67,9 +68,7 @@ class Deduplicator:
 
     @staticmethod
     def deduplicate_by_attribute(
-        items: List[T],
-        attribute: str,
-        merge_func: Optional[Callable[[T, T], T]] = None
+        items: List[T], attribute: str, merge_func: Optional[Callable[[T, T], T]] = None
     ) -> List[T]:
         """
         Deduplicate items by a specific attribute.
@@ -82,6 +81,7 @@ class Deduplicator:
         Returns:
             List of deduplicated items
         """
+
         def attr_key(item: T) -> Any:
             return getattr(item, attribute)
 
@@ -91,7 +91,9 @@ class Deduplicator:
     def deduplicate_dicts_by_key(
         items: List[Dict[str, Any]],
         key: str,
-        merge_func: Optional[Callable[[Dict[str, Any], Dict[str, Any]], Dict[str, Any]]] = None
+        merge_func: Optional[
+            Callable[[Dict[str, Any], Dict[str, Any]], Dict[str, Any]]
+        ] = None,
     ) -> List[Dict[str, Any]]:
         """
         Deduplicate dictionaries by a specific key.
@@ -104,6 +106,7 @@ class Deduplicator:
         Returns:
             List of deduplicated dictionaries
         """
+
         def dict_key(item: Dict[str, Any]) -> Any:
             return item.get(key)
 
@@ -120,7 +123,9 @@ class Deduplicator:
         return item2
 
     @staticmethod
-    def merge_dict_update(dict1: Dict[str, Any], dict2: Dict[str, Any]) -> Dict[str, Any]:
+    def merge_dict_update(
+        dict1: Dict[str, Any], dict2: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Merge function that updates first dict with values from second."""
         result = dict1.copy()
         result.update(dict2)

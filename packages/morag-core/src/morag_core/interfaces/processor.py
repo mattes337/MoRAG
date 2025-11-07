@@ -14,44 +14,58 @@ class ProcessingConfig:
     def __init__(self, **kwargs):
         """Initialize processing config with flexible parameter handling."""
         # File path (required for document processing)
-        self.file_path: Optional[str] = kwargs.get('file_path')
+        self.file_path: Optional[str] = kwargs.get("file_path")
 
         # Common configuration options for all processors
-        self.max_file_size: Optional[int] = kwargs.get('max_file_size')
-        self.quality_threshold: float = kwargs.get('quality_threshold', 0.7)
-        self.extract_metadata: bool = kwargs.get('extract_metadata', True)
+        self.max_file_size: Optional[int] = kwargs.get("max_file_size")
+        self.quality_threshold: float = kwargs.get("quality_threshold", 0.7)
+        self.extract_metadata: bool = kwargs.get("extract_metadata", True)
 
         # Document-specific options
-        self.chunking_strategy: Optional[str] = kwargs.get('chunking_strategy')
-        self.chunk_size: Optional[int] = kwargs.get('chunk_size')
-        self.chunk_overlap: Optional[int] = kwargs.get('chunk_overlap')
+        self.chunking_strategy: Optional[str] = kwargs.get("chunking_strategy")
+        self.chunk_size: Optional[int] = kwargs.get("chunk_size")
+        self.chunk_overlap: Optional[int] = kwargs.get("chunk_overlap")
 
         # Additional options that may be passed but should be ignored by this config
         # These are handled at higher levels (service/task level)
-        self.webhook_url: Optional[str] = kwargs.get('webhook_url')
-        self.metadata: Optional[Dict[str, Any]] = kwargs.get('metadata')
-        self.use_docling: Optional[bool] = kwargs.get('use_docling')
-        self.store_in_vector_db: Optional[bool] = kwargs.get('store_in_vector_db')
-        self.generate_embeddings: Optional[bool] = kwargs.get('generate_embeddings')
+        self.webhook_url: Optional[str] = kwargs.get("webhook_url")
+        self.metadata: Optional[Dict[str, Any]] = kwargs.get("metadata")
+        self.use_docling: Optional[bool] = kwargs.get("use_docling")
+        self.store_in_vector_db: Optional[bool] = kwargs.get("store_in_vector_db")
+        self.generate_embeddings: Optional[bool] = kwargs.get("generate_embeddings")
 
         # Document management options (handled at service level)
-        self.document_id: Optional[str] = kwargs.get('document_id')
-        self.replace_existing: Optional[bool] = kwargs.get('replace_existing')
+        self.document_id: Optional[str] = kwargs.get("document_id")
+        self.replace_existing: Optional[bool] = kwargs.get("replace_existing")
 
         # Remote processing options (handled at service level)
-        self.remote: Optional[bool] = kwargs.get('remote')
+        self.remote: Optional[bool] = kwargs.get("remote")
 
         # Progress callback for long-running operations
-        self.progress_callback: Optional[callable] = kwargs.get('progress_callback')
+        self.progress_callback: Optional[callable] = kwargs.get("progress_callback")
 
         # Store any additional unknown parameters for potential use by converters
         self.additional_options: Dict[str, Any] = {
-            k: v for k, v in kwargs.items()
-            if k not in {
-                'file_path', 'max_file_size', 'quality_threshold', 'extract_metadata',
-                'chunking_strategy', 'chunk_size', 'chunk_overlap', 'webhook_url',
-                'metadata', 'use_docling', 'store_in_vector_db', 'generate_embeddings',
-                'document_id', 'replace_existing', 'remote', 'progress_callback'
+            k: v
+            for k, v in kwargs.items()
+            if k
+            not in {
+                "file_path",
+                "max_file_size",
+                "quality_threshold",
+                "extract_metadata",
+                "chunking_strategy",
+                "chunk_size",
+                "chunk_overlap",
+                "webhook_url",
+                "metadata",
+                "use_docling",
+                "store_in_vector_db",
+                "generate_embeddings",
+                "document_id",
+                "replace_existing",
+                "remote",
+                "progress_callback",
             }
         }
 
@@ -59,6 +73,7 @@ class ProcessingConfig:
 @dataclass
 class ProcessingResult:
     """Base result for content processing."""
+
     success: bool
     processing_time: float
     metadata: Dict[str, Any] = field(default_factory=dict)
@@ -70,7 +85,9 @@ class BaseProcessor(ABC):
     """Base class for content processors."""
 
     @abstractmethod
-    async def process(self, file_path: Union[str, Path], config: Optional[ProcessingConfig] = None) -> ProcessingResult:
+    async def process(
+        self, file_path: Union[str, Path], config: Optional[ProcessingConfig] = None
+    ) -> ProcessingResult:
         """Process content from file.
 
         Args:
@@ -97,7 +114,9 @@ class BaseProcessor(ABC):
         """
         pass
 
-    def validate_input(self, file_path: Union[str, Path], config: ProcessingConfig) -> None:
+    def validate_input(
+        self, file_path: Union[str, Path], config: ProcessingConfig
+    ) -> None:
         """Validate input file.
 
         Args:

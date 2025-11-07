@@ -1,9 +1,11 @@
 """Tests for Document Processing Improvements (Tasks 1, 2, 3, 5)."""
 
-import pytest
 import asyncio
-from unittest.mock import Mock, AsyncMock, patch
 from pathlib import Path
+from unittest.mock import AsyncMock, Mock, patch
+
+import pytest
+
 
 # Test Task 1: Word Boundary Preservation
 def test_word_boundary_detection():
@@ -15,11 +17,14 @@ def test_word_boundary_detection():
 
     # Test backward search
     boundary = converter._find_word_boundary(text, 20, "backward")
-    assert text[boundary-1:boundary+1] in [" ", "! ", ". "] or boundary == 0
+    assert text[boundary - 1 : boundary + 1] in [" ", "! ", ". "] or boundary == 0
 
     # Test forward search
     boundary = converter._find_word_boundary(text, 20, "forward")
-    assert text[boundary-1:boundary+1] in [" ", "! ", ". "] or boundary == len(text)
+    assert text[boundary - 1 : boundary + 1] in [" ", "! ", ". "] or boundary == len(
+        text
+    )
+
 
 def test_sentence_boundary_detection():
     """Test enhanced sentence boundary detection."""
@@ -35,26 +40,29 @@ def test_sentence_boundary_detection():
     assert boundaries[0] == 0
     assert boundaries[-1] == len(text)
 
+
 @pytest.mark.asyncio
 async def test_enhanced_word_chunking():
     """Test enhanced word-based chunking with better overlap."""
-    from packages.morag_document.src.morag_document.converters.base import BaseConverter
-    from packages.morag_core.interfaces.converter import ConversionOptions, ChunkingStrategy
+    from packages.morag_core.interfaces.converter import (
+        ChunkingStrategy,
+        ConversionOptions,
+    )
     from packages.morag_core.models.document import Document, DocumentMetadata
+    from packages.morag_document.src.morag_document.converters.base import BaseConverter
 
     converter = BaseConverter()
 
     # Create test document
     text = "This is the first sentence. This is the second sentence. This is the third sentence. This is the fourth sentence."
     document = Document(
-        metadata=DocumentMetadata(title="Test", source="test.txt"),
-        raw_text=text
+        metadata=DocumentMetadata(title="Test", source="test.txt"), raw_text=text
     )
 
     options = ConversionOptions(
         chunking_strategy=ChunkingStrategy.WORD,
         chunk_size=50,  # Small chunks to test overlap
-        chunk_overlap=20
+        chunk_overlap=20,
     )
 
     result = await converter._chunk_document(document, options)
@@ -67,7 +75,8 @@ async def test_enhanced_word_chunking():
         words = chunk.content.split()
         # Each word should be complete (no partial words)
         for word in words:
-            assert not word.startswith(' ') and not word.endswith(' ')
+            assert not word.startswith(" ") and not word.endswith(" ")
+
 
 # Test Task 2: Search Embedding Optimization
 @pytest.mark.asyncio
@@ -90,8 +99,8 @@ async def test_search_embedding_optimization():
             "metadata": {
                 "text": "Test content",
                 "content_type": "document",
-                "source": "test.txt"
-            }
+                "source": "test.txt",
+            },
         }
     ]
 
@@ -114,6 +123,7 @@ async def test_search_embedding_optimization():
     assert "content" in result  # Text content in 'content' field
     assert "text" not in result["metadata"]  # No text duplication in metadata
 
+
 # Test Task 3: Text Duplication Fix
 def test_search_response_deduplication():
     """Test that search responses don't duplicate text content."""
@@ -127,15 +137,17 @@ def test_search_response_deduplication():
             "text": "This is test content",
             "content_type": "document",
             "source": "test.txt",
-            "chunk_index": 0
-        }
+            "chunk_index": 0,
+        },
     }
 
     services = MoRAGServices()
 
     # Simulate the formatting logic from search_similar
     text_content = mock_result.get("metadata", {}).get("text", "")
-    clean_metadata = {k: v for k, v in mock_result.get("metadata", {}).items() if k != "text"}
+    clean_metadata = {
+        k: v for k, v in mock_result.get("metadata", {}).items() if k != "text"
+    }
 
     formatted_result = {
         "id": mock_result.get("id"),
@@ -143,7 +155,7 @@ def test_search_response_deduplication():
         "content": text_content,
         "metadata": clean_metadata,
         "content_type": mock_result.get("metadata", {}).get("content_type"),
-        "source": mock_result.get("metadata", {}).get("source")
+        "source": mock_result.get("metadata", {}).get("source"),
     }
 
     # Verify no text duplication
@@ -151,6 +163,7 @@ def test_search_response_deduplication():
     assert "text" not in formatted_result["metadata"]
     assert "content_type" in formatted_result["metadata"]
     assert "source" in formatted_result["metadata"]
+
 
 # Test Task 5: Document Replacement
 @pytest.mark.asyncio
@@ -172,6 +185,7 @@ async def test_document_id_generation():
     assert file_with_content_id.startswith("test_txt_")
     assert len(file_with_content_id) > len("test_txt_")
 
+
 @pytest.mark.asyncio
 async def test_document_replacement_storage():
     """Test document replacement in storage layer."""
@@ -181,9 +195,7 @@ async def test_document_replacement_storage():
     mock_client = AsyncMock()
 
     storage = QdrantVectorStorage(
-        host="localhost",
-        port=6333,
-        collection_name="test_collection"
+        host="localhost", port=6333, collection_name="test_collection"
     )
     storage.client = mock_client
 
@@ -201,9 +213,7 @@ async def test_document_replacement_storage():
     storage.store_vectors = AsyncMock(return_value=["new_point1", "new_point2"])
 
     result_ids = await storage.replace_document(
-        "test_doc_id",
-        new_vectors,
-        new_metadata
+        "test_doc_id", new_vectors, new_metadata
     )
 
     assert result_ids == ["new_point1", "new_point2"]
@@ -217,13 +227,14 @@ async def test_document_replacement_storage():
         assert meta["document_id"] == "test_doc_id"
         assert "replaced_at" in meta
 
+
 def test_document_id_validation():
     """Test document ID validation."""
     import re
 
     # Valid IDs
     valid_ids = ["test_doc", "test-doc", "TestDoc123", "doc_123-abc"]
-    pattern = r'^[a-zA-Z0-9_-]+$'
+    pattern = r"^[a-zA-Z0-9_-]+$"
 
     for doc_id in valid_ids:
         assert re.match(pattern, doc_id), f"Valid ID {doc_id} should match pattern"
@@ -232,7 +243,10 @@ def test_document_id_validation():
     invalid_ids = ["test doc", "test.doc", "test@doc", "test/doc", ""]
 
     for doc_id in invalid_ids:
-        assert not re.match(pattern, doc_id), f"Invalid ID {doc_id} should not match pattern"
+        assert not re.match(
+            pattern, doc_id
+        ), f"Invalid ID {doc_id} should not match pattern"
+
 
 if __name__ == "__main__":
     pytest.main([__file__])

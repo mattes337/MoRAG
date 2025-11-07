@@ -18,10 +18,13 @@ class TestPDFEncodingFix:
         """Test various soft hyphen scenarios."""
         test_cases = [
             ("ange\u00ad ", "ange"),  # Soft hyphen at end with space
-            ("ange\u00ad", "ange"),   # Soft hyphen at end
+            ("ange\u00ad", "ange"),  # Soft hyphen at end
             ("word\u00ad next", "wordnext"),  # Soft hyphen joins words
             ("hyphen\u00adated", "hyphenated"),  # Soft hyphen within word
-            ("multi\u00adple\u00ad hyphens", "multiplehyphens"),  # Multiple soft hyphens
+            (
+                "multi\u00adple\u00ad hyphens",
+                "multiplehyphens",
+            ),  # Multiple soft hyphens
         ]
 
         for input_text, expected in test_cases:
@@ -46,9 +49,9 @@ class TestPDFEncodingFix:
         test_cases = [
             ("\ufb01le", "file"),  # fi ligature
             ("\ufb02ow", "flow"),  # fl ligature
-            ("\ufb00", "ff"),      # ff ligature
-            ("\ufb03", "ffi"),     # ffi ligature
-            ("\ufb04", "ffl"),     # ffl ligature
+            ("\ufb00", "ff"),  # ff ligature
+            ("\ufb03", "ffi"),  # ffi ligature
+            ("\ufb04", "ffl"),  # ffl ligature
         ]
 
         for input_text, expected in test_cases:
@@ -60,8 +63,8 @@ class TestPDFEncodingFix:
         test_cases = [
             ("\u201cHello\u201d", '"Hello"'),  # Smart quotes
             ("\u2018world\u2019", "'world'"),  # Smart single quotes
-            ("em\u2014dash", "em-dash"),       # Em dash
-            ("en\u2013dash", "en-dash"),       # En dash
+            ("em\u2014dash", "em-dash"),  # Em dash
+            ("en\u2013dash", "en-dash"),  # En dash
         ]
 
         for input_text, expected in test_cases:
@@ -72,11 +75,11 @@ class TestPDFEncodingFix:
         """Test common PDF encoding artifacts."""
         # Using escape sequences to avoid encoding issues
         test_cases = [
-            ("\u00e2\u0080\u0099", "'"),    # â€™ -> '
-            ("\u00e2\u0080\u009c", '"'),    # â€œ -> "
-            ("\u00e2\u0080\u009d", '"'),    # â€ -> "
-            ("\u00e2\u0080\u00a6", "..."), # â€¦ -> ...
-            ("\u00e2\u0080\u0094", "-"),   # â€" -> -
+            ("\u00e2\u0080\u0099", "'"),  # â€™ -> '
+            ("\u00e2\u0080\u009c", '"'),  # â€œ -> "
+            ("\u00e2\u0080\u009d", '"'),  # â€ -> "
+            ("\u00e2\u0080\u00a6", "..."),  # â€¦ -> ...
+            ("\u00e2\u0080\u0094", "-"),  # â€" -> -
         ]
 
         for input_text, expected in test_cases:
@@ -113,12 +116,12 @@ class TestPDFEncodingFix:
     def test_normalize_text_encoding_with_bytes(self):
         """Test normalize_text_encoding with byte input."""
         # Test UTF-8 bytes
-        utf8_bytes = "Hello world".encode('utf-8')
+        utf8_bytes = "Hello world".encode("utf-8")
         result = normalize_text_encoding(utf8_bytes)
         assert result == "Hello world"
 
         # Test Latin-1 bytes
-        latin1_bytes = "café".encode('latin-1')
+        latin1_bytes = "café".encode("latin-1")
         result = normalize_text_encoding(latin1_bytes)
         assert "caf" in result  # Should decode successfully
 

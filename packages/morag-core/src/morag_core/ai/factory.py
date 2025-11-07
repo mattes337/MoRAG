@@ -1,13 +1,15 @@
 """Factory patterns for creating MoRAG AI agents."""
 
-from typing import Type, TypeVar, Optional, Dict, Any
-from .base_agent import MoRAGBaseAgent, AgentConfig
-from .providers import GeminiProvider, ProviderConfig, ProviderFactory
+from typing import Any, Dict, Optional, Type, TypeVar
+
 import structlog
+
+from .base_agent import AgentConfig, MoRAGBaseAgent
+from .providers import GeminiProvider, ProviderConfig, ProviderFactory
 
 logger = structlog.get_logger(__name__)
 
-T = TypeVar('T', bound=MoRAGBaseAgent)
+T = TypeVar("T", bound=MoRAGBaseAgent)
 
 
 class AgentFactory:
@@ -52,7 +54,7 @@ class AgentFactory:
             "Creating agent",
             agent_class=agent_class.__name__,
             model=agent_config.model,
-            provider_available=provider.is_available()
+            provider_available=provider.is_available(),
         )
 
         try:
@@ -62,7 +64,7 @@ class AgentFactory:
                 "Failed to create agent",
                 agent_class=agent_class.__name__,
                 error=str(e),
-                error_type=type(e).__name__
+                error_type=type(e).__name__,
             )
             raise
 
@@ -111,7 +113,9 @@ class AgentFactory:
             provider_config_dict["api_key"] = api_key
 
         # Create configurations
-        provider_config = ProviderConfig(**provider_config_dict) if provider_config_dict else None
+        provider_config = (
+            ProviderConfig(**provider_config_dict) if provider_config_dict else None
+        )
         if provider_config:
             config_dict["provider_config"] = provider_config
 
@@ -134,7 +138,8 @@ class AgentFactory:
             "provider": agent.provider.get_provider_info(),
             "result_type": agent.get_result_type().__name__,
             "system_prompt_preview": agent.get_system_prompt()[:100] + "..."
-                if len(agent.get_system_prompt()) > 100 else agent.get_system_prompt()
+            if len(agent.get_system_prompt()) > 100
+            else agent.get_system_prompt(),
         }
 
 
@@ -188,5 +193,12 @@ def create_agent_with_config(
         Agent instance
     """
     return default_factory.create_agent_with_config(
-        agent_class, model, timeout, max_retries, temperature, max_tokens, api_key, **kwargs
+        agent_class,
+        model,
+        timeout,
+        max_retries,
+        temperature,
+        max_tokens,
+        api_key,
+        **kwargs
     )

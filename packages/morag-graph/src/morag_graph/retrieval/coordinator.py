@@ -2,16 +2,20 @@
 
 import asyncio
 import logging
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
 
+from ..models import Entity
 from ..query import QueryEntityExtractor
 from ..query.models import QueryAnalysis
-from ..models import Entity
-from .models import (
-    RetrievalResult, HybridRetrievalConfig, RetrievalError,
-    VectorRetriever, DocumentResult, ExpandedContext
-)
 from .context_expansion import ContextExpansionEngine
+from .models import (
+    DocumentResult,
+    ExpandedContext,
+    HybridRetrievalConfig,
+    RetrievalError,
+    RetrievalResult,
+    VectorRetriever,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +28,7 @@ class HybridRetrievalCoordinator:
         vector_retriever: VectorRetriever,
         context_expansion_engine: ContextExpansionEngine,
         query_entity_extractor: QueryEntityExtractor,
-        config: Optional[HybridRetrievalConfig] = None
+        config: Optional[HybridRetrievalConfig] = None,
     ):
         """Initialize the hybrid retrieval coordinator.
 
@@ -41,9 +45,7 @@ class HybridRetrievalCoordinator:
         self.logger = logging.getLogger(__name__)
 
     async def retrieve(
-        self,
-        query: str,
-        max_results: int = 10
+        self, query: str, max_results: int = 10
     ) -> List[RetrievalResult]:
         """Perform hybrid retrieval combining vector and graph methods.
 
@@ -61,13 +63,15 @@ class HybridRetrievalCoordinator:
             self.logger.info(f"Starting retrieval for query: {query}")
 
             # Analyze query and extract entities
-            query_analysis = await self.query_entity_extractor.extract_and_link_entities(query)
+            query_analysis = (
+                await self.query_entity_extractor.extract_and_link_entities(query)
+            )
 
             # Perform parallel retrieval
             vector_results, graph_results = await asyncio.gather(
                 self._vector_retrieval(query),
                 self._graph_retrieval(query_analysis),
-                return_exceptions=True
+                return_exceptions=True,
             )
 
             # Handle exceptions
@@ -79,7 +83,9 @@ class HybridRetrievalCoordinator:
                 self.logger.warning(f"Graph retrieval failed: {graph_results}")
                 graph_results = []
 
-            self.logger.info(f"Retrieved {len(vector_results)} vector results, {len(graph_results)} graph results")
+            self.logger.info(
+                f"Retrieved {len(vector_results)} vector results, {len(graph_results)} graph results"
+            )
 
             # Fuse results
             fused_results = await self._fuse_results(
@@ -87,9 +93,7 @@ class HybridRetrievalCoordinator:
             )
 
             # Rank and filter final results
-            final_results = self._rank_and_filter_results(
-                fused_results, max_results
-            )
+            final_results = self._rank_and_filter_results(fused_results, max_results)
 
             self.logger.info(f"Returning {len(final_results)} final results")
             return final_results
@@ -122,11 +126,11 @@ class HybridRetrievalCoordinator:
             results = []
             for doc in vector_docs:
                 result = RetrievalResult(
-                    content=doc.get('content', ''),
+                    content=doc.get("content", ""),
                     source="vector",
-                    score=doc.get('score', 0.0),
-                    metadata=doc.get('metadata', {}),
-                    reasoning="Retrieved via semantic similarity"
+                    score=doc.get("score", 0.0),
+                    metadata=doc.get("metadata", {}),
+                    reasoning="Retrieved via semantic similarity",
                 )
                 results.append(result)
 
@@ -137,7 +141,9 @@ class HybridRetrievalCoordinator:
             self.logger.error(f"Vector retrieval failed: {e}")
             return []
 
-    async def _graph_retrieval(self, query_analysis: QueryAnalysis) -> List[RetrievalResult]:
+    async def _graph_retrieval(
+        self, query_analysis: QueryAnalysis
+    ) -> List[RetrievalResult]:
         """Perform graph-guided retrieval.
 
         Args:
@@ -148,14 +154,20 @@ class HybridRetrievalCoordinator:
         """
         try:
             if not query_analysis.entities:
-                self.logger.debug("No entities found in query, skipping graph retrieval")
+                self.logger.debug(
+                    "No entities found in query, skipping graph retrieval"
+                )
                 return []
 
             # Expand context using graph
-            expanded_context = await self.context_expansion_engine.expand_context(query_analysis)
+            expanded_context = await self.context_expansion_engine.expand_context(
+                query_analysis
+            )
 
             if not expanded_context.expanded_entities:
-                self.logger.debug("No expanded entities found, skipping graph retrieval")
+                self.logger.debug(
+                    "No expanded entities found, skipping graph retrieval"
+                )
                 return []
 
             # Convert expanded entities to retrieval results
@@ -168,21 +180,25 @@ class HybridRetrievalCoordinator:
                     result = RetrievalResult(
                         content=doc.content,
                         source="graph",
-                        score=self._calculate_graph_relevance_score(entity, expanded_context),
+                        score=self._calculate_graph_relevance_score(
+                            entity, expanded_context
+                        ),
                         metadata={
                             **doc.metadata,
                             "entity_id": entity.id,
                             "entity_type": str(entity.type),
-                            "expansion_reasoning": expanded_context.expansion_reasoning
+                            "expansion_reasoning": expanded_context.expansion_reasoning,
                         },
                         entities=[entity.id],
-                        reasoning=f"Retrieved via graph expansion: {expanded_context.expansion_reasoning}"
+                        reasoning=f"Retrieved via graph expansion: {expanded_context.expansion_reasoning}",
                     )
                     results.append(result)
 
             # Limit results
-            limited_results = results[:self.config.max_graph_results]
-            self.logger.debug(f"Graph retrieval returned {len(limited_results)} results")
+            limited_results = results[: self.config.max_graph_results]
+            self.logger.debug(
+                f"Graph retrieval returned {len(limited_results)} results"
+            )
             return limited_results
 
         except Exception as e:
@@ -203,16 +219,18 @@ class HybridRetrievalCoordinator:
         # that mention this entity, possibly using the entity's mentioned_in_chunks
 
         # For now, return a mock document
-        if hasattr(entity, 'source_doc_id') and entity.source_doc_id:
-            return [DocumentResult(
-                content=f"Document content mentioning {entity.name}",
-                score=0.8,
-                metadata={
-                    "source_doc_id": entity.source_doc_id,
-                    "entity_name": entity.name,
-                    "entity_type": str(entity.type)
-                }
-            )]
+        if hasattr(entity, "source_doc_id") and entity.source_doc_id:
+            return [
+                DocumentResult(
+                    content=f"Document content mentioning {entity.name}",
+                    score=0.8,
+                    metadata={
+                        "source_doc_id": entity.source_doc_id,
+                        "entity_name": entity.name,
+                        "entity_type": str(entity.type),
+                    },
+                )
+            ]
 
         return []
 
@@ -220,7 +238,7 @@ class HybridRetrievalCoordinator:
         self,
         vector_results: List[RetrievalResult],
         graph_results: List[RetrievalResult],
-        query_analysis: QueryAnalysis
+        query_analysis: QueryAnalysis,
     ) -> List[RetrievalResult]:
         """Fuse vector and graph retrieval results.
 
@@ -250,7 +268,7 @@ class HybridRetrievalCoordinator:
         self,
         vector_results: List[RetrievalResult],
         graph_results: List[RetrievalResult],
-        query_analysis: QueryAnalysis
+        query_analysis: QueryAnalysis,
     ) -> List[RetrievalResult]:
         """Fuse results using weighted combination of scores.
 
@@ -309,7 +327,7 @@ class HybridRetrievalCoordinator:
     async def _rank_fusion(
         self,
         vector_results: List[RetrievalResult],
-        graph_results: List[RetrievalResult]
+        graph_results: List[RetrievalResult],
     ) -> List[RetrievalResult]:
         """Fuse results using reciprocal rank fusion.
 
@@ -328,20 +346,20 @@ class HybridRetrievalCoordinator:
         for rank, result in enumerate(vector_results):
             if result.content not in content_to_results:
                 content_to_results[result.content] = {
-                    'result': result,
-                    'vector_rank': rank + 1,
-                    'graph_rank': None
+                    "result": result,
+                    "vector_rank": rank + 1,
+                    "graph_rank": None,
                 }
 
         # Process graph results
         for rank, result in enumerate(graph_results):
             if result.content in content_to_results:
-                content_to_results[result.content]['graph_rank'] = rank + 1
+                content_to_results[result.content]["graph_rank"] = rank + 1
             else:
                 content_to_results[result.content] = {
-                    'result': result,
-                    'vector_rank': None,
-                    'graph_rank': rank + 1
+                    "result": result,
+                    "vector_rank": None,
+                    "graph_rank": rank + 1,
                 }
 
         # Calculate RRF scores
@@ -349,13 +367,13 @@ class HybridRetrievalCoordinator:
         for content, data in content_to_results.items():
             rrf_score = 0.0
 
-            if data['vector_rank'] is not None:
-                rrf_score += 1.0 / (k + data['vector_rank'])
+            if data["vector_rank"] is not None:
+                rrf_score += 1.0 / (k + data["vector_rank"])
 
-            if data['graph_rank'] is not None:
-                rrf_score += 1.0 / (k + data['graph_rank'])
+            if data["graph_rank"] is not None:
+                rrf_score += 1.0 / (k + data["graph_rank"])
 
-            result = data['result']
+            result = data["result"]
             result.score = rrf_score
             result.source = "rrf_fusion"
             fused_results.append(result)
@@ -366,7 +384,7 @@ class HybridRetrievalCoordinator:
         self,
         vector_results: List[RetrievalResult],
         graph_results: List[RetrievalResult],
-        query_analysis: QueryAnalysis
+        query_analysis: QueryAnalysis,
     ) -> List[RetrievalResult]:
         """Adaptively fuse results based on query characteristics.
 
@@ -389,7 +407,7 @@ class HybridRetrievalCoordinator:
     def _simple_fusion(
         self,
         vector_results: List[RetrievalResult],
-        graph_results: List[RetrievalResult]
+        graph_results: List[RetrievalResult],
     ) -> List[RetrievalResult]:
         """Simple fusion by concatenation with deduplication.
 
@@ -411,7 +429,9 @@ class HybridRetrievalCoordinator:
 
         return all_results
 
-    def _calculate_graph_relevance_score(self, entity: Entity, context: ExpandedContext) -> float:
+    def _calculate_graph_relevance_score(
+        self, entity: Entity, context: ExpandedContext
+    ) -> float:
         """Calculate relevance score for graph-retrieved content.
 
         Args:
@@ -428,7 +448,7 @@ class HybridRetrievalCoordinator:
             base_score += 0.3
 
         # Boost based on entity confidence
-        if hasattr(entity, 'confidence'):
+        if hasattr(entity, "confidence"):
             base_score += entity.confidence * 0.1
 
         # Context quality bonus
@@ -437,9 +457,7 @@ class HybridRetrievalCoordinator:
         return min(base_score, 1.0)
 
     def _rank_and_filter_results(
-        self,
-        results: List[RetrievalResult],
-        max_results: int
+        self, results: List[RetrievalResult], max_results: int
     ) -> List[RetrievalResult]:
         """Rank and filter final results.
 
@@ -452,15 +470,10 @@ class HybridRetrievalCoordinator:
         """
         # Filter by minimum confidence
         filtered_results = [
-            r for r in results
-            if r.score >= self.config.min_confidence_threshold
+            r for r in results if r.score >= self.config.min_confidence_threshold
         ]
 
         # Sort by score
-        sorted_results = sorted(
-            filtered_results,
-            key=lambda r: r.score,
-            reverse=True
-        )
+        sorted_results = sorted(filtered_results, key=lambda r: r.score, reverse=True)
 
         return sorted_results[:max_results]

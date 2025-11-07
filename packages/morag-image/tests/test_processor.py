@@ -1,18 +1,19 @@
 """Tests for the image processor module."""
 
-import os
-import pytest
-from pathlib import Path
 import asyncio
-from unittest.mock import patch, MagicMock
+import os
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 
-from morag_image.processor import ImageProcessor, ImageConfig, ImageProcessingResult
+import pytest
+from morag_image.processor import ImageConfig, ImageProcessingResult, ImageProcessor
 
 # Skip tests if API key is not available
 pytestmark = pytest.mark.skipif(
     os.environ.get("GOOGLE_API_KEY") is None,
-    reason="GOOGLE_API_KEY environment variable not set"
+    reason="GOOGLE_API_KEY environment variable not set",
 )
+
 
 # Fixture for test image path
 @pytest.fixture
@@ -21,12 +22,14 @@ def test_image_path():
     # This is a placeholder - in a real test, you would use a real test image
     return Path(__file__).parent / "resources" / "test_image.jpg"
 
+
 # Fixture for image processor
 @pytest.fixture
 def image_processor():
     """Create an ImageProcessor instance for testing."""
     api_key = os.environ.get("GOOGLE_API_KEY")
     return ImageProcessor(api_key=api_key)
+
 
 # Test extracting metadata
 def test_extract_metadata(image_processor, test_image_path, monkeypatch):
@@ -51,6 +54,7 @@ def test_extract_metadata(image_processor, test_image_path, monkeypatch):
     assert metadata.file_size == 1024
     assert metadata.has_exif is False
 
+
 # Test preprocessing image
 def test_preprocess_image(image_processor, test_image_path, monkeypatch):
     """Test image preprocessing (resizing)."""
@@ -61,12 +65,15 @@ def test_preprocess_image(image_processor, test_image_path, monkeypatch):
     mock_image.resize.return_value = MagicMock(width=1024, height=768)
 
     with patch("PIL.Image.open", return_value=mock_image):
-        resized_image = image_processor._preprocess_image(test_image_path, max_dimension=1024)
+        resized_image = image_processor._preprocess_image(
+            test_image_path, max_dimension=1024
+        )
 
     # Check that resize was called with correct parameters
     mock_image.resize.assert_called_once()
     assert resized_image.width == 1024
     assert resized_image.height == 768
+
 
 # Test OCR with Tesseract
 @pytest.mark.asyncio
@@ -79,6 +86,7 @@ async def test_extract_text_tesseract(image_processor, test_image_path):
 
     assert text == "Sample text from image"
 
+
 # Test OCR with EasyOCR
 @pytest.mark.asyncio
 async def test_extract_text_easyocr(image_processor, test_image_path):
@@ -89,15 +97,18 @@ async def test_extract_text_easyocr(image_processor, test_image_path):
         ([0, 0, 100, 100], "Sample", 0.95),
         ([0, 100, 100, 200], "text", 0.90),
         ([100, 0, 200, 100], "from", 0.85),
-        ([100, 100, 200, 200], "image", 0.80)
+        ([100, 100, 200, 200], "image", 0.80),
     ]
 
     with patch("easyocr.Reader", return_value=mock_reader):
         with patch("PIL.Image.open"):
-            text, confidence = await image_processor._extract_text_easyocr(test_image_path)
+            text, confidence = await image_processor._extract_text_easyocr(
+                test_image_path
+            )
 
     assert text == "Sample text from image"
     assert confidence == 0.875  # Average of confidence scores
+
 
 # Test generating caption with Gemini
 @pytest.mark.asyncio
@@ -116,16 +127,21 @@ async def test_generate_caption(image_processor, test_image_path):
 
     assert caption == "A beautiful landscape with mountains and a lake"
 
+
 # Test full image processing
 @pytest.mark.asyncio
 async def test_process_image(image_processor, test_image_path):
     """Test the full image processing pipeline."""
     # Mock all the individual processing functions
-    with patch.object(image_processor, "_extract_metadata") as mock_extract_metadata, \
-         patch.object(image_processor, "_preprocess_image") as mock_preprocess, \
-         patch.object(image_processor, "_generate_caption") as mock_generate_caption, \
-         patch.object(image_processor, "_extract_text_tesseract") as mock_extract_text:
-
+    with patch.object(
+        image_processor, "_extract_metadata"
+    ) as mock_extract_metadata, patch.object(
+        image_processor, "_preprocess_image"
+    ) as mock_preprocess, patch.object(
+        image_processor, "_generate_caption"
+    ) as mock_generate_caption, patch.object(
+        image_processor, "_extract_text_tesseract"
+    ) as mock_extract_text:
         # Set up mock returns
         mock_metadata = MagicMock()
         mock_metadata.width = 800
@@ -141,7 +157,7 @@ async def test_process_image(image_processor, test_image_path):
             generate_caption=True,
             extract_text=True,
             extract_metadata=True,
-            ocr_engine="tesseract"
+            ocr_engine="tesseract",
         )
 
         # Process image

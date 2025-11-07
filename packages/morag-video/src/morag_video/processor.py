@@ -1,23 +1,26 @@
 """Video processor module for MoRAG."""
 
-import os
-import time
-from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union, Any
-from dataclasses import dataclass, field
 import asyncio
-import structlog
+import os
 import tempfile
+import time
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple, Union
+
+import cv2
+import numpy as np
+import structlog
+from ffmpeg._filters import filter as ffmpeg_filter
 
 # Import ffmpeg-python components
 from ffmpeg._probe import probe as ffmpeg_probe
-from ffmpeg._run import input as ffmpeg_input, output as ffmpeg_output, run as ffmpeg_run, Error as FFmpegError
-from ffmpeg._filters import filter as ffmpeg_filter
+from ffmpeg._run import Error as FFmpegError
+from ffmpeg._run import input as ffmpeg_input
+from ffmpeg._run import output as ffmpeg_output
+from ffmpeg._run import run as ffmpeg_run
+from morag_core.exceptions import ExternalServiceError, ProcessingError
 from PIL import Image
-import cv2
-import numpy as np
-
-from morag_core.exceptions import ProcessingError, ExternalServiceError
 
 logger = structlog.get_logger(__name__)
 
@@ -25,6 +28,7 @@ logger = structlog.get_logger(__name__)
 @dataclass
 class VideoConfig:
     """Configuration for video processing."""
+
     extract_audio: bool = True
     generate_thumbnails: bool = True
     thumbnail_count: int = 5
@@ -51,22 +55,33 @@ class VideoConfig:
 
         # Override with environment variables if they exist
         # Support both WHISPER_MODEL_SIZE and MORAG_WHISPER_MODEL_SIZE
-        env_model_size = (
-            os.environ.get("WHISPER_MODEL_SIZE") or
-            os.environ.get("MORAG_WHISPER_MODEL_SIZE")
+        env_model_size = os.environ.get("WHISPER_MODEL_SIZE") or os.environ.get(
+            "MORAG_WHISPER_MODEL_SIZE"
         )
-        if env_model_size and self.audio_model_size == "base":  # Only override if using default
+        if (
+            env_model_size and self.audio_model_size == "base"
+        ):  # Only override if using default
             self.audio_model_size = env_model_size
 
         # Override speaker diarization if set in environment
         env_diarization = os.environ.get("MORAG_ENABLE_SPEAKER_DIARIZATION")
         if env_diarization is not None:
-            self.enable_speaker_diarization = env_diarization.lower() in ("true", "1", "yes", "on")
+            self.enable_speaker_diarization = env_diarization.lower() in (
+                "true",
+                "1",
+                "yes",
+                "on",
+            )
 
         # Override topic segmentation if set in environment
         env_topic_segmentation = os.environ.get("MORAG_ENABLE_TOPIC_SEGMENTATION")
         if env_topic_segmentation is not None:
-            self.enable_topic_segmentation = env_topic_segmentation.lower() in ("true", "1", "yes", "on")
+            self.enable_topic_segmentation = env_topic_segmentation.lower() in (
+                "true",
+                "1",
+                "yes",
+                "on",
+            )
 
         # Override language if set in environment
         env_language = os.environ.get("MORAG_VIDEO_LANGUAGE")
@@ -77,6 +92,7 @@ class VideoConfig:
 @dataclass
 class VideoMetadata:
     """Video metadata information."""
+
     duration: float
     width: int
     height: int
@@ -93,6 +109,7 @@ class VideoMetadata:
 @dataclass
 class VideoProcessingResult:
     """Result of video processing operation."""
+
     audio_path: Optional[Path]
     thumbnails: List[Path]
     keyframes: List[Path]
@@ -100,13 +117,16 @@ class VideoProcessingResult:
     processing_time: float
     temp_files: List[Path] = field(default_factory=list)
     # Enhanced audio processing results
-    audio_processing_result: Optional[Any] = None  # AudioProcessingResult from audio processor
+    audio_processing_result: Optional[
+        Any
+    ] = None  # AudioProcessingResult from audio processor
     # OCR results
     ocr_results: Optional[Dict[str, Any]] = None
 
 
 class VideoProcessingError(ProcessingError):
     """Error raised during video processing."""
+
     pass
 
 
@@ -130,7 +150,7 @@ class VideoProcessor:
         """Get audio processor instance, importing only when needed."""
         if self._audio_processor is None:
             try:
-                from morag_audio import AudioProcessor, AudioConfig
+                from morag_audio import AudioConfig, AudioProcessor
 
                 # Create audio config - let AudioConfig handle environment variables
                 # Only override if video config has non-default values
@@ -140,9 +160,13 @@ class VideoProcessor:
                 if self.config.audio_model_size != "base":
                     audio_config.model_size = self.config.audio_model_size
                 if self.config.enable_speaker_diarization != False:
-                    audio_config.enable_diarization = self.config.enable_speaker_diarization
+                    audio_config.enable_diarization = (
+                        self.config.enable_speaker_diarization
+                    )
                 if self.config.enable_topic_segmentation != False:
-                    audio_config.enable_topic_segmentation = self.config.enable_topic_segmentation
+                    audio_config.enable_topic_segmentation = (
+                        self.config.enable_topic_segmentation
+                    )
                 # Pass language configuration to audio processor
                 if self.config.language is not None:
                     audio_config.language = self.config.language
@@ -151,10 +175,12 @@ class VideoProcessor:
                 audio_config.device = "auto"
 
                 self._audio_processor = AudioProcessor(audio_config)
-                logger.info("Initialized AudioProcessor for video processing",
-                           model_size=audio_config.model_size,
-                           enable_diarization=audio_config.enable_diarization,
-                           enable_topic_segmentation=audio_config.enable_topic_segmentation)
+                logger.info(
+                    "Initialized AudioProcessor for video processing",
+                    model_size=audio_config.model_size,
+                    enable_diarization=audio_config.enable_diarization,
+                    enable_topic_segmentation=audio_config.enable_topic_segmentation,
+                )
             except ImportError as e:
                 logger.warning("Could not import AudioProcessor", error=str(e))
                 raise VideoProcessingError(f"AudioProcessor not available: {str(e)}")
@@ -166,21 +192,29 @@ class VideoProcessor:
             try:
                 if self.config.ocr_engine == "tesseract":
                     import pytesseract
+
                     self._ocr_engine = pytesseract
                     logger.info("Initialized Tesseract OCR engine")
                 elif self.config.ocr_engine == "easyocr":
                     import easyocr
-                    self._ocr_engine = easyocr.Reader(['en'])
+
+                    self._ocr_engine = easyocr.Reader(["en"])
                     logger.info("Initialized EasyOCR engine")
                 else:
                     logger.warning(f"Unknown OCR engine: {self.config.ocr_engine}")
-                    raise VideoProcessingError(f"Unknown OCR engine: {self.config.ocr_engine}")
+                    raise VideoProcessingError(
+                        f"Unknown OCR engine: {self.config.ocr_engine}"
+                    )
             except ImportError as e:
-                logger.warning(f"Could not import {self.config.ocr_engine}", error=str(e))
+                logger.warning(
+                    f"Could not import {self.config.ocr_engine}", error=str(e)
+                )
                 raise VideoProcessingError(f"OCR engine not available: {str(e)}")
         return self._ocr_engine
 
-    async def process_video(self, file_path: Union[str, Path], progress_callback: callable = None) -> VideoProcessingResult:
+    async def process_video(
+        self, file_path: Union[str, Path], progress_callback: callable = None
+    ) -> VideoProcessingResult:
         """Process video file with audio extraction and thumbnail generation.
 
         Args:
@@ -218,47 +252,67 @@ class VideoProcessor:
                 keyframes=[],
                 metadata=metadata,
                 processing_time=0.0,
-                temp_files=[]
+                temp_files=[],
             )
 
             # Extract audio if requested
             if self.config.extract_audio and metadata.has_audio:
                 if progress_callback:
                     progress_callback(0.3, "Extracting audio from video")
-                audio_path = await self._extract_audio(file_path, self.config.audio_format)
+                audio_path = await self._extract_audio(
+                    file_path, self.config.audio_format
+                )
                 result.audio_path = audio_path
                 result.temp_files.append(audio_path)
 
                 # Process extracted audio with enhanced features if enabled
                 if self.config.enable_enhanced_audio and audio_path:
                     try:
-                        logger.info("Starting enhanced audio processing for video",
-                                   audio_path=str(audio_path),
-                                   enable_diarization=self.config.enable_speaker_diarization,
-                                   enable_topic_segmentation=self.config.enable_topic_segmentation)
+                        logger.info(
+                            "Starting enhanced audio processing for video",
+                            audio_path=str(audio_path),
+                            enable_diarization=self.config.enable_speaker_diarization,
+                            enable_topic_segmentation=self.config.enable_topic_segmentation,
+                        )
 
                         audio_processor = self._get_audio_processor()
                         # Pass progress callback to audio processor if available
                         audio_progress_callback = None
                         if progress_callback:
-                            def audio_progress_callback(progress: float, message: str = None):
+
+                            def audio_progress_callback(
+                                progress: float, message: str = None
+                            ):
                                 # Map audio progress to video progress range (0.5 to 0.7)
                                 video_progress = 0.5 + (progress * 0.2)
-                                progress_callback(video_progress, f"Audio processing: {message or 'Processing audio'}")
+                                progress_callback(
+                                    video_progress,
+                                    f"Audio processing: {message or 'Processing audio'}",
+                                )
 
-                        audio_result = await audio_processor.process(audio_path, audio_progress_callback)
+                        audio_result = await audio_processor.process(
+                            audio_path, audio_progress_callback
+                        )
                         result.audio_processing_result = audio_result
 
-                        logger.info("Enhanced audio processing completed for video",
-                                   transcription_length=len(audio_result.transcript) if audio_result.transcript else 0,
-                                   language=audio_result.metadata.get("language", "unknown"),
-                                   speakers_detected=audio_result.metadata.get("num_speakers", 0),
-                                   topics_detected=audio_result.metadata.get("num_topics", 0))
+                        logger.info(
+                            "Enhanced audio processing completed for video",
+                            transcription_length=len(audio_result.transcript)
+                            if audio_result.transcript
+                            else 0,
+                            language=audio_result.metadata.get("language", "unknown"),
+                            speakers_detected=audio_result.metadata.get(
+                                "num_speakers", 0
+                            ),
+                            topics_detected=audio_result.metadata.get("num_topics", 0),
+                        )
 
                     except Exception as e:
-                        logger.warning("Enhanced audio processing failed for video",
-                                     audio_path=str(audio_path),
-                                     error=str(e))
+                        logger.warning(
+                            "Enhanced audio processing failed for video",
+                            audio_path=str(audio_path),
+                            error=str(e),
+                        )
                         # Continue without enhanced audio processing
                         result.audio_processing_result = None
 
@@ -270,7 +324,7 @@ class VideoProcessor:
                     file_path,
                     self.config.thumbnail_count,
                     self.config.thumbnail_size,
-                    self.config.thumbnail_format
+                    self.config.thumbnail_format,
                 )
                 result.thumbnails = thumbnails
                 result.temp_files.extend(thumbnails)
@@ -284,7 +338,7 @@ class VideoProcessor:
                     self.config.max_keyframes,
                     self.config.keyframe_threshold,
                     self.config.thumbnail_size,
-                    self.config.thumbnail_format
+                    self.config.thumbnail_format,
                 )
                 result.keyframes = keyframes
                 result.temp_files.extend(keyframes)
@@ -297,8 +351,7 @@ class VideoProcessor:
                         ocr_results = await self._perform_ocr(keyframes)
                         result.ocr_results = ocr_results
                     except Exception as e:
-                        logger.warning("OCR processing failed",
-                                     error=str(e))
+                        logger.warning("OCR processing failed", error=str(e))
                         result.ocr_results = None
 
             processing_time = time.time() - start_time
@@ -307,20 +360,22 @@ class VideoProcessor:
             if progress_callback:
                 progress_callback(0.95, "Finalizing video processing")
 
-            logger.info("Video processing completed",
-                       file_path=str(file_path),
-                       processing_time=processing_time,
-                       audio_extracted=result.audio_path is not None,
-                       thumbnails_count=len(result.thumbnails),
-                       keyframes_count=len(result.keyframes),
-                       ocr_performed=result.ocr_results is not None)
+            logger.info(
+                "Video processing completed",
+                file_path=str(file_path),
+                processing_time=processing_time,
+                audio_extracted=result.audio_path is not None,
+                thumbnails_count=len(result.thumbnails),
+                keyframes_count=len(result.keyframes),
+                ocr_performed=result.ocr_results is not None,
+            )
 
             return result
 
         except Exception as e:
-            logger.error("Video processing failed",
-                        file_path=str(file_path),
-                        error=str(e))
+            logger.error(
+                "Video processing failed", file_path=str(file_path), error=str(e)
+            )
             if isinstance(e, VideoProcessingError):
                 raise
             raise VideoProcessingError(f"Video processing failed: {str(e)}")
@@ -333,8 +388,12 @@ class VideoProcessor:
 
             # Find video stream
             video_stream = next(
-                (stream for stream in probe['streams'] if stream['codec_type'] == 'video'),
-                None
+                (
+                    stream
+                    for stream in probe["streams"]
+                    if stream["codec_type"] == "video"
+                ),
+                None,
             )
 
             if not video_stream:
@@ -342,18 +401,22 @@ class VideoProcessor:
 
             # Find audio stream
             audio_stream = next(
-                (stream for stream in probe['streams'] if stream['codec_type'] == 'audio'),
-                None
+                (
+                    stream
+                    for stream in probe["streams"]
+                    if stream["codec_type"] == "audio"
+                ),
+                None,
             )
 
             # Extract format information
-            format_info = probe.get('format', {})
+            format_info = probe.get("format", {})
 
             # Calculate fps from frame rate fraction
-            fps_fraction = video_stream.get('r_frame_rate', '0/1')
+            fps_fraction = video_stream.get("r_frame_rate", "0/1")
             try:
-                if '/' in fps_fraction:
-                    num, den = map(int, fps_fraction.split('/'))
+                if "/" in fps_fraction:
+                    num, den = map(int, fps_fraction.split("/"))
                     fps = num / den if den != 0 else 0
                 else:
                     fps = float(fps_fraction)
@@ -361,43 +424,54 @@ class VideoProcessor:
                 fps = 0
 
             metadata = VideoMetadata(
-                duration=float(format_info.get('duration', 0)),
-                width=int(video_stream.get('width', 0)),
-                height=int(video_stream.get('height', 0)),
+                duration=float(format_info.get("duration", 0)),
+                width=int(video_stream.get("width", 0)),
+                height=int(video_stream.get("height", 0)),
                 fps=fps,
-                codec=video_stream.get('codec_name', 'unknown'),
-                bitrate=int(format_info.get('bit_rate', 0)) if format_info.get('bit_rate') else None,
-                file_size=int(format_info.get('size', 0)),
-                format=format_info.get('format_name', 'unknown'),
+                codec=video_stream.get("codec_name", "unknown"),
+                bitrate=int(format_info.get("bit_rate", 0))
+                if format_info.get("bit_rate")
+                else None,
+                file_size=int(format_info.get("size", 0)),
+                format=format_info.get("format_name", "unknown"),
                 has_audio=audio_stream is not None,
-                audio_codec=audio_stream.get('codec_name') if audio_stream else None,
-                creation_time=format_info.get('tags', {}).get('creation_time')
+                audio_codec=audio_stream.get("codec_name") if audio_stream else None,
+                creation_time=format_info.get("tags", {}).get("creation_time"),
             )
 
-            logger.debug("Video metadata extracted",
-                        duration=metadata.duration,
-                        resolution=f"{metadata.width}x{metadata.height}",
-                        fps=metadata.fps,
-                        has_audio=metadata.has_audio)
+            logger.debug(
+                "Video metadata extracted",
+                duration=metadata.duration,
+                resolution=f"{metadata.width}x{metadata.height}",
+                fps=metadata.fps,
+                has_audio=metadata.has_audio,
+            )
 
             return metadata
 
         except Exception as e:
-            logger.error("Metadata extraction failed",
-                        file_path=str(file_path),
-                        error=str(e))
-            raise ExternalServiceError(f"Metadata extraction failed: {str(e)}", "ffmpeg")
+            logger.error(
+                "Metadata extraction failed", file_path=str(file_path), error=str(e)
+            )
+            raise ExternalServiceError(
+                f"Metadata extraction failed: {str(e)}", "ffmpeg"
+            )
 
     async def _extract_audio(self, file_path: Path, audio_format: str = "mp3") -> Path:
         """Extract audio track from video file with minimal processing overhead."""
         try:
             # Create output path
-            audio_path = self.temp_dir / f"audio_{int(time.time())}_{file_path.stem}.{audio_format}"
+            audio_path = (
+                self.temp_dir
+                / f"audio_{int(time.time())}_{file_path.stem}.{audio_format}"
+            )
 
-            logger.debug("Extracting audio from video",
-                        video_path=str(file_path),
-                        audio_path=str(audio_path),
-                        format=audio_format)
+            logger.debug(
+                "Extracting audio from video",
+                video_path=str(file_path),
+                audio_path=str(audio_path),
+                format=audio_format,
+            )
 
             # Get video metadata to determine best extraction strategy
             metadata = await self._extract_metadata(file_path)
@@ -407,24 +481,32 @@ class VideoProcessor:
                 # Try to copy stream if source is already MP3, otherwise use fast encoding
                 if metadata.audio_codec and "mp3" in metadata.audio_codec.lower():
                     codec = "copy"  # Stream copy - fastest, no re-encoding
-                    logger.debug("Using stream copy for MP3 extraction (minimal overhead)")
+                    logger.debug(
+                        "Using stream copy for MP3 extraction (minimal overhead)"
+                    )
                 else:
                     codec = "libmp3lame"  # Fast MP3 encoding
                     logger.debug("Using MP3 encoding for audio extraction")
             elif audio_format == "wav":
                 codec = "pcm_s16le"  # Uncompressed WAV
-                logger.warning("Using uncompressed WAV format - will result in large files")
+                logger.warning(
+                    "Using uncompressed WAV format - will result in large files"
+                )
             elif audio_format == "aac":
                 # Try to copy stream if source is already AAC
                 if metadata.audio_codec and "aac" in metadata.audio_codec.lower():
                     codec = "copy"  # Stream copy - fastest
-                    logger.debug("Using stream copy for AAC extraction (minimal overhead)")
+                    logger.debug(
+                        "Using stream copy for AAC extraction (minimal overhead)"
+                    )
                 else:
                     codec = "aac"  # Fast AAC encoding
                     logger.debug("Using AAC encoding for audio extraction")
             else:
                 codec = "libmp3lame"  # Default to MP3 for unknown formats
-                logger.debug(f"Unknown format {audio_format}, defaulting to MP3 encoding")
+                logger.debug(
+                    f"Unknown format {audio_format}, defaulting to MP3 encoding"
+                )
 
             # Extract audio using ffmpeg with optimized settings and error capture
             def run_ffmpeg_extraction():
@@ -444,62 +526,70 @@ class VideoProcessor:
                         ffmpeg_output(
                             ffmpeg_input(str(file_path)),
                             str(audio_path),
-                            **output_params
+                            **output_params,
                         ),
                         overwrite_output=True,
                         quiet=False,  # Enable stderr capture
-                        capture_stderr=True
+                        capture_stderr=True,
                     )
                 except FFmpegError as e:
                     # Capture stderr for detailed error information
-                    stderr_output = e.stderr.decode('utf-8') if e.stderr else "No stderr output"
-                    raise VideoProcessingError(f"FFmpeg audio extraction error: {stderr_output}")
+                    stderr_output = (
+                        e.stderr.decode("utf-8") if e.stderr else "No stderr output"
+                    )
+                    raise VideoProcessingError(
+                        f"FFmpeg audio extraction error: {stderr_output}"
+                    )
                 except Exception as e:
                     raise VideoProcessingError(f"Audio extraction error: {str(e)}")
 
             await asyncio.to_thread(run_ffmpeg_extraction)
 
             if not audio_path.exists():
-                raise VideoProcessingError("Audio extraction failed - output file not created")
+                raise VideoProcessingError(
+                    "Audio extraction failed - output file not created"
+                )
 
-            logger.debug("Audio extraction completed",
-                        audio_path=str(audio_path),
-                        file_size=audio_path.stat().st_size)
+            logger.debug(
+                "Audio extraction completed",
+                audio_path=str(audio_path),
+                file_size=audio_path.stat().st_size,
+            )
 
             return audio_path
 
         except Exception as e:
-            logger.error("Audio extraction failed",
-                        file_path=str(file_path),
-                        error=str(e))
+            logger.error(
+                "Audio extraction failed", file_path=str(file_path), error=str(e)
+            )
             raise ExternalServiceError(f"Audio extraction failed: {str(e)}", "ffmpeg")
 
     async def _generate_thumbnails(
-        self,
-        file_path: Path,
-        count: int,
-        size: Tuple[int, int],
-        format: str = "jpg"
+        self, file_path: Path, count: int, size: Tuple[int, int], format: str = "jpg"
     ) -> List[Path]:
         """Generate thumbnails at evenly spaced intervals."""
         try:
             thumbnails = []
 
-            logger.debug("Starting thumbnail generation",
-                        file_path=str(file_path),
-                        count=count,
-                        size=size,
-                        format=format)
+            logger.debug(
+                "Starting thumbnail generation",
+                file_path=str(file_path),
+                count=count,
+                size=size,
+                format=format,
+            )
 
             # Get video duration for timestamp calculation
             try:
                 probe = await asyncio.to_thread(ffmpeg_probe, str(file_path))
-                duration = float(probe['format']['duration'])
+                duration = float(probe["format"]["duration"])
                 logger.debug("Video duration extracted", duration=duration)
             except Exception as e:
-                logger.error("Failed to probe video for duration",
-                           file_path=str(file_path),
-                           error=str(e))
+                logger.error(
+                    "Failed to probe video for duration",
+                    file_path=str(file_path),
+                    error=str(e),
+                )
                 raise VideoProcessingError(f"Failed to probe video: {str(e)}")
 
             # Validate duration
@@ -511,7 +601,9 @@ class VideoProcessor:
                 timestamps = [duration / 2]  # Middle of video
             else:
                 # Ensure we don't go beyond video duration
-                timestamps = [min(i * duration / (count - 1), duration - 1) for i in range(count)]
+                timestamps = [
+                    min(i * duration / (count - 1), duration - 1) for i in range(count)
+                ]
 
             logger.debug("Calculated timestamps", timestamps=timestamps)
 
@@ -520,10 +612,12 @@ class VideoProcessor:
                 unique_id = int(time.time() * 1000000)  # Microsecond precision
                 thumbnail_path = self.temp_dir / f"thumb_{unique_id}_{i}.{format}"
 
-                logger.debug("Generating thumbnail",
-                           index=i,
-                           timestamp=timestamp,
-                           output_path=str(thumbnail_path))
+                logger.debug(
+                    "Generating thumbnail",
+                    index=i,
+                    timestamp=timestamp,
+                    output_path=str(thumbnail_path),
+                )
 
                 try:
                     # Generate thumbnail using ffmpeg with better error handling
@@ -531,103 +625,170 @@ class VideoProcessor:
                         try:
                             # Build ffmpeg command using internal functions
                             input_stream = ffmpeg_input(str(file_path), ss=timestamp)
-                            scaled_stream = ffmpeg_filter(input_stream, 'scale', size[0], size[1])
+                            scaled_stream = ffmpeg_filter(
+                                input_stream, "scale", size[0], size[1]
+                            )
                             # Use -update option to write single image and avoid pattern warnings
-                            output_stream = ffmpeg_output(scaled_stream, str(thumbnail_path),
-                                                        vframes=1, update=1)
-                            ffmpeg_run(output_stream, overwrite_output=True, quiet=True, capture_stderr=True)
+                            output_stream = ffmpeg_output(
+                                scaled_stream, str(thumbnail_path), vframes=1, update=1
+                            )
+                            ffmpeg_run(
+                                output_stream,
+                                overwrite_output=True,
+                                quiet=True,
+                                capture_stderr=True,
+                            )
 
                         except FFmpegError as e:
                             # Capture stderr for detailed error information
-                            stderr_output = e.stderr.decode('utf-8') if e.stderr else "No stderr output"
+                            stderr_output = (
+                                e.stderr.decode("utf-8")
+                                if e.stderr
+                                else "No stderr output"
+                            )
                             # Filter out pattern warnings which are not actual errors
                             if "image sequence pattern" not in stderr_output.lower():
-                                raise VideoProcessingError(f"FFmpeg error: {stderr_output}")
+                                raise VideoProcessingError(
+                                    f"FFmpeg error: {stderr_output}"
+                                )
                             else:
-                                logger.debug("FFmpeg pattern warning (non-critical)", stderr=stderr_output)
+                                logger.debug(
+                                    "FFmpeg pattern warning (non-critical)",
+                                    stderr=stderr_output,
+                                )
                         except Exception as e:
-                            raise VideoProcessingError(f"Thumbnail generation error: {str(e)}")
+                            raise VideoProcessingError(
+                                f"Thumbnail generation error: {str(e)}"
+                            )
 
                     await asyncio.to_thread(generate_thumbnail)
 
                     # Verify thumbnail was created
                     if thumbnail_path.exists() and thumbnail_path.stat().st_size > 0:
                         thumbnails.append(thumbnail_path)
-                        logger.debug("Thumbnail generated successfully",
-                                   thumbnail_path=str(thumbnail_path),
-                                   timestamp=timestamp,
-                                   file_size=thumbnail_path.stat().st_size)
+                        logger.debug(
+                            "Thumbnail generated successfully",
+                            thumbnail_path=str(thumbnail_path),
+                            timestamp=timestamp,
+                            file_size=thumbnail_path.stat().st_size,
+                        )
                     else:
-                        logger.warning("Thumbnail file not created or empty",
-                                     thumbnail_path=str(thumbnail_path),
-                                     timestamp=timestamp)
+                        logger.warning(
+                            "Thumbnail file not created or empty",
+                            thumbnail_path=str(thumbnail_path),
+                            timestamp=timestamp,
+                        )
 
                         # Try alternative approaches
                         # 1. Try with different timestamp
                         if timestamp > 1:
                             alt_timestamp = max(0, timestamp - 1)
-                            logger.debug("Retrying with alternative timestamp",
-                                       original_timestamp=timestamp,
-                                       alt_timestamp=alt_timestamp)
+                            logger.debug(
+                                "Retrying with alternative timestamp",
+                                original_timestamp=timestamp,
+                                alt_timestamp=alt_timestamp,
+                            )
 
-                            alt_thumbnail_path = self.temp_dir / f"thumb_{int(time.time())}_{i}_alt.{format}"
+                            alt_thumbnail_path = (
+                                self.temp_dir
+                                / f"thumb_{int(time.time())}_{i}_alt.{format}"
+                            )
 
                             def generate_alt_thumbnail():
                                 try:
-                                    input_stream = ffmpeg_input(str(file_path), ss=alt_timestamp)
-                                    scaled_stream = ffmpeg_filter(input_stream, 'scale', size[0], size[1])
-                                    output_stream = ffmpeg_output(scaled_stream, str(alt_thumbnail_path), vframes=1)
-                                    ffmpeg_run(output_stream, overwrite_output=True, quiet=False)
+                                    input_stream = ffmpeg_input(
+                                        str(file_path), ss=alt_timestamp
+                                    )
+                                    scaled_stream = ffmpeg_filter(
+                                        input_stream, "scale", size[0], size[1]
+                                    )
+                                    output_stream = ffmpeg_output(
+                                        scaled_stream,
+                                        str(alt_thumbnail_path),
+                                        vframes=1,
+                                    )
+                                    ffmpeg_run(
+                                        output_stream,
+                                        overwrite_output=True,
+                                        quiet=False,
+                                    )
                                 except Exception as e:
-                                    logger.warning("Alternative timestamp thumbnail generation failed", error=str(e))
+                                    logger.warning(
+                                        "Alternative timestamp thumbnail generation failed",
+                                        error=str(e),
+                                    )
 
                             await asyncio.to_thread(generate_alt_thumbnail)
 
-                            if alt_thumbnail_path.exists() and alt_thumbnail_path.stat().st_size > 0:
+                            if (
+                                alt_thumbnail_path.exists()
+                                and alt_thumbnail_path.stat().st_size > 0
+                            ):
                                 thumbnails.append(alt_thumbnail_path)
-                                logger.debug("Alternative timestamp thumbnail generated successfully",
-                                           thumbnail_path=str(alt_thumbnail_path))
+                                logger.debug(
+                                    "Alternative timestamp thumbnail generated successfully",
+                                    thumbnail_path=str(alt_thumbnail_path),
+                                )
                                 continue
 
                         # 2. Try without scaling (original size)
                         logger.debug("Retrying without scaling", timestamp=timestamp)
-                        no_scale_path = self.temp_dir / f"thumb_{int(time.time())}_{i}_noscale.{format}"
+                        no_scale_path = (
+                            self.temp_dir
+                            / f"thumb_{int(time.time())}_{i}_noscale.{format}"
+                        )
 
                         def generate_no_scale_thumbnail():
                             try:
-                                input_stream = ffmpeg_input(str(file_path), ss=timestamp)
-                                output_stream = ffmpeg_output(input_stream, str(no_scale_path), vframes=1)
-                                ffmpeg_run(output_stream, overwrite_output=True, quiet=False)
+                                input_stream = ffmpeg_input(
+                                    str(file_path), ss=timestamp
+                                )
+                                output_stream = ffmpeg_output(
+                                    input_stream, str(no_scale_path), vframes=1
+                                )
+                                ffmpeg_run(
+                                    output_stream, overwrite_output=True, quiet=False
+                                )
                             except Exception as e:
-                                logger.warning("No-scale thumbnail generation failed", error=str(e))
+                                logger.warning(
+                                    "No-scale thumbnail generation failed", error=str(e)
+                                )
 
                         await asyncio.to_thread(generate_no_scale_thumbnail)
 
                         if no_scale_path.exists() and no_scale_path.stat().st_size > 0:
                             thumbnails.append(no_scale_path)
-                            logger.debug("No-scale thumbnail generated successfully",
-                                       thumbnail_path=str(no_scale_path))
+                            logger.debug(
+                                "No-scale thumbnail generated successfully",
+                                thumbnail_path=str(no_scale_path),
+                            )
 
                 except Exception as e:
-                    logger.warning("Failed to generate thumbnail",
-                                 index=i,
-                                 timestamp=timestamp,
-                                 error=str(e))
+                    logger.warning(
+                        "Failed to generate thumbnail",
+                        index=i,
+                        timestamp=timestamp,
+                        error=str(e),
+                    )
                     # Continue with next thumbnail instead of failing completely
                     continue
 
-            logger.info("Thumbnail generation completed",
-                       count=len(thumbnails),
-                       requested=count,
-                       success_rate=f"{len(thumbnails)}/{count}")
+            logger.info(
+                "Thumbnail generation completed",
+                count=len(thumbnails),
+                requested=count,
+                success_rate=f"{len(thumbnails)}/{count}",
+            )
 
             return thumbnails
 
         except Exception as e:
-            logger.error("Thumbnail generation failed",
-                        file_path=str(file_path),
-                        error=str(e))
-            raise ExternalServiceError(f"Thumbnail generation failed: {str(e)}", "ffmpeg")
+            logger.error(
+                "Thumbnail generation failed", file_path=str(file_path), error=str(e)
+            )
+            raise ExternalServiceError(
+                f"Thumbnail generation failed: {str(e)}", "ffmpeg"
+            )
 
     async def _extract_keyframes(
         self,
@@ -635,21 +796,23 @@ class VideoProcessor:
         max_frames: int,
         threshold: float,
         size: Tuple[int, int],
-        format: str = "jpg"
+        format: str = "jpg",
     ) -> List[Path]:
         """Extract keyframes based on scene changes."""
         try:
             keyframes = []
 
-            logger.debug("Extracting keyframes",
-                        file_path=str(file_path),
-                        max_frames=max_frames,
-                        threshold=threshold)
+            logger.debug(
+                "Extracting keyframes",
+                file_path=str(file_path),
+                max_frames=max_frames,
+                threshold=threshold,
+            )
 
             # Try to use PySceneDetect if available for better scene detection
             try:
                 import scenedetect
-                from scenedetect import VideoManager, SceneManager
+                from scenedetect import SceneManager, VideoManager
                 from scenedetect.detectors import ContentDetector
 
                 logger.info("Using PySceneDetect for keyframe extraction")
@@ -687,8 +850,12 @@ class VideoProcessor:
                     def generate_keyframe():
                         try:
                             input_stream = ffmpeg_input(str(file_path), ss=timestamp)
-                            scaled_stream = ffmpeg_filter(input_stream, 'scale', size[0], size[1])
-                            output_stream = ffmpeg_output(scaled_stream, str(keyframe_path), vframes=1)
+                            scaled_stream = ffmpeg_filter(
+                                input_stream, "scale", size[0], size[1]
+                            )
+                            output_stream = ffmpeg_output(
+                                scaled_stream, str(keyframe_path), vframes=1
+                            )
                             ffmpeg_run(output_stream, overwrite_output=True, quiet=True)
                         except Exception as e:
                             logger.warning("Keyframe generation failed", error=str(e))
@@ -697,21 +864,29 @@ class VideoProcessor:
 
                     if keyframe_path.exists() and keyframe_path.stat().st_size > 0:
                         keyframes.append(keyframe_path)
-                        logger.debug("Keyframe generated successfully",
-                                   keyframe_path=str(keyframe_path),
-                                   timestamp=timestamp)
+                        logger.debug(
+                            "Keyframe generated successfully",
+                            keyframe_path=str(keyframe_path),
+                            timestamp=timestamp,
+                        )
 
                 # If we got keyframes, return them
                 if keyframes:
                     return keyframes
 
                 # Otherwise fall back to OpenCV method
-                logger.warning("PySceneDetect didn't find any keyframes, falling back to OpenCV")
+                logger.warning(
+                    "PySceneDetect didn't find any keyframes, falling back to OpenCV"
+                )
 
             except ImportError:
-                logger.info("PySceneDetect not available, using OpenCV for keyframe extraction")
+                logger.info(
+                    "PySceneDetect not available, using OpenCV for keyframe extraction"
+                )
             except Exception as e:
-                logger.warning("PySceneDetect failed, falling back to OpenCV", error=str(e))
+                logger.warning(
+                    "PySceneDetect failed, falling back to OpenCV", error=str(e)
+                )
 
             # Use OpenCV for scene change detection
             cap = cv2.VideoCapture(str(file_path))
@@ -727,7 +902,9 @@ class VideoProcessor:
             keyframe_timestamps = []
 
             # Sample frames at regular intervals to detect scene changes
-            sample_interval = max(1, frame_count // (max_frames * 10))  # Sample more than needed
+            sample_interval = max(
+                1, frame_count // (max_frames * 10)
+            )  # Sample more than needed
 
             while len(keyframe_timestamps) < max_frames and frame_idx < frame_count:
                 cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
@@ -744,17 +921,19 @@ class VideoProcessor:
                     hist_diff = cv2.compareHist(
                         cv2.calcHist([prev_frame], [0], None, [256], [0, 256]),
                         cv2.calcHist([gray], [0], None, [256], [0, 256]),
-                        cv2.HISTCMP_CORREL
+                        cv2.HISTCMP_CORREL,
                     )
 
                     # If difference is significant, it's a scene change
                     if hist_diff < (1 - threshold):
                         timestamp = frame_idx / fps
                         keyframe_timestamps.append(timestamp)
-                        logger.debug("Keyframe detected",
-                                   frame_idx=frame_idx,
-                                   timestamp=timestamp,
-                                   hist_diff=hist_diff)
+                        logger.debug(
+                            "Keyframe detected",
+                            frame_idx=frame_idx,
+                            timestamp=timestamp,
+                            hist_diff=hist_diff,
+                        )
 
                 prev_frame = gray
                 frame_idx += sample_interval
@@ -768,59 +947,87 @@ class VideoProcessor:
                 keyframe_path = self.temp_dir / f"keyframe_{unique_id}_{i}.{format}"
 
                 try:
+
                     def generate_keyframe():
                         try:
                             # Build ffmpeg command using internal functions
                             input_stream = ffmpeg_input(str(file_path), ss=timestamp)
-                            scaled_stream = ffmpeg_filter(input_stream, 'scale', size[0], size[1])
+                            scaled_stream = ffmpeg_filter(
+                                input_stream, "scale", size[0], size[1]
+                            )
                             # Use -update option to write single image and avoid pattern warnings
-                            output_stream = ffmpeg_output(scaled_stream, str(keyframe_path),
-                                                        vframes=1, update=1)
-                            ffmpeg_run(output_stream, overwrite_output=True, quiet=True, capture_stderr=True)
+                            output_stream = ffmpeg_output(
+                                scaled_stream, str(keyframe_path), vframes=1, update=1
+                            )
+                            ffmpeg_run(
+                                output_stream,
+                                overwrite_output=True,
+                                quiet=True,
+                                capture_stderr=True,
+                            )
 
                         except FFmpegError as e:
                             # Capture stderr for detailed error information
-                            stderr_output = e.stderr.decode('utf-8') if e.stderr else "No stderr output"
+                            stderr_output = (
+                                e.stderr.decode("utf-8")
+                                if e.stderr
+                                else "No stderr output"
+                            )
                             # Filter out pattern warnings which are not actual errors
                             if "image sequence pattern" not in stderr_output.lower():
-                                raise VideoProcessingError(f"FFmpeg keyframe error: {stderr_output}")
+                                raise VideoProcessingError(
+                                    f"FFmpeg keyframe error: {stderr_output}"
+                                )
                             else:
-                                logger.debug("FFmpeg pattern warning (non-critical)", stderr=stderr_output)
+                                logger.debug(
+                                    "FFmpeg pattern warning (non-critical)",
+                                    stderr=stderr_output,
+                                )
                         except Exception as e:
-                            raise VideoProcessingError(f"Keyframe generation error: {str(e)}")
+                            raise VideoProcessingError(
+                                f"Keyframe generation error: {str(e)}"
+                            )
 
                     await asyncio.to_thread(generate_keyframe)
 
                     # Verify keyframe was created
                     if keyframe_path.exists() and keyframe_path.stat().st_size > 0:
                         keyframes.append(keyframe_path)
-                        logger.debug("Keyframe generated successfully",
-                                   keyframe_path=str(keyframe_path),
-                                   timestamp=timestamp)
+                        logger.debug(
+                            "Keyframe generated successfully",
+                            keyframe_path=str(keyframe_path),
+                            timestamp=timestamp,
+                        )
                     else:
-                        logger.warning("Keyframe file not created or empty",
-                                     keyframe_path=str(keyframe_path),
-                                     timestamp=timestamp)
+                        logger.warning(
+                            "Keyframe file not created or empty",
+                            keyframe_path=str(keyframe_path),
+                            timestamp=timestamp,
+                        )
 
                 except Exception as e:
-                    logger.warning("Failed to generate keyframe",
-                                 index=i,
-                                 timestamp=timestamp,
-                                 error=str(e))
+                    logger.warning(
+                        "Failed to generate keyframe",
+                        index=i,
+                        timestamp=timestamp,
+                        error=str(e),
+                    )
                     # Continue with next keyframe instead of failing completely
                     continue
 
-            logger.info("Keyframes extracted",
-                       count=len(keyframes),
-                       max_frames=max_frames)
+            logger.info(
+                "Keyframes extracted", count=len(keyframes), max_frames=max_frames
+            )
 
             return keyframes
 
         except Exception as e:
-            logger.error("Keyframe extraction failed",
-                        file_path=str(file_path),
-                        error=str(e))
-            raise ExternalServiceError(f"Keyframe extraction failed: {str(e)}", "ffmpeg")
+            logger.error(
+                "Keyframe extraction failed", file_path=str(file_path), error=str(e)
+            )
+            raise ExternalServiceError(
+                f"Keyframe extraction failed: {str(e)}", "ffmpeg"
+            )
 
     async def _perform_ocr(self, image_paths: List[Path]) -> Dict[str, Any]:
         """Perform OCR on a list of images."""
@@ -861,6 +1068,8 @@ class VideoProcessor:
                     file_path.unlink()
                     logger.debug("Temporary file cleaned up", file_path=str(file_path))
             except Exception as e:
-                logger.warning("Failed to clean up temporary file",
-                             file_path=str(file_path),
-                             error=str(e))
+                logger.warning(
+                    "Failed to clean up temporary file",
+                    file_path=str(file_path),
+                    error=str(e),
+                )

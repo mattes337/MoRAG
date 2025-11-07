@@ -1,57 +1,65 @@
 """Integration tests for enhanced summarization pipeline."""
 
-import pytest
 import tempfile
 from pathlib import Path
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+from morag_document.tasks import _process_document_impl
+from morag_services.embedding import EmbeddingResult, SummaryResult
 from morag_services.processing import (
-    enhanced_summarization_service,
+    DocumentType,
     SummaryConfig,
     SummaryStrategy,
-    DocumentType
+    enhanced_summarization_service,
 )
-from morag_document.tasks import _process_document_impl
-from morag_services.embedding import SummaryResult, EmbeddingResult
+
 
 @pytest.fixture
 def mock_gemini_service():
     """Mock Gemini service for integration tests."""
-    with patch('morag.services.summarization.gemini_service') as mock:
-        mock.generate_summary = AsyncMock(return_value=SummaryResult(
-            summary="Enhanced test summary with improved quality and coherence.",
-            token_count=10,
-            model="gemini-2.0-flash-001"
-        ))
+    with patch("morag.services.summarization.gemini_service") as mock:
+        mock.generate_summary = AsyncMock(
+            return_value=SummaryResult(
+                summary="Enhanced test summary with improved quality and coherence.",
+                token_count=10,
+                model="gemini-2.0-flash-001",
+            )
+        )
         yield mock
+
 
 @pytest.fixture
 def mock_qdrant_service():
     """Mock Qdrant service for integration tests."""
-    with patch('morag.tasks.document_tasks.qdrant_service') as mock:
+    with patch("morag.tasks.document_tasks.qdrant_service") as mock:
         mock.store_chunks = AsyncMock(return_value=["point_1", "point_2"])
         yield mock
+
 
 @pytest.fixture
 def mock_enhanced_gemini_service():
     """Mock enhanced Gemini service with batch operations."""
-    with patch('morag.tasks.document_tasks.gemini_service') as mock:
+    with patch("morag.tasks.document_tasks.gemini_service") as mock:
         # Mock summary generation
-        mock.generate_summary = AsyncMock(return_value=SummaryResult(
-            summary="Enhanced summary with better quality assessment.",
-            token_count=12,
-            model="gemini-2.0-flash-001"
-        ))
+        mock.generate_summary = AsyncMock(
+            return_value=SummaryResult(
+                summary="Enhanced summary with better quality assessment.",
+                token_count=12,
+                model="gemini-2.0-flash-001",
+            )
+        )
 
         # Mock batch embedding generation
-        mock.generate_embeddings_batch = AsyncMock(return_value=[
-            EmbeddingResult(
-                embedding=[0.1] * 768,
-                token_count=10,
-                model="text-embedding-004"
-            )
-        ])
+        mock.generate_embeddings_batch = AsyncMock(
+            return_value=[
+                EmbeddingResult(
+                    embedding=[0.1] * 768, token_count=10, model="text-embedding-004"
+                )
+            ]
+        )
         yield mock
+
 
 class TestEnhancedSummarizationIntegration:
     """Test enhanced summarization integration with document processing."""
@@ -70,10 +78,12 @@ class TestEnhancedSummarizationIntegration:
         config = SummaryConfig(
             strategy=SummaryStrategy.ABSTRACTIVE,
             document_type=DocumentType.ACADEMIC,
-            style="abstract"
+            style="abstract",
         )
 
-        result = await enhanced_summarization_service.generate_summary(academic_text, config)
+        result = await enhanced_summarization_service.generate_summary(
+            academic_text, config
+        )
 
         assert result.strategy == SummaryStrategy.ABSTRACTIVE
         assert result.config.document_type == DocumentType.ACADEMIC
@@ -96,10 +106,12 @@ class TestEnhancedSummarizationIntegration:
         config = SummaryConfig(
             strategy=SummaryStrategy.HYBRID,
             document_type=DocumentType.TECHNICAL,
-            preserve_structure=True
+            preserve_structure=True,
         )
 
-        result = await enhanced_summarization_service.generate_summary(technical_text, config)
+        result = await enhanced_summarization_service.generate_summary(
+            technical_text, config
+        )
 
         assert result.strategy == SummaryStrategy.HYBRID
         assert result.config.document_type == DocumentType.TECHNICAL
@@ -112,19 +124,27 @@ class TestEnhancedSummarizationIntegration:
         long_text = """
         Chapter 1: Introduction
         This chapter introduces the fundamental concepts and background information.
-        """ + " ".join([f"This is sentence {i} with important information." for i in range(200)])
+        """ + " ".join(
+            [f"This is sentence {i} with important information." for i in range(200)]
+        )
 
         config = SummaryConfig(
             strategy=SummaryStrategy.HIERARCHICAL,
             context_window=100,  # Small window to force chunking
-            max_length=150
+            max_length=150,
         )
 
-        result = await enhanced_summarization_service.generate_summary(long_text, config)
+        result = await enhanced_summarization_service.generate_summary(
+            long_text, config
+        )
 
         assert result.strategy == SummaryStrategy.HIERARCHICAL
-        assert len(result.summary.split()) <= config.max_length * 1.2  # Allow some flexibility
-        assert mock_gemini_service.generate_summary.call_count > 1  # Multiple calls for chunks
+        assert (
+            len(result.summary.split()) <= config.max_length * 1.2
+        )  # Allow some flexibility
+        assert (
+            mock_gemini_service.generate_summary.call_count > 1
+        )  # Multiple calls for chunks
 
     @pytest.mark.asyncio
     async def test_enhanced_summary_with_focus_areas(self, mock_gemini_service):
@@ -140,10 +160,12 @@ class TestEnhancedSummarizationIntegration:
         config = SummaryConfig(
             strategy=SummaryStrategy.CONTEXTUAL,
             focus_areas=["revenue", "strategic decisions", "action items"],
-            document_type=DocumentType.BUSINESS
+            document_type=DocumentType.BUSINESS,
         )
 
-        result = await enhanced_summarization_service.generate_summary(business_text, config)
+        result = await enhanced_summarization_service.generate_summary(
+            business_text, config
+        )
 
         assert result.strategy == SummaryStrategy.CONTEXTUAL
         assert len(result.config.focus_areas) == 3
@@ -153,10 +175,16 @@ class TestEnhancedSummarizationIntegration:
         """Test adaptive configuration based on content analysis."""
         # Test with different types of content
         test_cases = [
-            ("This research methodology analyzes experimental results.", DocumentType.ACADEMIC),
-            ("Configure the system using these installation procedures.", DocumentType.TECHNICAL),
+            (
+                "This research methodology analyzes experimental results.",
+                DocumentType.ACADEMIC,
+            ),
+            (
+                "Configure the system using these installation procedures.",
+                DocumentType.TECHNICAL,
+            ),
             ("Revenue growth and market strategy decisions.", DocumentType.BUSINESS),
-            ("General information about various topics.", DocumentType.GENERAL)
+            ("General information about various topics.", DocumentType.GENERAL),
         ]
 
         for text, expected_type in test_cases:
@@ -173,7 +201,7 @@ class TestEnhancedSummarizationIntegration:
         config = SummaryConfig(
             quality_threshold=0.9,  # High threshold
             enable_refinement=True,
-            max_length=100
+            max_length=100,
         )
 
         text = "This is a test document with important information that needs summarization."
@@ -186,14 +214,13 @@ class TestEnhancedSummarizationIntegration:
 
     @pytest.mark.asyncio
     async def test_document_processing_with_enhanced_summary(
-        self,
-        mock_enhanced_gemini_service,
-        mock_qdrant_service
+        self, mock_enhanced_gemini_service, mock_qdrant_service
     ):
         """Test document processing pipeline with enhanced summarization."""
         # Create a test markdown file
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
-            f.write("""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
+            f.write(
+                """
 # Research Paper: Advanced Data Analysis
 
 ## Abstract
@@ -214,7 +241,8 @@ Performance metrics indicate a 25% improvement over existing methods.
 ## Conclusion
 This methodology offers substantial benefits for data analysis applications.
 Future work will focus on scaling to larger datasets.
-            """)
+            """
+            )
             temp_path = f.name
 
         try:
@@ -228,7 +256,7 @@ Future work will focus on scaling to larger datasets.
                 mock_task,
                 temp_path,
                 "document",
-                {"test": True, "enhanced_summary": True}
+                {"test": True, "enhanced_summary": True},
             )
 
             # Verify processing completed successfully
@@ -265,7 +293,9 @@ Future work will focus on scaling to larger datasets.
         short_text = "Short text."
         config = SummaryConfig(strategy=SummaryStrategy.EXTRACTIVE)
 
-        result = await enhanced_summarization_service.generate_summary(short_text, config)
+        result = await enhanced_summarization_service.generate_summary(
+            short_text, config
+        )
 
         assert result.strategy == SummaryStrategy.EXTRACTIVE
         assert len(result.summary) > 0
@@ -283,13 +313,15 @@ Future work will focus on scaling to larger datasets.
         strategies = [
             SummaryStrategy.EXTRACTIVE,
             SummaryStrategy.ABSTRACTIVE,
-            SummaryStrategy.HYBRID
+            SummaryStrategy.HYBRID,
         ]
 
         results = []
         for strategy in strategies:
             config = SummaryConfig(strategy=strategy, max_length=50)
-            result = await enhanced_summarization_service.generate_summary(test_text, config)
+            result = await enhanced_summarization_service.generate_summary(
+                test_text, config
+            )
             results.append(result)
 
         # Verify all strategies produced results
@@ -301,6 +333,7 @@ Future work will focus on scaling to larger datasets.
         for i, strategy in enumerate(strategies):
             assert results[i].strategy == strategy
 
+
 class TestPerformanceAndScaling:
     """Test performance and scaling aspects of enhanced summarization."""
 
@@ -308,17 +341,18 @@ class TestPerformanceAndScaling:
     async def test_large_document_processing(self, mock_gemini_service):
         """Test processing of large documents."""
         # Create a large document
-        large_text = "\n".join([
-            f"Paragraph {i}: " + " ".join([f"sentence {j}" for j in range(20)])
-            for i in range(50)
-        ])
-
-        config = SummaryConfig(
-            strategy=SummaryStrategy.HIERARCHICAL,
-            max_length=200
+        large_text = "\n".join(
+            [
+                f"Paragraph {i}: " + " ".join([f"sentence {j}" for j in range(20)])
+                for i in range(50)
+            ]
         )
 
-        result = await enhanced_summarization_service.generate_summary(large_text, config)
+        config = SummaryConfig(strategy=SummaryStrategy.HIERARCHICAL, max_length=200)
+
+        result = await enhanced_summarization_service.generate_summary(
+            large_text, config
+        )
 
         assert result.processing_time > 0
         assert len(result.summary.split()) <= config.max_length * 1.2
@@ -328,14 +362,11 @@ class TestPerformanceAndScaling:
         """Test concurrent summarization requests."""
         import asyncio
 
-        texts = [
-            f"Test document {i} with content to summarize." for i in range(5)
-        ]
+        texts = [f"Test document {i} with content to summarize." for i in range(5)]
 
         # Process multiple documents concurrently
         tasks = [
-            enhanced_summarization_service.generate_summary(text)
-            for text in texts
+            enhanced_summarization_service.generate_summary(text) for text in texts
         ]
 
         results = await asyncio.gather(*tasks)

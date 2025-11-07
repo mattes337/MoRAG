@@ -20,9 +20,9 @@ from pathlib import Path
 # Add the src directory to the path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-from morag_services import DocumentConverter, ConversionOptions
-from src.morag.converters.registry import document_converter
 import structlog
+from morag_services import ConversionOptions, DocumentConverter
+from src.morag.converters.registry import document_converter
 
 # Configure logging
 structlog.configure(
@@ -35,7 +35,7 @@ structlog.configure(
         structlog.processors.StackInfoRenderer(),
         structlog.processors.format_exc_info,
         structlog.processors.UnicodeDecoder(),
-        structlog.processors.JSONRenderer()
+        structlog.processors.JSONRenderer(),
     ],
     context_class=dict,
     logger_factory=structlog.stdlib.LoggerFactory(),
@@ -59,8 +59,8 @@ async def test_video_conversion_fixes(video_path: Path):
     print("-" * 40)
 
     converter_info = document_converter.get_converter_info()
-    if 'video' in converter_info:
-        video_info = converter_info['video']
+    if "video" in converter_info:
+        video_info = converter_info["video"]
         print(f"✅ Primary converter: {video_info['primary_converter']}")
         print(f"✅ Fallback converters: {video_info['fallback_converters']}")
         print(f"✅ Total fallback options: {len(video_info['fallback_converters'])}")
@@ -78,12 +78,12 @@ async def test_video_conversion_fixes(video_path: Path):
         min_quality_threshold=0.8,  # High threshold to trigger fallback
         include_metadata=True,
         format_options={
-            'include_audio': True,
-            'extract_keyframes': True,
-            'thumbnail_count': 3,
-            'keyframe_count': 5,
-            'optimize_for_speed': True
-        }
+            "include_audio": True,
+            "extract_keyframes": True,
+            "thumbnail_count": 3,
+            "keyframe_count": 5,
+            "optimize_for_speed": True,
+        },
     )
 
     start_time = time.time()
@@ -115,13 +115,14 @@ async def test_video_conversion_fixes(video_path: Path):
 
         # Save result for inspection
         output_path = video_path.parent / f"{video_path.stem}_conversion_test.md"
-        with open(output_path, 'w', encoding='utf-8') as f:
+        with open(output_path, "w", encoding="utf-8") as f:
             f.write(result.content)
         print(f"✅ Output saved to: {output_path}")
 
     except Exception as e:
         print(f"❌ Conversion failed: {e}")
         import traceback
+
         traceback.print_exc()
 
     print()
@@ -135,16 +136,18 @@ async def test_video_conversion_fixes(video_path: Path):
         min_quality_threshold=0.99,  # Very high threshold to force fallback
         include_metadata=True,
         format_options={
-            'include_audio': True,
-            'extract_keyframes': False,  # Disable for faster processing
-            'thumbnail_count': 0,
-            'optimize_for_speed': True
-        }
+            "include_audio": True,
+            "extract_keyframes": False,  # Disable for faster processing
+            "thumbnail_count": 0,
+            "optimize_for_speed": True,
+        },
     )
 
     start_time = time.time()
     try:
-        result = await document_converter.convert_to_markdown(video_path, fallback_options)
+        result = await document_converter.convert_to_markdown(
+            video_path, fallback_options
+        )
         processing_time = time.time() - start_time
 
         print(f"✅ Fallback conversion successful: {result.success}")
@@ -159,13 +162,14 @@ async def test_video_conversion_fixes(video_path: Path):
 
         # Save fallback result for comparison
         fallback_output_path = video_path.parent / f"{video_path.stem}_fallback_test.md"
-        with open(fallback_output_path, 'w', encoding='utf-8') as f:
+        with open(fallback_output_path, "w", encoding="utf-8") as f:
             f.write(result.content)
         print(f"✅ Fallback output saved to: {fallback_output_path}")
 
     except Exception as e:
         print(f"❌ Fallback conversion failed: {e}")
         import traceback
+
         traceback.print_exc()
 
     print()
@@ -177,6 +181,7 @@ async def test_video_conversion_fixes(video_path: Path):
     # Test primary video converter
     try:
         from morag_video import VideoConverter
+
         video_converter = VideoConverter()
 
         start_time = time.time()
@@ -185,7 +190,9 @@ async def test_video_conversion_fixes(video_path: Path):
 
         print(f"✅ Primary VideoConverter: {result.success}")
         print(f"  - Processing time: {processing_time:.2f} seconds")
-        print(f"  - Quality score: {result.quality_score.overall_score if result.quality_score else 'N/A'}")
+        print(
+            f"  - Quality score: {result.quality_score.overall_score if result.quality_score else 'N/A'}"
+        )
 
     except Exception as e:
         print(f"❌ Primary VideoConverter failed: {e}")
@@ -193,6 +200,7 @@ async def test_video_conversion_fixes(video_path: Path):
     # Test simple video converter
     try:
         from src.morag.converters.simple_video import SimpleVideoConverter
+
         simple_converter = SimpleVideoConverter()
 
         start_time = time.time()
@@ -201,7 +209,9 @@ async def test_video_conversion_fixes(video_path: Path):
 
         print(f"✅ SimpleVideoConverter: {result.success}")
         print(f"  - Processing time: {processing_time:.2f} seconds")
-        print(f"  - Quality score: {result.quality_score.overall_score if result.quality_score else 'N/A'}")
+        print(
+            f"  - Quality score: {result.quality_score.overall_score if result.quality_score else 'N/A'}"
+        )
 
     except Exception as e:
         print(f"❌ SimpleVideoConverter failed: {e}")
@@ -209,6 +219,7 @@ async def test_video_conversion_fixes(video_path: Path):
     # Test audio converter as fallback
     try:
         from morag_audio import AudioConverter
+
         audio_converter = AudioConverter()
 
         start_time = time.time()
@@ -217,7 +228,9 @@ async def test_video_conversion_fixes(video_path: Path):
 
         print(f"✅ AudioConverter (fallback): {result.success}")
         print(f"  - Processing time: {processing_time:.2f} seconds")
-        print(f"  - Quality score: {result.quality_score.overall_score if result.quality_score else 'N/A'}")
+        print(
+            f"  - Quality score: {result.quality_score.overall_score if result.quality_score else 'N/A'}"
+        )
 
     except Exception as e:
         print(f"❌ AudioConverter fallback failed: {e}")
@@ -250,6 +263,7 @@ async def main():
     except Exception as e:
         print(f"❌ Fatal error: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
 

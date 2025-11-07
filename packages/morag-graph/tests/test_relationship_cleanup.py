@@ -1,13 +1,13 @@
 """Tests for relationship cleanup maintenance job."""
-import pytest
+from typing import Any, Dict, List
 from unittest.mock import AsyncMock, MagicMock
-from typing import Dict, Any, List
 
+import pytest
 from morag_graph.maintenance.relationship_cleanup import (
-    RelationshipCleanupService,
     RelationshipCleanupConfig,
+    RelationshipCleanupService,
     parse_cleanup_overrides,
-    run_relationship_cleanup
+    run_relationship_cleanup,
 )
 
 
@@ -29,17 +29,14 @@ class TestRelationshipCleanupConfig:
         """Test configuration validation."""
         config = RelationshipCleanupConfig(
             similarity_threshold=1.5,  # Should be clamped to 1.0
-            batch_size=0,              # Should be set to 1
-            min_confidence=-0.1        # Should be clamped to 0.0
+            batch_size=0,  # Should be set to 1
+            min_confidence=-0.1,  # Should be clamped to 0.0
         )
         config.ensure_defaults()
 
         assert config.similarity_threshold == 1.0
         assert config.batch_size == 1
         assert config.min_confidence == 0.0
-
-
-
 
 
 class TestRelationshipCleanupService:
@@ -59,8 +56,6 @@ class TestRelationshipCleanupService:
         config = RelationshipCleanupConfig(dry_run=True)  # Use dry_run for tests
         return RelationshipCleanupService(mock_storage, config)
 
-
-
     async def test_run_cleanup_dry_run(self, cleanup_service, mock_storage):
         """Test running cleanup in dry-run mode."""
         # Mock the type summary query (for optimized approach)
@@ -68,8 +63,11 @@ class TestRelationshipCleanupService:
             # First call: type summary
             [
                 {
-                    "neo4j_type": "UNRELATED", "stored_type": "UNRELATED",
-                    "count": 1, "avg_confidence": 0.5, "sample_type_values": ["UNRELATED"]
+                    "neo4j_type": "UNRELATED",
+                    "stored_type": "UNRELATED",
+                    "count": 1,
+                    "avg_confidence": 0.5,
+                    "sample_type_values": ["UNRELATED"],
                 }
             ],
             # Second call: count UNRELATED relationships
@@ -77,7 +75,7 @@ class TestRelationshipCleanupService:
             # Third call: count orphaned relationships
             [{"count": 0}],
             # Fourth call: count low confidence relationships
-            [{"count": 0}]
+            [{"count": 0}],
         ]
 
         result = await cleanup_service.run_cleanup()

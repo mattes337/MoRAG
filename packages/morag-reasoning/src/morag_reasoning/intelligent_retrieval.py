@@ -1,27 +1,29 @@
 """Intelligent entity-based retrieval service with recursive path following."""
 
-import structlog
 import uuid
-from datetime import datetime
-from typing import List, Dict, Any, Set
 from dataclasses import dataclass
-from qdrant_client.models import Filter, FieldCondition, MatchValue
+from datetime import datetime
+from typing import Any, Dict, List, Set
 
-from morag_reasoning.llm import LLMClient
-from morag_reasoning.intelligent_retrieval_models import (
-    IntelligentRetrievalRequest, IntelligentRetrievalResponse,
-    KeyFact
-)
-from morag_reasoning.entity_identification import EntityIdentificationService
-from morag_reasoning.recursive_path_follower import RecursivePathFollower
-from morag_reasoning.fact_extraction import FactExtractionService
+import structlog
 from morag_graph.storage.neo4j_storage import Neo4jStorage
 from morag_graph.storage.qdrant_storage import QdrantStorage
+from morag_reasoning.entity_identification import EntityIdentificationService
+from morag_reasoning.fact_extraction import FactExtractionService
+from morag_reasoning.intelligent_retrieval_models import (
+    IntelligentRetrievalRequest,
+    IntelligentRetrievalResponse,
+    KeyFact,
+)
+from morag_reasoning.llm import LLMClient
+from morag_reasoning.recursive_path_follower import RecursivePathFollower
+from qdrant_client.models import FieldCondition, Filter, MatchValue
 
 
 @dataclass
 class RetrievedChunk:
     """A chunk retrieved from vector storage."""
+
     id: str
     content: str
     document_id: str
@@ -37,7 +39,7 @@ class IntelligentRetrievalService:
         self,
         llm_client: LLMClient,
         neo4j_storage: Neo4jStorage,
-        qdrant_storage: QdrantStorage
+        qdrant_storage: QdrantStorage,
     ):
         """Initialize the intelligent retrieval service.
 
@@ -56,19 +58,16 @@ class IntelligentRetrievalService:
             llm_client=llm_client,
             graph_storage=neo4j_storage,
             min_confidence=0.2,
-            max_entities=50
+            max_entities=50,
         )
         self.base_llm_client = llm_client
         self.base_neo4j_storage = neo4j_storage
 
         self.path_follower = RecursivePathFollower(
-            llm_client=llm_client,
-            graph_storage=neo4j_storage
+            llm_client=llm_client, graph_storage=neo4j_storage
         )
 
-        self.fact_extractor = FactExtractionService(
-            llm_client=llm_client
-        )
+        self.fact_extractor = FactExtractionService(llm_client=llm_client)
 
     def _chunk_id_to_point_id(self, chunk_id: str) -> int:
         """Convert chunk ID to Qdrant point ID using the same logic as ingestion.
@@ -83,8 +82,7 @@ class IntelligentRetrievalService:
         return abs(hash(chunk_id)) % (2**31)
 
     async def retrieve_intelligently(
-        self,
-        request: IntelligentRetrievalRequest
+        self, request: IntelligentRetrievalRequest
     ) -> IntelligentRetrievalResponse:
         """Perform intelligent entity-based retrieval with recursive path following.
 
@@ -99,37 +97,43 @@ class IntelligentRetrievalService:
         llm_calls = 0
 
         self.logger.info(
-            "Starting intelligent retrieval",
-            query_id=query_id,
-            query=request.query
+            "Starting intelligent retrieval", query_id=query_id, query=request.query
         )
 
         try:
             # Initialize entity service with language parameter and increased limits
-            if not self.entity_service or (hasattr(self.entity_service, 'language') and self.entity_service.language != request.language):
+            if not self.entity_service or (
+                hasattr(self.entity_service, "language")
+                and self.entity_service.language != request.language
+            ):
                 self.entity_service = EntityIdentificationService(
                     llm_client=self.base_llm_client,
                     graph_storage=self.base_neo4j_storage,
                     min_confidence=0.2,  # Lower threshold for more entities
-                    max_entities=request.max_entities_per_iteration * 3,  # Allow more initial entities
-                    language=request.language
+                    max_entities=request.max_entities_per_iteration
+                    * 3,  # Allow more initial entities
+                    language=request.language,
                 )
 
             # Step 1: Identify entities from the query
             self.logger.info("Step 1: Identifying entities from query")
-            identified_entities = await self.entity_service.identify_entities(request.query)
+            identified_entities = await self.entity_service.identify_entities(
+                request.query
+            )
             llm_calls += 1
 
             initial_entity_names = [entity.name for entity in identified_entities]
 
             if not initial_entity_names:
                 self.logger.warning("No entities identified from query")
-                return self._create_empty_response(query_id, request, start_time, llm_calls)
+                return self._create_empty_response(
+                    query_id, request, start_time, llm_calls
+                )
 
             self.logger.info(
                 "Entities identified",
                 entities=initial_entity_names,
-                count=len(initial_entity_names)
+                count=len(initial_entity_names),
             )
 
             # Step 2: Recursive path following
@@ -138,7 +142,7 @@ class IntelligentRetrievalService:
                 query=request.query,
                 initial_entities=initial_entity_names,
                 max_iterations=request.max_iterations,
-                max_entities_per_iteration=request.max_entities_per_iteration
+                max_entities_per_iteration=request.max_entities_per_iteration,
             )
             llm_calls += len(iterations)  # Each iteration involves an LLM call
 
@@ -152,7 +156,7 @@ class IntelligentRetrievalService:
             self.logger.info(
                 "Path following completed",
                 total_entities=len(all_entities),
-                iterations=len(iterations)
+                iterations=len(iterations),
             )
 
             # Step 4: Retrieve chunks for all identified entities
@@ -164,12 +168,14 @@ class IntelligentRetrievalService:
             # Update iteration chunk counts
             total_chunks = len(all_chunks)
             for iteration in iterations:
-                iteration.chunks_retrieved = total_chunks // len(iterations) if iterations else 0
+                iteration.chunks_retrieved = (
+                    total_chunks // len(iterations) if iterations else 0
+                )
 
             self.logger.info(
                 "Chunks retrieved",
                 total_chunks=total_chunks,
-                entities=len(all_entities)
+                entities=len(all_entities),
             )
 
             # Step 5: Extract key facts from chunks
@@ -179,14 +185,11 @@ class IntelligentRetrievalService:
                 query=request.query,
                 chunks=chunk_dicts,
                 max_facts=20,  # Could be made configurable
-                min_confidence=request.min_relevance_threshold
+                min_confidence=request.min_relevance_threshold,
             )
             llm_calls += 1
 
-            self.logger.info(
-                "Key facts extracted",
-                total_facts=len(key_facts)
-            )
+            self.logger.info("Key facts extracted", total_facts=len(key_facts))
 
             # Step 6: Calculate quality metrics
             confidence_score = self._calculate_confidence_score(key_facts)
@@ -210,7 +213,9 @@ class IntelligentRetrievalService:
                 completeness_score=completeness_score,
                 processing_time_ms=processing_time,
                 llm_calls_made=llm_calls,
-                debug_info=self._create_debug_info(request, identified_entities) if request.include_debug_info else None
+                debug_info=self._create_debug_info(request, identified_entities)
+                if request.include_debug_info
+                else None,
             )
 
             self.logger.info(
@@ -218,7 +223,7 @@ class IntelligentRetrievalService:
                 query_id=query_id,
                 processing_time_ms=processing_time,
                 key_facts=len(key_facts),
-                llm_calls=llm_calls
+                llm_calls=llm_calls,
             )
 
             return response
@@ -228,14 +233,12 @@ class IntelligentRetrievalService:
                 "Intelligent retrieval failed",
                 query_id=query_id,
                 error=str(e),
-                error_type=type(e).__name__
+                error_type=type(e).__name__,
             )
             raise
 
     async def _retrieve_chunks_for_entities(
-        self,
-        entities: List[str],
-        query: str
+        self, entities: List[str], query: str
     ) -> List[RetrievedChunk]:
         """Retrieve chunks for a list of entities.
 
@@ -259,22 +262,28 @@ class IntelligentRetrievalService:
                 if entity_candidates:
                     entity = entity_candidates[0]
                     # Get chunk IDs where this entity is mentioned
-                    chunk_ids = await self.neo4j_storage.get_chunks_by_entity_id(entity.id)
+                    chunk_ids = await self.neo4j_storage.get_chunks_by_entity_id(
+                        entity.id
+                    )
 
                     for chunk_id in chunk_ids:
                         try:
                             # First, get the actual chunk content from Neo4j
                             query = "MATCH (c:DocumentChunk {id: $chunk_id}) RETURN c.text as text, c.document_id as document_id"
-                            neo4j_result = await self.neo4j_storage._connection_ops._execute_query(query, {"chunk_id": chunk_id})
+                            neo4j_result = (
+                                await self.neo4j_storage._connection_ops._execute_query(
+                                    query, {"chunk_id": chunk_id}
+                                )
+                            )
 
                             if neo4j_result:
                                 chunk_data = neo4j_result[0]
-                                neo4j_content = chunk_data.get('text', '')
-                                neo4j_document_id = chunk_data.get('document_id', '')
+                                neo4j_content = chunk_data.get("text", "")
+                                neo4j_document_id = chunk_data.get("document_id", "")
 
                                 # Get metadata from Qdrant for additional information
                                 qdrant_metadata = {}
-                                document_name = ''
+                                document_name = ""
                                 try:
                                     scroll_result = await self.qdrant_storage.client.scroll(
                                         collection_name=self.qdrant_storage.config.collection_name,
@@ -282,52 +291,55 @@ class IntelligentRetrievalService:
                                             must=[
                                                 FieldCondition(
                                                     key="chunk_id",
-                                                    match=MatchValue(value=chunk_id)
+                                                    match=MatchValue(value=chunk_id),
                                                 )
                                             ]
                                         ),
                                         limit=1,
                                         with_payload=True,
-                                        with_vectors=False
+                                        with_vectors=False,
                                     )
                                     points, _ = scroll_result
                                     if points:
                                         qdrant_metadata = points[0].payload
-                                        document_name = qdrant_metadata.get('source_name', qdrant_metadata.get('file_name', ''))
+                                        document_name = qdrant_metadata.get(
+                                            "source_name",
+                                            qdrant_metadata.get("file_name", ""),
+                                        )
                                 except Exception as e:
                                     self.logger.warning(
                                         "Failed to retrieve metadata from Qdrant",
                                         chunk_id=chunk_id,
-                                        error=str(e)
+                                        error=str(e),
                                     )
 
                                 # Use Neo4j content (which has the actual transcript) instead of Qdrant content
                                 chunk = RetrievedChunk(
                                     id=chunk_id,
                                     content=neo4j_content,  # Use actual content from Neo4j
-                                    document_id=neo4j_document_id or qdrant_metadata.get('document_id', ''),
+                                    document_id=neo4j_document_id
+                                    or qdrant_metadata.get("document_id", ""),
                                     document_name=document_name,
                                     score=1.0,  # High score for entity-linked chunks
-                                    metadata=qdrant_metadata
+                                    metadata=qdrant_metadata,
                                 )
                                 all_chunks.append(chunk)
                             else:
                                 self.logger.warning(
-                                    "Chunk not found in Neo4j",
-                                    chunk_id=chunk_id
+                                    "Chunk not found in Neo4j", chunk_id=chunk_id
                                 )
                         except Exception as e:
                             self.logger.warning(
                                 "Failed to retrieve chunk content",
                                 chunk_id=chunk_id,
-                                error=str(e)
+                                error=str(e),
                             )
 
             except Exception as e:
                 self.logger.warning(
                     "Failed to retrieve chunks for entity",
                     entity=entity_name,
-                    error=str(e)
+                    error=str(e),
                 )
 
         # Also perform vector search with the original query
@@ -339,13 +351,13 @@ class IntelligentRetrievalService:
             # 2. Use qdrant_storage.client.search() with the query vector
             # 3. Process the results similar to entity-based chunks
 
-            self.logger.debug("Vector search skipped - relying on entity-based retrieval")
+            self.logger.debug(
+                "Vector search skipped - relying on entity-based retrieval"
+            )
 
         except Exception as e:
             self.logger.warning(
-                "Failed to perform vector search",
-                query=query,
-                error=str(e)
+                "Failed to perform vector search", query=query, error=str(e)
             )
 
         # Remove duplicates based on chunk ID
@@ -368,15 +380,15 @@ class IntelligentRetrievalService:
             Dictionary representation
         """
         return {
-            'id': chunk.id,
-            'chunk_id': chunk.id,
-            'content': chunk.content,
-            'text': chunk.content,
-            'document_id': chunk.document_id,
-            'document_name': chunk.document_name,
-            'score': chunk.score,
-            'relevance_score': chunk.score,
-            'metadata': chunk.metadata
+            "id": chunk.id,
+            "chunk_id": chunk.id,
+            "content": chunk.content,
+            "text": chunk.content,
+            "document_id": chunk.document_id,
+            "document_name": chunk.document_name,
+            "score": chunk.score,
+            "relevance_score": chunk.score,
+            "metadata": chunk.metadata,
         }
 
     def _calculate_confidence_score(self, key_facts: List[KeyFact]) -> float:
@@ -394,10 +406,7 @@ class IntelligentRetrievalService:
         return sum(fact.confidence for fact in key_facts) / len(key_facts)
 
     def _calculate_completeness_score(
-        self,
-        key_facts: List[KeyFact],
-        entities_explored: int,
-        chunks_retrieved: int
+        self, key_facts: List[KeyFact], entities_explored: int, chunks_retrieved: int
     ) -> float:
         """Calculate completeness score based on exploration coverage.
 
@@ -422,9 +431,7 @@ class IntelligentRetrievalService:
         return completeness
 
     def _create_debug_info(
-        self,
-        request: IntelligentRetrievalRequest,
-        identified_entities: List[Any]
+        self, request: IntelligentRetrievalRequest, identified_entities: List[Any]
     ) -> Dict[str, Any]:
         """Create debug information.
 
@@ -436,16 +443,16 @@ class IntelligentRetrievalService:
             Debug information dictionary
         """
         return {
-            'request_parameters': request.dict(),
-            'identified_entities': [
+            "request_parameters": request.dict(),
+            "identified_entities": [
                 {
-                    'name': entity.name,
-                    'type': entity.entity_type,
-                    'confidence': entity.confidence,
-                    'graph_linked': entity.graph_entity_id is not None
+                    "name": entity.name,
+                    "type": entity.entity_type,
+                    "confidence": entity.confidence,
+                    "graph_linked": entity.graph_entity_id is not None,
                 }
                 for entity in identified_entities
-            ]
+            ],
         }
 
     def _create_empty_response(
@@ -453,7 +460,7 @@ class IntelligentRetrievalService:
         query_id: str,
         request: IntelligentRetrievalRequest,
         start_time: datetime,
-        llm_calls: int
+        llm_calls: int,
     ) -> IntelligentRetrievalResponse:
         """Create empty response when no entities are found.
 
@@ -480,5 +487,5 @@ class IntelligentRetrievalService:
             confidence_score=0.0,
             completeness_score=0.0,
             processing_time_ms=processing_time,
-            llm_calls_made=llm_calls
+            llm_calls_made=llm_calls,
         )

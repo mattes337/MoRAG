@@ -1,19 +1,18 @@
 #!/usr/bin/env python3
 """Batch process multiple files using stage-based architecture."""
 
-import asyncio
 import argparse
+import asyncio
 from pathlib import Path
 from typing import List
 
-from morag_stages import StageManager, StageType, StageStatus
+from morag_stages import StageManager, StageStatus, StageType
 from morag_stages.models import StageContext
 
 
-async def process_file_through_stages(file_path: Path,
-                                     stages: List[StageType],
-                                     output_dir: Path,
-                                     config: dict) -> bool:
+async def process_file_through_stages(
+    file_path: Path, stages: List[StageType], output_dir: Path, config: dict
+) -> bool:
     """Process a single file through specified stages."""
 
     stage_manager = StageManager()
@@ -23,21 +22,25 @@ async def process_file_through_stages(file_path: Path,
     file_output_dir.mkdir(exist_ok=True)
 
     context = StageContext(
-        source_path=file_path,
-        output_dir=file_output_dir,
-        config=config
+        source_path=file_path, output_dir=file_output_dir, config=config
     )
 
     try:
         results = await stage_manager.execute_stage_chain(stages, [file_path], context)
 
         # Check if all stages completed successfully
-        success = all(r.status in [StageStatus.COMPLETED, StageStatus.SKIPPED] for r in results)
+        success = all(
+            r.status in [StageStatus.COMPLETED, StageStatus.SKIPPED] for r in results
+        )
 
         if success:
             print(f"✅ {file_path.name}: All stages completed")
         else:
-            failed_stages = [r.stage_type.value for r in results if r.status not in [StageStatus.COMPLETED, StageStatus.SKIPPED]]
+            failed_stages = [
+                r.stage_type.value
+                for r in results
+                if r.status not in [StageStatus.COMPLETED, StageStatus.SKIPPED]
+            ]
             print(f"❌ {file_path.name}: Failed stages: {failed_stages}")
 
         return success
@@ -55,19 +58,34 @@ async def batch_process(args):
     output_dir.mkdir(exist_ok=True)
 
     # Find all supported files
-    supported_extensions = {'.pdf', '.docx', '.txt', '.mp4', '.mp3', '.wav', '.m4a', '.flac'}
-    files = [f for f in input_dir.rglob('*') if f.suffix.lower() in supported_extensions]
+    supported_extensions = {
+        ".pdf",
+        ".docx",
+        ".txt",
+        ".mp4",
+        ".mp3",
+        ".wav",
+        ".m4a",
+        ".flac",
+    }
+    files = [
+        f for f in input_dir.rglob("*") if f.suffix.lower() in supported_extensions
+    ]
 
     print(f"Found {len(files)} files to process")
 
     # Parse stages to execute
-    if args.stages == 'all':
-        stages = [StageType.MARKDOWN_CONVERSION, StageType.CHUNKER,
-                 StageType.FACT_GENERATOR, StageType.INGESTOR]
+    if args.stages == "all":
+        stages = [
+            StageType.MARKDOWN_CONVERSION,
+            StageType.CHUNKER,
+            StageType.FACT_GENERATOR,
+            StageType.INGESTOR,
+        ]
         if args.optimize:
             stages.insert(1, StageType.MARKDOWN_OPTIMIZER)
     else:
-        stage_names = [s.strip() for s in args.stages.split(',')]
+        stage_names = [s.strip() for s in args.stages.split(",")]
         stages = []
         for name in stage_names:
             try:
@@ -81,6 +99,7 @@ async def batch_process(args):
     config = {}
     if args.config:
         import json
+
         with open(args.config) as f:
             config = json.load(f)
 
@@ -120,28 +139,50 @@ async def batch_process_with_resume(args):
     processed_files = set()
     if resume_file.exists():
         import json
+
         with open(resume_file) as f:
             progress_data = json.load(f)
-            processed_files = set(progress_data.get('completed', []))
-        print(f"📋 Resuming batch processing. {len(processed_files)} files already processed.")
+            processed_files = set(progress_data.get("completed", []))
+        print(
+            f"📋 Resuming batch processing. {len(processed_files)} files already processed."
+        )
 
     # Find all supported files
-    supported_extensions = {'.pdf', '.docx', '.txt', '.mp4', '.mp3', '.wav', '.m4a', '.flac'}
-    all_files = [f for f in input_dir.rglob('*') if f.suffix.lower() in supported_extensions]
+    supported_extensions = {
+        ".pdf",
+        ".docx",
+        ".txt",
+        ".mp4",
+        ".mp3",
+        ".wav",
+        ".m4a",
+        ".flac",
+    }
+    all_files = [
+        f for f in input_dir.rglob("*") if f.suffix.lower() in supported_extensions
+    ]
 
     # Filter out already processed files
-    files = [f for f in all_files if str(f.relative_to(input_dir)) not in processed_files]
+    files = [
+        f for f in all_files if str(f.relative_to(input_dir)) not in processed_files
+    ]
 
-    print(f"Found {len(files)} files to process ({len(all_files)} total, {len(processed_files)} already done)")
+    print(
+        f"Found {len(files)} files to process ({len(all_files)} total, {len(processed_files)} already done)"
+    )
 
     # Parse stages to execute
-    if args.stages == 'all':
-        stages = [StageType.MARKDOWN_CONVERSION, StageType.CHUNKER,
-                 StageType.FACT_GENERATOR, StageType.INGESTOR]
+    if args.stages == "all":
+        stages = [
+            StageType.MARKDOWN_CONVERSION,
+            StageType.CHUNKER,
+            StageType.FACT_GENERATOR,
+            StageType.INGESTOR,
+        ]
         if args.optimize:
             stages.insert(1, StageType.MARKDOWN_OPTIMIZER)
     else:
-        stage_names = [s.strip() for s in args.stages.split(',')]
+        stage_names = [s.strip() for s in args.stages.split(",")]
         stages = []
         for name in stage_names:
             try:
@@ -155,6 +196,7 @@ async def batch_process_with_resume(args):
     config = {}
     if args.config:
         import json
+
         with open(args.config) as f:
             config = json.load(f)
 
@@ -175,13 +217,18 @@ async def batch_process_with_resume(args):
 
             # Update resume file
             import json
-            with open(resume_file, 'w') as f:
-                json.dump({
-                    'completed': list(processed_files),
-                    'total_files': len(all_files),
-                    'successful': len(processed_files),
-                    'failed': failed
-                }, f, indent=2)
+
+            with open(resume_file, "w") as f:
+                json.dump(
+                    {
+                        "completed": list(processed_files),
+                        "total_files": len(all_files),
+                        "successful": len(processed_files),
+                        "failed": failed,
+                    },
+                    f,
+                    indent=2,
+                )
         else:
             failed += 1
 
@@ -195,11 +242,23 @@ async def batch_process_with_resume(args):
 def main():
     parser = argparse.ArgumentParser(description="Batch process files using stages")
     parser.add_argument("input_dir", help="Input directory containing files")
-    parser.add_argument("--output-dir", default="./batch_output", help="Output directory")
-    parser.add_argument("--stages", default="all", help="Stages to execute (e.g., 'markdown-conversion,chunker' or 'all')")
-    parser.add_argument("--optimize", action="store_true", help="Include markdown optimization stage (only with --stages=all)")
+    parser.add_argument(
+        "--output-dir", default="./batch_output", help="Output directory"
+    )
+    parser.add_argument(
+        "--stages",
+        default="all",
+        help="Stages to execute (e.g., 'markdown-conversion,chunker' or 'all')",
+    )
+    parser.add_argument(
+        "--optimize",
+        action="store_true",
+        help="Include markdown optimization stage (only with --stages=all)",
+    )
     parser.add_argument("--config", help="Configuration file path")
-    parser.add_argument("--resume", action="store_true", help="Enable resume capability")
+    parser.add_argument(
+        "--resume", action="store_true", help="Enable resume capability"
+    )
 
     args = parser.parse_args()
 

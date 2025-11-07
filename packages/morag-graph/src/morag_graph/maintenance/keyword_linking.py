@@ -14,9 +14,9 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
 import structlog
+from morag_graph.storage import Neo4jConfig, Neo4jStorage
 
-from morag_graph.storage import Neo4jStorage, Neo4jConfig
-from .base import MaintenanceJobBase, validate_positive_int, validate_float_range
+from .base import MaintenanceJobBase, validate_float_range, validate_positive_int
 from .query_optimizer import QueryOptimizer
 
 logger = structlog.get_logger(__name__)
@@ -24,9 +24,11 @@ logger = structlog.get_logger(__name__)
 
 @dataclass
 class KeywordLinkingConfig:
-    cooccurrence_min_share: float = 0.18  # min share of parent's facts co-occurring with proposal
-    limit_parents: int = 10               # how many parent keywords to consider per run
-    max_links_per_parent: int = 6         # cap links per parent to avoid explosions
+    cooccurrence_min_share: float = (
+        0.18  # min share of parent's facts co-occurring with proposal
+    )
+    limit_parents: int = 10  # how many parent keywords to consider per run
+    max_links_per_parent: int = 6  # cap links per parent to avoid explosions
     batch_size: int = 200
     dry_run: bool = True
     job_tag: str = ""
@@ -43,18 +45,20 @@ class KeywordLinkingConfig:
 class KeywordLinkingService(MaintenanceJobBase):
     """Create Entity->Entity links between keywords using co-occurrence and LLM typing."""
 
-    def __init__(self, storage: Neo4jStorage, config: Optional[KeywordLinkingConfig] = None):
+    def __init__(
+        self, storage: Neo4jStorage, config: Optional[KeywordLinkingConfig] = None
+    ):
         self.storage = storage
         self.link_config = config or KeywordLinkingConfig()
         self.link_config.ensure_defaults()
 
         # Initialize base class with config dict
         config_dict = {
-            'job_tag': self.link_config.job_tag,
-            'dry_run': self.link_config.dry_run,
-            'batch_size': self.link_config.batch_size,
-            'circuit_breaker_threshold': self.link_config.circuit_breaker_threshold,
-            'circuit_breaker_timeout': self.link_config.circuit_breaker_timeout,
+            "job_tag": self.link_config.job_tag,
+            "dry_run": self.link_config.dry_run,
+            "batch_size": self.link_config.batch_size,
+            "circuit_breaker_threshold": self.link_config.circuit_breaker_threshold,
+            "circuit_breaker_timeout": self.link_config.circuit_breaker_timeout,
         }
         super().__init__(config_dict)
 
@@ -66,12 +70,37 @@ class KeywordLinkingService(MaintenanceJobBase):
         errors = []
 
         # Validate integer parameters
-        errors.extend(validate_positive_int(self.link_config.limit_parents, "limit_parents", min_value=1, max_value=100))
-        errors.extend(validate_positive_int(self.link_config.max_links_per_parent, "max_links_per_parent", min_value=1, max_value=50))
-        errors.extend(validate_positive_int(self.link_config.batch_size, "batch_size", min_value=1, max_value=10000))
+        errors.extend(
+            validate_positive_int(
+                self.link_config.limit_parents,
+                "limit_parents",
+                min_value=1,
+                max_value=100,
+            )
+        )
+        errors.extend(
+            validate_positive_int(
+                self.link_config.max_links_per_parent,
+                "max_links_per_parent",
+                min_value=1,
+                max_value=50,
+            )
+        )
+        errors.extend(
+            validate_positive_int(
+                self.link_config.batch_size, "batch_size", min_value=1, max_value=10000
+            )
+        )
 
         # Validate float parameters
-        errors.extend(validate_float_range(self.link_config.cooccurrence_min_share, "cooccurrence_min_share", min_value=0.0, max_value=1.0))
+        errors.extend(
+            validate_float_range(
+                self.link_config.cooccurrence_min_share,
+                "cooccurrence_min_share",
+                min_value=0.0,
+                max_value=1.0,
+            )
+        )
 
         return errors
 
@@ -81,11 +110,14 @@ class KeywordLinkingService(MaintenanceJobBase):
         try:
             # Always prefer Gemini (via LLMClient env defaults)
             from morag_reasoning.llm import LLMClient  # type: ignore
+
             # Pass None to use environment variables for configuration
             self._llm_client = LLMClient(None)
             return self._llm_client
         except Exception as e:
-            logger.warning("LLM client unavailable, will fallback to ASSOCIATED_WITH", error=str(e))
+            logger.warning(
+                "LLM client unavailable, will fallback to ASSOCIATED_WITH", error=str(e)
+            )
             return None
 
     async def run(self) -> Dict[str, Any]:
@@ -97,7 +129,9 @@ class KeywordLinkingService(MaintenanceJobBase):
         if config_errors:
             raise ValueError(f"Configuration errors: {'; '.join(config_errors)}")
 
-        parents = await self._find_parent_candidates(limit=self.link_config.limit_parents)
+        parents = await self._find_parent_candidates(
+            limit=self.link_config.limit_parents
+        )
         summary: Dict[str, Any] = {
             "job_tag": self.link_config.job_tag,
             "processed": [],
@@ -107,7 +141,11 @@ class KeywordLinkingService(MaintenanceJobBase):
 
         # Process parents with error handling
         async def process_parent(row):
-            parent_id, parent_name, total_facts = row["k_id"], row["k_name"], row["fact_count"]
+            parent_id, parent_name, total_facts = (
+                row["k_id"],
+                row["k_name"],
+                row["fact_count"],
+            )
             proposals = await self._propose_links(parent_id, total_facts)
             proposals = proposals[: self.link_config.max_links_per_parent]
             if not proposals:
@@ -128,8 +166,7 @@ class KeywordLinkingService(MaintenanceJobBase):
     async def _find_parent_candidates(self, limit: int) -> List[Dict[str, Any]]:
         """Find entity candidates with sufficient fact counts using optimized query."""
         return await self.query_optimizer.find_entities_by_fact_count(
-            min_facts=10,
-            limit=limit
+            min_facts=10, limit=limit
         )
 
     async def _propose_links(self, k_id: str, total_facts: int) -> List[Dict[str, Any]]:
@@ -160,7 +197,9 @@ class KeywordLinkingService(MaintenanceJobBase):
         )
         return rows
 
-    async def _infer_type(self, parent_name: str, child_name: str, samples: List[str]) -> str:
+    async def _infer_type(
+        self, parent_name: str, child_name: str, samples: List[str]
+    ) -> str:
         client = await self._get_llm_client()
         if not client:
             return f"{self.link_config.fallback_link_type}|A_TO_B"
@@ -187,25 +226,28 @@ class KeywordLinkingService(MaintenanceJobBase):
             )
 
             text = await client.generate(prompt)
-            logger.debug("LLM response received",
-                       response_preview=text[:200],
-                       response_length=len(text))
+            logger.debug(
+                "LLM response received",
+                response_preview=text[:200],
+                response_length=len(text),
+            )
 
             # Parse JSON response directly (should be JSON-only now)
-            import json, re
+            import json
+            import re
 
             fallback_data = {
                 "relation_type": "INFLUENCES",  # More specific than RELATES_TO
-                "direction": "A_TO_B"
+                "direction": "A_TO_B",
             }
 
             # Clean the response text
             cleaned_text = text.strip()
 
             # Remove any potential markdown formatting
-            if cleaned_text.startswith('```json'):
+            if cleaned_text.startswith("```json"):
                 cleaned_text = cleaned_text[7:]
-            if cleaned_text.endswith('```'):
+            if cleaned_text.endswith("```"):
                 cleaned_text = cleaned_text[:-3]
             cleaned_text = cleaned_text.strip()
 
@@ -215,18 +257,22 @@ class KeywordLinkingService(MaintenanceJobBase):
                 logger.debug("Direct JSON parsing successful")
             except json.JSONDecodeError:
                 # If direct parsing fails, try to extract JSON
-                json_match = re.search(r'\{[^{}]*"relation_type"[^{}]*"direction"[^{}]*\}', text)
+                json_match = re.search(
+                    r'\{[^{}]*"relation_type"[^{}]*"direction"[^{}]*\}', text
+                )
                 if json_match:
                     try:
                         data = json.loads(json_match.group(0))
                         logger.debug("Extracted JSON from response")
                     except json.JSONDecodeError:
-                        logger.warning("JSON extraction failed",
-                                     response_text=text[:300])
+                        logger.warning(
+                            "JSON extraction failed", response_text=text[:300]
+                        )
                         data = fallback_data
                 else:
-                    logger.warning("No JSON found in response",
-                                 response_text=text[:300])
+                    logger.warning(
+                        "No JSON found in response", response_text=text[:300]
+                    )
                     data = fallback_data
 
             rtype = str(data.get("relation_type", "")).strip().upper().replace(" ", "_")
@@ -241,27 +287,47 @@ class KeywordLinkingService(MaintenanceJobBase):
                 rtype = "INFLUENCES"  # Use a more specific fallback
             elif rtype == "ASSOCIATED_WITH":
                 # Try to infer a more specific relationship based on context
-                if any(word in sample_text.lower() for word in ["treat", "cure", "heal", "therapy"]):
+                if any(
+                    word in sample_text.lower()
+                    for word in ["treat", "cure", "heal", "therapy"]
+                ):
                     rtype = "TREATS"
-                elif any(word in sample_text.lower() for word in ["cause", "lead", "result"]):
+                elif any(
+                    word in sample_text.lower() for word in ["cause", "lead", "result"]
+                ):
                     rtype = "CAUSES"
-                elif any(word in sample_text.lower() for word in ["prevent", "avoid", "protect"]):
+                elif any(
+                    word in sample_text.lower()
+                    for word in ["prevent", "avoid", "protect"]
+                ):
                     rtype = "PREVENTS"
-                elif any(word in sample_text.lower() for word in ["improve", "enhance", "boost"]):
+                elif any(
+                    word in sample_text.lower()
+                    for word in ["improve", "enhance", "boost"]
+                ):
                     rtype = "IMPROVES"
-                elif any(word in sample_text.lower() for word in ["support", "help", "assist"]):
+                elif any(
+                    word in sample_text.lower()
+                    for word in ["support", "help", "assist"]
+                ):
                     rtype = "SUPPORTS"
                 else:
                     rtype = "INFLUENCES"  # Final fallback
 
-            logger.debug("Parsed relationship", relation_type=rtype, direction=direction)
+            logger.debug(
+                "Parsed relationship", relation_type=rtype, direction=direction
+            )
             return f"{rtype}|{direction}"
 
         try:
             return await self.safe_llm_call(llm_inference)
         except Exception as e:
-            logger.warning("LLM inference failed, using fallback type",
-                         error=str(e), parent=parent_name, child=child_name)
+            logger.warning(
+                "LLM inference failed, using fallback type",
+                error=str(e),
+                parent=parent_name,
+                child=child_name,
+            )
             return f"INFLUENCES|A_TO_B"
 
     async def _sample_cofacts(self, parent_id: str, child_id: str) -> List[str]:
@@ -273,10 +339,14 @@ class KeywordLinkingService(MaintenanceJobBase):
                COALESCE(f.remarks, '') AS txt
         LIMIT 3
         """
-        rows = await self.storage._connection_ops._execute_query(q, {"parent_id": parent_id, "child_id": child_id})
+        rows = await self.storage._connection_ops._execute_query(
+            q, {"parent_id": parent_id, "child_id": child_id}
+        )
         return [r.get("txt", "").strip() for r in rows if r.get("txt", "").strip()]
 
-    async def _link_parent(self, parent_id: str, parent_name: str, proposals: List[Dict[str, Any]]) -> Dict[str, Any]:
+    async def _link_parent(
+        self, parent_id: str, parent_name: str, proposals: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
         created = 0
         planned: List[Dict[str, Any]] = []
         for p in proposals:
@@ -286,7 +356,14 @@ class KeywordLinkingService(MaintenanceJobBase):
             rtype, direction = type_and_dir.split("|", 1)
 
             if self.link_config.dry_run:
-                planned.append({"parent": parent_name, "child": child_name, "type": rtype, "direction": direction})
+                planned.append(
+                    {
+                        "parent": parent_name,
+                        "child": child_name,
+                        "type": rtype,
+                        "direction": direction,
+                    }
+                )
                 continue
 
             # Apply link
@@ -298,7 +375,11 @@ class KeywordLinkingService(MaintenanceJobBase):
                 SET h.job_tag = $job_tag, h.created_from = 'keyword_linking'
                 RETURN count(h) AS linked
                 """
-                params = {"a": parent_id, "b": child_id, "job_tag": self.link_config.job_tag}
+                params = {
+                    "a": parent_id,
+                    "b": child_id,
+                    "job_tag": self.link_config.job_tag,
+                }
             else:
                 q = f"""
                 MATCH (a:Entity {{id: $a}}), (b:Entity {{id: $b}})
@@ -307,25 +388,47 @@ class KeywordLinkingService(MaintenanceJobBase):
                 SET h.job_tag = $job_tag, h.created_from = 'keyword_linking'
                 RETURN count(h) AS linked
                 """
-                params = {"a": parent_id, "b": child_id, "job_tag": self.link_config.job_tag}
+                params = {
+                    "a": parent_id,
+                    "b": child_id,
+                    "job_tag": self.link_config.job_tag,
+                }
             res = await self.storage._connection_ops._execute_query(q, params)
-            created += (res[0]["linked"] if res else 0)
-            planned.append({"parent": parent_name, "child": child_name, "type": rtype, "direction": direction})
+            created += res[0]["linked"] if res else 0
+            planned.append(
+                {
+                    "parent": parent_name,
+                    "child": child_name,
+                    "type": rtype,
+                    "direction": direction,
+                }
+            )
 
-        logger.info("Keyword links processed", parent=parent_name, count=len(planned), created=created)
+        logger.info(
+            "Keyword links processed",
+            parent=parent_name,
+            count=len(planned),
+            created=created,
+        )
         return {"parent": parent_name, "links": planned, "created": created}
 
 
-async def run_keyword_linking(config_overrides: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+async def run_keyword_linking(
+    config_overrides: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
     """Entrypoint to run the keyword linking job."""
     import os
+
     neo_config = Neo4jConfig(
         uri=os.getenv("NEO4J_URI", "neo4j://localhost:7687"),
         username=os.getenv("NEO4J_USERNAME", "neo4j"),
         password=os.getenv("NEO4J_PASSWORD", "password"),
         database=os.getenv("NEO4J_DATABASE", "neo4j"),
         verify_ssl=os.getenv("NEO4J_VERIFY_SSL", "true").lower() == "true",
-        trust_all_certificates=os.getenv("NEO4J_TRUST_ALL_CERTIFICATES", "false").lower() == "true",
+        trust_all_certificates=os.getenv(
+            "NEO4J_TRUST_ALL_CERTIFICATES", "false"
+        ).lower()
+        == "true",
     )
     storage = Neo4jStorage(neo_config)
     await storage.connect()
@@ -343,15 +446,21 @@ async def run_keyword_linking(config_overrides: Optional[Dict[str, Any]] = None)
 
 
 def main():
-    import argparse, json
+    import argparse
+    import json
+
     parser = argparse.ArgumentParser(description="Run Keyword Linking maintenance job")
-    parser.add_argument("--share", type=float, default=0.18, help="Min co-occurrence share")
+    parser.add_argument(
+        "--share", type=float, default=0.18, help="Min co-occurrence share"
+    )
     parser.add_argument("--limit-parents", type=int, default=10)
     parser.add_argument("--max-per-parent", type=int, default=6)
     parser.add_argument("--batch-size", type=int, default=200)
     parser.add_argument("--fallback-type", type=str, default="ASSOCIATED_WITH")
     parser.add_argument("--no-llm", action="store_true", default=False)
-    parser.add_argument("--apply", action="store_true", help="Actually apply changes (disable dry-run)")
+    parser.add_argument(
+        "--apply", action="store_true", help="Actually apply changes (disable dry-run)"
+    )
     parser.add_argument("--job-tag", type=str, default="")
     args = parser.parse_args()
 

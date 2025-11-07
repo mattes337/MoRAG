@@ -1,8 +1,10 @@
-import pytest
-import time
 import asyncio
-from unittest.mock import patch, MagicMock, AsyncMock
+import time
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 from morag_services.storage import QdrantService
+
 
 @pytest.mark.performance
 class TestQdrantPerformance:
@@ -26,12 +28,9 @@ class TestQdrantPerformance:
             optimizer_status=MagicMock(status=MagicMock(value="ok")),
             config=MagicMock(
                 params=MagicMock(
-                    vectors=MagicMock(
-                        size=768,
-                        distance=MagicMock(value="Cosine")
-                    )
+                    vectors=MagicMock(size=768, distance=MagicMock(value="Cosine"))
                 )
-            )
+            ),
         )
         mock_client.upsert = MagicMock()
         mock_client.search.return_value = []
@@ -51,14 +50,16 @@ class TestQdrantPerformance:
         embeddings = []
 
         for i in range(batch_size):
-            chunks.append({
-                "text": f"Performance test chunk {i}",
-                "summary": f"Summary {i}",
-                "source": "performance_test.pdf",
-                "source_type": "document",
-                "chunk_index": i,
-                "metadata": {"batch": "performance"}
-            })
+            chunks.append(
+                {
+                    "text": f"Performance test chunk {i}",
+                    "summary": f"Summary {i}",
+                    "source": "performance_test.pdf",
+                    "source_type": "document",
+                    "chunk_index": i,
+                    "metadata": {"batch": "performance"},
+                }
+            )
             embeddings.append([float(i) / batch_size] * 768)
 
         # Mock async operations with slight delay to simulate real operations
@@ -66,7 +67,7 @@ class TestQdrantPerformance:
             await asyncio.sleep(0.001)  # Simulate small delay
             return None
 
-        with patch('asyncio.to_thread', new_callable=AsyncMock) as mock_to_thread:
+        with patch("asyncio.to_thread", new_callable=AsyncMock) as mock_to_thread:
             mock_to_thread.side_effect = mock_upsert
 
             # Measure insertion time
@@ -98,7 +99,7 @@ class TestQdrantPerformance:
                 "summary": f"Document {i}",
                 "source": f"doc_{i}.pdf",
                 "source_type": "document",
-                "metadata": {"search_test": True}
+                "metadata": {"search_test": True},
             }
             mock_results.append(mock_result)
 
@@ -107,15 +108,13 @@ class TestQdrantPerformance:
             await asyncio.sleep(0.01)  # Simulate search delay
             return mock_results
 
-        with patch('asyncio.to_thread', new_callable=AsyncMock) as mock_to_thread:
+        with patch("asyncio.to_thread", new_callable=AsyncMock) as mock_to_thread:
             mock_to_thread.side_effect = mock_search
 
             # Measure search time
             start_time = time.time()
             results = await service.search_similar(
-                query_embedding=[0.5] * 768,
-                limit=10,
-                score_threshold=0.0
+                query_embedding=[0.5] * 768, limit=10, score_threshold=0.0
             )
             end_time = time.time()
 
@@ -142,11 +141,11 @@ class TestQdrantPerformance:
                 "source": f"concurrent_doc_{index}.txt",
                 "source_type": "document",
                 "chunk_index": 0,
-                "metadata": {"index": index}
+                "metadata": {"index": index},
             }
             embedding = [float(index) / 100] * 768
 
-            with patch('asyncio.to_thread', new_callable=AsyncMock) as mock_to_thread:
+            with patch("asyncio.to_thread", new_callable=AsyncMock) as mock_to_thread:
                 mock_to_thread.side_effect = mock_store_operation
                 return await service.store_chunks([chunk], [embedding])
 
@@ -175,24 +174,26 @@ class TestQdrantPerformance:
         embeddings = []
 
         for i in range(batch_size):
-            chunks.append({
-                "text": f"Large batch chunk {i}",
-                "summary": f"Summary {i}",
-                "source": "large_doc.pdf",
-                "source_type": "document",
-                "chunk_index": i,
-                "metadata": {"batch_index": i}
-            })
+            chunks.append(
+                {
+                    "text": f"Large batch chunk {i}",
+                    "summary": f"Summary {i}",
+                    "source": "large_doc.pdf",
+                    "source_type": "document",
+                    "chunk_index": i,
+                    "metadata": {"batch_index": i},
+                }
+            )
             embeddings.append([float(i) / batch_size] * 768)
 
         # Mock batch operations
         async def mock_batch_upsert(*args, **kwargs):
             # Simulate batch processing time
-            batch_points = kwargs.get('points', args[1] if len(args) > 1 else [])
+            batch_points = kwargs.get("points", args[1] if len(args) > 1 else [])
             await asyncio.sleep(len(batch_points) * 0.001)  # Scale with batch size
             return None
 
-        with patch('asyncio.to_thread', new_callable=AsyncMock) as mock_to_thread:
+        with patch("asyncio.to_thread", new_callable=AsyncMock) as mock_to_thread:
             mock_to_thread.side_effect = mock_batch_upsert
 
             start_time = time.time()
@@ -204,7 +205,9 @@ class TestQdrantPerformance:
             assert len(point_ids) == batch_size
             assert batch_time < 60.0  # Should complete within 60 seconds
 
-            print(f"Large batch ({batch_size} chunks) completed in {batch_time:.2f} seconds")
+            print(
+                f"Large batch ({batch_size} chunks) completed in {batch_time:.2f} seconds"
+            )
             print(f"Rate: {batch_size / batch_time:.2f} chunks/second")
 
     @pytest.mark.asyncio
@@ -219,14 +222,16 @@ class TestQdrantPerformance:
         # Create chunks with larger text content
         for i in range(50):
             large_text = f"Large content chunk {i} " * 100  # Simulate larger documents
-            large_chunks.append({
-                "text": large_text,
-                "summary": f"Large summary {i}",
-                "source": f"large_document_{i}.pdf",
-                "source_type": "document",
-                "chunk_index": i,
-                "metadata": {"size": "large", "index": i}
-            })
+            large_chunks.append(
+                {
+                    "text": large_text,
+                    "summary": f"Large summary {i}",
+                    "source": f"large_document_{i}.pdf",
+                    "source_type": "document",
+                    "chunk_index": i,
+                    "metadata": {"size": "large", "index": i},
+                }
+            )
             large_embeddings.append([float(i) / 50] * 768)
 
         async def mock_memory_operation(*args, **kwargs):
@@ -234,7 +239,7 @@ class TestQdrantPerformance:
             await asyncio.sleep(0.02)
             return None
 
-        with patch('asyncio.to_thread', new_callable=AsyncMock) as mock_to_thread:
+        with patch("asyncio.to_thread", new_callable=AsyncMock) as mock_to_thread:
             mock_to_thread.side_effect = mock_memory_operation
 
             start_time = time.time()
@@ -274,7 +279,7 @@ class TestQdrantPerformance:
                 "source": "error_test.pdf",
                 "source_type": "document",
                 "chunk_index": i,
-                "metadata": {"test": "error_recovery"}
+                "metadata": {"test": "error_recovery"},
             }
             for i in range(5)
         ]
@@ -283,7 +288,7 @@ class TestQdrantPerformance:
         # Test error handling performance
         start_time = time.time()
 
-        with patch('asyncio.to_thread', new_callable=AsyncMock) as mock_to_thread:
+        with patch("asyncio.to_thread", new_callable=AsyncMock) as mock_to_thread:
             mock_to_thread.side_effect = mock_unreliable_operation
 
             try:
@@ -298,6 +303,7 @@ class TestQdrantPerformance:
         assert error_handling_time < 5.0
 
         print(f"Error recovery test completed in {error_handling_time:.3f} seconds")
+
 
 class TestPerformanceBenchmarks:
     """Performance benchmark tests."""
@@ -334,11 +340,9 @@ class TestPerformanceBenchmarks:
             # Simulate batch creation
             batch = []
             for i in range(batch_size):
-                batch.append({
-                    "id": f"test-{i}",
-                    "vector": [0.1] * 768,
-                    "payload": {"index": i}
-                })
+                batch.append(
+                    {"id": f"test-{i}", "vector": [0.1] * 768, "payload": {"index": i}}
+                )
 
             end_time = time.time()
             batch_creation_time = end_time - start_time

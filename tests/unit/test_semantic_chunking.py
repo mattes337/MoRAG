@@ -1,16 +1,20 @@
 import pytest
-from morag_services.processing import chunking_service, ChunkInfo, SemanticChunker
+from morag_services.processing import ChunkInfo, SemanticChunker, chunking_service
+
 
 @pytest.mark.asyncio
 async def test_simple_chunking():
     """Test simple text chunking."""
     text = "This is a simple test. It has multiple sentences. Each sentence should be processed correctly."
 
-    chunks = await chunking_service.semantic_chunk(text, chunk_size=50, strategy="simple")
+    chunks = await chunking_service.semantic_chunk(
+        text, chunk_size=50, strategy="simple"
+    )
 
     assert len(chunks) > 0
     assert all(len(chunk) <= 60 for chunk in chunks)  # Allow some flexibility
     assert "".join(chunks).replace(" ", "") in text.replace(" ", "")
+
 
 @pytest.mark.asyncio
 async def test_sentence_chunking():
@@ -21,12 +25,17 @@ async def test_sentence_chunking():
     This is the fifth sentence.
     """
 
-    chunks = await chunking_service.semantic_chunk(text, chunk_size=100, strategy="sentence")
+    chunks = await chunking_service.semantic_chunk(
+        text, chunk_size=100, strategy="sentence"
+    )
 
     assert len(chunks) > 0
     # Each chunk should contain complete sentences
     for chunk in chunks:
-        assert chunk.strip().endswith('.') or chunk == chunks[-1]  # Last chunk might not end with period
+        assert (
+            chunk.strip().endswith(".") or chunk == chunks[-1]
+        )  # Last chunk might not end with period
+
 
 @pytest.mark.asyncio
 async def test_paragraph_chunking():
@@ -40,12 +49,15 @@ async def test_paragraph_chunking():
     This is the third paragraph. It's shorter.
     """
 
-    chunks = await chunking_service.semantic_chunk(text, chunk_size=200, strategy="paragraph")
+    chunks = await chunking_service.semantic_chunk(
+        text, chunk_size=200, strategy="paragraph"
+    )
 
     assert len(chunks) > 0
     # Should preserve paragraph structure
     for chunk in chunks:
         assert chunk.strip()
+
 
 @pytest.mark.asyncio
 async def test_semantic_chunking():
@@ -57,15 +69,20 @@ async def test_semantic_chunking():
     Computer vision helps machines interpret visual information. It's used in many applications today.
     """
 
-    chunks = await chunking_service.semantic_chunk(text, chunk_size=150, strategy="semantic")
+    chunks = await chunking_service.semantic_chunk(
+        text, chunk_size=150, strategy="semantic"
+    )
 
     assert len(chunks) > 0
     assert all(len(chunk) > 0 for chunk in chunks)
 
+
 @pytest.mark.asyncio
 async def test_chunk_with_metadata():
     """Test chunking with full metadata."""
-    text = "This is a test document. It contains multiple sentences for testing purposes."
+    text = (
+        "This is a test document. It contains multiple sentences for testing purposes."
+    )
 
     chunk_infos = await chunking_service.chunk_with_metadata(text, chunk_size=50)
 
@@ -79,6 +96,7 @@ async def test_chunk_with_metadata():
         assert chunk.end_char > chunk.start_char
         assert chunk.chunk_type in ["semantic", "simple", "sentence", "paragraph"]
 
+
 @pytest.mark.asyncio
 async def test_empty_text_handling():
     """Test handling of empty text."""
@@ -88,6 +106,7 @@ async def test_empty_text_handling():
     chunks = await chunking_service.semantic_chunk("   ", chunk_size=100)
     assert len(chunks) == 0
 
+
 @pytest.mark.asyncio
 async def test_very_short_text():
     """Test handling of very short text."""
@@ -96,6 +115,7 @@ async def test_very_short_text():
 
     assert len(chunks) == 1
     assert chunks[0].strip() == text
+
 
 @pytest.mark.asyncio
 async def test_text_structure_analysis():
@@ -125,7 +145,13 @@ async def test_text_structure_analysis():
     assert analysis["sentence_count"] > 0
     assert analysis["paragraph_count"] > 0
     assert analysis["text_complexity"] in ["low", "medium", "high", "empty"]
-    assert analysis["recommended_strategy"] in ["simple", "sentence", "paragraph", "semantic"]
+    assert analysis["recommended_strategy"] in [
+        "simple",
+        "sentence",
+        "paragraph",
+        "semantic",
+    ]
+
 
 @pytest.mark.asyncio
 async def test_empty_text_analysis():
@@ -135,6 +161,7 @@ async def test_empty_text_analysis():
     assert analysis["text_complexity"] == "empty"
     assert analysis["estimated_chunks"] == 0
     assert analysis["recommended_strategy"] == "simple"
+
 
 @pytest.mark.asyncio
 async def test_chunk_size_limits():
@@ -148,13 +175,18 @@ async def test_chunk_size_limits():
     """
 
     # Test small chunks with simple strategy to ensure chunking
-    small_chunks = await chunking_service.semantic_chunk(text, chunk_size=50, strategy="simple")
+    small_chunks = await chunking_service.semantic_chunk(
+        text, chunk_size=50, strategy="simple"
+    )
 
     # Test large chunks
-    large_chunks = await chunking_service.semantic_chunk(text, chunk_size=500, strategy="simple")
+    large_chunks = await chunking_service.semantic_chunk(
+        text, chunk_size=500, strategy="simple"
+    )
 
     assert len(small_chunks) >= len(large_chunks)  # Should have at least as many chunks
     assert all(len(chunk) <= 70 for chunk in small_chunks)  # Allow some flexibility
+
 
 @pytest.mark.asyncio
 async def test_chunking_strategies():
@@ -171,9 +203,12 @@ async def test_chunking_strategies():
     strategies = ["simple", "sentence", "paragraph", "semantic"]
 
     for strategy in strategies:
-        chunks = await chunking_service.semantic_chunk(text, chunk_size=100, strategy=strategy)
+        chunks = await chunking_service.semantic_chunk(
+            text, chunk_size=100, strategy=strategy
+        )
         assert len(chunks) > 0, f"Strategy {strategy} failed"
         assert all(chunk.strip() for chunk in chunks), f"Empty chunks in {strategy}"
+
 
 def test_semantic_chunker_initialization():
     """Test SemanticChunker initialization."""
@@ -183,6 +218,7 @@ def test_semantic_chunker_initialization():
     assert chunker.max_chunk_size > 0
     assert chunker.min_chunk_size > 0
     assert chunker.overlap_size >= 0
+
 
 @pytest.mark.asyncio
 async def test_chunk_overlap():
@@ -200,6 +236,7 @@ async def test_chunk_overlap():
             # This is a basic check - in practice, overlap detection is complex
             assert chunks[i].text  # At least ensure chunks exist
 
+
 @pytest.mark.asyncio
 async def test_large_text_processing():
     """Test processing of larger text documents."""
@@ -216,6 +253,7 @@ async def test_large_text_processing():
     combined_length = sum(len(chunk) for chunk in chunks)
     # Allow for some variation due to spacing and overlap
     assert combined_length >= len(large_text) * 0.8
+
 
 @pytest.mark.asyncio
 async def test_special_characters_handling():

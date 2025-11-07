@@ -1,25 +1,29 @@
 """Tests for recursive fact retrieval system."""
 
-import pytest
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
-from typing import List, Dict, Any
 
 # Import the components we're testing
 import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent / "packages" / "morag-reasoning" / "src"))
+from typing import Any, Dict, List
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+
+sys.path.insert(
+    0, str(Path(__file__).parent.parent / "packages" / "morag-reasoning" / "src")
+)
 
 from morag_reasoning import (
-    RecursiveFactRetrievalService,
-    RecursiveFactRetrievalRequest,
-    GraphTraversalAgent,
     FactCriticAgent,
-    RawFact,
-    ScoredFact,
     FinalFact,
+    GraphTraversalAgent,
     LLMClient,
-    LLMConfig
+    LLMConfig,
+    RawFact,
+    RecursiveFactRetrievalRequest,
+    RecursiveFactRetrievalService,
+    ScoredFact,
 )
 
 
@@ -29,9 +33,7 @@ class TestRecursiveFactModels:
     def test_raw_fact_creation(self):
         """Test RawFact model creation."""
         fact = RawFact(
-            fact_text="Test fact",
-            source_node_id="node_123",
-            extracted_from_depth=1
+            fact_text="Test fact", source_node_id="node_123", extracted_from_depth=1
         )
         assert fact.fact_text == "Test fact"
         assert fact.source_node_id == "node_123"
@@ -46,7 +48,7 @@ class TestRecursiveFactModels:
             source_node_id="node_123",
             extracted_from_depth=1,
             score=0.8,
-            source_description="Test source"
+            source_description="Test source",
         )
         assert fact.score == 0.8
         assert fact.source_description == "Test source"
@@ -59,7 +61,7 @@ class TestRecursiveFactModels:
             extracted_from_depth=1,
             score=0.8,
             source_description="Test source",
-            final_decayed_score=0.6
+            final_decayed_score=0.6,
         )
         assert fact.final_decayed_score == 0.6
 
@@ -73,10 +75,14 @@ class TestRecursiveFactModels:
 
         # Test validation ranges
         with pytest.raises(ValueError):
-            RecursiveFactRetrievalRequest(user_query="Test", max_depth=0)  # Below minimum
+            RecursiveFactRetrievalRequest(
+                user_query="Test", max_depth=0
+            )  # Below minimum
 
         with pytest.raises(ValueError):
-            RecursiveFactRetrievalRequest(user_query="Test", decay_rate=1.5)  # Above maximum
+            RecursiveFactRetrievalRequest(
+                user_query="Test", decay_rate=1.5
+            )  # Above maximum
 
 
 class TestGraphTraversalAgent:
@@ -102,18 +108,22 @@ class TestGraphTraversalAgent:
         return mock_storage
 
     @pytest.fixture
-    def graph_traversal_agent(self, mock_llm_client, mock_neo4j_storage, mock_qdrant_storage):
+    def graph_traversal_agent(
+        self, mock_llm_client, mock_neo4j_storage, mock_qdrant_storage
+    ):
         """Create a GraphTraversalAgent instance."""
-        with patch('morag_reasoning.graph_traversal_agent.Agent') as mock_agent:
+        with patch("morag_reasoning.graph_traversal_agent.Agent") as mock_agent:
             mock_agent.return_value = MagicMock()
             return GraphTraversalAgent(
                 llm_client=mock_llm_client,
                 neo4j_storage=mock_neo4j_storage,
-                qdrant_storage=mock_qdrant_storage
+                qdrant_storage=mock_qdrant_storage,
             )
 
     @pytest.mark.asyncio
-    async def test_get_node_context(self, graph_traversal_agent, mock_neo4j_storage, mock_qdrant_storage):
+    async def test_get_node_context(
+        self, graph_traversal_agent, mock_neo4j_storage, mock_qdrant_storage
+    ):
         """Test getting node context."""
         # Mock entity data
         mock_entity = MagicMock()
@@ -136,11 +146,15 @@ class TestGraphTraversalAgent:
         assert len(context.neighbors_and_relations) == 0
 
     @pytest.mark.asyncio
-    async def test_get_node_context_with_error(self, graph_traversal_agent, mock_neo4j_storage, mock_qdrant_storage):
+    async def test_get_node_context_with_error(
+        self, graph_traversal_agent, mock_neo4j_storage, mock_qdrant_storage
+    ):
         """Test getting node context when errors occur."""
         # Mock errors
         mock_neo4j_storage.get_entity.side_effect = Exception("Neo4j error")
-        mock_qdrant_storage.get_chunks_by_entity_id.side_effect = Exception("Qdrant error")
+        mock_qdrant_storage.get_chunks_by_entity_id.side_effect = Exception(
+            "Qdrant error"
+        )
 
         context = await graph_traversal_agent._get_node_context("test_node")
 
@@ -164,7 +178,7 @@ class TestFactCriticAgent:
     @pytest.fixture
     def fact_critic_agent(self, mock_llm_client):
         """Create a FactCriticAgent instance."""
-        with patch('morag_reasoning.fact_critic_agent.Agent') as mock_agent:
+        with patch("morag_reasoning.fact_critic_agent.Agent") as mock_agent:
             mock_agent.return_value = MagicMock()
             return FactCriticAgent(llm_client=mock_llm_client)
 
@@ -176,18 +190,20 @@ class TestFactCriticAgent:
                 source_node_id="node1",
                 extracted_from_depth=0,
                 score=0.8,
-                source_description="Source 1"
+                source_description="Source 1",
             ),
             ScoredFact(
                 fact_text="Fact at depth 2",
                 source_node_id="node2",
                 extracted_from_depth=2,
                 score=0.8,
-                source_description="Source 2"
-            )
+                source_description="Source 2",
+            ),
         ]
 
-        final_facts = fact_critic_agent.apply_relevance_decay(scored_facts, decay_rate=0.2)
+        final_facts = fact_critic_agent.apply_relevance_decay(
+            scored_facts, decay_rate=0.2
+        )
 
         assert len(final_facts) == 2
 
@@ -229,7 +245,7 @@ class TestRecursiveFactRetrievalService:
         return RecursiveFactRetrievalService(
             llm_client=mock_llm_client,
             neo4j_storage=mock_neo4j_storage,
-            qdrant_storage=mock_qdrant_storage
+            qdrant_storage=mock_qdrant_storage,
         )
 
     @pytest.mark.asyncio
@@ -300,7 +316,7 @@ async def test_integration_basic_flow():
     service = RecursiveFactRetrievalService(
         llm_client=mock_llm_client,
         neo4j_storage=mock_neo4j_storage,
-        qdrant_storage=mock_qdrant_storage
+        qdrant_storage=mock_qdrant_storage,
     )
 
     # Verify service components are initialized

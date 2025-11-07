@@ -18,26 +18,26 @@ Examples:
     python test_universal_conversion.py presentation.pptx --include-metadata
 """
 
-import asyncio
 import argparse
+import asyncio
+import json
 import sys
 import time
 from pathlib import Path
 from typing import Optional
-import json
 
 # Add the src directory to the path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
+import structlog
+from morag_core.models import get_conversion_config
 from morag_services import (
-    DocumentConverter,
-    ConversionOptions,
     ChunkingStrategy,
     ConversionError,
-    UnsupportedFormatError
+    ConversionOptions,
+    DocumentConverter,
+    UnsupportedFormatError,
 )
-from morag_core.models import get_conversion_config
-import structlog
 
 # Configure logging
 structlog.configure(
@@ -50,7 +50,7 @@ structlog.configure(
         structlog.processors.StackInfoRenderer(),
         structlog.processors.format_exc_info,
         structlog.processors.UnicodeDecoder(),
-        structlog.processors.JSONRenderer()
+        structlog.processors.JSONRenderer(),
     ],
     context_class=dict,
     logger_factory=structlog.stdlib.LoggerFactory(),
@@ -71,20 +71,16 @@ Examples:
   %(prog)s document.pdf
   %(prog)s audio.mp3 --chunking-strategy sentence
   %(prog)s presentation.pptx --include-metadata --output-suffix _converted
-        """
+        """,
     )
 
-    parser.add_argument(
-        "file_path",
-        type=str,
-        help="Path to the document to convert"
-    )
+    parser.add_argument("file_path", type=str, help="Path to the document to convert")
 
     parser.add_argument(
         "--output-suffix",
         type=str,
         default="_converted",
-        help="Suffix to add to output filename (default: _converted)"
+        help="Suffix to add to output filename (default: _converted)",
     )
 
     parser.add_argument(
@@ -92,45 +88,38 @@ Examples:
         type=str,
         choices=[strategy.value for strategy in ChunkingStrategy],
         default="page",
-        help="Chunking strategy to use (default: page)"
+        help="Chunking strategy to use (default: page)",
     )
 
     parser.add_argument(
-        "--include-metadata",
-        action="store_true",
-        help="Include metadata in conversion"
+        "--include-metadata", action="store_true", help="Include metadata in conversion"
     )
 
     parser.add_argument(
-        "--extract-images",
-        action="store_true",
-        help="Extract images during conversion"
+        "--extract-images", action="store_true", help="Extract images during conversion"
     )
 
     parser.add_argument(
         "--quality-threshold",
         type=float,
         default=0.7,
-        help="Minimum quality threshold (default: 0.7)"
+        help="Minimum quality threshold (default: 0.7)",
     )
 
     parser.add_argument(
-        "--verbose",
-        "-v",
-        action="store_true",
-        help="Enable verbose output"
+        "--verbose", "-v", action="store_true", help="Enable verbose output"
     )
 
     parser.add_argument(
-        "--output-dir",
-        type=str,
-        help="Output directory (default: same as input file)"
+        "--output-dir", type=str, help="Output directory (default: same as input file)"
     )
 
     return parser.parse_args()
 
 
-def create_output_path(input_path: Path, suffix: str, output_dir: Optional[str] = None) -> Path:
+def create_output_path(
+    input_path: Path, suffix: str, output_dir: Optional[str] = None
+) -> Path:
     """Create output file path with suffix."""
     if output_dir:
         output_directory = Path(output_dir)
@@ -198,7 +187,9 @@ def print_conversion_result(result, processing_time: float, output_path: Path):
         print(f"    - Completeness: {result.quality_score.completeness_score:.2f}")
         print(f"    - Readability: {result.quality_score.readability_score:.2f}")
         print(f"    - Structure: {result.quality_score.structure_score:.2f}")
-        print(f"    - Metadata preservation: {result.quality_score.metadata_preservation:.2f}")
+        print(
+            f"    - Metadata preservation: {result.quality_score.metadata_preservation:.2f}"
+        )
 
         # Quality interpretation
         if result.quality_score.overall_score >= 0.8:
@@ -222,7 +213,7 @@ def print_conversion_result(result, processing_time: float, output_path: Path):
 
 def save_conversion_metadata(result, output_path: Path, processing_time: float):
     """Save conversion metadata to JSON file."""
-    metadata_path = output_path.with_suffix('.json')
+    metadata_path = output_path.with_suffix(".json")
 
     metadata = {
         "conversion_info": {
@@ -232,28 +223,38 @@ def save_conversion_metadata(result, output_path: Path, processing_time: float):
             "fallback_used": result.fallback_used,
             "original_format": result.original_format,
             "target_format": result.target_format,
-            "timestamp": time.time()
+            "timestamp": time.time(),
         },
         "content_stats": {
             "content_length": len(result.content),
             "word_count": result.word_count,
-            "line_count": len(result.content.splitlines()) if result.content else 0
+            "line_count": len(result.content.splitlines()) if result.content else 0,
         },
         "quality_metrics": {
-            "overall_score": result.quality_score.overall_score if result.quality_score else None,
-            "completeness_score": result.quality_score.completeness_score if result.quality_score else None,
-            "readability_score": result.quality_score.readability_score if result.quality_score else None,
-            "structure_score": result.quality_score.structure_score if result.quality_score else None,
-            "metadata_preservation": result.quality_score.metadata_preservation if result.quality_score else None,
-            "is_high_quality": result.is_high_quality
+            "overall_score": result.quality_score.overall_score
+            if result.quality_score
+            else None,
+            "completeness_score": result.quality_score.completeness_score
+            if result.quality_score
+            else None,
+            "readability_score": result.quality_score.readability_score
+            if result.quality_score
+            else None,
+            "structure_score": result.quality_score.structure_score
+            if result.quality_score
+            else None,
+            "metadata_preservation": result.quality_score.metadata_preservation
+            if result.quality_score
+            else None,
+            "is_high_quality": result.is_high_quality,
         },
         "document_metadata": result.metadata,
         "warnings": result.warnings,
         "error_message": result.error_message,
-        "images": result.images
+        "images": result.images,
     }
 
-    with open(metadata_path, 'w', encoding='utf-8') as f:
+    with open(metadata_path, "w", encoding="utf-8") as f:
         json.dump(metadata, f, indent=2, ensure_ascii=False)
 
     print(f"📄 Metadata saved to: {metadata_path}")
@@ -308,7 +309,7 @@ async def test_conversion(args):
 
         # Save markdown content
         if result.success and result.content:
-            with open(output_path, 'w', encoding='utf-8') as f:
+            with open(output_path, "w", encoding="utf-8") as f:
                 f.write(result.content)
 
             # Save metadata
@@ -337,6 +338,7 @@ async def test_conversion(args):
         print(f"❌ Unexpected error: {e}")
         if args.verbose:
             import traceback
+
             traceback.print_exc()
         return 1
 

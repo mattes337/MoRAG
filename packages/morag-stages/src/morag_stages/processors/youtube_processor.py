@@ -2,10 +2,11 @@
 
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any, Dict
+
 import structlog
 
-from .interface import StageProcessor, ProcessorResult
+from .interface import ProcessorResult, StageProcessor
 
 logger = structlog.get_logger(__name__)
 
@@ -13,6 +14,7 @@ logger = structlog.get_logger(__name__)
 try:
     from morag_core.exceptions import ProcessingError
 except ImportError:
+
     class ProcessingError(Exception):  # type: ignore
         pass
 
@@ -30,6 +32,7 @@ class YouTubeStageProcessor(StageProcessor):
         if self._youtube_processor is None:
             try:
                 from morag_youtube import YouTubeProcessor
+
                 self._youtube_processor = YouTubeProcessor()
             except ImportError as e:
                 raise ProcessingError(f"YouTube processor not available: {e}")
@@ -40,6 +43,7 @@ class YouTubeStageProcessor(StageProcessor):
         if self._youtube_service is None:
             try:
                 from morag_youtube.service import YouTubeService
+
                 self._youtube_service = YouTubeService()
             except ImportError as e:
                 raise ProcessingError(f"YouTube service not available: {e}")
@@ -50,50 +54,49 @@ class YouTubeStageProcessor(StageProcessor):
         return content_type.upper() == "YOUTUBE"
 
     async def process(
-        self,
-        input_file: Path,
-        output_file: Path,
-        config: Dict[str, Any]
+        self, input_file: Path, output_file: Path, config: Dict[str, Any]
     ) -> ProcessorResult:
         """Process YouTube URL to markdown."""
         # Convert Path back to URL string and fix Windows path conversion issues
         url = str(input_file)
 
         # Handle Windows path conversion issue - Path() mangles URLs
-        if not url.startswith(('http://', 'https://')):
+        if not url.startswith(("http://", "https://")):
             # Convert backslashes to forward slashes
-            url = url.replace('\\', '/')
+            url = url.replace("\\", "/")
 
             # Fix common URL mangling patterns
-            if url.startswith('https:') and not url.startswith('https://'):
+            if url.startswith("https:") and not url.startswith("https://"):
                 # Pattern: https:/www.youtube.com -> https://www.youtube.com
-                if url.startswith('https://'):
+                if url.startswith("https://"):
                     pass  # Already correct
-                elif url.startswith('https:/'):
-                    url = url.replace('https:/', 'https://', 1)
+                elif url.startswith("https:/"):
+                    url = url.replace("https:/", "https://", 1)
                 else:
-                    url = url.replace('https:', 'https://', 1)
-            elif url.startswith('http:') and not url.startswith('http://'):
+                    url = url.replace("https:", "https://", 1)
+            elif url.startswith("http:") and not url.startswith("http://"):
                 # Pattern: http:/www.youtube.com -> http://www.youtube.com
-                if url.startswith('http://'):
+                if url.startswith("http://"):
                     pass  # Already correct
-                elif url.startswith('http:/'):
-                    url = url.replace('http:/', 'http://', 1)
+                elif url.startswith("http:/"):
+                    url = url.replace("http:/", "http://", 1)
                 else:
-                    url = url.replace('http:', 'http://', 1)
+                    url = url.replace("http:", "http://", 1)
 
             # Handle case where the URL got completely mangled
-            if 'youtube.com' in url and not url.startswith(('http://', 'https://')):
+            if "youtube.com" in url and not url.startswith(("http://", "https://")):
                 # Try to reconstruct from fragments
-                if 'https' in url:
-                    url = 'https://www.youtube.com' + url.split('youtube.com')[-1]
+                if "https" in url:
+                    url = "https://www.youtube.com" + url.split("youtube.com")[-1]
                 else:
-                    url = 'https://www.youtube.com' + url.split('youtube.com')[-1]
+                    url = "https://www.youtube.com" + url.split("youtube.com")[-1]
 
             # Additional fix for URLs that lost protocol entirely
-            elif ('www.' in url or '.com' in url or '.org' in url or '.net' in url) and not url.startswith(('http://', 'https://')):
+            elif (
+                "www." in url or ".com" in url or ".org" in url or ".net" in url
+            ) and not url.startswith(("http://", "https://")):
                 # Default to https for security
-                url = 'https://' + url
+                url = "https://" + url
 
         logger.info("Processing YouTube URL", url=url)
 
@@ -103,14 +106,15 @@ class YouTubeStageProcessor(StageProcessor):
 
             # Convert config to YouTubeConfig
             from morag_youtube import YouTubeConfig
+
             youtube_config = YouTubeConfig(
-                extract_metadata=config.get('extract_metadata', True),
-                extract_transcript=config.get('extract_transcript', True),
-                use_proxy=config.get('use_proxy', True),
-                pre_transcribed=config.get('pre_transcribed', False),
-                metadata=config.get('metadata'),
-                transcript=config.get('transcript'),
-                transcript_segments=config.get('transcript_segments')
+                extract_metadata=config.get("extract_metadata", True),
+                extract_transcript=config.get("extract_transcript", True),
+                use_proxy=config.get("use_proxy", True),
+                pre_transcribed=config.get("pre_transcribed", False),
+                metadata=config.get("metadata"),
+                transcript=config.get("transcript"),
+                transcript_segments=config.get("transcript_segments"),
             )
 
             # Process the URL
@@ -120,7 +124,9 @@ class YouTubeStageProcessor(StageProcessor):
             if not result.success:
                 error_msg = result.error_message or "YouTube processing failed"
                 logger.error("YouTube processing failed", url=url, error=error_msg)
-                raise ProcessingError(f"YouTube processing failed for {url}: {error_msg}")
+                raise ProcessingError(
+                    f"YouTube processing failed for {url}: {error_msg}"
+                )
 
             # Create markdown content
             metadata = {
@@ -133,39 +139,50 @@ class YouTubeStageProcessor(StageProcessor):
                 "duration": result.metadata.duration if result.metadata else None,
                 "view_count": result.metadata.view_count if result.metadata else None,
                 "like_count": result.metadata.like_count if result.metadata else None,
-                "comment_count": result.metadata.comment_count if result.metadata else None,
+                "comment_count": result.metadata.comment_count
+                if result.metadata
+                else None,
                 "upload_date": result.metadata.upload_date if result.metadata else None,
                 "description": result.metadata.description if result.metadata else None,
                 "tags": result.metadata.tags if result.metadata else [],
                 "categories": result.metadata.categories if result.metadata else [],
-                "thumbnail_url": result.metadata.thumbnail_url if result.metadata else None,
+                "thumbnail_url": result.metadata.thumbnail_url
+                if result.metadata
+                else None,
                 "webpage_url": result.metadata.webpage_url if result.metadata else url,
                 "channel_id": result.metadata.channel_id if result.metadata else None,
                 "channel_url": result.metadata.channel_url if result.metadata else None,
                 "playlist_id": result.metadata.playlist_id if result.metadata else None,
-                "playlist_title": result.metadata.playlist_title if result.metadata else None,
-                "playlist_index": result.metadata.playlist_index if result.metadata else None,
-                "created_at": datetime.now().isoformat()
+                "playlist_title": result.metadata.playlist_title
+                if result.metadata
+                else None,
+                "playlist_index": result.metadata.playlist_index
+                if result.metadata
+                else None,
+                "created_at": datetime.now().isoformat(),
             }
 
             # Create content with transcript
             content_lines = []
             if result.transcript:
                 # Format transcript with timecodes if segments are available
-                transcript_text = self._format_transcript_with_timecodes(result.transcript)
+                transcript_text = self._format_transcript_with_timecodes(
+                    result.transcript
+                )
                 content_lines.append(f"\n# Transcript\n\n{transcript_text}")
 
-            content = '\n'.join(content_lines)
+            content = "\n".join(content_lines)
             markdown_content = self.create_markdown_with_metadata(content, metadata)
 
             # Write to file
-            output_file.write_text(markdown_content, encoding='utf-8')
+            output_file.write_text(markdown_content, encoding="utf-8")
 
             # Generate final filename based on video title if available
             final_output_file = output_file
-            if result.metadata.get('title'):
+            if result.metadata.get("title"):
                 from ..stages.markdown_conversion import sanitize_filename
-                safe_title = sanitize_filename(result.metadata['title'])
+
+                safe_title = sanitize_filename(result.metadata["title"])
                 final_output_file = output_file.parent / f"{safe_title}.md"
                 if final_output_file != output_file:
                     output_file.rename(final_output_file)
@@ -176,9 +193,9 @@ class YouTubeStageProcessor(StageProcessor):
                 metrics={
                     "url": url,
                     "content_length": len(result.transcript or ""),
-                    "transcript_only": config.get('transcript_only', True)
+                    "transcript_only": config.get("transcript_only", True),
                 },
-                final_output_file=final_output_file
+                final_output_file=final_output_file,
             )
 
         except Exception as e:
@@ -190,13 +207,17 @@ class YouTubeStageProcessor(StageProcessor):
                 video_id = service.transcript_service.extract_video_id(url)
 
                 # Try to get transcript using fallback
-                transcript_result = await service.transcript_service.get_transcript(video_id)
+                transcript_result = await service.transcript_service.get_transcript(
+                    video_id
+                )
 
                 if transcript_result and transcript_result.segments:
-                    transcript_text = '\n'.join([
-                        f"[{segment.start:.1f}s] {segment.text}"
-                        for segment in transcript_result.segments
-                    ])
+                    transcript_text = "\n".join(
+                        [
+                            f"[{segment.start:.1f}s] {segment.text}"
+                            for segment in transcript_result.segments
+                        ]
+                    )
 
                     metadata = {
                         "title": f"YouTube Video {video_id}",
@@ -205,12 +226,14 @@ class YouTubeStageProcessor(StageProcessor):
                         "url": url,
                         "video_id": video_id,
                         "created_at": datetime.now().isoformat(),
-                        "fallback_processing": True
+                        "fallback_processing": True,
                     }
 
                     content = f"\n# Transcript\n\n{transcript_text}"
-                    markdown_content = self.create_markdown_with_metadata(content, metadata)
-                    output_file.write_text(markdown_content, encoding='utf-8')
+                    markdown_content = self.create_markdown_with_metadata(
+                        content, metadata
+                    )
+                    output_file.write_text(markdown_content, encoding="utf-8")
 
                     return ProcessorResult(
                         content=content,
@@ -218,14 +241,17 @@ class YouTubeStageProcessor(StageProcessor):
                         metrics={
                             "url": url,
                             "content_length": len(transcript_text),
-                            "fallback_used": True
+                            "fallback_used": True,
                         },
-                        final_output_file=output_file
+                        final_output_file=output_file,
                     )
 
             except Exception as fallback_error:
-                logger.error("YouTube fallback processing also failed",
-                           url=url, error=str(fallback_error))
+                logger.error(
+                    "YouTube fallback processing also failed",
+                    url=url,
+                    error=str(fallback_error),
+                )
 
             raise ProcessingError(f"YouTube processing failed for {url}: {e}")
 
@@ -260,7 +286,7 @@ class YouTubeStageProcessor(StageProcessor):
                             formatted_lines.append(text)
 
                 if formatted_lines:
-                    return '\n'.join(formatted_lines)
+                    return "\n".join(formatted_lines)
 
             # Fallback to text field if segments don't work
             return transcript_data.get("text", "")

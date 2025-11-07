@@ -1,21 +1,21 @@
 """Tests for LLM batch processing functionality."""
 
-import pytest
 import asyncio
+from typing import Any, Dict, List
 from unittest.mock import AsyncMock, MagicMock, patch
-from typing import List, Dict, Any
 
-from morag_reasoning.llm import LLMClient, LLMConfig
+import pytest
 from morag_reasoning.batch_processor import (
-    BatchProcessor,
     BatchItem,
+    BatchProcessor,
     BatchResult,
-    TextAnalysisBatchProcessor,
     DocumentChunkBatchProcessor,
+    TextAnalysisBatchProcessor,
+    batch_document_chunks,
     batch_llm_calls,
     batch_text_analysis,
-    batch_document_chunks
 )
+from morag_reasoning.llm import LLMClient, LLMConfig
 
 
 class TestLLMClientBatching:
@@ -30,7 +30,7 @@ class TestLLMClientBatching:
             batch_size=5,
             enable_batching=True,
             batch_delay=1.0,
-            max_batch_tokens=500000
+            max_batch_tokens=500000,
         )
 
         assert config.batch_size == 5
@@ -45,13 +45,15 @@ class TestLLMClientBatching:
             provider="gemini",
             model="gemini-1.5-flash",
             api_key="test-key",
-            enable_batching=False
+            enable_batching=False,
         )
 
         client = LLMClient(config)
 
         # Mock the generate_text method
-        client.generate_text = AsyncMock(side_effect=["Response 1", "Response 2", "Response 3"])
+        client.generate_text = AsyncMock(
+            side_effect=["Response 1", "Response 2", "Response 3"]
+        )
 
         prompts = ["Prompt 1", "Prompt 2", "Prompt 3"]
         responses = await client.generate_batch(prompts)
@@ -67,7 +69,7 @@ class TestLLMClientBatching:
             provider="gemini",
             model="gemini-1.5-flash",
             api_key="test-key",
-            enable_batching=True
+            enable_batching=True,
         )
 
         client = LLMClient(config)
@@ -89,9 +91,7 @@ class TestLLMClientBatching:
     async def test_batch_response_parsing(self):
         """Test that batch responses are parsed correctly."""
         config = LLMConfig(
-            provider="gemini",
-            model="gemini-1.5-flash",
-            api_key="test-key"
+            provider="gemini", model="gemini-1.5-flash", api_key="test-key"
         )
 
         client = LLMClient(config)
@@ -108,7 +108,9 @@ Machine Learning is a subset of AI.
 {delimiter}"""
 
         original_prompts = ["What is AI?", "What is ML?"]
-        parsed_responses = client._parse_batch_response(response, original_prompts, delimiter)
+        parsed_responses = client._parse_batch_response(
+            response, original_prompts, delimiter
+        )
 
         assert len(parsed_responses) == 2
         assert "Artificial Intelligence" in parsed_responses[0]
@@ -117,9 +119,7 @@ Machine Learning is a subset of AI.
     def test_token_estimation(self):
         """Test token estimation for batch processing."""
         config = LLMConfig(
-            provider="gemini",
-            model="gemini-1.5-flash",
-            api_key="test-key"
+            provider="gemini", model="gemini-1.5-flash", api_key="test-key"
         )
 
         client = LLMClient(config)
@@ -179,7 +179,9 @@ class TestBatchProcessor:
 
         assert len(results) == 2
         assert all(not result.success for result in results)
-        assert all("Batch processing failed" in result.error_message for result in results)
+        assert all(
+            "Batch processing failed" in result.error_message for result in results
+        )
 
 
 class TestTextAnalysisBatchProcessor:
@@ -263,7 +265,7 @@ class TestDocumentChunkBatchProcessor:
         chunk = {
             "id": "chunk_1",
             "text": "Apple Inc. was founded by Steve Jobs.",
-            "document_id": "doc_1"
+            "document_id": "doc_1",
         }
 
         prompt = processor.create_prompt(chunk)
@@ -300,7 +302,9 @@ class TestConvenienceFunctions:
         mock_client = MagicMock()
         mock_client.config = MagicMock()
         mock_client.config.batch_size = 2
-        mock_client.generate_batch = AsyncMock(return_value=["Response 1", "Response 2"])
+        mock_client.generate_batch = AsyncMock(
+            return_value=["Response 1", "Response 2"]
+        )
 
         def prompt_creator(item: str) -> str:
             return f"Process: {item}"
@@ -324,7 +328,9 @@ class TestConvenienceFunctions:
         mock_client = MagicMock()
         mock_client.config = MagicMock()
         mock_client.config.batch_size = 2
-        mock_client.generate_batch = AsyncMock(return_value=['[{"name": "Test", "type": "ENTITY"}]'])
+        mock_client.generate_batch = AsyncMock(
+            return_value=['[{"name": "Test", "type": "ENTITY"}]']
+        )
 
         texts = ["Test text"]
         results = await batch_text_analysis(mock_client, texts, "entity_extraction")
@@ -339,7 +345,9 @@ class TestConvenienceFunctions:
         mock_client = MagicMock()
         mock_client.config = MagicMock()
         mock_client.config.batch_size = 2
-        mock_client.generate_batch = AsyncMock(return_value=['{"entities": [], "relations": []}'])
+        mock_client.generate_batch = AsyncMock(
+            return_value=['{"entities": [], "relations": []}']
+        )
 
         chunks = [{"id": "chunk_1", "text": "Test text", "document_id": "doc_1"}]
         results = await batch_document_chunks(mock_client, chunks, "extraction")

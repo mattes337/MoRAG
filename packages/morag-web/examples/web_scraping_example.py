@@ -25,7 +25,7 @@ async def basic_scraping_example(url: str) -> None:
         convert_to_markdown=True,
         clean_content=True,
         remove_navigation=True,
-        remove_footer=True
+        remove_footer=True,
     )
 
     # Process URL
@@ -41,12 +41,20 @@ async def basic_scraping_example(url: str) -> None:
 
         # Print content preview
         print("\n📝 Content Preview:")
-        preview = content.content[:300] + "..." if len(content.content) > 300 else content.content
+        preview = (
+            content.content[:300] + "..."
+            if len(content.content) > 300
+            else content.content
+        )
         print(f"{preview}")
 
         # Print markdown preview
         print("\n📝 Markdown Preview:")
-        md_preview = content.markdown_content[:300] + "..." if len(content.markdown_content) > 300 else content.markdown_content
+        md_preview = (
+            content.markdown_content[:300] + "..."
+            if len(content.markdown_content) > 300
+            else content.markdown_content
+        )
         print(f"{md_preview}")
 
         # Print links and images
@@ -89,7 +97,7 @@ async def service_example(urls: List[str]) -> None:
     results = await service.process_multiple_urls(
         urls,
         {"timeout": 10, "max_retries": 1, "rate_limit_delay": 1.0},
-        concurrency_limit=2
+        concurrency_limit=2,
     )
 
     # Print results summary

@@ -1,9 +1,10 @@
 """Tests for remote job service."""
 
-import pytest
 from unittest.mock import Mock, patch
-from morag.services.remote_job_service import RemoteJobService
+
+import pytest
 from morag.models.remote_job_api import CreateRemoteJobRequest, SubmitResultRequest
+from morag.services.remote_job_service import RemoteJobService
 from morag_core.models.remote_job import RemoteJob
 
 
@@ -27,7 +28,7 @@ class TestRemoteJobService:
             ingestion_task_id="test-task-123",
             source_file_path="/tmp/test.mp3",
             content_type="audio",
-            task_options={"webhook_url": "http://example.com/webhook"}
+            task_options={"webhook_url": "http://example.com/webhook"},
         )
         mock_repository.create_job.return_value = mock_job
 
@@ -36,7 +37,7 @@ class TestRemoteJobService:
             source_file_path="/tmp/test.mp3",
             content_type="audio",
             task_options={"webhook_url": "http://example.com/webhook"},
-            ingestion_task_id="test-task-123"
+            ingestion_task_id="test-task-123",
         )
 
         # Call service
@@ -48,7 +49,7 @@ class TestRemoteJobService:
             ingestion_task_id="test-task-123",
             source_file_path="/tmp/test.mp3",
             content_type="audio",
-            task_options={"webhook_url": "http://example.com/webhook"}
+            task_options={"webhook_url": "http://example.com/webhook"},
         )
 
     def test_poll_available_jobs(self, service, mock_repository):
@@ -56,7 +57,7 @@ class TestRemoteJobService:
         # Setup mock
         mock_jobs = [
             RemoteJob.create_new("task-1", "/tmp/test1.mp3", "audio", {}),
-            RemoteJob.create_new("task-2", "/tmp/test2.mp3", "audio", {})
+            RemoteJob.create_new("task-2", "/tmp/test2.mp3", "audio", {}),
         ]
         mock_repository.poll_available_jobs.return_value = mock_jobs
 
@@ -81,7 +82,7 @@ class TestRemoteJobService:
             success=True,
             content="Processed content",
             metadata={"duration": 120.5},
-            processing_time=45.2
+            processing_time=45.2,
         )
 
         # Call service
@@ -95,7 +96,7 @@ class TestRemoteJobService:
             content="Processed content",
             metadata={"duration": 120.5},
             error_message=None,
-            processing_time=45.2
+            processing_time=45.2,
         )
 
     def test_get_job_status(self, service, mock_repository):

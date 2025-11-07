@@ -1,34 +1,38 @@
 """Tests for PydanticAI foundation components."""
 
-import pytest
 import asyncio
-import sys
 import os
+import sys
 from typing import Type
+
+import pytest
 from pydantic import BaseModel, Field
 
 # Add the packages directory to the Python path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'packages', 'morag-core', 'src'))
+sys.path.insert(
+    0, os.path.join(os.path.dirname(__file__), "..", "packages", "morag-core", "src")
+)
 
 # Import the AI components we just created
 from morag_core.ai import (
-    MoRAGBaseAgent,
     AgentConfig,
-    GeminiProvider,
-    ProviderConfig,
+    AgentError,
     AgentFactory,
+    ConfidenceLevel,
+    Entity,
+    EntityExtractionResult,
+    GeminiProvider,
+    MoRAGBaseAgent,
+    ProviderConfig,
+    ValidationError,
     create_agent,
     create_agent_with_config,
-    EntityExtractionResult,
-    Entity,
-    ConfidenceLevel,
-    AgentError,
-    ValidationError,
 )
 
 
 class SimpleTestResult(BaseModel):
     """Simple test result for testing."""
+
     message: str = Field(description="A simple message")
     confidence: float = Field(ge=0.0, le=1.0, description="Confidence score")
 
@@ -48,11 +52,7 @@ class TestProviderConfig:
 
     def test_provider_config_creation(self):
         """Test creating provider configuration."""
-        config = ProviderConfig(
-            api_key="test-key",
-            timeout=60,
-            max_retries=5
-        )
+        config = ProviderConfig(api_key="test-key", timeout=60, max_retries=5)
 
         assert config.api_key == "test-key"
         assert config.timeout == 60
@@ -81,7 +81,7 @@ class TestAgentConfig:
             timeout=60,
             max_retries=5,
             temperature=0.5,
-            max_tokens=1000
+            max_tokens=1000,
         )
 
         assert config.model == "google-gla:gemini-1.5-pro"
@@ -124,7 +124,10 @@ class TestGeminiProvider:
         provider = GeminiProvider()
 
         # Test different model name formats
-        assert provider.get_model_name("google-gla:gemini-1.5-flash") == "google-gla:gemini-1.5-flash"
+        assert (
+            provider.get_model_name("google-gla:gemini-1.5-flash")
+            == "google-gla:gemini-1.5-flash"
+        )
         assert provider.get_model_name("gemini-1.5-pro") == "google-gla:gemini-1.5-pro"
         assert provider.get_model_name("unknown-model") == "google-gla:gemini-1.5-flash"
 
@@ -211,7 +214,7 @@ class TestAgentFactory:
             SimpleTestAgent,
             model="google-gla:gemini-1.5-pro",
             timeout=60,
-            temperature=0.5
+            temperature=0.5,
         )
 
         assert isinstance(agent, SimpleTestAgent)
@@ -246,9 +249,7 @@ class TestConvenienceFunctions:
     def test_create_agent_with_config_function(self):
         """Test create_agent_with_config convenience function."""
         agent = create_agent_with_config(
-            SimpleTestAgent,
-            model="google-gla:gemini-1.5-pro",
-            timeout=45
+            SimpleTestAgent, model="google-gla:gemini-1.5-pro", timeout=45
         )
 
         assert isinstance(agent, SimpleTestAgent)
@@ -267,7 +268,7 @@ class TestStructuredModels:
             confidence=0.95,
             start_pos=0,
             end_pos=10,
-            context="Apple Inc. is a technology company"
+            context="Apple Inc. is a technology company",
         )
 
         assert entity.name == "Apple Inc."
@@ -281,13 +282,11 @@ class TestStructuredModels:
         """Test EntityExtractionResult model."""
         entities = [
             Entity(name="Apple", type="ORGANIZATION", confidence=0.9),
-            Entity(name="iPhone", type="PRODUCT", confidence=0.8)
+            Entity(name="iPhone", type="PRODUCT", confidence=0.8),
         ]
 
         result = EntityExtractionResult(
-            entities=entities,
-            confidence=ConfidenceLevel.HIGH,
-            processing_time=1.5
+            entities=entities, confidence=ConfidenceLevel.HIGH, processing_time=1.5
         )
 
         assert len(result.entities) == 2

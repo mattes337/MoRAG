@@ -1,13 +1,14 @@
 """Configuration manager for agents."""
 
-import os
 import json
-import yaml
-from typing import Dict, Any, Optional, Type
+import os
 from pathlib import Path
-import structlog
+from typing import Any, Dict, Optional, Type
 
-from ..base.config import AgentConfig, PromptConfig, ModelConfig, RetryConfig
+import structlog
+import yaml
+
+from ..base.config import AgentConfig, ModelConfig, PromptConfig, RetryConfig
 from ..base.exceptions import ConfigurationError
 
 logger = structlog.get_logger(__name__)
@@ -22,7 +23,9 @@ class AgentConfigManager:
         Args:
             config_dir: Directory containing configuration files
         """
-        self.config_dir = Path(config_dir) if config_dir else Path("agents/config/defaults")
+        self.config_dir = (
+            Path(config_dir) if config_dir else Path("agents/config/defaults")
+        )
         self.configs: Dict[str, AgentConfig] = {}
         self.logger = logger.bind(component="config_manager")
 
@@ -37,7 +40,7 @@ class AgentConfigManager:
 
         for config_file in self.config_dir.glob("*.yaml"):
             try:
-                with open(config_file, 'r') as f:
+                with open(config_file, "r") as f:
                     config_data = yaml.safe_load(f)
 
                 agent_name = config_file.stem
@@ -83,7 +86,7 @@ class AgentConfigManager:
             description=f"Default configuration for {agent_name}",
             model=ModelConfig(),
             retry=RetryConfig(),
-            prompt=PromptConfig()
+            prompt=PromptConfig(),
         )
 
     def register_config(self, agent_name: str, config: AgentConfig) -> None:
@@ -107,15 +110,17 @@ class AgentConfigManager:
             raise ConfigurationError(f"No config found for {agent_name}")
 
         config = self.configs[agent_name]
-        save_path = Path(config_path) if config_path else self.config_dir / f"{agent_name}.yaml"
+        save_path = (
+            Path(config_path) if config_path else self.config_dir / f"{agent_name}.yaml"
+        )
 
         # Ensure directory exists
         save_path.parent.mkdir(parents=True, exist_ok=True)
 
         # Convert to dict and save
-        config_dict = config.dict(exclude={'model': {'api_key'}})  # Don't save API keys
+        config_dict = config.dict(exclude={"model": {"api_key"}})  # Don't save API keys
 
-        with open(save_path, 'w') as f:
+        with open(save_path, "w") as f:
             yaml.dump(config_dict, f, default_flow_style=False, indent=2)
 
         self.logger.info(f"Saved config for {agent_name} to {save_path}")
@@ -168,7 +173,9 @@ class AgentConfigManager:
         except Exception as e:
             raise ConfigurationError(f"Configuration validation failed: {e}") from e
 
-    def create_config_from_env(self, agent_name: str, env_prefix: str = None) -> AgentConfig:
+    def create_config_from_env(
+        self, agent_name: str, env_prefix: str = None
+    ) -> AgentConfig:
         """Create configuration from environment variables.
 
         Args:

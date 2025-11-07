@@ -1,23 +1,28 @@
 """Recursive path following service for intelligent retrieval."""
 
-import structlog
 from typing import List, Optional, Set
-from pydantic_ai import Agent
-from pydantic import BaseModel, Field
 
-from morag_reasoning.llm import LLMClient
-from morag_reasoning.intelligent_retrieval_models import (
-    EntityPath, PathDecision, RetrievalIteration
-)
+import structlog
 from morag_graph.storage.neo4j_storage import Neo4jStorage
+from morag_reasoning.intelligent_retrieval_models import (
+    EntityPath,
+    PathDecision,
+    RetrievalIteration,
+)
+from morag_reasoning.llm import LLMClient
+from pydantic import BaseModel, Field
+from pydantic_ai import Agent
 
 
 class PathFollowingDecision(BaseModel):
     """LLM decision for path following."""
+
     continue_exploration: bool = Field(..., description="Whether to continue exploring")
     paths_to_follow: List[int] = Field(..., description="Indices of paths to follow")
     reasoning: str = Field(..., description="Reasoning for the decision")
-    stop_reason: Optional[str] = Field(None, description="Reason to stop if continue_exploration is False")
+    stop_reason: Optional[str] = Field(
+        None, description="Reason to stop if continue_exploration is False"
+    )
 
 
 class RecursivePathFollower:
@@ -30,7 +35,7 @@ class RecursivePathFollower:
         max_iterations: int = 8,
         max_paths_per_entity: int = 10,
         max_depth: int = 3,
-        min_relevance_threshold: float = 0.2
+        min_relevance_threshold: float = 0.2,
     ):
         """Initialize the recursive path follower.
 
@@ -54,7 +59,7 @@ class RecursivePathFollower:
         self.agent = Agent(
             model=llm_client.get_model(),
             result_type=PathFollowingDecision,
-            system_prompt=self._get_system_prompt()
+            system_prompt=self._get_system_prompt(),
         )
 
     def _get_system_prompt(self) -> str:
@@ -88,7 +93,7 @@ Be strategic and focused - aim for comprehensive but efficient exploration."""
         query: str,
         initial_entities: List[str],
         max_iterations: Optional[int] = None,
-        max_entities_per_iteration: int = 10
+        max_entities_per_iteration: int = 10,
     ) -> List[RetrievalIteration]:
         """Follow paths recursively through the graph.
 
@@ -110,7 +115,7 @@ Be strategic and focused - aim for comprehensive but efficient exploration."""
             "Starting recursive path following",
             query=query,
             initial_entities=initial_entities,
-            max_iterations=max_iter
+            max_iterations=max_iter,
         )
 
         for iteration in range(max_iter):
@@ -152,7 +157,9 @@ Be strategic and focused - aim for comprehensive but efficient exploration."""
                 # Mark all paths as stopped
                 for path in paths_found:
                     path.llm_decision = PathDecision.STOP
-                    path.decision_reasoning = decision.stop_reason or "LLM decided to stop exploration"
+                    path.decision_reasoning = (
+                        decision.stop_reason or "LLM decided to stop exploration"
+                    )
 
             # Create iteration record
             iteration_record = RetrievalIteration(
@@ -161,7 +168,9 @@ Be strategic and focused - aim for comprehensive but efficient exploration."""
                 paths_found=paths_found,
                 paths_followed=paths_to_follow,
                 chunks_retrieved=0,  # Will be filled by caller
-                llm_stop_reason=decision.stop_reason if not decision.continue_exploration else None
+                llm_stop_reason=decision.stop_reason
+                if not decision.continue_exploration
+                else None,
             )
             iterations.append(iteration_record)
 
@@ -189,15 +198,13 @@ Be strategic and focused - aim for comprehensive but efficient exploration."""
         self.logger.info(
             "Recursive path following completed",
             total_iterations=len(iterations),
-            total_entities_explored=len(explored_entities)
+            total_entities_explored=len(explored_entities),
         )
 
         return iterations
 
     async def _discover_paths_from_entities(
-        self,
-        entities: List[str],
-        explored_entities: Set[str]
+        self, entities: List[str], explored_entities: Set[str]
     ) -> List[EntityPath]:
         """Discover paths from a list of entities.
 
@@ -228,7 +235,7 @@ Be strategic and focused - aim for comprehensive but efficient exploration."""
                 )
 
                 # Convert neighbors to paths
-                for neighbor in neighbors[:self.max_paths_per_entity]:
+                for neighbor in neighbors[: self.max_paths_per_entity]:
                     # Check if neighbor name is already explored (use names for consistency)
                     if neighbor.name in explored_entities:
                         continue
@@ -237,12 +244,17 @@ Be strategic and focused - aim for comprehensive but efficient exploration."""
                     path = EntityPath(
                         entity_id=entity.id,
                         entity_name=entity.name,
-                        path_entities=[entity.name, neighbor.name],  # Use names for consistency
-                        path_relations=["RELATED_TO"],  # Simplified - could get actual relation types
+                        path_entities=[
+                            entity.name,
+                            neighbor.name,
+                        ],  # Use names for consistency
+                        path_relations=[
+                            "RELATED_TO"
+                        ],  # Simplified - could get actual relation types
                         depth=1,
                         relevance_score=0.7,  # Higher default relevance to encourage exploration
                         llm_decision=PathDecision.FOLLOW,  # Will be updated by LLM
-                        decision_reasoning=""  # Will be updated by LLM
+                        decision_reasoning="",  # Will be updated by LLM
                     )
                     all_paths.append(path)
 
@@ -250,7 +262,7 @@ Be strategic and focused - aim for comprehensive but efficient exploration."""
                 self.logger.warning(
                     "Failed to discover paths from entity",
                     entity=entity_name,
-                    error=str(e)
+                    error=str(e),
                 )
 
         return all_paths
@@ -261,7 +273,7 @@ Be strategic and focused - aim for comprehensive but efficient exploration."""
         explored_entities: List[str],
         available_paths: List[EntityPath],
         iteration: int,
-        max_iterations: int
+        max_iterations: int,
     ) -> PathFollowingDecision:
         """Use LLM to make path following decision.
 
@@ -287,16 +299,14 @@ Be strategic and focused - aim for comprehensive but efficient exploration."""
 
         except Exception as e:
             self.logger.error(
-                "Failed to make path decision",
-                error=str(e),
-                iteration=iteration
+                "Failed to make path decision", error=str(e), iteration=iteration
             )
             # Fallback decision
             return PathFollowingDecision(
                 continue_exploration=False,
                 paths_to_follow=[],
                 reasoning="Error in LLM decision making",
-                stop_reason="LLM decision error"
+                stop_reason="LLM decision error",
             )
 
     def _create_decision_prompt(
@@ -305,7 +315,7 @@ Be strategic and focused - aim for comprehensive but efficient exploration."""
         explored_entities: List[str],
         available_paths: List[EntityPath],
         iteration: int,
-        max_iterations: int
+        max_iterations: int,
     ) -> str:
         """Create prompt for path following decision.
 

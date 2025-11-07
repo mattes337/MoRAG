@@ -4,24 +4,28 @@ These tests cover unusual scenarios, boundary conditions, and integration
 aspects to ensure robust handling of dynamic types.
 """
 
-import pytest
-from unittest.mock import Mock, AsyncMock, patch
-from typing import Dict, List, Optional
 import json
+from typing import Dict, List, Optional
+from unittest.mock import AsyncMock, Mock, patch
 
+import pytest
 from morag_graph.extraction import EntityExtractor, RelationExtractor
+
 # Import LLMConfig from morag-reasoning package
 try:
     from morag_reasoning.llm import LLMConfig
 except ImportError:
     # Fallback LLMConfig for compatibility
     from pydantic import BaseModel
+
     class LLMConfig(BaseModel):
         provider: str = "gemini"
         model: str = "gemini-1.5-flash"
         api_key: str = None
         temperature: float = 0.1
         max_tokens: int = 2000
+
+
 from morag_graph.models import Entity, Relation
 
 
@@ -46,7 +50,9 @@ class TestDynamicTypesEdgeCases:
 
         # Both should use dynamic prompts without predefined types
         assert "semantic meaning" in prompt_none or "not limit yourself" in prompt_none
-        assert "semantic meaning" in prompt_empty or "not limit yourself" in prompt_empty
+        assert (
+            "semantic meaning" in prompt_empty or "not limit yourself" in prompt_empty
+        )
 
     def test_none_vs_empty_dict_relation_types(self):
         """Test the distinction between None and empty dict for relation types."""
@@ -66,7 +72,9 @@ class TestDynamicTypesEdgeCases:
 
         # Both should use dynamic prompts without predefined types
         assert "semantic meaning" in prompt_none or "not limit yourself" in prompt_none
-        assert "semantic meaning" in prompt_empty or "not limit yourself" in prompt_empty
+        assert (
+            "semantic meaning" in prompt_empty or "not limit yourself" in prompt_empty
+        )
 
     def test_special_characters_in_type_names(self):
         """Test handling of special characters in type names and descriptions."""
@@ -78,9 +86,9 @@ class TestDynamicTypesEdgeCases:
             "TYPE.WITH.DOT": "Type with dot",
             "TYPE WITH SPACE": "Type with space",
             "TYPE_WITH_UNICODE_🚀": "Type with unicode emoji",
-            "TYPE_WITH_QUOTES": 'Description with "quotes" and \'apostrophes\'',
+            "TYPE_WITH_QUOTES": "Description with \"quotes\" and 'apostrophes'",
             "TYPE_WITH_NEWLINE": "Description with\nnewline",
-            "TYPE_WITH_SPECIAL_CHARS": "Description with @#$%^&*()+={}[]|\\:;\"'<>?,./"
+            "TYPE_WITH_SPECIAL_CHARS": "Description with @#$%^&*()+={}[]|\\:;\"'<>?,./",
         }
 
         # Should handle special characters without errors
@@ -106,7 +114,7 @@ class TestDynamicTypesEdgeCases:
         entity_types = {
             "LONG_TYPE": long_description,
             "VERY_LONG_TYPE": very_long_description,
-            "NORMAL_TYPE": "Normal description"
+            "NORMAL_TYPE": "Normal description",
         }
 
         # Should handle long descriptions without errors
@@ -128,7 +136,7 @@ class TestDynamicTypesEdgeCases:
             "PERSON": "Lowercase person",
             "Person": "Titlecase person",
             "person": "Lowercase person",
-            "PERSON_TYPE": "Person type variant"
+            "PERSON_TYPE": "Person type variant",
         }
 
         extractor = EntityExtractor(config, entity_types=entity_types)
@@ -148,7 +156,7 @@ class TestDynamicTypesEdgeCases:
             "TYPE_123": "Mixed alphanumeric",
             "123_TYPE": "Numeric prefix",
             "TYPE_123_SUFFIX": "Numeric in middle",
-            "42": "Answer to everything"
+            "42": "Answer to everything",
         }
 
         extractor = EntityExtractor(config, entity_types=entity_types)
@@ -167,7 +175,7 @@ class TestDynamicTypesEdgeCases:
             "WHITESPACE_DESC": "   ",
             "TAB_DESC": "\t",
             "NEWLINE_DESC": "\n",
-            "NORMAL_DESC": "Normal description"
+            "NORMAL_DESC": "Normal description",
         }
 
         extractor = EntityExtractor(config, entity_types=entity_types)
@@ -193,7 +201,9 @@ class TestDynamicTypesEdgeCases:
 
         # Single relation type
         single_relation_type = {"ONLY_RELATION": "The only relation type"}
-        relation_extractor = RelationExtractor(config, relation_types=single_relation_type)
+        relation_extractor = RelationExtractor(
+            config, relation_types=single_relation_type
+        )
 
         assert len(relation_extractor.relation_types) == 1
         assert "ONLY_RELATION" in relation_extractor.relation_types
@@ -209,18 +219,22 @@ class TestDynamicTypesEdgeCases:
         custom_entity_types = {
             "PERSON": "Custom person definition",
             "ORGANIZATION": "Custom organization definition",
-            "CUSTOM_TYPE": "Completely new type"
+            "CUSTOM_TYPE": "Completely new type",
         }
 
         extractor = EntityExtractor(config, entity_types=custom_entity_types)
 
         # Should use custom descriptions, not defaults
         assert extractor.entity_types["PERSON"] == "Custom person definition"
-        assert extractor.entity_types["ORGANIZATION"] == "Custom organization definition"
+        assert (
+            extractor.entity_types["ORGANIZATION"] == "Custom organization definition"
+        )
 
         prompt = extractor.get_system_prompt()
         assert "PERSON: Custom person definition" in prompt
-        assert "PERSON: Names of people" not in prompt  # Default description should not appear
+        assert (
+            "PERSON: Names of people" not in prompt
+        )  # Default description should not appear
 
     def test_mixed_default_and_custom_types(self):
         """Test mixing some default types with custom types."""
@@ -231,7 +245,7 @@ class TestDynamicTypesEdgeCases:
             "PERSON": "Names of people, individuals, or human beings",  # Default PERSON
             "CUSTOM_ENTITY": "Custom entity type",
             "LOCATION": "Places, cities, countries, or geographical locations",  # Default LOCATION
-            "ANOTHER_CUSTOM": "Another custom type"
+            "ANOTHER_CUSTOM": "Another custom type",
         }
 
         extractor = EntityExtractor(config, entity_types=mixed_types)
@@ -258,18 +272,20 @@ class TestDynamicTypesIntegration:
             "PATIENT": "Person receiving medical care",
             "DOCTOR": "Medical professional",
             "CONDITION": "Medical condition or disease",
-            "MEDICATION": "Pharmaceutical drug"
+            "MEDICATION": "Pharmaceutical drug",
         }
 
         medical_relation_types = {
             "TREATS": "Doctor treats patient",
             "DIAGNOSED_WITH": "Patient diagnosed with condition",
             "PRESCRIBED": "Doctor prescribes medication",
-            "TAKES": "Patient takes medication"
+            "TAKES": "Patient takes medication",
         }
 
         entity_extractor = EntityExtractor(config, entity_types=medical_entity_types)
-        relation_extractor = RelationExtractor(config, relation_types=medical_relation_types)
+        relation_extractor = RelationExtractor(
+            config, relation_types=medical_relation_types
+        )
 
         # Verify both extractors have the expected types
         assert len(entity_extractor.entity_types) == 4
@@ -293,12 +309,12 @@ class TestDynamicTypesIntegration:
         # Intentionally overlapping names (though semantically different)
         entity_types = {
             "CONNECTION": "A network connection or link",
-            "PROCESS": "A running system process"
+            "PROCESS": "A running system process",
         }
 
         relation_types = {
             "CONNECTION": "One entity connects to another",
-            "PROCESS": "One entity processes another"
+            "PROCESS": "One entity processes another",
         }
 
         entity_extractor = EntityExtractor(config, entity_types=entity_types)
@@ -318,29 +334,28 @@ class TestDynamicTypesIntegration:
         config = LLMConfig(provider="mock", model="test")
 
         # Start with broad types
-        broad_types = {
-            "ENTITY": "Any entity",
-            "THING": "Any thing"
-        }
+        broad_types = {"ENTITY": "Any entity", "THING": "Any thing"}
 
         # Refine to specific types
         specific_types = {
             "PROTEIN": "Biological protein",
             "GENE": "Genetic sequence",
             "PATHWAY": "Biological pathway",
-            "DISEASE": "Medical condition"
+            "DISEASE": "Medical condition",
         }
 
         # Very specific types
         ultra_specific_types = {
             "KINASE_PROTEIN": "Protein kinase enzyme",
-            "TUMOR_SUPPRESSOR_GENE": "Gene that prevents tumor formation"
+            "TUMOR_SUPPRESSOR_GENE": "Gene that prevents tumor formation",
         }
 
         # Each extractor should work with its level of specificity
         broad_extractor = EntityExtractor(config, entity_types=broad_types)
         specific_extractor = EntityExtractor(config, entity_types=specific_types)
-        ultra_specific_extractor = EntityExtractor(config, entity_types=ultra_specific_types)
+        ultra_specific_extractor = EntityExtractor(
+            config, entity_types=ultra_specific_types
+        )
 
         broad_prompt = broad_extractor.get_system_prompt()
         specific_prompt = specific_extractor.get_system_prompt()
@@ -373,7 +388,7 @@ class TestDynamicTypesIntegration:
             "PERSON_CUSTOMER": "Person who is a customer",
             "ORGANIZATION": "Any organization",
             "ORGANIZATION_COMPANY": "Commercial organization",
-            "ORGANIZATION_NONPROFIT": "Non-profit organization"
+            "ORGANIZATION_NONPROFIT": "Non-profit organization",
         }
 
         extractor = EntityExtractor(config, entity_types=hierarchical_types)
@@ -397,7 +412,7 @@ class TestDynamicTypesIntegration:
             "PLAINTIFF": "Party bringing a lawsuit",
             "DEFENDANT": "Party being sued",
             "COURT": "Legal court or tribunal",
-            "STATUTE": "Legal statute or law"
+            "STATUTE": "Legal statute or law",
         }
 
         # Financial domain
@@ -405,7 +420,7 @@ class TestDynamicTypesIntegration:
             "INVESTOR": "Person or entity that invests",
             "COMPANY": "Business entity",
             "STOCK": "Financial security",
-            "TRANSACTION": "Financial transaction"
+            "TRANSACTION": "Financial transaction",
         }
 
         # Technical domain
@@ -413,7 +428,7 @@ class TestDynamicTypesIntegration:
             "SERVER": "Computer server",
             "DATABASE": "Data storage system",
             "API": "Application programming interface",
-            "USER": "System user"
+            "USER": "System user",
         }
 
         # Create extractors for each domain
@@ -453,16 +468,30 @@ class TestDynamicTypesIntegration:
 
         # Both should have the same default types
         assert old_entity_extractor.entity_types == new_entity_extractor.entity_types
-        assert old_relation_extractor.relation_types == new_relation_extractor.relation_types
+        assert (
+            old_relation_extractor.relation_types
+            == new_relation_extractor.relation_types
+        )
 
         # Both should generate the same prompts
-        assert old_entity_extractor.get_system_prompt() == new_entity_extractor.get_system_prompt()
-        assert old_relation_extractor.get_system_prompt() == new_relation_extractor.get_system_prompt()
+        assert (
+            old_entity_extractor.get_system_prompt()
+            == new_entity_extractor.get_system_prompt()
+        )
+        assert (
+            old_relation_extractor.get_system_prompt()
+            == new_relation_extractor.get_system_prompt()
+        )
 
         # Should use dynamic prompts (no predefined types)
         entity_prompt = old_entity_extractor.get_system_prompt()
         relation_prompt = old_relation_extractor.get_system_prompt()
 
         # Both should use dynamic prompts without predefined types
-        assert "semantic meaning" in entity_prompt or "not limit yourself" in entity_prompt
-        assert "semantic meaning" in relation_prompt or "not limit yourself" in relation_prompt
+        assert (
+            "semantic meaning" in entity_prompt or "not limit yourself" in entity_prompt
+        )
+        assert (
+            "semantic meaning" in relation_prompt
+            or "not limit yourself" in relation_prompt
+        )

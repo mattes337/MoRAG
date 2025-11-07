@@ -2,14 +2,15 @@
 """Test script to verify QdrantVectorStorage fixes."""
 
 import asyncio
-import sys
 import os
+import sys
 from pathlib import Path
 
 # Add the packages to the Python path
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root / "packages" / "morag-core" / "src"))
 sys.path.insert(0, str(project_root / "packages" / "morag-services" / "src"))
+
 
 async def test_qdrant_instantiation():
     """Test that QdrantVectorStorage can be instantiated without errors."""
@@ -20,19 +21,26 @@ async def test_qdrant_instantiation():
 
         # Try to instantiate
         storage = QdrantVectorStorage(
-            host="localhost",
-            port=6333,
-            collection_name="test_collection"
+            host="localhost", port=6333, collection_name="test_collection"
         )
 
         print("✅ Successfully instantiated QdrantVectorStorage")
 
         # Check that it has all required methods
         required_methods = [
-            'initialize', 'shutdown', 'health_check',
-            'put_object', 'get_object', 'delete_object', 'list_objects',
-            'get_object_metadata', 'object_exists',
-            'add_vectors', 'search_vectors', 'delete_vectors', 'update_vector_metadata'
+            "initialize",
+            "shutdown",
+            "health_check",
+            "put_object",
+            "get_object",
+            "delete_object",
+            "list_objects",
+            "get_object_metadata",
+            "object_exists",
+            "add_vectors",
+            "search_vectors",
+            "delete_vectors",
+            "update_vector_metadata",
         ]
 
         missing_methods = []
@@ -49,7 +57,9 @@ async def test_qdrant_instantiation():
         # Test health check (without connecting to actual Qdrant)
         try:
             health = await storage.health_check()
-            print(f"✅ Health check method works (status: {health.get('status', 'unknown')})")
+            print(
+                f"✅ Health check method works (status: {health.get('status', 'unknown')})"
+            )
         except Exception as e:
             print(f"⚠️  Health check failed (expected if Qdrant not running): {e}")
 
@@ -58,8 +68,10 @@ async def test_qdrant_instantiation():
     except Exception as e:
         print(f"❌ Error: {e}")
         import traceback
+
         traceback.print_exc()
         return False
+
 
 async def main():
     """Main test function."""
@@ -77,6 +89,7 @@ async def main():
         print("❌ Tests failed. Check the errors above.")
 
     return success
+
 
 if __name__ == "__main__":
     success = asyncio.run(main())

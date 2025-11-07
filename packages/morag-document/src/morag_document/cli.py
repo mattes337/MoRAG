@@ -1,15 +1,14 @@
 """Command-line interface for document processing."""
 
+import argparse
+import asyncio
+import json
 import os
 import sys
-import json
-import asyncio
-import argparse
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import structlog
-
 from morag_core.interfaces.converter import ChunkingStrategy
 from morag_core.interfaces.service import ServiceConfig
 from morag_core.utils.logging import configure_logging
@@ -30,7 +29,8 @@ async def process_document(args: argparse.Namespace) -> None:
     if args.enable_embedding:
         config["enable_embedding"] = True
         config["embedding"] = {
-            "api_key": os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"),
+            "api_key": os.environ.get("GEMINI_API_KEY")
+            or os.environ.get("GOOGLE_API_KEY"),
             "model": args.embedding_model,
         }
 
@@ -122,9 +122,7 @@ def main():
 
     # Process command
     process_parser = subparsers.add_parser("process", help="Process document")
-    process_parser.add_argument(
-        "file_path", help="Path to document file"
-    )
+    process_parser.add_argument("file_path", help="Path to document file")
     process_parser.add_argument(
         "--chunking-strategy",
         choices=[s.value for s in ChunkingStrategy],

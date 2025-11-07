@@ -6,22 +6,20 @@ This script demonstrates the enhanced audio processing capabilities of MoRAG,
 including speaker diarization and topic segmentation features.
 """
 
+import argparse
 import asyncio
+import json
 import sys
 import time
 from pathlib import Path
-import argparse
-import json
 
 # Add the src directory to the path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from morag_audio import AudioProcessor, AudioConfig
-from morag_audio.services import SpeakerDiarizationService
-from morag_audio.services import TopicSegmentationService
-from morag_audio import AudioConverter
-from morag_core.interfaces.converter import ConversionOptions
+from morag_audio import AudioConfig, AudioConverter, AudioProcessor
+from morag_audio.services import SpeakerDiarizationService, TopicSegmentationService
 from morag_core.config import settings
+from morag_core.interfaces.converter import ConversionOptions
 
 
 def print_banner():
@@ -37,7 +35,7 @@ def print_section(title: str):
     """Print section header."""
     print(f"\n{'─' * 60}")
     print(f"📋 {title}")
-    print('─' * 60)
+    print("─" * 60)
 
 
 async def demo_basic_audio_processing(audio_file: Path):
@@ -47,7 +45,7 @@ async def demo_basic_audio_processing(audio_file: Path):
     config = AudioConfig(
         model_size="base",  # Use base model for better quality
         device="cpu",
-        compute_type="int8"
+        compute_type="int8",
     )
 
     processor = AudioProcessor(config)
@@ -57,9 +55,7 @@ async def demo_basic_audio_processing(audio_file: Path):
 
     start_time = time.time()
     result = await processor.process_audio_file(
-        audio_file,
-        enable_diarization=False,
-        enable_topic_segmentation=False
+        audio_file, enable_diarization=False, enable_topic_segmentation=False
     )
     processing_time = time.time() - start_time
 
@@ -97,17 +93,25 @@ async def demo_speaker_diarization(audio_file: Path):
     print("\n👥 Speaker Details:")
     for i, speaker in enumerate(result.speakers, 1):
         speaking_time = speaker.total_speaking_time
-        percentage = (speaking_time / result.total_duration) * 100 if result.total_duration > 0 else 0
+        percentage = (
+            (speaking_time / result.total_duration) * 100
+            if result.total_duration > 0
+            else 0
+        )
 
         print(f"  Speaker {i} ({speaker.speaker_id}):")
         print(f"    🕐 Speaking time: {speaking_time:.2f}s ({percentage:.1f}%)")
         print(f"    📊 Segments: {speaker.segment_count}")
         print(f"    ⏰ Avg segment: {speaker.average_segment_duration:.2f}s")
-        print(f"    🎬 First/Last: {speaker.first_appearance:.1f}s - {speaker.last_appearance:.1f}s")
+        print(
+            f"    🎬 First/Last: {speaker.first_appearance:.1f}s - {speaker.last_appearance:.1f}s"
+        )
 
     print(f"\n🎬 Speaker Timeline (first 10 segments):")
     for i, segment in enumerate(result.segments[:10]):
-        print(f"  {segment.start_time:6.1f}s - {segment.end_time:6.1f}s: {segment.speaker_id}")
+        print(
+            f"  {segment.start_time:6.1f}s - {segment.end_time:6.1f}s: {segment.speaker_id}"
+        )
 
     if len(result.segments) > 10:
         print(f"  ... and {len(result.segments) - 10} more segments")
@@ -135,7 +139,9 @@ async def demo_topic_segmentation(text: str):
     print("\n📚 Topic Details:")
     for i, topic in enumerate(result.topics, 1):
         print(f"  Topic {i}: {topic.title}")
-        print(f"    📝 Summary: {topic.summary[:100]}{'...' if len(topic.summary) > 100 else ''}")
+        print(
+            f"    📝 Summary: {topic.summary[:100]}{'...' if len(topic.summary) > 100 else ''}"
+        )
         print(f"    📄 Sentences: {len(topic.sentences)}")
         print(f"    📊 Confidence: {topic.confidence:.2f}")
 
@@ -148,7 +154,11 @@ async def demo_topic_segmentation(text: str):
 
         # Show first sentence of topic
         if topic.sentences:
-            first_sentence = topic.sentences[0][:100] + "..." if len(topic.sentences[0]) > 100 else topic.sentences[0]
+            first_sentence = (
+                topic.sentences[0][:100] + "..."
+                if len(topic.sentences[0]) > 100
+                else topic.sentences[0]
+            )
             print(f"    📖 First sentence: {first_sentence}")
         print()
 
@@ -159,11 +169,7 @@ async def demo_enhanced_processing(audio_file: Path):
     """Demonstrate complete enhanced processing."""
     print_section("Enhanced Audio Processing (Complete Pipeline)")
 
-    config = AudioConfig(
-        model_size="base",
-        device="cpu",
-        compute_type="int8"
-    )
+    config = AudioConfig(model_size="base", device="cpu", compute_type="int8")
 
     processor = AudioProcessor(config)
 
@@ -172,9 +178,7 @@ async def demo_enhanced_processing(audio_file: Path):
 
     start_time = time.time()
     result = await processor.process_audio_file(
-        audio_file,
-        enable_diarization=True,
-        enable_topic_segmentation=True
+        audio_file, enable_diarization=True, enable_topic_segmentation=True
     )
     processing_time = time.time() - start_time
 
@@ -211,12 +215,12 @@ async def demo_markdown_conversion(audio_file: Path):
     options = ConversionOptions(
         include_metadata=True,
         format_options={
-            'enable_diarization': True,
-            'enable_topic_segmentation': True,
-            'include_timestamps': True,
-            'include_speaker_info': True,
-            'include_topic_info': True
-        }
+            "enable_diarization": True,
+            "enable_topic_segmentation": True,
+            "include_timestamps": True,
+            "include_speaker_info": True,
+            "include_topic_info": True,
+        },
     )
 
     print(f"🎯 Converting to markdown: {audio_file.name}")
@@ -233,13 +237,13 @@ async def demo_markdown_conversion(audio_file: Path):
     if result.success:
         # Save markdown to file
         output_file = audio_file.parent / f"{audio_file.stem}_enhanced.md"
-        with open(output_file, 'w', encoding='utf-8') as f:
+        with open(output_file, "w", encoding="utf-8") as f:
             f.write(result.content)
 
         print(f"💾 Markdown saved to: {output_file}")
 
         # Show preview
-        lines = result.content.split('\n')
+        lines = result.content.split("\n")
         preview_lines = lines[:20]
         print("\n📄 Markdown Preview (first 20 lines):")
         print("─" * 40)
@@ -256,8 +260,12 @@ async def main():
     """Main demo function."""
     parser = argparse.ArgumentParser(description="Enhanced Audio Processing Demo")
     parser.add_argument("audio_file", help="Path to audio file")
-    parser.add_argument("--basic-only", action="store_true", help="Run only basic processing")
-    parser.add_argument("--no-markdown", action="store_true", help="Skip markdown conversion")
+    parser.add_argument(
+        "--basic-only", action="store_true", help="Run only basic processing"
+    )
+    parser.add_argument(
+        "--no-markdown", action="store_true", help="Skip markdown conversion"
+    )
     parser.add_argument("--output-json", help="Save results to JSON file")
 
     args = parser.parse_args()
@@ -277,47 +285,47 @@ async def main():
     try:
         # Basic processing
         basic_result = await demo_basic_audio_processing(audio_file)
-        results['basic'] = {
-            'text': basic_result.text,
-            'language': basic_result.language,
-            'duration': basic_result.duration,
-            'confidence': basic_result.confidence,
-            'segments_count': len(basic_result.segments)
+        results["basic"] = {
+            "text": basic_result.text,
+            "language": basic_result.language,
+            "duration": basic_result.duration,
+            "confidence": basic_result.confidence,
+            "segments_count": len(basic_result.segments),
         }
 
         if not args.basic_only:
             # Speaker diarization
             speaker_result = await demo_speaker_diarization(audio_file)
-            results['speakers'] = {
-                'total_speakers': speaker_result.total_speakers,
-                'total_duration': speaker_result.total_duration,
-                'model_used': speaker_result.model_used,
-                'speakers': [
+            results["speakers"] = {
+                "total_speakers": speaker_result.total_speakers,
+                "total_duration": speaker_result.total_duration,
+                "model_used": speaker_result.model_used,
+                "speakers": [
                     {
-                        'id': s.speaker_id,
-                        'speaking_time': s.total_speaking_time,
-                        'segments': s.segment_count
+                        "id": s.speaker_id,
+                        "speaking_time": s.total_speaking_time,
+                        "segments": s.segment_count,
                     }
                     for s in speaker_result.speakers
-                ]
+                ],
             }
 
             # Topic segmentation
             if basic_result.text:
                 topic_result = await demo_topic_segmentation(basic_result.text)
-                results['topics'] = {
-                    'total_topics': topic_result.total_topics,
-                    'method': topic_result.segmentation_method,
-                    'model_used': topic_result.model_used,
-                    'topics': [
+                results["topics"] = {
+                    "total_topics": topic_result.total_topics,
+                    "method": topic_result.segmentation_method,
+                    "model_used": topic_result.model_used,
+                    "topics": [
                         {
-                            'title': t.title,
-                            'summary': t.summary,
-                            'sentences_count': len(t.sentences),
-                            'keywords': t.keywords
+                            "title": t.title,
+                            "summary": t.summary,
+                            "sentences_count": len(t.sentences),
+                            "keywords": t.keywords,
                         }
                         for t in topic_result.topics
-                    ]
+                    ],
                 }
 
             # Enhanced processing
@@ -326,15 +334,15 @@ async def main():
             # Markdown conversion
             if not args.no_markdown:
                 markdown_result = await demo_markdown_conversion(audio_file)
-                results['markdown'] = {
-                    'success': markdown_result.success,
-                    'content_length': len(markdown_result.content),
-                    'quality_score': markdown_result.quality_score.overall_score
+                results["markdown"] = {
+                    "success": markdown_result.success,
+                    "content_length": len(markdown_result.content),
+                    "quality_score": markdown_result.quality_score.overall_score,
                 }
 
         # Save results to JSON if requested
         if args.output_json:
-            with open(args.output_json, 'w', encoding='utf-8') as f:
+            with open(args.output_json, "w", encoding="utf-8") as f:
                 json.dump(results, f, indent=2, ensure_ascii=False)
             print(f"\n💾 Results saved to: {args.output_json}")
 
@@ -347,6 +355,7 @@ async def main():
     except Exception as e:
         print(f"\n❌ Error during demo: {str(e)}")
         import traceback
+
         traceback.print_exc()
         return 1
 

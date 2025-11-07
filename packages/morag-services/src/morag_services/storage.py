@@ -1,19 +1,25 @@
 """Vector storage services for MoRAG using Qdrant."""
 
+import asyncio
+import hashlib
+import uuid
+from datetime import datetime, timezone
+from typing import Any, Awaitable, Callable, Dict, List, Optional, Union
+
+import structlog
+from morag_core.exceptions import StorageError
+from morag_core.interfaces.storage import VectorStorage as BaseVectorStorage
 from qdrant_client import QdrantClient
 from qdrant_client.models import (
-    Distance, VectorParams, CreateCollection, PointStruct,
-    Filter, FieldCondition, MatchValue, SearchRequest
+    CreateCollection,
+    Distance,
+    FieldCondition,
+    Filter,
+    MatchValue,
+    PointStruct,
+    SearchRequest,
+    VectorParams,
 )
-from typing import List, Dict, Any, Optional, Union, Callable, Awaitable
-import structlog
-import asyncio
-from datetime import datetime, timezone
-import uuid
-import hashlib
-
-from morag_core.interfaces.storage import VectorStorage as BaseVectorStorage
-from morag_core.exceptions import StorageError
 
 logger = structlog.get_logger(__name__)
 
@@ -44,9 +50,7 @@ class EmbeddingCache:
         return hashlib.sha256(text.encode()).hexdigest()[:16]
 
     async def get_or_compute(
-        self,
-        text: str,
-        compute_func: Callable[[str], Awaitable[List[float]]]
+        self, text: str, compute_func: Callable[[str], Awaitable[List[float]]]
     ) -> List[float]:
         """Get embedding from cache or compute and cache it.
 
@@ -102,7 +106,7 @@ class EmbeddingCache:
             "cache_size": len(self.cache),
             "max_size": self.max_size,
             "utilization": len(self.cache) / self.max_size if self.max_size > 0 else 0,
-            "access_order_length": len(self.access_order)
+            "access_order_length": len(self.access_order),
         }
 
     def resize(self, new_max_size: int) -> None:
@@ -122,10 +126,12 @@ class EmbeddingCache:
             oldest = self.access_order.pop(0)
             del self.cache[oldest]
 
-        logger.info("Resized embedding cache",
-                   old_size=old_size,
-                   new_size=new_max_size,
-                   current_entries=len(self.cache))
+        logger.info(
+            "Resized embedding cache",
+            old_size=old_size,
+            new_size=new_max_size,
+            current_entries=len(self.cache),
+        )
 
 
 class QdrantVectorStorage(BaseVectorStorage):
@@ -137,7 +143,7 @@ class QdrantVectorStorage(BaseVectorStorage):
         port: int = 6333,
         api_key: Optional[str] = None,
         collection_name: Optional[str] = None,
-        verify_ssl: Optional[bool] = None
+        verify_ssl: Optional[bool] = None,
     ):
         """Initialize Qdrant storage.
 
@@ -149,16 +155,19 @@ class QdrantVectorStorage(BaseVectorStorage):
             verify_ssl: Whether to verify SSL certificates (default: from environment)
         """
         import os
+
         self.host = host
         self.port = port
         self.api_key = api_key
         # Use environment variable if verify_ssl not explicitly set
         if verify_ssl is None:
-            self.verify_ssl = os.getenv('QDRANT_VERIFY_SSL', 'true').lower() == 'true'
+            self.verify_ssl = os.getenv("QDRANT_VERIFY_SSL", "true").lower() == "true"
         else:
             self.verify_ssl = verify_ssl
         if not collection_name:
-            raise ValueError("collection_name is required - set QDRANT_COLLECTION_NAME environment variable")
+            raise ValueError(
+                "collection_name is required - set QDRANT_COLLECTION_NAME environment variable"
+            )
         self.collection_name = collection_name
         self.client: Optional[QdrantClient] = None
         self._initialized = False
@@ -211,7 +220,7 @@ class QdrantVectorStorage(BaseVectorStorage):
                 "port": self.port,
                 "collections_count": len(collections.collections),
                 "collections": [col.name for col in collections.collections],
-                "initialized": self._initialized
+                "initialized": self._initialized,
             }
         except Exception as e:
             return {
@@ -219,19 +228,20 @@ class QdrantVectorStorage(BaseVectorStorage):
                 "error": str(e),
                 "host": self.host,
                 "port": self.port,
-                "initialized": self._initialized
+                "initialized": self._initialized,
             }
 
     async def connect(self) -> None:
         """Initialize connection to Qdrant."""
         try:
             # Check if host is a URL (starts with http:// or https://)
-            if self.host.startswith(('http://', 'https://')):
+            if self.host.startswith(("http://", "https://")):
                 from urllib.parse import urlparse
+
                 parsed = urlparse(self.host)
                 hostname = parsed.hostname
-                port = parsed.port or (443 if parsed.scheme == 'https' else 6333)
-                use_https = parsed.scheme == 'https'
+                port = parsed.port or (443 if parsed.scheme == "https" else 6333)
+                use_https = parsed.scheme == "https"
 
                 # Use host/port connection which works better with HTTPS
                 self.client = QdrantClient(
@@ -240,14 +250,16 @@ class QdrantVectorStorage(BaseVectorStorage):
                     https=use_https,
                     api_key=self.api_key,
                     timeout=30,
-                    verify=self.verify_ssl
+                    verify=self.verify_ssl,
                 )
 
-                logger.info("Connecting to Qdrant via URL",
-                           url=self.host,
-                           hostname=hostname,
-                           port=port,
-                           https=use_https)
+                logger.info(
+                    "Connecting to Qdrant via URL",
+                    url=self.host,
+                    hostname=hostname,
+                    port=port,
+                    https=use_https,
+                )
             else:
                 # Use host/port connection for local instances
                 self.client = QdrantClient(
@@ -255,24 +267,28 @@ class QdrantVectorStorage(BaseVectorStorage):
                     port=self.port,
                     api_key=self.api_key,
                     timeout=30,
-                    verify=self.verify_ssl
+                    verify=self.verify_ssl,
                 )
 
-                logger.info("Connecting to Qdrant via host/port",
-                           host=self.host,
-                           port=self.port)
+                logger.info(
+                    "Connecting to Qdrant via host/port", host=self.host, port=self.port
+                )
 
             # Test connection
             collections = await asyncio.to_thread(self.client.get_collections)
-            logger.info("Connected to Qdrant successfully",
-                       collections_count=len(collections.collections),
-                       collections=[col.name for col in collections.collections])
+            logger.info(
+                "Connected to Qdrant successfully",
+                collections_count=len(collections.collections),
+                collections=[col.name for col in collections.collections],
+            )
 
         except Exception as e:
-            logger.error("Failed to connect to Qdrant",
-                        host=self.host,
-                        port=self.port,
-                        error=str(e))
+            logger.error(
+                "Failed to connect to Qdrant",
+                host=self.host,
+                port=self.port,
+                error=str(e),
+            )
             raise StorageError(f"Failed to connect to Qdrant: {str(e)}")
 
     async def disconnect(self) -> None:
@@ -295,29 +311,31 @@ class QdrantVectorStorage(BaseVectorStorage):
             # Check if collection exists
             collections = await asyncio.to_thread(self.client.get_collections)
             collection_exists = any(
-                col.name == self.collection_name
-                for col in collections.collections
+                col.name == self.collection_name for col in collections.collections
             )
 
             if not collection_exists:
-                logger.info("Collection does not exist, creating it",
-                           collection=self.collection_name,
-                           vector_size=vector_size)
+                logger.info(
+                    "Collection does not exist, creating it",
+                    collection=self.collection_name,
+                    vector_size=vector_size,
+                )
                 await self.create_collection(self.collection_name, vector_size)
             else:
-                logger.info("Collection already exists", collection=self.collection_name)
+                logger.info(
+                    "Collection already exists", collection=self.collection_name
+                )
 
         except Exception as e:
-            logger.error("Failed to ensure collection exists",
-                        collection=self.collection_name,
-                        error=str(e))
+            logger.error(
+                "Failed to ensure collection exists",
+                collection=self.collection_name,
+                error=str(e),
+            )
             raise StorageError(f"Failed to ensure collection exists: {str(e)}")
 
     async def create_collection(
-        self,
-        collection_name: str,
-        vector_size: int = 768,
-        force_recreate: bool = False
+        self, collection_name: str, vector_size: int = 768, force_recreate: bool = False
     ) -> None:
         """Create or recreate a collection."""
         if not self.client:
@@ -327,30 +345,31 @@ class QdrantVectorStorage(BaseVectorStorage):
             # Check if collection exists
             collections = await asyncio.to_thread(self.client.get_collections)
             collection_exists = any(
-                col.name == collection_name
-                for col in collections.collections
+                col.name == collection_name for col in collections.collections
             )
 
             if collection_exists:
                 if force_recreate:
-                    logger.info("Deleting existing collection", collection=collection_name)
+                    logger.info(
+                        "Deleting existing collection", collection=collection_name
+                    )
                     await asyncio.to_thread(
-                        self.client.delete_collection,
-                        collection_name=collection_name
+                        self.client.delete_collection, collection_name=collection_name
                     )
                 else:
                     logger.info("Collection already exists", collection=collection_name)
                     return
 
             # Create collection
-            logger.info("Creating collection", collection=collection_name, vector_size=vector_size)
+            logger.info(
+                "Creating collection",
+                collection=collection_name,
+                vector_size=vector_size,
+            )
             await asyncio.to_thread(
                 self.client.create_collection,
                 collection_name=collection_name,
-                vectors_config=VectorParams(
-                    size=vector_size,
-                    distance=Distance.COSINE
-                )
+                vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
             )
 
             logger.info("Collection created successfully", collection=collection_name)
@@ -363,14 +382,16 @@ class QdrantVectorStorage(BaseVectorStorage):
         self,
         vectors: List[List[float]],
         metadata: List[Dict[str, Any]],
-        collection_name: Optional[str] = None
+        collection_name: Optional[str] = None,
     ) -> List[str]:
         """Store vectors with metadata."""
         if not self.client:
             await self.connect()
 
         if len(vectors) != len(metadata):
-            raise StorageError("Number of vectors must match number of metadata entries")
+            raise StorageError(
+                "Number of vectors must match number of metadata entries"
+            )
 
         target_collection = collection_name or self.collection_name
 
@@ -387,30 +408,23 @@ class QdrantVectorStorage(BaseVectorStorage):
                 point_ids.append(point_id)
 
                 # Prepare payload
-                payload = {
-                    "created_at": datetime.now(timezone.utc).isoformat(),
-                    **meta
-                }
+                payload = {"created_at": datetime.now(timezone.utc).isoformat(), **meta}
 
-                points.append(PointStruct(
-                    id=point_id,
-                    vector=vector,
-                    payload=payload
-                ))
+                points.append(PointStruct(id=point_id, vector=vector, payload=payload))
 
             # Store points in batches
             batch_size = 100
             for i in range(0, len(points), batch_size):
-                batch = points[i:i + batch_size]
+                batch = points[i : i + batch_size]
                 await asyncio.to_thread(
-                    self.client.upsert,
-                    collection_name=target_collection,
-                    points=batch
+                    self.client.upsert, collection_name=target_collection, points=batch
                 )
 
-            logger.info("Stored vectors successfully",
-                       count=len(vectors),
-                       collection=target_collection)
+            logger.info(
+                "Stored vectors successfully",
+                count=len(vectors),
+                collection=target_collection,
+            )
             return point_ids
 
         except Exception as e:
@@ -423,7 +437,7 @@ class QdrantVectorStorage(BaseVectorStorage):
         limit: int = 10,
         score_threshold: float = 0.7,
         filters: Optional[Dict[str, Any]] = None,
-        collection_name: Optional[str] = None
+        collection_name: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """Search for similar vectors."""
         if not self.client:
@@ -437,10 +451,9 @@ class QdrantVectorStorage(BaseVectorStorage):
             if filters:
                 conditions = []
                 for key, value in filters.items():
-                    conditions.append(FieldCondition(
-                        key=key,
-                        match=MatchValue(value=value)
-                    ))
+                    conditions.append(
+                        FieldCondition(key=key, match=MatchValue(value=value))
+                    )
                 if conditions:
                     search_filter = Filter(must=conditions)
 
@@ -452,21 +465,21 @@ class QdrantVectorStorage(BaseVectorStorage):
                 limit=limit,
                 score_threshold=score_threshold,
                 query_filter=search_filter,
-                with_payload=True
+                with_payload=True,
             )
 
             # Format results
             formatted_results = []
             for result in results:
-                formatted_results.append({
-                    "id": result.id,
-                    "score": result.score,
-                    "metadata": result.payload
-                })
+                formatted_results.append(
+                    {"id": result.id, "score": result.score, "metadata": result.payload}
+                )
 
-            logger.info("Search completed",
-                       results_count=len(formatted_results),
-                       collection=target_collection)
+            logger.info(
+                "Search completed",
+                results_count=len(formatted_results),
+                collection=target_collection,
+            )
             return formatted_results
 
         except Exception as e:
@@ -477,7 +490,7 @@ class QdrantVectorStorage(BaseVectorStorage):
         self,
         filters: Dict[str, Any],
         limit: int = 10,
-        collection_name: Optional[str] = None
+        collection_name: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """Search for vectors by metadata only (no vector similarity).
 
@@ -495,15 +508,14 @@ class QdrantVectorStorage(BaseVectorStorage):
         target_collection = collection_name or self.collection_name
 
         try:
-            from qdrant_client.models import Filter, FieldCondition, MatchValue
+            from qdrant_client.models import FieldCondition, Filter, MatchValue
 
             # Build filter conditions
             conditions = []
             for key, value in filters.items():
-                conditions.append(FieldCondition(
-                    key=key,
-                    match=MatchValue(value=value)
-                ))
+                conditions.append(
+                    FieldCondition(key=key, match=MatchValue(value=value))
+                )
 
             search_filter = Filter(must=conditions) if conditions else None
 
@@ -513,22 +525,26 @@ class QdrantVectorStorage(BaseVectorStorage):
                 collection_name=target_collection,
                 scroll_filter=search_filter,
                 limit=limit,
-                with_payload=True
+                with_payload=True,
             )
 
             # Format results
             formatted_results = []
             for point in points:
-                formatted_results.append({
-                    "id": point.id,
-                    "metadata": point.payload,
-                    "text": point.payload.get("text", ""),
-                    "score": 1.0  # No similarity score for metadata-only search
-                })
+                formatted_results.append(
+                    {
+                        "id": point.id,
+                        "metadata": point.payload,
+                        "text": point.payload.get("text", ""),
+                        "score": 1.0,  # No similarity score for metadata-only search
+                    }
+                )
 
-            logger.info("Metadata search completed",
-                       results_count=len(formatted_results),
-                       collection=target_collection)
+            logger.info(
+                "Metadata search completed",
+                results_count=len(formatted_results),
+                collection=target_collection,
+            )
             return formatted_results
 
         except Exception as e:
@@ -536,9 +552,7 @@ class QdrantVectorStorage(BaseVectorStorage):
             raise StorageError(f"Metadata search failed: {str(e)}")
 
     async def find_document_points(
-        self,
-        document_id: str,
-        collection_name: Optional[str] = None
+        self, document_id: str, collection_name: Optional[str] = None
     ) -> List[str]:
         """Find all vector points for a document by document ID.
 
@@ -555,14 +569,13 @@ class QdrantVectorStorage(BaseVectorStorage):
         target_collection = collection_name or self.collection_name
 
         try:
-            from qdrant_client.models import Filter, FieldCondition, MatchValue
+            from qdrant_client.models import FieldCondition, Filter, MatchValue
 
             # Search for points with matching document_id
             search_filter = Filter(
                 must=[
                     FieldCondition(
-                        key="document_id",
-                        match=MatchValue(value=document_id)
+                        key="document_id", match=MatchValue(value=document_id)
                     )
                 ]
             )
@@ -578,7 +591,7 @@ class QdrantVectorStorage(BaseVectorStorage):
                     scroll_filter=search_filter,
                     limit=100,
                     offset=offset,
-                    with_payload=False  # We only need IDs
+                    with_payload=False,  # We only need IDs
                 )
 
                 batch_points = result[0]
@@ -591,21 +604,21 @@ class QdrantVectorStorage(BaseVectorStorage):
                 if offset is None:
                     break
 
-            logger.info("Found document points",
-                       document_id=document_id,
-                       points_count=len(points))
+            logger.info(
+                "Found document points",
+                document_id=document_id,
+                points_count=len(points),
+            )
             return points
 
         except Exception as e:
-            logger.error("Failed to find document points",
-                        document_id=document_id,
-                        error=str(e))
+            logger.error(
+                "Failed to find document points", document_id=document_id, error=str(e)
+            )
             return []
 
     async def delete_document_points(
-        self,
-        document_id: str,
-        collection_name: Optional[str] = None
+        self, document_id: str, collection_name: Optional[str] = None
     ) -> int:
         """Delete all vector points for a document.
 
@@ -625,15 +638,15 @@ class QdrantVectorStorage(BaseVectorStorage):
         # Delete the points
         deleted_count = await self.delete_vectors_legacy(point_ids, collection_name)
 
-        logger.info("Deleted document points",
-                   document_id=document_id,
-                   deleted_count=deleted_count)
+        logger.info(
+            "Deleted document points",
+            document_id=document_id,
+            deleted_count=deleted_count,
+        )
         return deleted_count
 
     async def delete_vectors_legacy(
-        self,
-        vector_ids: List[str],
-        collection_name: Optional[str] = None
+        self, vector_ids: List[str], collection_name: Optional[str] = None
     ) -> int:
         """Delete vectors by IDs (legacy method)."""
         if not self.client:
@@ -645,12 +658,12 @@ class QdrantVectorStorage(BaseVectorStorage):
             await asyncio.to_thread(
                 self.client.delete,
                 collection_name=target_collection,
-                points_selector=vector_ids
+                points_selector=vector_ids,
             )
 
-            logger.info("Deleted vectors",
-                       count=len(vector_ids),
-                       collection=target_collection)
+            logger.info(
+                "Deleted vectors", count=len(vector_ids), collection=target_collection
+            )
             return len(vector_ids)
 
         except Exception as e:
@@ -662,7 +675,7 @@ class QdrantVectorStorage(BaseVectorStorage):
         document_id: str,
         new_vectors: List[List[float]],
         new_metadata: List[Dict[str, Any]],
-        collection_name: Optional[str] = None
+        collection_name: Optional[str] = None,
     ) -> List[str]:
         """Replace existing document with new vectors.
 
@@ -679,41 +692,47 @@ class QdrantVectorStorage(BaseVectorStorage):
 
         try:
             # Find existing document chunks
-            existing_points = await self.find_document_points(document_id, target_collection)
+            existing_points = await self.find_document_points(
+                document_id, target_collection
+            )
 
             # Delete existing points if any
             if existing_points:
                 await self.delete_document_points(document_id, target_collection)
-                logger.info("Deleted existing document points",
-                           document_id=document_id,
-                           points_deleted=len(existing_points))
+                logger.info(
+                    "Deleted existing document points",
+                    document_id=document_id,
+                    points_deleted=len(existing_points),
+                )
 
             # Add document_id to all metadata entries
             for metadata in new_metadata:
-                metadata['document_id'] = document_id
-                metadata['replaced_at'] = datetime.now(timezone.utc).isoformat()
+                metadata["document_id"] = document_id
+                metadata["replaced_at"] = datetime.now(timezone.utc).isoformat()
 
             # Store new vectors
             new_point_ids = await self.store_vectors(
-                new_vectors,
-                new_metadata,
-                target_collection
+                new_vectors, new_metadata, target_collection
             )
 
-            logger.info("Document replaced successfully",
-                       document_id=document_id,
-                       old_points=len(existing_points) if existing_points else 0,
-                       new_points=len(new_point_ids))
+            logger.info(
+                "Document replaced successfully",
+                document_id=document_id,
+                old_points=len(existing_points) if existing_points else 0,
+                new_points=len(new_point_ids),
+            )
 
             return new_point_ids
 
         except Exception as e:
-            logger.error("Failed to replace document",
-                        document_id=document_id,
-                        error=str(e))
+            logger.error(
+                "Failed to replace document", document_id=document_id, error=str(e)
+            )
             raise StorageError(f"Failed to replace document: {str(e)}")
 
-    async def get_collection_info(self, collection_name: Optional[str] = None) -> Dict[str, Any]:
+    async def get_collection_info(
+        self, collection_name: Optional[str] = None
+    ) -> Dict[str, Any]:
         """Get collection information."""
         if not self.client:
             await self.connect()
@@ -722,8 +741,7 @@ class QdrantVectorStorage(BaseVectorStorage):
 
         try:
             info = await asyncio.to_thread(
-                self.client.get_collection,
-                collection_name=target_collection
+                self.client.get_collection, collection_name=target_collection
             )
 
             return {
@@ -734,8 +752,8 @@ class QdrantVectorStorage(BaseVectorStorage):
                 "status": info.status.value,
                 "config": {
                     "vector_size": info.config.params.vectors.size,
-                    "distance": info.config.params.vectors.distance.value
-                }
+                    "distance": info.config.params.vectors.distance.value,
+                },
             }
 
         except Exception as e:
@@ -747,7 +765,7 @@ class QdrantVectorStorage(BaseVectorStorage):
         self,
         key: str,
         data: Union[bytes, str, Dict[str, Any]],
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> "StorageObject":
         """Store an object in Qdrant as a point with metadata.
 
@@ -767,9 +785,10 @@ class QdrantVectorStorage(BaseVectorStorage):
         try:
             # Convert data to string for storage
             if isinstance(data, bytes):
-                data_str = data.decode('utf-8')
+                data_str = data.decode("utf-8")
             elif isinstance(data, dict):
                 import json
+
                 data_str = json.dumps(data)
             else:
                 data_str = str(data)
@@ -782,25 +801,17 @@ class QdrantVectorStorage(BaseVectorStorage):
                 "object_data": data_str,
                 "object_type": "generic",
                 "created_at": datetime.now(timezone.utc).isoformat(),
-                **(metadata or {})
+                **(metadata or {}),
             }
 
-            point = PointStruct(
-                id=key,
-                vector=dummy_vector,
-                payload=payload
-            )
+            point = PointStruct(id=key, vector=dummy_vector, payload=payload)
 
             await asyncio.to_thread(
-                self.client.upsert,
-                collection_name=self.collection_name,
-                points=[point]
+                self.client.upsert, collection_name=self.collection_name, points=[point]
             )
 
             return StorageObject(
-                key=key,
-                storage_type=StorageType.VECTOR,
-                metadata=metadata
+                key=key, storage_type=StorageType.VECTOR, metadata=metadata
             )
 
         except Exception as e:
@@ -821,9 +832,7 @@ class QdrantVectorStorage(BaseVectorStorage):
 
         try:
             points = await asyncio.to_thread(
-                self.client.retrieve,
-                collection_name=self.collection_name,
-                ids=[key]
+                self.client.retrieve, collection_name=self.collection_name, ids=[key]
             )
 
             if not points:
@@ -838,6 +847,7 @@ class QdrantVectorStorage(BaseVectorStorage):
             # Try to parse as JSON, fallback to string
             try:
                 import json
+
                 return json.loads(data_str)
             except (json.JSONDecodeError, TypeError):
                 return data_str
@@ -862,7 +872,7 @@ class QdrantVectorStorage(BaseVectorStorage):
             await asyncio.to_thread(
                 self.client.delete,
                 collection_name=self.collection_name,
-                points_selector=[key]
+                points_selector=[key],
             )
 
             logger.info("Deleted object", key=key)
@@ -892,18 +902,20 @@ class QdrantVectorStorage(BaseVectorStorage):
             points, _ = await asyncio.to_thread(
                 self.client.scroll,
                 collection_name=self.collection_name,
-                limit=1000  # Adjust as needed
+                limit=1000,  # Adjust as needed
             )
 
             objects = []
             for point in points:
                 object_key = point.payload.get("object_key", str(point.id))
                 if object_key.startswith(prefix):
-                    objects.append(StorageObject(
-                        key=object_key,
-                        storage_type=StorageType.VECTOR,
-                        metadata=point.payload
-                    ))
+                    objects.append(
+                        StorageObject(
+                            key=object_key,
+                            storage_type=StorageType.VECTOR,
+                            metadata=point.payload,
+                        )
+                    )
 
             return objects
 
@@ -927,9 +939,7 @@ class QdrantVectorStorage(BaseVectorStorage):
 
         try:
             points = await asyncio.to_thread(
-                self.client.retrieve,
-                collection_name=self.collection_name,
-                ids=[key]
+                self.client.retrieve, collection_name=self.collection_name, ids=[key]
             )
 
             if not points:
@@ -941,7 +951,7 @@ class QdrantVectorStorage(BaseVectorStorage):
                 created_at=point.payload.get("created_at"),
                 modified_at=point.payload.get("modified_at"),
                 content_type=point.payload.get("content_type"),
-                custom_metadata=point.payload
+                custom_metadata=point.payload,
             )
 
         except Exception as e:
@@ -962,9 +972,7 @@ class QdrantVectorStorage(BaseVectorStorage):
 
         try:
             points = await asyncio.to_thread(
-                self.client.retrieve,
-                collection_name=self.collection_name,
-                ids=[key]
+                self.client.retrieve, collection_name=self.collection_name, ids=[key]
             )
 
             return len(points) > 0
@@ -978,7 +986,7 @@ class QdrantVectorStorage(BaseVectorStorage):
         self,
         vectors: List[List[float]],
         metadata: List[Dict[str, Any]],
-        ids: Optional[List[str]] = None
+        ids: Optional[List[str]] = None,
     ) -> List[str]:
         """Add vectors to storage.
 
@@ -997,7 +1005,7 @@ class QdrantVectorStorage(BaseVectorStorage):
         self,
         query_vector: List[float],
         limit: int = 10,
-        filter_expr: Optional[Dict[str, Any]] = None
+        filter_expr: Optional[Dict[str, Any]] = None,
     ) -> List[Dict[str, Any]]:
         """Search for similar vectors.
 
@@ -1015,7 +1023,7 @@ class QdrantVectorStorage(BaseVectorStorage):
             limit=limit,
             score_threshold=0.0,  # Return all results up to limit
             filters=filter_expr,
-            collection_name=self.collection_name
+            collection_name=self.collection_name,
         )
 
     async def delete_vectors(self, ids: List[str]) -> bool:
@@ -1035,10 +1043,7 @@ class QdrantVectorStorage(BaseVectorStorage):
             return False
 
     async def update_vector_metadata(
-        self,
-        id: str,
-        metadata: Dict[str, Any],
-        upsert: bool = False
+        self, id: str, metadata: Dict[str, Any], upsert: bool = False
     ) -> bool:
         """Update vector metadata.
 
@@ -1056,16 +1061,16 @@ class QdrantVectorStorage(BaseVectorStorage):
         try:
             # Get existing point
             points = await asyncio.to_thread(
-                self.client.retrieve,
-                collection_name=self.collection_name,
-                ids=[id]
+                self.client.retrieve, collection_name=self.collection_name, ids=[id]
             )
 
             if not points:
                 if not upsert:
                     return False
                 # For upsert, we'd need the vector, which we don't have
-                logger.warning("Cannot upsert vector metadata without vector data", id=id)
+                logger.warning(
+                    "Cannot upsert vector metadata without vector data", id=id
+                )
                 return False
 
             point = points[0]
@@ -1075,15 +1080,13 @@ class QdrantVectorStorage(BaseVectorStorage):
 
             # Create updated point
             updated_point = PointStruct(
-                id=id,
-                vector=point.vector,
-                payload=updated_payload
+                id=id, vector=point.vector, payload=updated_payload
             )
 
             await asyncio.to_thread(
                 self.client.upsert,
                 collection_name=self.collection_name,
-                points=[updated_point]
+                points=[updated_point],
             )
 
             logger.info("Updated vector metadata", id=id)
@@ -1094,7 +1097,6 @@ class QdrantVectorStorage(BaseVectorStorage):
             return False
 
 
-
 # Convenience class for backward compatibility
 class QdrantService(QdrantVectorStorage):
     """Legacy QdrantService for backward compatibility."""
@@ -1102,8 +1104,5 @@ class QdrantService(QdrantVectorStorage):
     def __init__(self):
         # Initialize with default settings - these would come from config
         super().__init__(
-            host="localhost",
-            port=6333,
-            api_key=None,
-            collection_name="morag_vectors"
+            host="localhost", port=6333, api_key=None, collection_name="morag_vectors"
         )

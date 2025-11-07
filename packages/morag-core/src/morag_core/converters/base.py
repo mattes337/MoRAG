@@ -1,11 +1,11 @@
 """Base converter classes for MoRAG."""
 
+import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
-import uuid
 
 from ..exceptions import ProcessingError
 
@@ -101,7 +101,9 @@ class ConversionQualityValidator:
         # Additional quality checks can be added here
         return True
 
-    def validate_file_integrity(self, source_path: Union[str, Path], target_path: Union[str, Path]) -> bool:
+    def validate_file_integrity(
+        self, source_path: Union[str, Path], target_path: Union[str, Path]
+    ) -> bool:
         """Validate file integrity after conversion.
 
         Args:
@@ -153,10 +155,7 @@ class BaseConverter(ABC):
 
     @abstractmethod
     def convert(
-        self,
-        source_path: Union[str, Path],
-        target_path: Union[str, Path],
-        **kwargs
+        self, source_path: Union[str, Path], target_path: Union[str, Path], **kwargs
     ) -> ConversionResult:
         """Convert file from source to target format.
 
@@ -205,7 +204,7 @@ class BaseConverter(ABC):
         Returns:
             Format string
         """
-        return Path(file_path).suffix.lower().lstrip('.')
+        return Path(file_path).suffix.lower().lstrip(".")
 
     def estimate_conversion_time(self, source_path: Union[str, Path]) -> float:
         """Estimate conversion time based on file size.

@@ -29,13 +29,13 @@ def sanitize_filename(filename: str, max_length: int = 100) -> str:
 
     # Remove or replace invalid characters for Windows/Unix (including spaces)
     invalid_chars = r'[<>:"/\\|?*\x00-\x1f% ]'
-    sanitized = re.sub(invalid_chars, '_', filename)
+    sanitized = re.sub(invalid_chars, "_", filename)
 
     # Remove leading/trailing dots and underscores
-    sanitized = sanitized.strip('._')
+    sanitized = sanitized.strip("._")
 
     # Replace multiple consecutive underscores with single underscore
-    sanitized = re.sub(r'_+', '_', sanitized)
+    sanitized = re.sub(r"_+", "_", sanitized)
 
     # Ensure filename is not empty
     if not sanitized:
@@ -43,7 +43,7 @@ def sanitize_filename(filename: str, max_length: int = 100) -> str:
 
     # Truncate if too long
     if len(sanitized) > max_length:
-        sanitized = sanitized[:max_length].rstrip('_')
+        sanitized = sanitized[:max_length].rstrip("_")
 
     return sanitized
 
@@ -60,13 +60,16 @@ class FileManager:
         self.temp_files_dir = self.base_storage_dir / "temp_files"
         self.metadata_dir = self.base_storage_dir / "metadata"
 
-        for dir_path in [self.stage_outputs_dir, self.temp_files_dir, self.metadata_dir]:
+        for dir_path in [
+            self.stage_outputs_dir,
+            self.temp_files_dir,
+            self.metadata_dir,
+        ]:
             dir_path.mkdir(exist_ok=True)
 
-    def store_stage_output(self,
-                          stage_result,  # StageResult type
-                          source_file: Path,
-                          context) -> Dict[str, str]:  # StageContext type
+    def store_stage_output(
+        self, stage_result, source_file: Path, context  # StageResult type
+    ) -> Dict[str, str]:  # StageContext type
         """Store stage output files and return file IDs."""
 
         file_ids = {}
@@ -83,18 +86,22 @@ class FileManager:
 
             # Store metadata
             metadata = {
-                'file_id': file_id,
-                'original_name': output_file.name,
-                'original_path': str(output_file),
-                'storage_path': str(storage_path),
-                'stage': stage_result.stage_type.value,
-                'stage_name': stage_result.stage_type.name,
-                'source_file': str(source_file),
-                'created_at': datetime.utcnow().isoformat(),
-                'file_size': storage_path.stat().st_size,
-                'checksum': self._calculate_checksum(storage_path),
-                'stage_metadata': stage_result.metadata.__dict__ if hasattr(stage_result.metadata, '__dict__') else {},
-                'webhook_url': context.webhook_url if hasattr(context, 'webhook_url') else None
+                "file_id": file_id,
+                "original_name": output_file.name,
+                "original_path": str(output_file),
+                "storage_path": str(storage_path),
+                "stage": stage_result.stage_type.value,
+                "stage_name": stage_result.stage_type.name,
+                "source_file": str(source_file),
+                "created_at": datetime.utcnow().isoformat(),
+                "file_size": storage_path.stat().st_size,
+                "checksum": self._calculate_checksum(storage_path),
+                "stage_metadata": stage_result.metadata.__dict__
+                if hasattr(stage_result.metadata, "__dict__")
+                else {},
+                "webhook_url": context.webhook_url
+                if hasattr(context, "webhook_url")
+                else None,
             }
 
             self._store_file_metadata(file_id, metadata)
@@ -116,7 +123,7 @@ class FileManager:
         metadata_path = self.metadata_dir / f"{file_id}.json"
 
         if metadata_path.exists():
-            with open(metadata_path, 'r') as f:
+            with open(metadata_path, "r") as f:
                 data = json.load(f)
                 return data if isinstance(data, dict) else None
 
@@ -128,15 +135,15 @@ class FileManager:
 
         for metadata_file in self.metadata_dir.glob("*.json"):
             try:
-                with open(metadata_file, 'r') as f:
+                with open(metadata_file, "r") as f:
                     metadata = json.load(f)
 
-                if Path(metadata['source_file']) == source_file:
+                if Path(metadata["source_file"]) == source_file:
                     files.append(metadata)
             except Exception:
                 continue
 
-        return sorted(files, key=lambda x: x['stage'])
+        return sorted(files, key=lambda x: x["stage"])
 
     def list_files_by_stage(self, stage: str) -> List[Dict[str, Any]]:
         """List all files created by a specific stage."""
@@ -144,15 +151,15 @@ class FileManager:
 
         for metadata_file in self.metadata_dir.glob("*.json"):
             try:
-                with open(metadata_file, 'r') as f:
+                with open(metadata_file, "r") as f:
                     metadata = json.load(f)
 
-                if metadata['stage'] == stage:
+                if metadata["stage"] == stage:
                     files.append(metadata)
             except Exception:
                 continue
 
-        return sorted(files, key=lambda x: x['created_at'])
+        return sorted(files, key=lambda x: x["created_at"])
 
     def cleanup_old_files(self, max_age_hours: int = 24) -> int:
         """Clean up files older than specified age."""
@@ -161,14 +168,14 @@ class FileManager:
 
         for metadata_file in self.metadata_dir.glob("*.json"):
             try:
-                with open(metadata_file, 'r') as f:
+                with open(metadata_file, "r") as f:
                     metadata = json.load(f)
 
-                created_at = datetime.fromisoformat(metadata['created_at'])
+                created_at = datetime.fromisoformat(metadata["created_at"])
 
                 if created_at < cutoff_time:
                     # Delete actual file
-                    file_path = Path(metadata['storage_path'])
+                    file_path = Path(metadata["storage_path"])
                     if file_path.exists():
                         file_path.unlink()
 
@@ -177,7 +184,11 @@ class FileManager:
                     files_deleted += 1
 
             except Exception as e:
-                logger.warning("Failed to process metadata file", metadata_file=str(metadata_file), error=str(e))
+                logger.warning(
+                    "Failed to process metadata file",
+                    metadata_file=str(metadata_file),
+                    error=str(e),
+                )
 
         return files_deleted
 
@@ -189,24 +200,24 @@ class FileManager:
 
         for metadata_file in self.metadata_dir.glob("*.json"):
             try:
-                with open(metadata_file, 'r') as f:
+                with open(metadata_file, "r") as f:
                     metadata = json.load(f)
 
                 total_files += 1
-                total_size += metadata.get('file_size', 0)
+                total_size += metadata.get("file_size", 0)
 
-                stage = metadata.get('stage', 'unknown')
+                stage = metadata.get("stage", "unknown")
                 stage_counts[stage] = stage_counts.get(stage, 0) + 1
 
             except Exception:
                 continue
 
         return {
-            'total_files': total_files,
-            'total_size_bytes': total_size,
-            'total_size_mb': round(total_size / (1024 * 1024), 2),
-            'files_by_stage': stage_counts,
-            'storage_directory': str(self.base_storage_dir)
+            "total_files": total_files,
+            "total_size_bytes": total_size,
+            "total_size_mb": round(total_size / (1024 * 1024), 2),
+            "files_by_stage": stage_counts,
+            "storage_directory": str(self.base_storage_dir),
         }
 
     def _generate_file_id(self, file_path: Path, stage_type) -> str:
@@ -229,7 +240,7 @@ class FileManager:
         """Store file metadata."""
         metadata_path = self.metadata_dir / f"{file_id}.json"
 
-        with open(metadata_path, 'w') as f:
+        with open(metadata_path, "w") as f:
             json.dump(metadata, f, indent=2)
 
 
@@ -241,7 +252,7 @@ class FileNamingConvention:
         "markdown-optimizer": ".opt.md",
         "chunker": ".chunks.json",
         "fact-generator": ".facts.json",
-        "ingestor": ".ingestion.json"
+        "ingestor": ".ingestion.json",
     }
 
     @classmethod

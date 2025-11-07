@@ -1,11 +1,11 @@
 """Query analysis agent."""
 
-from typing import Type, List, Optional
+from typing import List, Optional, Type
+
 import structlog
 
 from ..base.agent import BaseAgent
 from ..base.config import AgentConfig, PromptConfig
-
 from .models import QueryAnalysisResult
 
 logger = structlog.get_logger(__name__)
@@ -33,10 +33,8 @@ class QueryAnalysisAgent(BaseAgent[QueryAnalysisResult]):
                 "extract_keywords": True,
                 "analyze_complexity": True,
                 "detect_temporal_context": True,
-            }
+            },
         )
-
-
 
     def get_result_type(self) -> Type[QueryAnalysisResult]:
         """Get the result type for query analysis."""
@@ -46,7 +44,7 @@ class QueryAnalysisAgent(BaseAgent[QueryAnalysisResult]):
         self,
         query: str,
         context: Optional[str] = None,
-        user_history: Optional[List[str]] = None
+        user_history: Optional[List[str]] = None,
     ) -> QueryAnalysisResult:
         """Analyze a user query to extract intent and entities.
 
@@ -66,21 +64,19 @@ class QueryAnalysisAgent(BaseAgent[QueryAnalysisResult]):
                 query_type="factual",
                 complexity="simple",
                 confidence="low",
-                metadata={"error": "Empty query"}
+                metadata={"error": "Empty query"},
             )
 
         self.logger.info(
             "Starting query analysis",
             query_length=len(query),
             has_context=context is not None,
-            has_history=user_history is not None and len(user_history) > 0
+            has_history=user_history is not None and len(user_history) > 0,
         )
 
         try:
             result = await self.execute(
-                query,
-                context=context,
-                user_history=user_history
+                query, context=context, user_history=user_history
             )
 
             self.logger.info(
@@ -90,7 +86,7 @@ class QueryAnalysisAgent(BaseAgent[QueryAnalysisResult]):
                 keyword_count=len(result.keywords),
                 query_type=result.query_type,
                 complexity=result.complexity,
-                confidence=result.confidence
+                confidence=result.confidence,
             )
 
             return result
@@ -100,9 +96,7 @@ class QueryAnalysisAgent(BaseAgent[QueryAnalysisResult]):
             raise
 
     async def extract_search_terms(
-        self,
-        query: str,
-        expand_terms: bool = True
+        self, query: str, expand_terms: bool = True
     ) -> List[str]:
         """Extract optimized search terms from a query.
 
@@ -123,7 +117,9 @@ class QueryAnalysisAgent(BaseAgent[QueryAnalysisResult]):
 
         # If expansion is requested, add the original query words
         if expand_terms:
-            query_words = [word.strip().lower() for word in query.split() if len(word.strip()) >= 3]
+            query_words = [
+                word.strip().lower() for word in query.split() if len(word.strip()) >= 3
+            ]
             search_terms.extend(query_words)
             search_terms = list(set(search_terms))  # Remove duplicates
 

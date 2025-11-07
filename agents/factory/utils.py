@@ -1,6 +1,7 @@
 """Utility functions for agent creation and management."""
 
-from typing import Type, Optional, TypeVar
+from typing import Optional, Type, TypeVar
+
 import structlog
 
 from ..base.agent import BaseAgent
@@ -9,7 +10,7 @@ from .registry import AgentRegistry
 
 logger = structlog.get_logger(__name__)
 
-T = TypeVar('T', bound=BaseAgent)
+T = TypeVar("T", bound=BaseAgent)
 
 # Global registry instance
 _registry = None
@@ -41,7 +42,9 @@ def create_agent(
         Agent instance
     """
     registry = get_registry()
-    return registry.create_agent(agent_name, config, model_override=model_override, **config_overrides)
+    return registry.create_agent(
+        agent_name, config, model_override=model_override, **config_overrides
+    )
 
 
 def get_agent(
@@ -62,7 +65,9 @@ def get_agent(
         Agent instance
     """
     registry = get_registry()
-    return registry.get_agent(agent_name, config, model_override=model_override, **config_overrides)
+    return registry.get_agent(
+        agent_name, config, model_override=model_override, **config_overrides
+    )
 
 
 def register_agent(agent_name: str, agent_class: Type[BaseAgent]) -> None:
@@ -97,9 +102,7 @@ def clear_agent_cache(agent_name: Optional[str] = None) -> None:
 
 
 def create_agent_with_config(
-    agent_class: Type[T],
-    config: Optional[AgentConfig] = None,
-    **config_overrides
+    agent_class: Type[T], config: Optional[AgentConfig] = None, **config_overrides
 ) -> T:
     """Create an agent with a specific class and configuration.
 
@@ -112,4 +115,6 @@ def create_agent_with_config(
         Agent instance
     """
     registry = get_registry()
-    return registry.factory.create_agent_with_config(agent_class, config, **config_overrides)
+    return registry.factory.create_agent_with_config(
+        agent_class, config, **config_overrides
+    )

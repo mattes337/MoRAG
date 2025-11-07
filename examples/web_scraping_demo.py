@@ -9,8 +9,8 @@ and process the content for RAG applications.
 
 import asyncio
 import json
-from pathlib import Path
 import sys
+from pathlib import Path
 
 # Add the src directory to the path so we can import MoRAG modules
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
@@ -35,13 +35,13 @@ async def demo_basic_scraping():
         convert_to_markdown=True,
         clean_content=True,
         remove_navigation=True,
-        remove_footer=True
+        remove_footer=True,
     )
 
     # Example URLs to scrape (using public, scraping-friendly sites)
     test_urls = [
         "https://httpbin.org/html",  # Simple test HTML
-        "https://example.com",       # Basic example site
+        "https://example.com",  # Basic example site
     ]
 
     print(f"📋 Configuration:")
@@ -76,7 +76,7 @@ async def demo_basic_scraping():
                 # Show metadata
                 print("📊 Metadata:")
                 for key, value in content.metadata.items():
-                    if key not in ['extracted_at']:  # Skip timestamp
+                    if key not in ["extracted_at"]:  # Skip timestamp
                         print(f"   • {key}: {value}")
                 print()
 
@@ -131,9 +131,7 @@ async def demo_batch_processing():
 
     web_processor = WebProcessor()
     config = WebScrapingConfig(
-        timeout=5,
-        rate_limit_delay=0.5,
-        convert_to_markdown=True
+        timeout=5, rate_limit_delay=0.5, convert_to_markdown=True
     )
 
     # Multiple URLs for batch processing
@@ -194,23 +192,26 @@ async def demo_configuration_options():
 
     # Test different configurations
     configs = [
-        ("Minimal extraction", WebScrapingConfig(
-            extract_links=False,
-            convert_to_markdown=False,
-            clean_content=False
-        )),
-        ("Full extraction", WebScrapingConfig(
-            extract_links=True,
-            convert_to_markdown=True,
-            clean_content=True,
-            remove_navigation=True,
-            remove_footer=True
-        )),
-        ("Fast processing", WebScrapingConfig(
-            timeout=3,
-            max_retries=1,
-            rate_limit_delay=0.1
-        ))
+        (
+            "Minimal extraction",
+            WebScrapingConfig(
+                extract_links=False, convert_to_markdown=False, clean_content=False
+            ),
+        ),
+        (
+            "Full extraction",
+            WebScrapingConfig(
+                extract_links=True,
+                convert_to_markdown=True,
+                clean_content=True,
+                remove_navigation=True,
+                remove_footer=True,
+            ),
+        ),
+        (
+            "Fast processing",
+            WebScrapingConfig(timeout=3, max_retries=1, rate_limit_delay=0.1),
+        ),
     ]
 
     for name, config in configs:
@@ -262,6 +263,7 @@ async def main():
     except Exception as e:
         print(f"\n💥 Demo failed: {str(e)}")
         import traceback
+
         traceback.print_exc()
 
 

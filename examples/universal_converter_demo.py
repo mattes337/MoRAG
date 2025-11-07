@@ -8,16 +8,16 @@ to structured markdown using the unified conversion framework.
 """
 
 import asyncio
-import sys
-from pathlib import Path
-import tempfile
 import json
+import sys
+import tempfile
+from pathlib import Path
 
 # Add the src directory to the path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
+from morag_core.interfaces.converter import ChunkingStrategy, ConversionOptions
 from morag_document.converters import DocumentConverter
-from morag_core.interfaces.converter import ConversionOptions, ChunkingStrategy
 
 
 async def demo_basic_conversion():
@@ -37,7 +37,7 @@ async def demo_basic_conversion():
     converter_info = converter.get_converter_info()
     for format_type, info in converter_info.items():
         print(f"  • {format_type}: {info['primary_converter']}")
-        if info['fallback_converters']:
+        if info["fallback_converters"]:
             print(f"    Fallbacks: {', '.join(info['fallback_converters'])}")
     print()
 
@@ -60,7 +60,7 @@ async def demo_pdf_conversion():
         print(f"Detected format: {detected_format}")
 
         # Create conversion options
-        options = ConversionOptions.for_format('pdf')
+        options = ConversionOptions.for_format("pdf")
         options.chunking_strategy = ChunkingStrategy.PAGE
         options.include_metadata = True
         options.include_toc = True
@@ -70,7 +70,9 @@ async def demo_pdf_conversion():
 
         # Note: This would fail in demo because we don't have actual PDF processing
         # but shows the API usage
-        print("Note: Actual conversion would require proper PDF file and MoRAG processors")
+        print(
+            "Note: Actual conversion would require proper PDF file and MoRAG processors"
+        )
 
     finally:
         pdf_path.unlink()
@@ -92,7 +94,7 @@ async def demo_configuration():
     options = ConversionOptions(
         chunking_strategy=ChunkingStrategy.PAGE,
         include_metadata=True,
-        extract_images=False
+        extract_images=False,
     )
 
     print("Example configuration:")
@@ -114,7 +116,7 @@ async def demo_conversion_options():
     print()
 
     # Create options for different formats
-    formats = ['pdf', 'audio', 'video', 'web']
+    formats = ["pdf", "audio", "video", "web"]
 
     for format_type in formats:
         print(f"{format_type.upper()} options:")
@@ -136,8 +138,8 @@ async def demo_quality_assessment():
     print("📊 Quality Assessment Demo")
     print("-" * 30)
 
-    from src.morag.converters.quality import ConversionQualityValidator
     from morag_core.interfaces.converter import ConversionResult, QualityScore
+    from src.morag.converters.quality import ConversionQualityValidator
 
     validator = ConversionQualityValidator()
 
@@ -168,11 +170,11 @@ to determine conversion quality.
     sample_result = ConversionResult(
         content=sample_content,
         metadata={
-            'title': 'Sample Document',
-            'word_count': len(sample_content.split()),
-            'format_type': 'demo'
+            "title": "Sample Document",
+            "word_count": len(sample_content.split()),
+            "format_type": "demo",
         },
-        success=True
+        success=True,
     )
 
     # Assess quality
@@ -219,6 +221,7 @@ async def main():
     except Exception as e:
         print(f"❌ Demo failed: {str(e)}")
         import traceback
+
         traceback.print_exc()
 
 

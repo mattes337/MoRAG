@@ -1,10 +1,11 @@
 """Tests for hybrid fact extraction approach."""
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock
-from morag_graph.models.fact import Fact, StructuredMetadata
-from morag_graph.extraction.fact_extractor import FactExtractor
+
+import pytest
 from morag_graph.extraction.fact_entity_converter import FactEntityConverter
+from morag_graph.extraction.fact_extractor import FactExtractor
+from morag_graph.models.fact import Fact, StructuredMetadata
 
 
 class TestStructuredMetadata:
@@ -15,14 +16,12 @@ class TestStructuredMetadata:
         metadata = StructuredMetadata(
             primary_entities=["entity1", "entity2"],
             relationships=["relates_to", "affects"],
-            domain_concepts=["concept1", "concept2"]
+            domain_concepts=["concept1", "concept2"],
         )
 
         assert metadata.primary_entities == ["entity1", "entity2"]
         assert metadata.relationships == ["relates_to", "affects"]
         assert metadata.domain_concepts == ["concept1", "concept2"]
-
-
 
 
 class TestHybridFact:
@@ -33,7 +32,7 @@ class TestHybridFact:
         metadata = StructuredMetadata(
             primary_entities=["Ashwagandha", "stress", "anxiety"],
             relationships=["treats", "reduces"],
-            domain_concepts=["herbal medicine", "adaptogen", "dosage"]
+            domain_concepts=["herbal medicine", "adaptogen", "dosage"],
         )
 
         fact = Fact(
@@ -43,11 +42,15 @@ class TestHybridFact:
             source_document_id="doc_456",
             extraction_confidence=0.9,
             fact_type="methodological",
-            keywords=["ashwagandha", "stress", "anxiety", "dosage"]
+            keywords=["ashwagandha", "stress", "anxiety", "dosage"],
         )
 
         assert fact.fact_text.startswith("Ashwagandha extract")
-        assert fact.structured_metadata.primary_entities == ["Ashwagandha", "stress", "anxiety"]
+        assert fact.structured_metadata.primary_entities == [
+            "Ashwagandha",
+            "stress",
+            "anxiety",
+        ]
         assert fact.extraction_confidence == 0.9
         assert fact.fact_type == "methodological"
         assert fact.id.startswith("fact_")
@@ -59,7 +62,7 @@ class TestHybridFact:
             source_chunk_id="chunk_123",
             source_document_id="doc_456",
             extraction_confidence=0.8,
-            fact_type="definition"
+            fact_type="definition",
         )
 
         assert fact.get_display_text() == "This is a complete fact statement."
@@ -74,7 +77,7 @@ class TestHybridFact:
             source_chunk_id="chunk_123",
             source_document_id="doc_456",
             extraction_confidence=0.8,
-            fact_type="definition"
+            fact_type="definition",
         )
         assert fact.is_complete()
 
@@ -84,7 +87,7 @@ class TestHybridFact:
             source_chunk_id="chunk_123",
             source_document_id="doc_456",
             extraction_confidence=0.8,
-            fact_type="definition"
+            fact_type="definition",
         )
         assert not empty_fact.is_complete()
 
@@ -93,7 +96,7 @@ class TestHybridFact:
         metadata = StructuredMetadata(
             primary_entities=["entity1", "entity2"],
             relationships=["relates_to"],
-            domain_concepts=["concept1"]
+            domain_concepts=["concept1"],
         )
 
         fact = Fact(
@@ -103,7 +106,7 @@ class TestHybridFact:
             source_document_id="doc_456",
             extraction_confidence=0.8,
             fact_type="definition",
-            keywords=["keyword1", "keyword2"]
+            keywords=["keyword1", "keyword2"],
         )
 
         search_text = fact.get_search_text()
@@ -120,7 +123,7 @@ class TestHybridFact:
         metadata = StructuredMetadata(
             primary_entities=["entity1"],
             relationships=["relates_to"],
-            domain_concepts=["concept1"]
+            domain_concepts=["concept1"],
         )
 
         original_fact = Fact(
@@ -129,7 +132,7 @@ class TestHybridFact:
             source_chunk_id="chunk_123",
             source_document_id="doc_456",
             extraction_confidence=0.8,
-            fact_type="definition"
+            fact_type="definition",
         )
 
         # Convert to dict
@@ -141,8 +144,13 @@ class TestHybridFact:
         # Convert back to fact
         restored_fact = Fact.from_dict(fact_dict)
         assert restored_fact.fact_text == original_fact.fact_text
-        assert restored_fact.structured_metadata.primary_entities == original_fact.structured_metadata.primary_entities
-        assert restored_fact.extraction_confidence == original_fact.extraction_confidence
+        assert (
+            restored_fact.structured_metadata.primary_entities
+            == original_fact.structured_metadata.primary_entities
+        )
+        assert (
+            restored_fact.extraction_confidence == original_fact.extraction_confidence
+        )
 
 
 class TestHybridFactExtraction:
@@ -158,16 +166,13 @@ class TestHybridFactExtraction:
     @pytest.fixture
     def fact_extractor(self, mock_llm_client):
         """Create fact extractor with mocked LLM."""
-        return FactExtractor(
-            llm_client=mock_llm_client,
-            max_facts_per_chunk=5
-        )
+        return FactExtractor(llm_client=mock_llm_client, max_facts_per_chunk=5)
 
     @pytest.mark.asyncio
     async def test_hybrid_fact_extraction_response_parsing(self, fact_extractor):
         """Test parsing of hybrid fact extraction response."""
         # Mock LLM response with hybrid format
-        mock_response = '''[
+        mock_response = """[
           {
             "fact_text": "PostgreSQL query performance can be optimized by creating B-tree indexes on frequently queried columns using CREATE INDEX syntax, with composite queries requiring multi-column indexes where the most selective column is placed first.",
             "structured_metadata": {
@@ -179,7 +184,7 @@ class TestHybridFactExtraction:
             "confidence": 0.95,
             "keywords": ["PostgreSQL", "B-tree index", "query optimization"]
           }
-        ]'''
+        ]"""
 
         fact_extractor.llm_client.generate.return_value = mock_response
 
@@ -188,7 +193,7 @@ class TestHybridFactExtraction:
             chunk_text="Sample text about PostgreSQL optimization",
             chunk_id="chunk_123",
             document_id="doc_456",
-            context={"domain": "technical", "language": "en"}
+            context={"domain": "technical", "language": "en"},
         )
 
         assert len(facts) == 1
@@ -199,8 +204,6 @@ class TestHybridFactExtraction:
         assert "CREATE INDEX" in fact.structured_metadata.domain_concepts
         assert fact.fact_type == "methodological"
         assert fact.extraction_confidence == 0.95
-
-
 
 
 class TestHybridFactEntityConversion:
@@ -216,7 +219,7 @@ class TestHybridFactEntityConversion:
         metadata = StructuredMetadata(
             primary_entities=["PostgreSQL", "B-tree index", "query performance"],
             relationships=["optimizes", "improves"],
-            domain_concepts=["database optimization", "indexing strategy"]
+            domain_concepts=["database optimization", "indexing strategy"],
         )
 
         fact = Fact(
@@ -226,10 +229,12 @@ class TestHybridFactEntityConversion:
             source_document_id="doc_456",
             extraction_confidence=0.9,
             fact_type="methodological",
-            keywords=["PostgreSQL", "optimization"]
+            keywords=["PostgreSQL", "optimization"],
         )
 
-        entities, relationships = fact_entity_converter.convert_facts_to_entities([fact])
+        entities, relationships = fact_entity_converter.convert_facts_to_entities(
+            [fact]
+        )
 
         # Should create entities from primary_entities, domain_concepts, and keywords
         entity_names = [e.name for e in entities]

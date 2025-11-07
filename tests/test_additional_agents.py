@@ -1,19 +1,22 @@
 """Tests for additional PydanticAI agents (summarization, query analysis)."""
 
-import pytest
 import asyncio
-import sys
 import os
+import sys
+
+import pytest
 
 # Add the packages directory to the Python path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'packages', 'morag-core', 'src'))
+sys.path.insert(
+    0, os.path.join(os.path.dirname(__file__), "..", "packages", "morag-core", "src")
+)
 
 from morag_core.ai import (
-    SummarizationAgent,
-    QueryAnalysisAgent,
-    SummaryResult,
-    QueryAnalysisResult,
     ConfidenceLevel,
+    QueryAnalysisAgent,
+    QueryAnalysisResult,
+    SummarizationAgent,
+    SummaryResult,
 )
 
 
@@ -47,10 +50,7 @@ class TestSummarizationAgent:
 
         text = "This is a sample text for testing."
         prompt = agent._build_summarization_prompt(
-            text=text,
-            max_length=100,
-            style="concise",
-            context="Test context"
+            text=text, max_length=100, style="concise", context="Test context"
         )
 
         assert "concise" in prompt.lower()
@@ -100,12 +100,14 @@ class TestSummarizationAgent:
             "concise": "concise",
             "detailed": "comprehensive",
             "bullet": "bullet",
-            "abstract": "abstract"
+            "abstract": "abstract",
         }
 
         for style, expected_word in style_tests.items():
             prompt = agent._build_summarization_prompt(text, 100, style, None)
-            assert expected_word in prompt.lower(), f"Expected '{expected_word}' in prompt for style '{style}'"
+            assert (
+                expected_word in prompt.lower()
+            ), f"Expected '{expected_word}' in prompt for style '{style}'"
 
     @pytest.mark.asyncio
     async def test_interface_compatibility(self):
@@ -117,23 +119,23 @@ class TestSummarizationAgent:
 
         # Check summarize_text signature
         sig = inspect.signature(agent.summarize_text)
-        assert 'text' in sig.parameters
-        assert 'max_length' in sig.parameters
-        assert 'style' in sig.parameters
-        assert 'context' in sig.parameters
+        assert "text" in sig.parameters
+        assert "max_length" in sig.parameters
+        assert "style" in sig.parameters
+        assert "context" in sig.parameters
 
         # Check summarize_document signature
         sig = inspect.signature(agent.summarize_document)
-        assert 'text' in sig.parameters
-        assert 'title' in sig.parameters
-        assert 'document_type' in sig.parameters
-        assert 'max_length' in sig.parameters
+        assert "text" in sig.parameters
+        assert "title" in sig.parameters
+        assert "document_type" in sig.parameters
+        assert "max_length" in sig.parameters
 
         # Check summarize_chunks signature
         sig = inspect.signature(agent.summarize_chunks)
-        assert 'chunks' in sig.parameters
-        assert 'max_length' in sig.parameters
-        assert 'preserve_structure' in sig.parameters
+        assert "chunks" in sig.parameters
+        assert "max_length" in sig.parameters
+        assert "preserve_structure" in sig.parameters
 
 
 class TestQueryAnalysisAgent:
@@ -230,9 +232,10 @@ class TestQueryAnalysisAgent:
 
         # Test method signature
         import inspect
+
         sig = inspect.signature(agent.extract_search_terms)
-        assert 'query' in sig.parameters
-        assert 'expand_terms' in sig.parameters
+        assert "query" in sig.parameters
+        assert "expand_terms" in sig.parameters
 
         # Test with simple query (would normally call API)
         # Here we're just testing the interface exists
@@ -248,19 +251,19 @@ class TestQueryAnalysisAgent:
 
         # Check analyze_query signature
         sig = inspect.signature(agent.analyze_query)
-        assert 'query' in sig.parameters
-        assert 'context' in sig.parameters
-        assert 'user_history' in sig.parameters
+        assert "query" in sig.parameters
+        assert "context" in sig.parameters
+        assert "user_history" in sig.parameters
 
         # Check analyze_batch_queries signature
         sig = inspect.signature(agent.analyze_batch_queries)
-        assert 'queries' in sig.parameters
-        assert 'context' in sig.parameters
+        assert "queries" in sig.parameters
+        assert "context" in sig.parameters
 
         # Check extract_search_terms signature
         sig = inspect.signature(agent.extract_search_terms)
-        assert 'query' in sig.parameters
-        assert 'expand_terms' in sig.parameters
+        assert "query" in sig.parameters
+        assert "expand_terms" in sig.parameters
 
 
 class TestAgentIntegration:
@@ -303,8 +306,12 @@ class TestAgentIntegration:
         assert isinstance(query_result, QueryAnalysisResult)
 
         # Both should have appropriate confidence levels for empty input
-        assert summary_result.confidence in [ConfidenceLevel.HIGH]  # Empty is handled well
-        assert query_result.confidence == ConfidenceLevel.LOW  # Empty query is problematic
+        assert summary_result.confidence in [
+            ConfidenceLevel.HIGH
+        ]  # Empty is handled well
+        assert (
+            query_result.confidence == ConfidenceLevel.LOW
+        )  # Empty query is problematic
 
     def test_agent_configuration(self):
         """Test agent configuration options."""
@@ -318,7 +325,7 @@ class TestAgentIntegration:
 
         # Test query analysis agent (no specific config for now)
         agent3 = QueryAnalysisAgent()
-        assert hasattr(agent3, 'logger')
+        assert hasattr(agent3, "logger")
 
     def test_logging_setup(self):
         """Test that agents have proper logging setup."""
@@ -328,7 +335,7 @@ class TestAgentIntegration:
         ]
 
         for agent in agents:
-            assert hasattr(agent, 'logger')
+            assert hasattr(agent, "logger")
             assert agent.logger is not None
 
 

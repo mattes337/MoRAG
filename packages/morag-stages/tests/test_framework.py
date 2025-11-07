@@ -3,6 +3,9 @@
 import asyncio
 import json
 import shutil
+
+# Add path for stage imports
+import sys
 import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -10,8 +13,6 @@ from typing import Any, Dict, List, Optional
 import pytest
 import structlog
 
-# Add path for stage imports
-import sys
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from morag_stages import StageManager, StageType
@@ -53,7 +54,7 @@ class StageTestFramework:
     def create_test_file(self, filename: str, content: str) -> Path:
         """Create a test file with given content."""
         file_path = self.test_data_dir / filename
-        file_path.write_text(content, encoding='utf-8')
+        file_path.write_text(content, encoding="utf-8")
         return file_path
 
     def create_test_markdown(self, filename: str = "test.md") -> Path:
@@ -90,7 +91,7 @@ This document contains various topics that can be used for testing fact extracti
                 "title": "Test Document",
                 "content_type": "document",
                 "source_file": "test_input.pdf",
-                "processed_at": "2024-01-01T00:00:00"
+                "processed_at": "2024-01-01T00:00:00",
             },
             "summary": "This is a test document that covers artificial intelligence, machine learning, data science, and natural language processing topics.",
             "chunk_count": 3,
@@ -102,8 +103,8 @@ This document contains various topics that can be used for testing fact extracti
                     "embedding": [0.1] * 1536,
                     "source_metadata": {
                         "title": "Test Document",
-                        "section": "Section 1"
-                    }
+                        "section": "Section 1",
+                    },
                 },
                 {
                     "index": 1,
@@ -112,8 +113,8 @@ This document contains various topics that can be used for testing fact extracti
                     "embedding": [0.2] * 1536,
                     "source_metadata": {
                         "title": "Test Document",
-                        "section": "Section 2"
-                    }
+                        "section": "Section 2",
+                    },
                 },
                 {
                     "index": 2,
@@ -122,14 +123,14 @@ This document contains various topics that can be used for testing fact extracti
                     "embedding": [0.3] * 1536,
                     "source_metadata": {
                         "title": "Test Document",
-                        "section": "Conclusion"
-                    }
-                }
-            ]
+                        "section": "Conclusion",
+                    },
+                },
+            ],
         }
 
         file_path = self.test_data_dir / filename
-        file_path.write_text(json.dumps(chunks_data, indent=2), encoding='utf-8')
+        file_path.write_text(json.dumps(chunks_data, indent=2), encoding="utf-8")
         return file_path
 
     def create_test_facts_json(self, filename: str = "test.facts.json") -> Path:
@@ -143,7 +144,7 @@ This document contains various topics that can be used for testing fact extracti
                     "object": "artificial intelligence",
                     "confidence": 0.9,
                     "source_chunk_index": 0,
-                    "domain": "technology"
+                    "domain": "technology",
                 },
                 {
                     "statement": "Machine learning is related to data science",
@@ -152,8 +153,8 @@ This document contains various topics that can be used for testing fact extracti
                     "object": "data science",
                     "confidence": 0.85,
                     "source_chunk_index": 1,
-                    "domain": "technology"
-                }
+                    "domain": "technology",
+                },
             ],
             "entities": [
                 {
@@ -161,22 +162,22 @@ This document contains various topics that can be used for testing fact extracti
                     "normalized_name": "artificial_intelligence",
                     "entity_type": "Technology",
                     "confidence": 0.95,
-                    "mentions": 2
+                    "mentions": 2,
                 },
                 {
                     "name": "machine learning",
                     "normalized_name": "machine_learning",
                     "entity_type": "Technology",
                     "confidence": 0.9,
-                    "mentions": 1
+                    "mentions": 1,
                 },
                 {
                     "name": "data science",
                     "normalized_name": "data_science",
                     "entity_type": "Field",
                     "confidence": 0.88,
-                    "mentions": 1
-                }
+                    "mentions": 1,
+                },
             ],
             "relations": [
                 {
@@ -184,15 +185,15 @@ This document contains various topics that can be used for testing fact extracti
                     "predicate": "IS_PART_OF",
                     "object": "artificial intelligence",
                     "confidence": 0.9,
-                    "relation_type": "hierarchical"
+                    "relation_type": "hierarchical",
                 },
                 {
                     "subject": "data science",
                     "predicate": "USES",
                     "object": "machine learning",
                     "confidence": 0.85,
-                    "relation_type": "functional"
-                }
+                    "relation_type": "functional",
+                },
             ],
             "keywords": [
                 "artificial intelligence",
@@ -200,26 +201,28 @@ This document contains various topics that can be used for testing fact extracti
                 "data science",
                 "natural language processing",
                 "testing",
-                "fact extraction"
-            ]
+                "fact extraction",
+            ],
         }
 
         file_path = self.test_data_dir / filename
-        file_path.write_text(json.dumps(facts_data, indent=2), encoding='utf-8')
+        file_path.write_text(json.dumps(facts_data, indent=2), encoding="utf-8")
         return file_path
 
-    def create_context(self, source_file: Path, config: Optional[Dict[str, Any]] = None) -> StageContext:
+    def create_context(
+        self, source_file: Path, config: Optional[Dict[str, Any]] = None
+    ) -> StageContext:
         """Create a stage context for testing."""
         return StageContext(
-            source_path=source_file,
-            output_dir=self.output_dir,
-            config=config or {}
+            source_path=source_file, output_dir=self.output_dir, config=config or {}
         )
 
-    async def execute_stage_test(self,
-                                stage_type: StageType,
-                                input_files: List[Path],
-                                config: Optional[Dict[str, Any]] = None):
+    async def execute_stage_test(
+        self,
+        stage_type: StageType,
+        input_files: List[Path],
+        config: Optional[Dict[str, Any]] = None,
+    ):
         """Execute a stage for testing."""
 
         context = self.create_context(input_files[0], config)
@@ -228,33 +231,50 @@ This document contains various topics that can be used for testing fact extracti
 
     def assert_stage_success(self, result):
         """Assert that stage execution was successful."""
-        assert result.status == StageStatus.COMPLETED, f"Stage failed with status: {result.status}, error: {result.error_message}"
+        assert (
+            result.status == StageStatus.COMPLETED
+        ), f"Stage failed with status: {result.status}, error: {result.error_message}"
         assert result.error_message is None, f"Stage had error: {result.error_message}"
         assert len(result.output_files) > 0, "Stage produced no output files"
-        assert all(f.exists() for f in result.output_files), "Some output files do not exist"
+        assert all(
+            f.exists() for f in result.output_files
+        ), "Some output files do not exist"
 
     def assert_stage_skipped(self, result):
         """Assert that stage execution was skipped."""
-        assert result.status == StageStatus.SKIPPED, f"Expected stage to be skipped, got: {result.status}"
-        assert len(result.output_files) > 0, "Skipped stage should still have output files"
+        assert (
+            result.status == StageStatus.SKIPPED
+        ), f"Expected stage to be skipped, got: {result.status}"
+        assert (
+            len(result.output_files) > 0
+        ), "Skipped stage should still have output files"
 
-    def assert_file_content(self, file_path: Path, expected_content: Optional[str] = None, min_length: Optional[int] = None):
+    def assert_file_content(
+        self,
+        file_path: Path,
+        expected_content: Optional[str] = None,
+        min_length: Optional[int] = None,
+    ):
         """Assert file content meets expectations."""
         assert file_path.exists(), f"File {file_path} does not exist"
 
-        content = file_path.read_text(encoding='utf-8')
+        content = file_path.read_text(encoding="utf-8")
 
         if expected_content:
-            assert expected_content in content, f"Expected content '{expected_content}' not found in file"
+            assert (
+                expected_content in content
+            ), f"Expected content '{expected_content}' not found in file"
 
         if min_length:
-            assert len(content) >= min_length, f"File content too short: {len(content)} < {min_length}"
+            assert (
+                len(content) >= min_length
+            ), f"File content too short: {len(content)} < {min_length}"
 
     def assert_json_structure(self, file_path: Path, required_keys: List[str]):
         """Assert JSON file has required structure."""
         assert file_path.exists(), f"JSON file {file_path} does not exist"
 
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
         for key in required_keys:
@@ -265,7 +285,9 @@ This document contains various topics that can be used for testing fact extracti
         for file_path in files:
             if file_path.name.endswith(extension):
                 return file_path
-        raise AssertionError(f"No file with extension '{extension}' found in {[f.name for f in files]}")
+        raise AssertionError(
+            f"No file with extension '{extension}' found in {[f.name for f in files]}"
+        )
 
 
 @pytest.fixture

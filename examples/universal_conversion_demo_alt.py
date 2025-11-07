@@ -11,14 +11,14 @@ Usage:
 
 import asyncio
 import sys
-from pathlib import Path
 import tempfile
+from pathlib import Path
 
 # Add the src directory to the path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
+from morag_core.interfaces.converter import ChunkingStrategy, ConversionOptions
 from morag_document.converters import DocumentConverter
-from morag_core.interfaces.converter import ConversionOptions, ChunkingStrategy
 
 
 async def demo_text_conversion():
@@ -38,7 +38,9 @@ Features:
 
 This shows how the universal converter works with plain text files."""
 
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as f:
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".txt", delete=False, encoding="utf-8"
+    ) as f:
         f.write(sample_text)
         text_file = Path(f.name)
 
@@ -46,14 +48,13 @@ This shows how the universal converter works with plain text files."""
         converter = DocumentConverter()
 
         # Test different chunking strategies
-        strategies = ['page', 'paragraph', 'sentence']
+        strategies = ["page", "paragraph", "sentence"]
 
         for strategy in strategies:
             print(f"\n🔄 Converting with {strategy} chunking...")
 
             options = ConversionOptions(
-                chunking_strategy=ChunkingStrategy(strategy),
-                include_metadata=True
+                chunking_strategy=ChunkingStrategy(strategy), include_metadata=True
             )
 
             result = await converter.convert_to_markdown(text_file, options)
@@ -91,7 +92,7 @@ async def demo_pdf_conversion():
     options = ConversionOptions(
         chunking_strategy=ChunkingStrategy.PAGE,
         include_metadata=True,
-        extract_images=False  # Skip images for demo
+        extract_images=False,  # Skip images for demo
     )
 
     print("🔄 Converting PDF (this may take a while)...")
@@ -124,7 +125,7 @@ async def demo_format_detection():
         "video.mp4",
         "webpage.html",
         "text.txt",
-        "markdown.md"
+        "markdown.md",
     ]
 
     print("Format detection results:")
@@ -150,7 +151,7 @@ async def demo_converter_info():
     for format_type, details in info.items():
         print(f"  {format_type}:")
         print(f"    Primary: {details['primary_converter']}")
-        if details['fallback_converters']:
+        if details["fallback_converters"]:
             print(f"    Fallbacks: {', '.join(details['fallback_converters'])}")
 
 
@@ -161,15 +162,23 @@ async def demo_quality_assessment():
 
     # Create sample content with different quality levels
     samples = [
-        ("High Quality", "# Document\n\n## Section 1\n\nWell structured content with proper headings.\n\n## Section 2\n\nMore content here."),
-        ("Medium Quality", "Document\n\nSome content without proper structure.\n\nMore text here."),
-        ("Low Quality", "just some text without any structure at all")
+        (
+            "High Quality",
+            "# Document\n\n## Section 1\n\nWell structured content with proper headings.\n\n## Section 2\n\nMore content here.",
+        ),
+        (
+            "Medium Quality",
+            "Document\n\nSome content without proper structure.\n\nMore text here.",
+        ),
+        ("Low Quality", "just some text without any structure at all"),
     ]
 
     converter = DocumentConverter()
 
     for name, content in samples:
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as f:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".txt", delete=False, encoding="utf-8"
+        ) as f:
             f.write(content)
             temp_file = Path(f.name)
 
@@ -213,6 +222,7 @@ async def main():
     except Exception as e:
         print(f"❌ Demo failed: {str(e)}")
         import traceback
+
         traceback.print_exc()
 
 

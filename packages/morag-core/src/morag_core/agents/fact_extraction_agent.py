@@ -1,9 +1,9 @@
 """Fact extraction agent using Outlines for guaranteed structured output."""
 
-from typing import Type, List, Optional, Dict, Any
+from typing import Any, Dict, List, Optional, Type
 
-from ..ai.base_agent import MoRAGBaseAgent, AgentConfig
-from ..ai.models import FactExtractionResult, ExtractedFact, ConfidenceLevel
+from ..ai.base_agent import AgentConfig, MoRAGBaseAgent
+from ..ai.models import ConfidenceLevel, ExtractedFact, FactExtractionResult
 from ..utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -22,15 +22,22 @@ class FactExtractionAgent(MoRAGBaseAgent[FactExtractionResult]):
             config = AgentConfig(
                 model="google-gla:gemini-1.5-flash",
                 temperature=0.1,
-                outlines_provider="gemini"
+                outlines_provider="gemini",
             )
 
         super().__init__(config)
 
         # Fact extraction specific configuration
         self.fact_types = [
-            "statistical", "causal", "technical", "definition", "procedural",
-            "declarative", "regulatory", "temporal", "comparative"
+            "statistical",
+            "causal",
+            "technical",
+            "definition",
+            "procedural",
+            "declarative",
+            "regulatory",
+            "temporal",
+            "comparative",
         ]
         self.max_facts = 20
         self.min_confidence = 0.5
@@ -103,7 +110,7 @@ IMPORTANT:
         domain: str = "general",
         query_context: Optional[str] = None,
         max_facts: Optional[int] = None,
-        min_confidence: Optional[float] = None
+        min_confidence: Optional[float] = None,
     ) -> FactExtractionResult:
         """Extract facts from text with guaranteed structured output.
 
@@ -124,7 +131,7 @@ IMPORTANT:
                 confidence=ConfidenceLevel.HIGH,
                 domain=domain,
                 language="en",
-                metadata={"error": "Empty text", "domain": domain}
+                metadata={"error": "Empty text", "domain": domain},
             )
 
         # Update configuration for this extraction
@@ -138,7 +145,7 @@ IMPORTANT:
             text_length=len(text),
             domain=domain,
             has_query_context=query_context is not None,
-            structured_generation=self.is_outlines_available()
+            structured_generation=self.is_outlines_available(),
         )
 
         # Prepare the extraction prompt
@@ -155,7 +162,7 @@ IMPORTANT:
                 "Fact extraction completed",
                 facts_extracted=result.total_facts,
                 confidence=result.confidence,
-                used_outlines=self.is_outlines_available()
+                used_outlines=self.is_outlines_available(),
             )
 
             return result
@@ -169,18 +176,14 @@ IMPORTANT:
                 confidence=ConfidenceLevel.LOW,
                 domain=domain,
                 language="en",
-                metadata={
-                    "error": str(e),
-                    "domain": domain,
-                    "fallback": True
-                }
+                metadata={"error": str(e), "domain": domain, "fallback": True},
             )
 
     async def extract_facts_batch(
         self,
         texts: List[str],
         domain: str = "general",
-        query_context: Optional[str] = None
+        query_context: Optional[str] = None,
     ) -> List[FactExtractionResult]:
         """Extract facts from multiple texts.
 
@@ -196,9 +199,7 @@ IMPORTANT:
             return []
 
         self.logger.info(
-            "Starting batch fact extraction",
-            batch_size=len(texts),
-            domain=domain
+            "Starting batch fact extraction", batch_size=len(texts), domain=domain
         )
 
         results = []
@@ -212,28 +213,25 @@ IMPORTANT:
 
             except Exception as e:
                 self.logger.warning(
-                    "Failed to extract facts from text",
-                    text_index=i,
-                    error=str(e)
+                    "Failed to extract facts from text", text_index=i, error=str(e)
                 )
                 # Add fallback result
-                results.append(FactExtractionResult(
-                    facts=[],
-                    total_facts=0,
-                    confidence=ConfidenceLevel.LOW,
-                    domain=domain,
-                    language="en",
-                    metadata={"error": str(e), "text_index": i}
-                ))
+                results.append(
+                    FactExtractionResult(
+                        facts=[],
+                        total_facts=0,
+                        confidence=ConfidenceLevel.LOW,
+                        domain=domain,
+                        language="en",
+                        metadata={"error": str(e), "text_index": i},
+                    )
+                )
 
         self.logger.info(f"Batch fact extraction completed for {len(results)} texts")
         return results
 
     def _create_extraction_prompt(
-        self,
-        text: str,
-        domain: str,
-        query_context: Optional[str] = None
+        self, text: str, domain: str, query_context: Optional[str] = None
     ) -> str:
         """Create the extraction prompt for the given text and domain.
 
@@ -269,10 +267,7 @@ Extract high-quality, self-contained facts that provide valuable information abo
         return prompt
 
     def _post_process_result(
-        self,
-        result: FactExtractionResult,
-        original_text: str,
-        domain: str
+        self, result: FactExtractionResult, original_text: str, domain: str
     ) -> FactExtractionResult:
         """Post-process the extraction result.
 
@@ -286,30 +281,31 @@ Extract high-quality, self-contained facts that provide valuable information abo
         """
         # Filter facts by confidence threshold
         filtered_facts = [
-            fact for fact in result.facts
-            if fact.confidence >= self.min_confidence
+            fact for fact in result.facts if fact.confidence >= self.min_confidence
         ]
 
         # Limit to max_facts
         if len(filtered_facts) > self.max_facts:
             # Sort by confidence and take top facts
             filtered_facts = sorted(
-                filtered_facts,
-                key=lambda f: f.confidence,
-                reverse=True
-            )[:self.max_facts]
+                filtered_facts, key=lambda f: f.confidence, reverse=True
+            )[: self.max_facts]
 
         # Update metadata
         metadata = result.metadata or {}
-        metadata.update({
-            "domain": domain,
-            "original_fact_count": len(result.facts),
-            "filtered_fact_count": len(filtered_facts),
-            "text_length": len(original_text),
-            "min_confidence_threshold": self.min_confidence,
-            "max_facts_limit": self.max_facts,
-            "extraction_method": "outlines" if self.is_outlines_available() else "fallback"
-        })
+        metadata.update(
+            {
+                "domain": domain,
+                "original_fact_count": len(result.facts),
+                "filtered_fact_count": len(filtered_facts),
+                "text_length": len(original_text),
+                "min_confidence_threshold": self.min_confidence,
+                "max_facts_limit": self.max_facts,
+                "extraction_method": "outlines"
+                if self.is_outlines_available()
+                else "fallback",
+            }
+        )
 
         # Create updated result
         return FactExtractionResult(
@@ -318,5 +314,5 @@ Extract high-quality, self-contained facts that provide valuable information abo
             confidence=result.confidence,
             domain=domain,
             language=result.language,
-            metadata=metadata
+            metadata=metadata,
         )

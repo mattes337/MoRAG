@@ -2,11 +2,12 @@
 
 import asyncio
 import json
-from typing import List, Dict, Any, Optional, Tuple
-import structlog
+from typing import Any, Dict, List, Optional, Tuple
 
+import structlog
+from morag_core.exceptions import ExternalServiceError, ProcessingError
 from morag_core.models.document import Document, DocumentChunk
-from morag_core.exceptions import ProcessingError, ExternalServiceError
+
 from .embedding import GeminiEmbeddingService
 
 logger = structlog.get_logger(__name__)
@@ -35,9 +36,7 @@ class ContextualRetrievalService:
             self._initialized = True
 
     async def generate_contextual_chunks(
-        self,
-        document: Document,
-        max_context_length: int = 500
+        self, document: Document, max_context_length: int = 500
     ) -> List[Dict[str, Any]]:
         """Generate contextual chunks with summaries for improved retrieval.
 
@@ -56,7 +55,9 @@ class ContextualRetrievalService:
 
         try:
             # Generate document summary for context
-            document_summary = await self._generate_document_summary(document, max_context_length)
+            document_summary = await self._generate_document_summary(
+                document, max_context_length
+            )
 
             contextual_chunks = []
 
@@ -71,8 +72,7 @@ class ContextualRetrievalService:
 
                 # Generate dense embedding for enhanced content
                 dense_embedding = await self.embedding_service.generate_embedding(
-                    enhanced_content,
-                    task_type="retrieval_document"
+                    enhanced_content, task_type="retrieval_document"
                 )
 
                 # Generate sparse embedding for original content (keyword-based)
@@ -94,32 +94,40 @@ class ContextualRetrievalService:
                         "document_title": document.metadata.title,
                         "has_contextual_summary": True,
                         "context_length": len(contextual_summary),
-                        **chunk.metadata
-                    }
+                        **chunk.metadata,
+                    },
                 }
 
                 contextual_chunks.append(contextual_chunk)
 
-                logger.debug("Generated contextual chunk",
-                           chunk_index=i,
-                           context_length=len(contextual_summary),
-                           enhanced_content_length=len(enhanced_content))
+                logger.debug(
+                    "Generated contextual chunk",
+                    chunk_index=i,
+                    context_length=len(contextual_summary),
+                    enhanced_content_length=len(enhanced_content),
+                )
 
-            logger.info("Generated contextual chunks for document",
-                       document_id=document.metadata.document_id,
-                       chunk_count=len(contextual_chunks),
-                       document_summary_length=len(document_summary))
+            logger.info(
+                "Generated contextual chunks for document",
+                document_id=document.metadata.document_id,
+                chunk_count=len(contextual_chunks),
+                document_summary_length=len(document_summary),
+            )
 
             return contextual_chunks
 
         except Exception as e:
-            logger.error("Failed to generate contextual chunks",
-                        error=str(e),
-                        error_type=e.__class__.__name__,
-                        document_id=document.metadata.document_id)
+            logger.error(
+                "Failed to generate contextual chunks",
+                error=str(e),
+                error_type=e.__class__.__name__,
+                document_id=document.metadata.document_id,
+            )
             raise ProcessingError(f"Contextual retrieval processing failed: {str(e)}")
 
-    async def _generate_document_summary(self, document: Document, max_length: int) -> str:
+    async def _generate_document_summary(
+        self, document: Document, max_length: int
+    ) -> str:
         """Generate a summary of the entire document for context.
 
         Args:
@@ -131,34 +139,47 @@ class ContextualRetrievalService:
         """
         try:
             # Use the embedding service's summarization capability
-            full_text = document.raw_text or "\n\n".join([chunk.content for chunk in document.chunks])
+            full_text = document.raw_text or "\n\n".join(
+                [chunk.content for chunk in document.chunks]
+            )
 
             if not full_text:
                 return "Document content not available."
 
             # Generate summary using Gemini
-            language = document.metadata.get("language") if hasattr(document, 'metadata') else None
+            language = (
+                document.metadata.get("language")
+                if hasattr(document, "metadata")
+                else None
+            )
             summary_result = await self.embedding_service.generate_summary(
-                full_text,
-                max_length=max_length,
-                language=language
+                full_text, max_length=max_length, language=language
             )
 
-            return summary_result.summary if hasattr(summary_result, 'summary') else str(summary_result)
+            return (
+                summary_result.summary
+                if hasattr(summary_result, "summary")
+                else str(summary_result)
+            )
 
         except Exception as e:
-            logger.warning("Failed to generate document summary, using fallback",
-                          error=str(e))
+            logger.warning(
+                "Failed to generate document summary, using fallback", error=str(e)
+            )
             # Fallback: use first few sentences
-            sentences = full_text.split('. ')[:3]
-            return '. '.join(sentences) + '.' if sentences else "Document summary not available."
+            sentences = full_text.split(". ")[:3]
+            return (
+                ". ".join(sentences) + "."
+                if sentences
+                else "Document summary not available."
+            )
 
     async def _generate_chunk_context(
         self,
         chunk: DocumentChunk,
         document_summary: str,
         document: Document,
-        max_length: int
+        max_length: int,
     ) -> str:
         """Generate contextual summary for a specific chunk.
 
@@ -187,22 +208,27 @@ Chunk Content:
 
             # Generate contextual summary using Gemini
             summary_result = await self.embedding_service.summarize(
-                context_prompt,
-                max_length=max_length
+                context_prompt, max_length=max_length
             )
 
-            context = summary_result.summary if hasattr(summary_result, 'summary') else str(summary_result)
+            context = (
+                summary_result.summary
+                if hasattr(summary_result, "summary")
+                else str(summary_result)
+            )
 
             # Ensure context is within length limit
             if len(context) > max_length:
-                context = context[:max_length-3] + "..."
+                context = context[: max_length - 3] + "..."
 
             return context
 
         except Exception as e:
-            logger.warning("Failed to generate chunk context, using fallback",
-                          error=str(e),
-                          chunk_index=getattr(chunk, 'index', 'unknown'))
+            logger.warning(
+                "Failed to generate chunk context, using fallback",
+                error=str(e),
+                chunk_index=getattr(chunk, "index", "unknown"),
+            )
 
             # Fallback context
             section_info = f" from section '{chunk.section}'" if chunk.section else ""
@@ -225,7 +251,7 @@ Chunk Content:
             from collections import Counter
 
             # Extract keywords (simple approach)
-            words = re.findall(r'\b[a-zA-Z]{3,}\b', text.lower())
+            words = re.findall(r"\b[a-zA-Z]{3,}\b", text.lower())
             word_counts = Counter(words)
 
             # Calculate simple TF scores
@@ -239,15 +265,14 @@ Chunk Content:
             return sparse_embedding
 
         except Exception as e:
-            logger.warning("Failed to generate sparse embedding",
-                          error=str(e))
+            logger.warning("Failed to generate sparse embedding", error=str(e))
             return {}
 
     async def store_contextual_chunks(
         self,
         contextual_chunks: List[Dict[str, Any]],
         vector_storage,
-        collection_name: Optional[str] = None
+        collection_name: Optional[str] = None,
     ) -> List[str]:
         """Store contextual chunks in vector database with dual embeddings.
 
@@ -266,13 +291,15 @@ Chunk Content:
                 # Store dense embedding
                 dense_point_id = await vector_storage.store_vectors(
                     vectors=[chunk_data["dense_embedding"]],
-                    metadata=[{
-                        **chunk_data["metadata"],
-                        "content": chunk_data["enhanced_content"],
-                        "embedding_type": "dense",
-                        "contextual_summary": chunk_data["contextual_summary"]
-                    }],
-                    collection_name=collection_name
+                    metadata=[
+                        {
+                            **chunk_data["metadata"],
+                            "content": chunk_data["enhanced_content"],
+                            "embedding_type": "dense",
+                            "contextual_summary": chunk_data["contextual_summary"],
+                        }
+                    ],
+                    collection_name=collection_name,
                 )
 
                 # Store sparse embedding metadata (Qdrant doesn't natively support sparse vectors)
@@ -281,7 +308,7 @@ Chunk Content:
                     "content": chunk_data["original_content"],
                     "embedding_type": "sparse",
                     "sparse_keywords": json.dumps(chunk_data["sparse_embedding"]),
-                    "contextual_summary": chunk_data["contextual_summary"]
+                    "contextual_summary": chunk_data["contextual_summary"],
                 }
 
                 # Create a dummy dense vector for sparse metadata storage
@@ -289,19 +316,23 @@ Chunk Content:
                 sparse_point_id = await vector_storage.store_vectors(
                     vectors=[dummy_vector],
                     metadata=[sparse_metadata],
-                    collection_name=collection_name
+                    collection_name=collection_name,
                 )
 
                 point_ids.extend(dense_point_id + sparse_point_id)
 
-            logger.info("Stored contextual chunks with dual embeddings",
-                       chunk_count=len(contextual_chunks),
-                       point_count=len(point_ids))
+            logger.info(
+                "Stored contextual chunks with dual embeddings",
+                chunk_count=len(contextual_chunks),
+                point_count=len(point_ids),
+            )
 
             return point_ids
 
         except Exception as e:
-            logger.error("Failed to store contextual chunks",
-                        error=str(e),
-                        error_type=e.__class__.__name__)
+            logger.error(
+                "Failed to store contextual chunks",
+                error=str(e),
+                error_type=e.__class__.__name__,
+            )
             raise ProcessingError(f"Failed to store contextual chunks: {str(e)}")

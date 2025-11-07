@@ -1,12 +1,12 @@
 """Tests for document deduplication service."""
 
-import pytest
-import tempfile
 import json
+import tempfile
 from pathlib import Path
-from fastapi.testclient import TestClient
-from unittest.mock import AsyncMock, patch, Mock
+from unittest.mock import AsyncMock, Mock, patch
 
+import pytest
+from fastapi.testclient import TestClient
 from morag.server import create_app
 from morag.services.document_deduplication_service import DocumentDeduplicationService
 
@@ -21,7 +21,7 @@ def client():
 @pytest.fixture
 def sample_text_file():
     """Create a sample text file for testing."""
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
         f.write("# Test Document\n\nThis is a test document for deduplication testing.")
         temp_path = Path(f.name)
 
@@ -61,7 +61,9 @@ class TestDocumentDeduplicationService:
         assert dedup_service.validate_document_id("") is False
         assert dedup_service.validate_document_id(None) is False
         assert dedup_service.validate_document_id("a" * 256) is False  # Too long
-        assert dedup_service.validate_document_id("doc<script>") is False  # Invalid chars
+        assert (
+            dedup_service.validate_document_id("doc<script>") is False
+        )  # Invalid chars
         assert dedup_service.validate_document_id("doc\nwith\nnewlines") is False
         assert dedup_service.validate_document_id("doc'with'quotes") is False
 
@@ -77,7 +79,9 @@ class TestDocumentDeduplicationService:
         assert doc_id != doc_id2
 
     @pytest.mark.asyncio
-    async def test_check_document_exists_not_found(self, dedup_service, mock_vector_storage):
+    async def test_check_document_exists_not_found(
+        self, dedup_service, mock_vector_storage
+    ):
         """Test checking for non-existent document."""
         mock_vector_storage.search_by_metadata.return_value = []
 
@@ -85,12 +89,13 @@ class TestDocumentDeduplicationService:
         assert result is None
 
         mock_vector_storage.search_by_metadata.assert_called_once_with(
-            filter_dict={"document_id": "non-existent-doc"},
-            limit=1
+            filter_dict={"document_id": "non-existent-doc"}, limit=1
         )
 
     @pytest.mark.asyncio
-    async def test_check_document_exists_found(self, dedup_service, mock_vector_storage):
+    async def test_check_document_exists_found(
+        self, dedup_service, mock_vector_storage
+    ):
         """Test checking for existing document."""
         mock_point = Mock()
         mock_point.payload = {
@@ -98,7 +103,7 @@ class TestDocumentDeduplicationService:
             "created_at": "2024-01-01T12:00:00Z",
             "original_filename": "test.txt",
             "content_type": "text/plain",
-            "file_size_bytes": 1024
+            "file_size_bytes": 1024,
         }
         mock_vector_storage.search_by_metadata.return_value = [mock_point]
 
@@ -117,7 +122,7 @@ class TestDocumentDeduplicationService:
             "status": "completed",
             "facts_count": 10,
             "keywords_count": 5,
-            "chunks_count": 3
+            "chunks_count": 3,
         }
 
         response = dedup_service.create_duplicate_error_response(existing_doc)
@@ -134,19 +139,21 @@ class TestDocumentDeduplicationService:
 class TestMarkdownConversionWithDeduplication:
     """Test markdown conversion endpoint with deduplication."""
 
-    @patch('morag.api_models.endpoints.conversion.get_deduplication_service')
-    def test_convert_with_new_document_id(self, mock_get_service, client, sample_text_file):
+    @patch("morag.api_models.endpoints.conversion.get_deduplication_service")
+    def test_convert_with_new_document_id(
+        self, mock_get_service, client, sample_text_file
+    ):
         """Test conversion with new document ID."""
         mock_service = AsyncMock()
         mock_service.validate_document_id.return_value = True
         mock_service.check_document_exists.return_value = None
         mock_get_service.return_value = mock_service
 
-        with open(sample_text_file, 'rb') as f:
+        with open(sample_text_file, "rb") as f:
             response = client.post(
                 "/api/convert/markdown",
                 files={"file": ("test.txt", f, "text/plain")},
-                data={"document_id": "test-doc-123"}
+                data={"document_id": "test-doc-123"},
             )
 
         assert response.status_code == 200
@@ -154,8 +161,10 @@ class TestMarkdownConversionWithDeduplication:
         assert data["success"] is True
         assert data["metadata"]["document_id"] == "test-doc-123"
 
-    @patch('morag.api_models.endpoints.conversion.get_deduplication_service')
-    def test_convert_with_existing_document_id(self, mock_get_service, client, sample_text_file):
+    @patch("morag.api_models.endpoints.conversion.get_deduplication_service")
+    def test_convert_with_existing_document_id(
+        self, mock_get_service, client, sample_text_file
+    ):
         """Test conversion with existing document ID."""
         mock_service = AsyncMock()
         mock_service.validate_document_id.return_value = True
@@ -163,18 +172,15 @@ class TestMarkdownConversionWithDeduplication:
             "document_id": "existing-doc",
             "created_at": "2024-01-01T12:00:00Z",
             "status": "completed",
-            "metadata": {
-                "content_type": "text/plain",
-                "file_size_bytes": 1024
-            }
+            "metadata": {"content_type": "text/plain", "file_size_bytes": 1024},
         }
         mock_get_service.return_value = mock_service
 
-        with open(sample_text_file, 'rb') as f:
+        with open(sample_text_file, "rb") as f:
             response = client.post(
                 "/api/convert/markdown",
                 files={"file": ("test.txt", f, "text/plain")},
-                data={"document_id": "existing-doc"}
+                data={"document_id": "existing-doc"},
             )
 
         assert response.status_code == 200
@@ -183,34 +189,37 @@ class TestMarkdownConversionWithDeduplication:
         assert data["metadata"]["status"] == "already_exists"
         assert data["metadata"]["document_id"] == "existing-doc"
 
-    @patch('morag.api_models.endpoints.conversion.get_deduplication_service')
-    def test_convert_with_invalid_document_id(self, mock_get_service, client, sample_text_file):
+    @patch("morag.api_models.endpoints.conversion.get_deduplication_service")
+    def test_convert_with_invalid_document_id(
+        self, mock_get_service, client, sample_text_file
+    ):
         """Test conversion with invalid document ID."""
         mock_service = Mock()
         mock_service.validate_document_id.return_value = False
         mock_get_service.return_value = mock_service
 
-        with open(sample_text_file, 'rb') as f:
+        with open(sample_text_file, "rb") as f:
             response = client.post(
                 "/api/convert/markdown",
                 files={"file": ("test.txt", f, "text/plain")},
-                data={"document_id": "invalid<id>"}
+                data={"document_id": "invalid<id>"},
             )
 
         assert response.status_code == 400
         assert "Invalid document ID format" in response.json()["detail"]
 
-    @patch('morag.api_models.endpoints.conversion.get_deduplication_service')
-    def test_convert_without_document_id(self, mock_get_service, client, sample_text_file):
+    @patch("morag.api_models.endpoints.conversion.get_deduplication_service")
+    def test_convert_without_document_id(
+        self, mock_get_service, client, sample_text_file
+    ):
         """Test conversion without document ID (auto-generation)."""
         mock_service = Mock()
         mock_service.generate_document_id.return_value = "auto-generated-123"
         mock_get_service.return_value = mock_service
 
-        with open(sample_text_file, 'rb') as f:
+        with open(sample_text_file, "rb") as f:
             response = client.post(
-                "/api/convert/markdown",
-                files={"file": ("test.txt", f, "text/plain")}
+                "/api/convert/markdown", files={"file": ("test.txt", f, "text/plain")}
             )
 
         assert response.status_code == 200
@@ -222,9 +231,11 @@ class TestMarkdownConversionWithDeduplication:
 class TestEnhancedProcessingWithDeduplication:
     """Test enhanced processing endpoint with deduplication."""
 
-    @patch('morag.tasks.enhanced_processing_task.enhanced_process_ingest_task.delay')
-    @patch('morag.api_models.endpoints.conversion.get_deduplication_service')
-    def test_process_with_duplicate_document_id(self, mock_get_service, mock_task, client, sample_text_file):
+    @patch("morag.tasks.enhanced_processing_task.enhanced_process_ingest_task.delay")
+    @patch("morag.api_models.endpoints.conversion.get_deduplication_service")
+    def test_process_with_duplicate_document_id(
+        self, mock_get_service, mock_task, client, sample_text_file
+    ):
         """Test processing with duplicate document ID returns 409 error."""
         mock_service = AsyncMock()
         mock_service.validate_document_id.return_value = True
@@ -233,22 +244,22 @@ class TestEnhancedProcessingWithDeduplication:
             "created_at": "2024-01-01T12:00:00Z",
             "status": "completed",
             "facts_count": 10,
-            "keywords_count": 5
+            "keywords_count": 5,
         }
         mock_service.create_duplicate_error_response.return_value = {
             "error": "duplicate_document",
-            "message": "Document with ID 'duplicate-doc' already exists"
+            "message": "Document with ID 'duplicate-doc' already exists",
         }
         mock_get_service.return_value = mock_service
 
-        with open(sample_text_file, 'rb') as f:
+        with open(sample_text_file, "rb") as f:
             response = client.post(
                 "/api/convert/process-ingest",
                 files={"file": ("test.txt", f, "text/plain")},
                 data={
                     "webhook_url": "http://example.com/webhook",
-                    "document_id": "duplicate-doc"
-                }
+                    "document_id": "duplicate-doc",
+                },
             )
 
         assert response.status_code == 409

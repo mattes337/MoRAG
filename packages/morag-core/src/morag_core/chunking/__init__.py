@@ -1,8 +1,8 @@
 """Universal chunking configuration and strategies for MoRAG."""
 
 from .config import ChunkingConfig, ChunkingStrategy
-from .semantic_chunker import SemanticChunker
 from .factory import ChunkerFactory, create_chunker
+from .semantic_chunker import SemanticChunker
 
 __all__ = [
     "ChunkingConfig",

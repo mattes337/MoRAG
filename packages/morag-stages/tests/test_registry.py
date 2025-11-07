@@ -1,12 +1,12 @@
 """Tests for stage registry."""
 
-import pytest
 from pathlib import Path
 from typing import List
 
-from morag_stages.models import Stage, StageType, StageResult, StageContext
+import pytest
+from morag_stages.exceptions import StageDependencyError, StageError
+from morag_stages.models import Stage, StageContext, StageResult, StageType
 from morag_stages.registry import StageRegistry
-from morag_stages.exceptions import StageError, StageDependencyError
 
 
 class MockStage(Stage):
@@ -16,7 +16,9 @@ class MockStage(Stage):
         super().__init__(stage_type)
         self._dependencies = dependencies or []
 
-    async def execute(self, input_files: List[Path], context: StageContext) -> StageResult:
+    async def execute(
+        self, input_files: List[Path], context: StageContext
+    ) -> StageResult:
         """Mock execute method."""
         pass
 
@@ -28,7 +30,9 @@ class MockStage(Stage):
         """Mock dependencies method."""
         return self._dependencies
 
-    def get_expected_outputs(self, input_files: List[Path], context: StageContext) -> List[Path]:
+    def get_expected_outputs(
+        self, input_files: List[Path], context: StageContext
+    ) -> List[Path]:
         """Mock expected outputs method."""
         return []
 
@@ -119,7 +123,11 @@ class TestStageRegistry:
         registry.register_stage(Stage3)
 
         # Test valid chain
-        chain = [StageType.MARKDOWN_CONVERSION, StageType.CHUNKER, StageType.FACT_GENERATOR]
+        chain = [
+            StageType.MARKDOWN_CONVERSION,
+            StageType.CHUNKER,
+            StageType.FACT_GENERATOR,
+        ]
         assert registry.validate_stage_chain(chain) is True
 
     def test_validate_stage_chain_missing_dependency(self):
@@ -156,7 +164,9 @@ class TestStageRegistry:
 
         class Stage4(MockStage):
             def __init__(self):
-                super().__init__(StageType.INGESTOR, [StageType.CHUNKER, StageType.FACT_GENERATOR])
+                super().__init__(
+                    StageType.INGESTOR, [StageType.CHUNKER, StageType.FACT_GENERATOR]
+                )
 
         registry.register_stage(Stage1)
         registry.register_stage(Stage2)
@@ -164,10 +174,20 @@ class TestStageRegistry:
         registry.register_stage(Stage4)
 
         # Test ordering
-        unordered = [StageType.INGESTOR, StageType.FACT_GENERATOR, StageType.MARKDOWN_CONVERSION, StageType.CHUNKER]
+        unordered = [
+            StageType.INGESTOR,
+            StageType.FACT_GENERATOR,
+            StageType.MARKDOWN_CONVERSION,
+            StageType.CHUNKER,
+        ]
         ordered = registry.get_dependency_order(unordered)
 
-        expected = [StageType.MARKDOWN_CONVERSION, StageType.CHUNKER, StageType.FACT_GENERATOR, StageType.INGESTOR]
+        expected = [
+            StageType.MARKDOWN_CONVERSION,
+            StageType.CHUNKER,
+            StageType.FACT_GENERATOR,
+            StageType.INGESTOR,
+        ]
         assert ordered == expected
 
     def test_get_dependency_order_circular(self):
@@ -198,11 +218,15 @@ class TestStageRegistry:
         # Mock stages with external dependencies only
         class MarkdownOptimizerStage(MockStage):
             def __init__(self):
-                super().__init__(StageType.MARKDOWN_OPTIMIZER, [StageType.MARKDOWN_CONVERSION])  # External dependency
+                super().__init__(
+                    StageType.MARKDOWN_OPTIMIZER, [StageType.MARKDOWN_CONVERSION]
+                )  # External dependency
 
         class ChunkerStage(MockStage):
             def __init__(self):
-                super().__init__(StageType.CHUNKER, [StageType.MARKDOWN_CONVERSION])  # External dependency
+                super().__init__(
+                    StageType.CHUNKER, [StageType.MARKDOWN_CONVERSION]
+                )  # External dependency
 
         class FactGeneratorStage(MockStage):
             def __init__(self):
@@ -213,19 +237,35 @@ class TestStageRegistry:
         registry.register_stage(FactGeneratorStage)
 
         # Test that user's order is preserved when external dependencies exist
-        user_order = [StageType.MARKDOWN_OPTIMIZER, StageType.CHUNKER, StageType.FACT_GENERATOR]
+        user_order = [
+            StageType.MARKDOWN_OPTIMIZER,
+            StageType.CHUNKER,
+            StageType.FACT_GENERATOR,
+        ]
         ordered = registry.get_dependency_order(user_order)
 
         # Should preserve user's order: markdown-optimizer first, then chunker, then fact-generator
-        expected = [StageType.MARKDOWN_OPTIMIZER, StageType.CHUNKER, StageType.FACT_GENERATOR]
+        expected = [
+            StageType.MARKDOWN_OPTIMIZER,
+            StageType.CHUNKER,
+            StageType.FACT_GENERATOR,
+        ]
         assert ordered == expected
 
         # Test reverse user order
-        reverse_user_order = [StageType.CHUNKER, StageType.MARKDOWN_OPTIMIZER, StageType.FACT_GENERATOR]
+        reverse_user_order = [
+            StageType.CHUNKER,
+            StageType.MARKDOWN_OPTIMIZER,
+            StageType.FACT_GENERATOR,
+        ]
         ordered_reverse = registry.get_dependency_order(reverse_user_order)
 
         # Should preserve user's order: chunker first, then markdown-optimizer, then fact-generator
-        expected_reverse = [StageType.CHUNKER, StageType.MARKDOWN_OPTIMIZER, StageType.FACT_GENERATOR]
+        expected_reverse = [
+            StageType.CHUNKER,
+            StageType.MARKDOWN_OPTIMIZER,
+            StageType.FACT_GENERATOR,
+        ]
         assert ordered_reverse == expected_reverse
 
     def test_get_optional_stages(self):

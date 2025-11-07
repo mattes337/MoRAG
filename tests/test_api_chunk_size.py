@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Test script for API chunk size parameters."""
 
+import json
 import os
 import sys
 import tempfile
-import json
 from pathlib import Path
 
 # Add the project root to the Python path
@@ -14,6 +14,7 @@ sys.path.insert(0, str(project_root))
 try:
     from fastapi.testclient import TestClient
     from morag.server import create_app
+
     FASTAPI_AVAILABLE = True
 except ImportError:
     FASTAPI_AVAILABLE = False
@@ -35,13 +36,13 @@ def test_api_chunk_size_parameters():
         # Create a test file
         test_content = "This is a test document. " * 100  # Create some content
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
             f.write(test_content)
             temp_file_path = f.name
 
         try:
             # Test file upload with chunk size parameters
-            with open(temp_file_path, 'rb') as f:
+            with open(temp_file_path, "rb") as f:
                 response = client.post(
                     "/api/v1/ingest/file",
                     files={"file": ("test.txt", f, "text/plain")},
@@ -49,8 +50,8 @@ def test_api_chunk_size_parameters():
                         "source_type": "document",
                         "chunk_size": "2000",
                         "chunk_overlap": "100",
-                        "chunking_strategy": "paragraph"
-                    }
+                        "chunking_strategy": "paragraph",
+                    },
                 )
 
             print(f"API Response Status: {response.status_code}")
@@ -75,6 +76,7 @@ def test_api_chunk_size_parameters():
     except Exception as e:
         print(f"❌ API test failed: {e}")
         import traceback
+
         traceback.print_exc()
 
 
@@ -93,21 +95,21 @@ def test_api_chunk_size_validation():
         # Create a test file
         test_content = "This is a test document."
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
             f.write(test_content)
             temp_file_path = f.name
 
         try:
             # Test with invalid chunk size (too small)
-            with open(temp_file_path, 'rb') as f:
+            with open(temp_file_path, "rb") as f:
                 response = client.post(
                     "/api/v1/ingest/file",
                     files={"file": ("test.txt", f, "text/plain")},
                     data={
                         "source_type": "document",
                         "chunk_size": "100",  # Too small
-                        "chunk_overlap": "50"
-                    }
+                        "chunk_overlap": "50",
+                    },
                 )
 
             print(f"Invalid chunk size response: {response.status_code}")
@@ -119,15 +121,15 @@ def test_api_chunk_size_validation():
                 print(f"Response: {response.text}")
 
             # Test with invalid chunk size (too large)
-            with open(temp_file_path, 'rb') as f:
+            with open(temp_file_path, "rb") as f:
                 response = client.post(
                     "/api/v1/ingest/file",
                     files={"file": ("test.txt", f, "text/plain")},
                     data={
                         "source_type": "document",
                         "chunk_size": "20000",  # Too large
-                        "chunk_overlap": "100"
-                    }
+                        "chunk_overlap": "100",
+                    },
                 )
 
             print(f"Invalid chunk size response: {response.status_code}")
@@ -148,6 +150,7 @@ def test_api_chunk_size_validation():
     except Exception as e:
         print(f"❌ API validation test failed: {e}")
         import traceback
+
         traceback.print_exc()
 
 
@@ -206,6 +209,7 @@ def test_api_openapi_schema():
     except Exception as e:
         print(f"❌ OpenAPI test failed: {e}")
         import traceback
+
         traceback.print_exc()
 
 
@@ -230,6 +234,7 @@ def main():
     except Exception as e:
         print(f"❌ Test suite failed: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
 

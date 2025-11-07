@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
 """Example CLI usage of MoRAG Stages."""
 
-import asyncio
 import argparse
+import asyncio
 import json
 import sys
 from pathlib import Path
 from typing import List, Optional
 
 from morag_stages import (
-    StageManager, StageType, StageContext,
-    StageError, StageDependencyError
+    StageContext,
+    StageDependencyError,
+    StageError,
+    StageManager,
+    StageType,
 )
 
 
@@ -19,7 +22,7 @@ async def execute_single_stage(
     input_file: Path,
     output_dir: Path,
     config: Optional[dict] = None,
-    webhook_url: Optional[str] = None
+    webhook_url: Optional[str] = None,
 ) -> bool:
     """Execute a single stage.
 
@@ -47,7 +50,7 @@ async def execute_single_stage(
         source_path=input_file,
         output_dir=output_dir,
         webhook_url=webhook_url,
-        config=config or {}
+        config=config or {},
     )
 
     try:
@@ -76,7 +79,7 @@ async def execute_stage_chain(
     input_file: Path,
     output_dir: Path,
     config: Optional[dict] = None,
-    webhook_url: Optional[str] = None
+    webhook_url: Optional[str] = None,
 ) -> bool:
     """Execute a chain of stages.
 
@@ -107,7 +110,7 @@ async def execute_stage_chain(
             source_path=input_file,
             output_dir=output_dir,
             webhook_url=webhook_url,
-            config=config or {}
+            config=config or {},
         )
 
         print(f"🚀 Executing stage chain: {' → '.join(stage_names)}")
@@ -121,7 +124,9 @@ async def execute_stage_chain(
         for result in results:
             if result.success:
                 successful += 1
-                print(f"✅ {result.stage_type.value}: completed ({result.metadata.execution_time:.2f}s)")
+                print(
+                    f"✅ {result.stage_type.value}: completed ({result.metadata.execution_time:.2f}s)"
+                )
             elif result.skipped:
                 skipped += 1
                 print(f"⏭️  {result.stage_type.value}: skipped")
@@ -129,7 +134,9 @@ async def execute_stage_chain(
                 failed += 1
                 print(f"❌ {result.stage_type.value}: failed - {result.error_message}")
 
-        print(f"\n📊 Summary: {successful} successful, {skipped} skipped, {failed} failed")
+        print(
+            f"\n📊 Summary: {successful} successful, {skipped} skipped, {failed} failed"
+        )
 
         # Get final output files
         if results:
@@ -157,7 +164,7 @@ def load_config(config_file: Optional[Path]) -> dict:
         return {}
 
     try:
-        with open(config_file, 'r') as f:
+        with open(config_file, "r") as f:
             return json.load(f)
     except (json.JSONDecodeError, IOError) as e:
         print(f"⚠️  Failed to load config file {config_file}: {e}")
@@ -182,29 +189,33 @@ Examples:
 
   # With webhook notifications
   python cli_example.py stage markdown-conversion input.txt --webhook-url http://localhost:8080/webhook
-        """
+        """,
     )
 
-    subparsers = parser.add_subparsers(dest='command', help='Commands')
+    subparsers = parser.add_subparsers(dest="command", help="Commands")
 
     # Single stage command
-    stage_parser = subparsers.add_parser('stage', help='Execute single stage')
-    stage_parser.add_argument('stage_name', help='Stage name to execute')
-    stage_parser.add_argument('input_file', type=Path, help='Input file path')
-    stage_parser.add_argument('--output-dir', type=Path, default=Path('./output'), help='Output directory')
-    stage_parser.add_argument('--config', type=Path, help='Configuration file (JSON)')
-    stage_parser.add_argument('--webhook-url', help='Webhook URL for notifications')
+    stage_parser = subparsers.add_parser("stage", help="Execute single stage")
+    stage_parser.add_argument("stage_name", help="Stage name to execute")
+    stage_parser.add_argument("input_file", type=Path, help="Input file path")
+    stage_parser.add_argument(
+        "--output-dir", type=Path, default=Path("./output"), help="Output directory"
+    )
+    stage_parser.add_argument("--config", type=Path, help="Configuration file (JSON)")
+    stage_parser.add_argument("--webhook-url", help="Webhook URL for notifications")
 
     # Stage chain command
-    chain_parser = subparsers.add_parser('chain', help='Execute stage chain')
-    chain_parser.add_argument('stages', help='Comma-separated list of stage names')
-    chain_parser.add_argument('input_file', type=Path, help='Input file path')
-    chain_parser.add_argument('--output-dir', type=Path, default=Path('./output'), help='Output directory')
-    chain_parser.add_argument('--config', type=Path, help='Configuration file (JSON)')
-    chain_parser.add_argument('--webhook-url', help='Webhook URL for notifications')
+    chain_parser = subparsers.add_parser("chain", help="Execute stage chain")
+    chain_parser.add_argument("stages", help="Comma-separated list of stage names")
+    chain_parser.add_argument("input_file", type=Path, help="Input file path")
+    chain_parser.add_argument(
+        "--output-dir", type=Path, default=Path("./output"), help="Output directory"
+    )
+    chain_parser.add_argument("--config", type=Path, help="Configuration file (JSON)")
+    chain_parser.add_argument("--webhook-url", help="Webhook URL for notifications")
 
     # List stages command
-    list_parser = subparsers.add_parser('list', help='List available stages')
+    list_parser = subparsers.add_parser("list", help="List available stages")
 
     args = parser.parse_args()
 
@@ -212,42 +223,42 @@ Examples:
         parser.print_help()
         return
 
-    if args.command == 'list':
+    if args.command == "list":
         print("Available stages:")
         for stage_type in StageType:
             print(f"  - {stage_type.value}")
         return
 
     # Load configuration
-    config = load_config(getattr(args, 'config', None))
+    config = load_config(getattr(args, "config", None))
 
     # Create output directory
-    output_dir = getattr(args, 'output_dir', Path('./output'))
+    output_dir = getattr(args, "output_dir", Path("./output"))
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Execute command
     success = False
 
-    if args.command == 'stage':
+    if args.command == "stage":
         success = await execute_single_stage(
             args.stage_name,
             args.input_file,
             output_dir,
             config,
-            getattr(args, 'webhook_url', None)
+            getattr(args, "webhook_url", None),
         )
-    elif args.command == 'chain':
-        stage_names = [s.strip() for s in args.stages.split(',')]
+    elif args.command == "chain":
+        stage_names = [s.strip() for s in args.stages.split(",")]
         success = await execute_stage_chain(
             stage_names,
             args.input_file,
             output_dir,
             config,
-            getattr(args, 'webhook_url', None)
+            getattr(args, "webhook_url", None),
         )
 
     sys.exit(0 if success else 1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     asyncio.run(main())

@@ -7,12 +7,12 @@ and are linked to DocumentChunk nodes that contain the actual text content.
 
 import json
 from datetime import datetime
-from typing import Dict, Optional, Any, ClassVar
+from typing import Any, ClassVar, Dict, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
+from ..utils.id_generation import IDValidator, UnifiedIDGenerator
 from .types import EntityId
-from ..utils.id_generation import UnifiedIDGenerator, IDValidator
 
 
 class Document(BaseModel):
@@ -55,14 +55,13 @@ class Document(BaseModel):
     def __init__(self, **data):
         """Initialize document with unified ID generation."""
         # Generate unified ID if not provided
-        if 'id' not in data or not data['id']:
-            data['id'] = UnifiedIDGenerator.generate_document_id(
-                source_file=data.get('source_file', ''),
-                checksum=data.get('checksum')
+        if "id" not in data or not data["id"]:
+            data["id"] = UnifiedIDGenerator.generate_document_id(
+                source_file=data.get("source_file", ""), checksum=data.get("checksum")
             )
         super().__init__(**data)
 
-    @field_validator('id')
+    @field_validator("id")
     @classmethod
     def validate_id_format(cls, v):
         """Validate document ID format."""
@@ -97,38 +96,44 @@ class Document(BaseModel):
         properties = self.model_dump()
 
         # Convert datetime objects to ISO strings for Neo4J
-        if 'ingestion_timestamp' in properties and properties['ingestion_timestamp']:
-            properties['ingestion_timestamp'] = properties['ingestion_timestamp'].isoformat()
-        if 'last_modified' in properties and properties['last_modified']:
-            properties['last_modified'] = properties['last_modified'].isoformat()
+        if "ingestion_timestamp" in properties and properties["ingestion_timestamp"]:
+            properties["ingestion_timestamp"] = properties[
+                "ingestion_timestamp"
+            ].isoformat()
+        if "last_modified" in properties and properties["last_modified"]:
+            properties["last_modified"] = properties["last_modified"].isoformat()
 
         # Serialize metadata to JSON string for Neo4J storage
-        if 'metadata' in properties:
-            properties['metadata'] = json.dumps(properties['metadata'])
+        if "metadata" in properties:
+            properties["metadata"] = json.dumps(properties["metadata"])
 
         # Add label for Neo4J
-        properties['_labels'] = [self._neo4j_label]
+        properties["_labels"] = [self._neo4j_label]
 
         return properties
 
     @classmethod
-    def from_neo4j_node(cls, node: Dict[str, Any]) -> 'Document':
+    def from_neo4j_node(cls, node: Dict[str, Any]) -> "Document":
         """Create document from Neo4J node properties."""
         # Make a copy to avoid modifying the original
         node = node.copy()
 
         # Deserialize metadata from JSON string
-        if 'metadata' in node and isinstance(node['metadata'], str):
-            node['metadata'] = json.loads(node['metadata'])
+        if "metadata" in node and isinstance(node["metadata"], str):
+            node["metadata"] = json.loads(node["metadata"])
 
         # Convert ISO strings back to datetime objects
-        if 'ingestion_timestamp' in node and isinstance(node['ingestion_timestamp'], str):
-            node['ingestion_timestamp'] = datetime.fromisoformat(node['ingestion_timestamp'])
-        if 'last_modified' in node and isinstance(node['last_modified'], str):
-            node['last_modified'] = datetime.fromisoformat(node['last_modified'])
+        if "ingestion_timestamp" in node and isinstance(
+            node["ingestion_timestamp"], str
+        ):
+            node["ingestion_timestamp"] = datetime.fromisoformat(
+                node["ingestion_timestamp"]
+            )
+        if "last_modified" in node and isinstance(node["last_modified"], str):
+            node["last_modified"] = datetime.fromisoformat(node["last_modified"])
 
         # Remove Neo4J specific properties
-        if '_labels' in node:
-            node.pop('_labels')
+        if "_labels" in node:
+            node.pop("_labels")
 
         return cls(**node)

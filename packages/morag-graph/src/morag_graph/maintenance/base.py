@@ -9,25 +9,32 @@ import asyncio
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple, TypeVar, Generic, Callable
 from datetime import datetime
+from typing import Any, Callable, Dict, Generic, List, Optional, Tuple, TypeVar
 
 import structlog
 
 logger = structlog.get_logger(__name__)
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 class MaintenanceJobError(Exception):
     """Base exception for maintenance jobs."""
+
     pass
 
 
 class PartialFailureError(MaintenanceJobError):
     """Raised when job partially fails but can continue."""
 
-    def __init__(self, message: str, successful_count: int, failed_count: int, failures: List[Exception]):
+    def __init__(
+        self,
+        message: str,
+        successful_count: int,
+        failed_count: int,
+        failures: List[Exception],
+    ):
         super().__init__(message)
         self.successful_count = successful_count
         self.failed_count = failed_count
@@ -36,22 +43,26 @@ class PartialFailureError(MaintenanceJobError):
 
 class CriticalMaintenanceError(MaintenanceJobError):
     """Raised when job encounters critical failure and must stop."""
+
     pass
 
 
 class CircuitBreakerError(MaintenanceJobError):
     """Raised when circuit breaker trips due to repeated failures."""
+
     pass
 
 
 class ConfigurationError(MaintenanceJobError):
     """Raised when configuration is invalid."""
+
     pass
 
 
 @dataclass
 class BatchResult(Generic[T]):
     """Result of a batch operation."""
+
     successful: List[T] = field(default_factory=list)
     failed: List[Tuple[Any, Exception]] = field(default_factory=list)
 
@@ -77,6 +88,7 @@ class BatchResult(Generic[T]):
 @dataclass
 class CircuitBreakerState:
     """State for circuit breaker pattern."""
+
     failure_count: int = 0
     last_failure_time: Optional[datetime] = None
     state: str = "CLOSED"  # CLOSED, OPEN, HALF_OPEN
@@ -89,8 +101,7 @@ class CircuitBreaker:
 
     def __init__(self, failure_threshold: int = 5, timeout_seconds: int = 60):
         self.state = CircuitBreakerState(
-            failure_threshold=failure_threshold,
-            timeout_seconds=timeout_seconds
+            failure_threshold=failure_threshold, timeout_seconds=timeout_seconds
         )
 
     async def call(self, func: Callable, *args, **kwargs):
@@ -126,8 +137,9 @@ class CircuitBreaker:
 
         if self.state.failure_count >= self.state.failure_threshold:
             self.state.state = "OPEN"
-            logger.warning("Circuit breaker opened",
-                         failure_count=self.state.failure_count)
+            logger.warning(
+                "Circuit breaker opened", failure_count=self.state.failure_count
+            )
 
     def _reset(self):
         """Reset the circuit breaker to closed state."""
@@ -143,12 +155,12 @@ class MaintenanceJobBase(ABC):
     def __init__(self, config: Dict[str, Any]):
         self.config = config
         self.circuit_breaker = CircuitBreaker(
-            failure_threshold=config.get('circuit_breaker_threshold', 5),
-            timeout_seconds=config.get('circuit_breaker_timeout', 60)
+            failure_threshold=config.get("circuit_breaker_threshold", 5),
+            timeout_seconds=config.get("circuit_breaker_timeout", 60),
         )
-        self.job_tag = config.get('job_tag', self._generate_job_tag())
-        self.dry_run = config.get('dry_run', True)
-        self.batch_size = config.get('batch_size', 100)
+        self.job_tag = config.get("job_tag", self._generate_job_tag())
+        self.dry_run = config.get("dry_run", True)
+        self.batch_size = config.get("batch_size", 100)
 
     def _generate_job_tag(self) -> str:
         """Generate a unique job tag for this run."""
@@ -170,7 +182,7 @@ class MaintenanceJobBase(ABC):
         self,
         batch_items: List[Any],
         operation: Callable,
-        critical_failure_threshold: float = 0.5
+        critical_failure_threshold: float = 0.5,
     ) -> BatchResult:
         """Execute batch with error handling and partial failure recovery."""
         successful = []
@@ -184,20 +196,21 @@ class MaintenanceJobBase(ABC):
                 # Critical errors should stop the entire job
                 raise
             except Exception as e:
-                logger.error("Batch item failed",
-                           item=str(item)[:100],
-                           error=str(e))
+                logger.error("Batch item failed", item=str(item)[:100], error=str(e))
                 failed.append((item, e))
 
         result = BatchResult(successful=successful, failed=failed)
 
         # Check if failure rate is too high
-        if result.failure_count > 0 and result.success_rate < critical_failure_threshold:
+        if (
+            result.failure_count > 0
+            and result.success_rate < critical_failure_threshold
+        ):
             raise PartialFailureError(
                 f"Batch failure rate too high: {result.success_rate:.2%}",
                 result.success_count,
                 result.failure_count,
-                [e for _, e in failed]
+                [e for _, e in failed],
             )
 
         return result
@@ -208,21 +221,27 @@ class MaintenanceJobBase(ABC):
 
     def log_job_start(self):
         """Log job start with configuration."""
-        logger.info("Maintenance job starting",
-                   job_name=self.__class__.__name__,
-                   job_tag=self.job_tag,
-                   dry_run=self.dry_run,
-                   config=self.config)
+        logger.info(
+            "Maintenance job starting",
+            job_name=self.__class__.__name__,
+            job_tag=self.job_tag,
+            dry_run=self.dry_run,
+            config=self.config,
+        )
 
     def log_job_complete(self, result: Dict[str, Any]):
         """Log job completion with results."""
-        logger.info("Maintenance job completed",
-                   job_name=self.__class__.__name__,
-                   job_tag=self.job_tag,
-                   result=result)
+        logger.info(
+            "Maintenance job completed",
+            job_name=self.__class__.__name__,
+            job_tag=self.job_tag,
+            result=result,
+        )
 
 
-def validate_positive_int(value: Any, name: str, min_value: int = 1, max_value: Optional[int] = None) -> List[str]:
+def validate_positive_int(
+    value: Any, name: str, min_value: int = 1, max_value: Optional[int] = None
+) -> List[str]:
     """Validate that a value is a positive integer within bounds."""
     errors = []
 
@@ -239,7 +258,9 @@ def validate_positive_int(value: Any, name: str, min_value: int = 1, max_value: 
     return errors
 
 
-def validate_float_range(value: Any, name: str, min_value: float = 0.0, max_value: float = 1.0) -> List[str]:
+def validate_float_range(
+    value: Any, name: str, min_value: float = 0.0, max_value: float = 1.0
+) -> List[str]:
     """Validate that a value is a float within the specified range."""
     errors = []
 

@@ -1,18 +1,18 @@
 """Unit tests for content converter service."""
 
-import pytest
 from unittest.mock import patch
 
+import pytest
+from src.morag.core.exceptions import ValidationError
 from src.morag.services.content_converter import (
+    CodeBlockProcessor,
     ContentConverter,
     ConversionConfig,
     ConversionOptions,
     CustomMarkdownConverter,
+    ImageProcessor,
     TableProcessor,
-    CodeBlockProcessor,
-    ImageProcessor
 )
-from src.morag.core.exceptions import ValidationError
 
 
 class TestConversionConfig:
@@ -30,20 +30,18 @@ class TestConversionConfig:
         assert config.remove_empty_elements is True
         assert config.sanitize_html is True
         assert isinstance(config.allowed_tags, list)
-        assert 'h1' in config.allowed_tags
-        assert 'table' in config.allowed_tags
+        assert "h1" in config.allowed_tags
+        assert "table" in config.allowed_tags
 
     def test_custom_config(self):
         """Test custom configuration values."""
         config = ConversionConfig(
-            preserve_tables=False,
-            sanitize_html=False,
-            allowed_tags=['p', 'div']
+            preserve_tables=False, sanitize_html=False, allowed_tags=["p", "div"]
         )
 
         assert config.preserve_tables is False
         assert config.sanitize_html is False
-        assert config.allowed_tags == ['p', 'div']
+        assert config.allowed_tags == ["p", "div"]
 
 
 class TestConversionOptions:
@@ -65,9 +63,7 @@ class TestConversionOptions:
     def test_custom_options(self):
         """Test custom option values."""
         options = ConversionOptions(
-            heading_style="SETEXT",
-            bullet_style="*",
-            link_style="reference"
+            heading_style="SETEXT", bullet_style="*", link_style="reference"
         )
 
         assert options.heading_style == "SETEXT"
@@ -152,8 +148,8 @@ print("Hello, World!")
         html = '<script>alert("xss")</script><p>Safe content</p>'
         sanitized = converter._sanitize_html(html)
 
-        assert '<script>' not in sanitized
-        assert 'Safe content' in sanitized
+        assert "<script>" not in sanitized
+        assert "Safe content" in sanitized
 
     def test_sanitize_html_disabled(self):
         """Test HTML sanitization when disabled."""
@@ -168,35 +164,35 @@ print("Hello, World!")
     def test_clean_markdown_content(self, converter):
         """Test markdown content cleaning."""
         markdown = "# Header\n\n\n\nParagraph   \n\n\n[]() empty link\n\n\n# Another"
-        cleaned = converter._clean_content(markdown, 'markdown')
+        cleaned = converter._clean_content(markdown, "markdown")
 
-        assert '\n\n\n\n' not in cleaned
-        assert '[]()' not in cleaned
+        assert "\n\n\n\n" not in cleaned
+        assert "[]()" not in cleaned
         assert cleaned.strip() == cleaned
 
     def test_clean_html_content(self, converter):
         """Test HTML content cleaning."""
         html = "<p>  Text  </p>  <div>  More  </div>"
-        cleaned = converter._clean_content(html, 'html')
+        cleaned = converter._clean_content(html, "html")
 
-        assert '  ' not in cleaned
+        assert "  " not in cleaned
         assert cleaned.strip() == cleaned
 
     def test_extract_main_content_with_selectors(self, converter, sample_html):
         """Test main content extraction with custom selectors."""
-        selectors = ['body']
+        selectors = ["body"]
         result = converter.extract_main_content(sample_html, selectors)
 
-        assert '<body>' in result
-        assert 'Main Heading' in result
+        assert "<body>" in result
+        assert "Main Heading" in result
 
     def test_extract_main_content_default(self, converter):
         """Test main content extraction with default selectors."""
-        html = '<html><body><main><p>Main content</p></main><nav>Navigation</nav></body></html>'
+        html = "<html><body><main><p>Main content</p></main><nav>Navigation</nav></body></html>"
         result = converter.extract_main_content(html)
 
-        assert 'Main content' in result
-        assert '<main>' in result
+        assert "Main content" in result
+        assert "<main>" in result
 
     @pytest.mark.asyncio
     async def test_html_to_markdown_success(self, converter, sample_html):
@@ -205,25 +201,23 @@ print("Hello, World!")
 
         assert result.success is True
         assert result.error_message is None
-        assert '# Main Heading' in result.content
-        assert '**test**' in result.content
-        assert '*emphasis*' in result.content
-        assert '- Item 1' in result.content
-        assert '| Name | Age |' in result.content
-        assert '```' in result.content  # Code blocks (language may not be preserved)
+        assert "# Main Heading" in result.content
+        assert "**test**" in result.content
+        assert "*emphasis*" in result.content
+        assert "- Item 1" in result.content
+        assert "| Name | Age |" in result.content
+        assert "```" in result.content  # Code blocks (language may not be preserved)
         assert 'print("Hello, World!")' in result.content  # Code content
-        assert '![Test Image]' in result.content
+        assert "![Test Image]" in result.content
         assert result.processing_time > 0
-        assert result.metadata['html_length'] > 0
-        assert result.metadata['markdown_length'] > 0
+        assert result.metadata["html_length"] > 0
+        assert result.metadata["markdown_length"] > 0
 
     @pytest.mark.asyncio
     async def test_html_to_markdown_with_options(self, converter, sample_html):
         """Test HTML to Markdown conversion with custom options."""
         options = ConversionOptions(
-            heading_style="SETEXT",
-            bullet_style="*",
-            link_style="reference"
+            heading_style="SETEXT", bullet_style="*", link_style="reference"
         )
 
         result = await converter.html_to_markdown(sample_html, options)
@@ -235,8 +229,14 @@ print("Hello, World!")
     async def test_html_to_markdown_error_handling(self, converter):
         """Test HTML to Markdown conversion error handling."""
         # Test with invalid HTML that might cause issues
-        with patch.object(converter, '_convert_with_markdownify', side_effect=Exception("Test error")):
-            with patch.object(converter, '_convert_with_html2text', side_effect=Exception("Test error")):
+        with patch.object(
+            converter, "_convert_with_markdownify", side_effect=Exception("Test error")
+        ):
+            with patch.object(
+                converter,
+                "_convert_with_html2text",
+                side_effect=Exception("Test error"),
+            ):
                 result = await converter.html_to_markdown("<invalid>")
 
                 assert result.success is False
@@ -250,21 +250,23 @@ print("Hello, World!")
 
         assert result.success is True
         assert result.error_message is None
-        assert '<h1>' in result.content
-        assert '<strong>' in result.content
-        assert '<em>' in result.content
-        assert '<ul>' in result.content
-        assert '<table>' in result.content
-        assert '<pre>' in result.content
-        assert '<img' in result.content
+        assert "<h1>" in result.content
+        assert "<strong>" in result.content
+        assert "<em>" in result.content
+        assert "<ul>" in result.content
+        assert "<table>" in result.content
+        assert "<pre>" in result.content
+        assert "<img" in result.content
         assert result.processing_time > 0
-        assert result.metadata['markdown_length'] > 0
-        assert result.metadata['html_length'] > 0
+        assert result.metadata["markdown_length"] > 0
+        assert result.metadata["html_length"] > 0
 
     @pytest.mark.asyncio
     async def test_markdown_to_html_error_handling(self, converter):
         """Test Markdown to HTML conversion error handling."""
-        with patch.object(converter.markdown_converter, 'convert', side_effect=Exception("Test error")):
+        with patch.object(
+            converter.markdown_converter, "convert", side_effect=Exception("Test error")
+        ):
             result = await converter.markdown_to_html("# Test")
 
             assert result.success is False
@@ -274,31 +276,31 @@ print("Hello, World!")
     def test_clean_content_public_method(self, converter):
         """Test public clean_content method."""
         content = "  Test content  \n\n\n"
-        cleaned = converter.clean_content(content, 'markdown')
+        cleaned = converter.clean_content(content, "markdown")
 
         assert cleaned.strip() == "Test content"
 
     @pytest.mark.asyncio
     async def test_convert_content_html_to_markdown(self, converter, sample_html):
         """Test generic convert_content method for HTML to Markdown."""
-        result = await converter.convert_content(sample_html, 'html', 'markdown')
+        result = await converter.convert_content(sample_html, "html", "markdown")
 
         assert result.success is True
-        assert '# Main Heading' in result.content
+        assert "# Main Heading" in result.content
 
     @pytest.mark.asyncio
     async def test_convert_content_markdown_to_html(self, converter, sample_markdown):
         """Test generic convert_content method for Markdown to HTML."""
-        result = await converter.convert_content(sample_markdown, 'markdown', 'html')
+        result = await converter.convert_content(sample_markdown, "markdown", "html")
 
         assert result.success is True
-        assert '<h1>' in result.content
+        assert "<h1>" in result.content
 
     @pytest.mark.asyncio
     async def test_convert_content_unsupported_format(self, converter):
         """Test convert_content with unsupported format combination."""
         with pytest.raises(ValidationError) as exc_info:
-            await converter.convert_content("test", 'xml', 'json')
+            await converter.convert_content("test", "xml", "json")
 
         assert "Unsupported conversion" in str(exc_info.value)
 
@@ -308,7 +310,7 @@ class TestCustomMarkdownConverter:
 
     def test_init(self):
         """Test CustomMarkdownConverter initialization."""
-        options = {'preserve_tables': True}
+        options = {"preserve_tables": True}
         converter = CustomMarkdownConverter(**options)
 
         assert converter.options == options
@@ -327,42 +329,44 @@ class TestCustomMarkdownConverter:
         </table>
         """
 
-        soup = BeautifulSoup(html, 'html.parser')
-        table = soup.find('table')
+        soup = BeautifulSoup(html, "html.parser")
+        table = soup.find("table")
 
         converter = CustomMarkdownConverter(preserve_tables=True)
-        result = converter.convert_table(table, '', [])
+        result = converter.convert_table(table, "", [])
 
-        assert '| Name | Age |' in result
-        assert '| --- | --- |' in result
-        assert '| John | 30 |' in result
-        assert '| Jane | 25 |' in result
+        assert "| Name | Age |" in result
+        assert "| --- | --- |" in result
+        assert "| John | 30 |" in result
+        assert "| Jane | 25 |" in result
 
     def test_convert_pre_with_language(self):
         """Test code block conversion with language."""
         from bs4 import BeautifulSoup
 
         html = '<pre><code class="language-python">print("hello")</code></pre>'
-        soup = BeautifulSoup(html, 'html.parser')
-        pre = soup.find('pre')
+        soup = BeautifulSoup(html, "html.parser")
+        pre = soup.find("pre")
 
-        converter = CustomMarkdownConverter(preserve_code_blocks=True, code_fence_style='```')
-        result = converter.convert_pre(pre, '', [])
+        converter = CustomMarkdownConverter(
+            preserve_code_blocks=True, code_fence_style="```"
+        )
+        result = converter.convert_pre(pre, "", [])
 
-        assert '```python' in result
+        assert "```python" in result
         assert 'print("hello")' in result
-        assert result.count('```') == 2
+        assert result.count("```") == 2
 
     def test_convert_img_with_title(self):
         """Test image conversion with title."""
         from bs4 import BeautifulSoup
 
         html = '<img src="test.jpg" alt="Test" title="Test Title">'
-        soup = BeautifulSoup(html, 'html.parser')
-        img = soup.find('img')
+        soup = BeautifulSoup(html, "html.parser")
+        img = soup.find("img")
 
         converter = CustomMarkdownConverter(preserve_images=True)
-        result = converter.convert_img(img, '', [])
+        result = converter.convert_img(img, "", [])
 
         assert result == '![Test](test.jpg "Test Title")'
 
@@ -371,13 +375,13 @@ class TestCustomMarkdownConverter:
         from bs4 import BeautifulSoup
 
         html = '<figure><img src="test.jpg" alt=""><figcaption>Test Caption</figcaption></figure>'
-        soup = BeautifulSoup(html, 'html.parser')
-        img = soup.find('img')
+        soup = BeautifulSoup(html, "html.parser")
+        img = soup.find("img")
 
         converter = CustomMarkdownConverter(preserve_images=True)
-        result = converter.convert_img(img, '', [])
+        result = converter.convert_img(img, "", [])
 
-        assert result == '![Test Caption](test.jpg)'
+        assert result == "![Test Caption](test.jpg)"
 
 
 class TestTableProcessor:
@@ -397,15 +401,15 @@ class TestTableProcessor:
         </table>
         """
 
-        soup = BeautifulSoup(html, 'html.parser')
-        table = soup.find('table')
+        soup = BeautifulSoup(html, "html.parser")
+        table = soup.find("table")
 
         result = TableProcessor.convert_table(table)
 
-        assert '| Name | Age |' in result
-        assert '| --- | --- |' in result
-        assert '| John | 30 |' in result
-        assert '| Jane | 25 |' in result
+        assert "| Name | Age |" in result
+        assert "| --- | --- |" in result
+        assert "| John | 30 |" in result
+        assert "| Jane | 25 |" in result
 
     def test_convert_table_with_colspan(self):
         """Test table conversion with colspan."""
@@ -418,12 +422,12 @@ class TestTableProcessor:
         </table>
         """
 
-        soup = BeautifulSoup(html, 'html.parser')
-        table = soup.find('table')
+        soup = BeautifulSoup(html, "html.parser")
+        table = soup.find("table")
 
         result = TableProcessor.convert_table(table)
 
-        assert 'spans 2 columns' in result
+        assert "spans 2 columns" in result
 
     def test_convert_table_no_headers(self):
         """Test table conversion without headers."""
@@ -436,21 +440,21 @@ class TestTableProcessor:
         </table>
         """
 
-        soup = BeautifulSoup(html, 'html.parser')
-        table = soup.find('table')
+        soup = BeautifulSoup(html, "html.parser")
+        table = soup.find("table")
 
         result = TableProcessor.convert_table(table)
 
-        assert '| Column 1 | Column 2 |' in result
-        assert '| John | 30 |' in result
+        assert "| Column 1 | Column 2 |" in result
+        assert "| John | 30 |" in result
 
     def test_convert_empty_table(self):
         """Test conversion of empty table."""
         from bs4 import BeautifulSoup
 
-        html = '<table></table>'
-        soup = BeautifulSoup(html, 'html.parser')
-        table = soup.find('table')
+        html = "<table></table>"
+        soup = BeautifulSoup(html, "html.parser")
+        table = soup.find("table")
 
         result = TableProcessor.convert_table(table)
 
@@ -467,13 +471,13 @@ class TestTableProcessor:
         </table>
         """
 
-        soup = BeautifulSoup(html, 'html.parser')
-        table = soup.find('table')
+        soup = BeautifulSoup(html, "html.parser")
+        table = soup.find("table")
 
         result = TableProcessor.handle_complex_tables(table)
 
         # Should fall back to basic conversion for now
-        assert '| Name | Age |' in result
+        assert "| Name | Age |" in result
 
 
 class TestCodeBlockProcessor:
@@ -489,22 +493,22 @@ class TestCodeBlockProcessor:
         <pre><code>plain code</code></pre>
         """
 
-        soup = BeautifulSoup(html, 'html.parser')
+        soup = BeautifulSoup(html, "html.parser")
         code_blocks = CodeBlockProcessor.extract_code_blocks(soup)
 
         assert len(code_blocks) == 3
-        assert code_blocks[0]['language'] == 'python'
-        assert code_blocks[0]['code'] == 'print("hello")'
-        assert code_blocks[1]['language'] == 'javascript'
-        assert code_blocks[2]['language'] == ''  # No language specified
+        assert code_blocks[0]["language"] == "python"
+        assert code_blocks[0]["code"] == 'print("hello")'
+        assert code_blocks[1]["language"] == "javascript"
+        assert code_blocks[2]["language"] == ""  # No language specified
 
     def test_preserve_syntax_highlighting(self):
         """Test syntax highlighting preservation."""
         from bs4 import BeautifulSoup
 
         html = '<code class="language-python">print("hello")</code>'
-        soup = BeautifulSoup(html, 'html.parser')
-        code = soup.find('code')
+        soup = BeautifulSoup(html, "html.parser")
+        code = soup.find("code")
 
         result = CodeBlockProcessor.preserve_syntax_highlighting(code)
 
@@ -514,13 +518,13 @@ class TestCodeBlockProcessor:
         """Test syntax highlighting preservation without language."""
         from bs4 import BeautifulSoup
 
-        html = '<code>plain code</code>'
-        soup = BeautifulSoup(html, 'html.parser')
-        code = soup.find('code')
+        html = "<code>plain code</code>"
+        soup = BeautifulSoup(html, "html.parser")
+        code = soup.find("code")
 
         result = CodeBlockProcessor.preserve_syntax_highlighting(code)
 
-        assert result == '```\nplain code\n```'
+        assert result == "```\nplain code\n```"
 
 
 class TestImageProcessor:
@@ -536,26 +540,26 @@ class TestImageProcessor:
         <img src="test3.gif">
         """
 
-        soup = BeautifulSoup(html, 'html.parser')
+        soup = BeautifulSoup(html, "html.parser")
         images = ImageProcessor.process_images(soup)
 
         assert len(images) == 3
-        assert images[0]['src'] == 'test1.jpg'
-        assert images[0]['alt'] == 'Test 1'
-        assert images[0]['title'] == 'Title 1'
-        assert images[0]['markdown'] == '![Test 1](test1.jpg "Title 1")'
-        assert images[1]['markdown'] == '![Test 2](test2.png)'
-        assert images[2]['alt'] == ''
+        assert images[0]["src"] == "test1.jpg"
+        assert images[0]["alt"] == "Test 1"
+        assert images[0]["title"] == "Title 1"
+        assert images[0]["markdown"] == '![Test 1](test1.jpg "Title 1")'
+        assert images[1]["markdown"] == "![Test 2](test2.png)"
+        assert images[2]["alt"] == ""
 
     def test_process_images_with_base_url(self):
         """Test image processing with base URL."""
         from bs4 import BeautifulSoup
 
         html = '<img src="/images/test.jpg" alt="Test">'
-        soup = BeautifulSoup(html, 'html.parser')
-        images = ImageProcessor.process_images(soup, 'https://example.com')
+        soup = BeautifulSoup(html, "html.parser")
+        images = ImageProcessor.process_images(soup, "https://example.com")
 
-        assert images[0]['src'] == 'https://example.com/images/test.jpg'
+        assert images[0]["src"] == "https://example.com/images/test.jpg"
 
     def test_process_images_with_figure_caption(self):
         """Test image processing with figure caption."""
@@ -568,22 +572,22 @@ class TestImageProcessor:
         </figure>
         """
 
-        soup = BeautifulSoup(html, 'html.parser')
+        soup = BeautifulSoup(html, "html.parser")
         images = ImageProcessor.process_images(soup)
 
         assert len(images) == 1
-        assert images[0]['alt'] == 'Test Caption'
-        assert images[0]['caption'] == 'Test Caption'
+        assert images[0]["alt"] == "Test Caption"
+        assert images[0]["caption"] == "Test Caption"
 
     def test_to_markdown_with_title(self):
         """Test markdown conversion with title."""
-        result = ImageProcessor.to_markdown('test.jpg', 'Alt text', 'Title text')
+        result = ImageProcessor.to_markdown("test.jpg", "Alt text", "Title text")
         assert result == '![Alt text](test.jpg "Title text")'
 
     def test_to_markdown_without_title(self):
         """Test markdown conversion without title."""
-        result = ImageProcessor.to_markdown('test.jpg', 'Alt text')
-        assert result == '![Alt text](test.jpg)'
+        result = ImageProcessor.to_markdown("test.jpg", "Alt text")
+        assert result == "![Alt text](test.jpg)"
 
     def test_handle_figure_captions(self):
         """Test figure caption handling."""
@@ -596,23 +600,23 @@ class TestImageProcessor:
         </figure>
         """
 
-        soup = BeautifulSoup(html, 'html.parser')
-        figure = soup.find('figure')
+        soup = BeautifulSoup(html, "html.parser")
+        figure = soup.find("figure")
 
         result = ImageProcessor.handle_figure_captions(figure)
 
         # The function uses the original alt text, not the caption for the alt attribute
         assert '![Test](test.jpg "Title")' in result
-        assert '*Figure Caption*' in result
+        assert "*Figure Caption*" in result
 
     def test_handle_figure_no_image(self):
         """Test figure handling without image."""
         from bs4 import BeautifulSoup
 
-        html = '<figure><figcaption>Caption only</figcaption></figure>'
-        soup = BeautifulSoup(html, 'html.parser')
-        figure = soup.find('figure')
+        html = "<figure><figcaption>Caption only</figcaption></figure>"
+        soup = BeautifulSoup(html, "html.parser")
+        figure = soup.find("figure")
 
         result = ImageProcessor.handle_figure_captions(figure)
 
-        assert result == ''
+        assert result == ""

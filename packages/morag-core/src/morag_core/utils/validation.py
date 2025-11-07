@@ -6,11 +6,13 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Union
 from urllib.parse import urlparse
 
-from ..exceptions import ValidationError
 from ..config import settings
+from ..exceptions import ValidationError
 
 
-def validate_file_size(file_path: Union[str, Path], max_size: Optional[int] = None) -> bool:
+def validate_file_size(
+    file_path: Union[str, Path], max_size: Optional[int] = None
+) -> bool:
     """Validate file size.
 
     Args:
@@ -39,7 +41,9 @@ def validate_file_size(file_path: Union[str, Path], max_size: Optional[int] = No
     return True
 
 
-def validate_file_type(file_path: Union[str, Path], allowed_extensions: Set[str]) -> bool:
+def validate_file_type(
+    file_path: Union[str, Path], allowed_extensions: Set[str]
+) -> bool:
     """Validate file type by extension.
 
     Args:
@@ -53,7 +57,7 @@ def validate_file_type(file_path: Union[str, Path], allowed_extensions: Set[str]
         ValidationError: If file type is not allowed
     """
     file_path = Path(file_path)
-    extension = file_path.suffix.lower().lstrip('.')
+    extension = file_path.suffix.lower().lstrip(".")
 
     if not extension or extension not in allowed_extensions:
         raise ValidationError(
@@ -128,7 +132,7 @@ def validate_api_key(api_key: str, min_length: int = 8) -> bool:
         raise ValidationError(f"API key must be at least {min_length} characters long")
 
     # Check if API key contains only alphanumeric characters and common separators
-    if not re.match(r'^[a-zA-Z0-9_\-\.]+$', api_key):
+    if not re.match(r"^[a-zA-Z0-9_\-\.]+$", api_key):
         raise ValidationError("API key contains invalid characters")
 
     return True
@@ -175,7 +179,7 @@ def validate_email(email: str) -> bool:
     Raises:
         ValidationError: If email is invalid
     """
-    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    email_pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
 
     if not re.match(email_pattern, email):
         raise ValidationError(f"Invalid email format: {email}")
@@ -195,10 +199,10 @@ def sanitize_filename(filename: str, max_length: int = 255) -> str:
     """
     # Remove or replace invalid characters
     invalid_chars = r'[<>:"/\\|?*\x00-\x1f]'
-    sanitized = re.sub(invalid_chars, '_', filename)
+    sanitized = re.sub(invalid_chars, "_", filename)
 
     # Remove leading/trailing dots and spaces
-    sanitized = sanitized.strip('. ')
+    sanitized = sanitized.strip(". ")
 
     # Ensure filename is not empty
     if not sanitized:
@@ -213,7 +217,9 @@ def sanitize_filename(filename: str, max_length: int = 255) -> str:
     return sanitized
 
 
-def sanitize_filepath(filepath: Union[str, Path], base_dir: Optional[Union[str, Path]] = None) -> Path:
+def sanitize_filepath(
+    filepath: Union[str, Path], base_dir: Optional[Union[str, Path]] = None
+) -> Path:
     """Sanitize file path to prevent traversal and injection attacks.
 
     Args:
@@ -235,27 +241,29 @@ def sanitize_filepath(filepath: Union[str, Path], base_dir: Optional[Union[str, 
     path_str = str(path)
 
     # Check for null bytes (can cause issues in some systems)
-    if '\x00' in path_str:
+    if "\x00" in path_str:
         raise ValidationError(f"Null byte detected in path: {filepath}")
 
     # Check for dangerous command injection patterns
     dangerous_patterns = [
-        r'[;&|`$()]',  # Shell metacharacters
-        r'\$\(',       # Command substitution
-        r'`.*`',       # Backtick command substitution
-        r'>\s*/',      # Output redirection to system paths
-        r'<\s*/',      # Input redirection from system paths
-        r'\|\s*\w+',   # Pipe to commands
+        r"[;&|`$()]",  # Shell metacharacters
+        r"\$\(",  # Command substitution
+        r"`.*`",  # Backtick command substitution
+        r">\s*/",  # Output redirection to system paths
+        r"<\s*/",  # Input redirection from system paths
+        r"\|\s*\w+",  # Pipe to commands
     ]
 
     for pattern in dangerous_patterns:
         if re.search(pattern, path_str):
-            raise ValidationError(f"Dangerous characters or patterns detected in path: {filepath}")
+            raise ValidationError(
+                f"Dangerous characters or patterns detected in path: {filepath}"
+            )
 
     # Check for path traversal patterns
     traversal_patterns = [
-        r'\.\./',      # Directory traversal
-        r'\.\.\\'      # Windows directory traversal
+        r"\.\./",  # Directory traversal
+        r"\.\.\\",  # Windows directory traversal
     ]
 
     for pattern in traversal_patterns:
@@ -278,29 +286,52 @@ def sanitize_filepath(filepath: Union[str, Path], base_dir: Optional[Union[str, 
     try:
         resolved.relative_to(base_dir)
     except ValueError:
-        raise ValidationError(f"Path traversal detected - path outside base directory: {filepath}")
+        raise ValidationError(
+            f"Path traversal detected - path outside base directory: {filepath}"
+        )
 
     # Additional filename validation
     filename = resolved.name
     if filename:
         # Check for reserved Windows filenames
         reserved_names = {
-            'CON', 'PRN', 'AUX', 'NUL',
-            'COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9',
-            'LPT1', 'LPT2', 'LPT3', 'LPT4', 'LPT5', 'LPT6', 'LPT7', 'LPT8', 'LPT9'
+            "CON",
+            "PRN",
+            "AUX",
+            "NUL",
+            "COM1",
+            "COM2",
+            "COM3",
+            "COM4",
+            "COM5",
+            "COM6",
+            "COM7",
+            "COM8",
+            "COM9",
+            "LPT1",
+            "LPT2",
+            "LPT3",
+            "LPT4",
+            "LPT5",
+            "LPT6",
+            "LPT7",
+            "LPT8",
+            "LPT9",
         }
 
         # Check base filename without extension
-        base_filename = filename.split('.')[0].upper()
+        base_filename = filename.split(".")[0].upper()
         if base_filename in reserved_names:
             raise ValidationError(f"Reserved filename detected: {filename}")
 
         # Check for filenames that are only dots or whitespace
-        if filename.strip('. \t\n\r') == '':
-            raise ValidationError(f"Invalid filename (only dots/whitespace): {filename}")
+        if filename.strip(". \t\n\r") == "":
+            raise ValidationError(
+                f"Invalid filename (only dots/whitespace): {filename}"
+            )
 
         # Check for filenames that start with multiple dots (potential traversal or hidden files)
-        if filename.startswith('..'):
+        if filename.startswith(".."):
             raise ValidationError(f"Filename cannot start with double dots: {filename}")
 
     return resolved

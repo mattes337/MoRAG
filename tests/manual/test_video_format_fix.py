@@ -14,8 +14,8 @@ from unittest.mock import Mock
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from morag_video import VideoConverter
 from morag_core.interfaces.converter import ConversionOptions
+from morag_video import VideoConverter
 
 
 async def test_video_format():
@@ -27,34 +27,36 @@ async def test_video_format():
     # Create mock video result
     video_result = Mock()
     video_result.metadata = {
-        'filename': 'test_video.mp4',
-        'duration': 120,
-        'resolution': '1920x1080',
-        'fps': 30,
-        'format': 'mp4'
+        "filename": "test_video.mp4",
+        "duration": 120,
+        "resolution": "1920x1080",
+        "fps": 30,
+        "format": "mp4",
     }
 
     # Mock audio transcript
-    video_result.audio_transcript = "Hello everyone. Welcome to this video. Today we'll discuss important topics."
+    video_result.audio_transcript = (
+        "Hello everyone. Welcome to this video. Today we'll discuss important topics."
+    )
     video_result.summary = "A video about important topics."
 
     # Mock keyframes (optional)
     video_result.keyframes = [
         {
-            'timestamp': 10.0,
-            'description': 'Opening scene',
-            'objects': ['person', 'microphone'],
-            'text_content': 'Welcome'
+            "timestamp": 10.0,
+            "description": "Opening scene",
+            "objects": ["person", "microphone"],
+            "text_content": "Welcome",
         }
     ]
 
     # Mock scenes (optional)
     video_result.scenes = [
         {
-            'start_time': 0.0,
-            'end_time': 60.0,
-            'description': 'Introduction segment',
-            'activity': 'speaking'
+            "start_time": 0.0,
+            "end_time": 60.0,
+            "description": "Introduction segment",
+            "activity": "speaking",
         }
     ]
 
@@ -62,7 +64,7 @@ async def test_video_format():
     options = ConversionOptions(
         include_metadata=True,
         extract_images=True,
-        format_options={'include_timestamps': True}
+        format_options={"include_timestamps": True},
     )
 
     # Generate markdown
@@ -134,11 +136,11 @@ async def test_video_format_without_transcript():
     # Create mock video result without transcript
     video_result = Mock()
     video_result.metadata = {
-        'filename': 'silent_video.mp4',
-        'duration': 60,
-        'resolution': '1280x720',
-        'fps': 24,
-        'format': 'mp4'
+        "filename": "silent_video.mp4",
+        "duration": 60,
+        "resolution": "1280x720",
+        "fps": 24,
+        "format": "mp4",
     }
 
     # No audio transcript
@@ -149,10 +151,7 @@ async def test_video_format_without_transcript():
     video_result.scenes = []
 
     # Create conversion options
-    options = ConversionOptions(
-        include_metadata=True,
-        extract_images=False
-    )
+    options = ConversionOptions(include_metadata=True, extract_images=False)
 
     # Generate markdown
     markdown = await converter._create_structured_markdown(video_result, options)
@@ -216,6 +215,7 @@ async def main():
     except Exception as e:
         print(f"\n💥 Test failed with error: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 

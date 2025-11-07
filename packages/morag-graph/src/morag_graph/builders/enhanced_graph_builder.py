@@ -3,19 +3,20 @@
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
 
-from ..storage.base import BaseStorage
-from ..models import Entity, Relation, DocumentChunk
 from ..extraction import EntityExtractor, RelationExtractor
+from ..models import DocumentChunk, Entity, Relation
+from ..storage.base import BaseStorage
 from ..updates.checksum_manager import DocumentChecksumManager
-from ..updates.cleanup_manager import DocumentCleanupManager, CleanupResult
-from .graph_builder import GraphBuildResult, GraphBuildError
+from ..updates.cleanup_manager import CleanupResult, DocumentCleanupManager
+from .graph_builder import GraphBuildError, GraphBuildResult
 
 # SpaCy imports (optional)
 try:
     from ..extraction import SpacyEntityExtractor
     from ..normalizers import SpacyNormalizer
+
     _SPACY_AVAILABLE = True
 except ImportError:
     _SPACY_AVAILABLE = False
@@ -62,7 +63,7 @@ class EnhancedGraphBuilder:
         min_confidence: float = 0.6,
         chunk_size: int = 1000,
         max_workers: int = 10,
-        **kwargs
+        **kwargs,
     ):
         """Initialize the enhanced graph builder.
 
@@ -89,14 +90,14 @@ class EnhancedGraphBuilder:
             domain=domain,
             min_confidence=min_confidence,
             chunk_size=chunk_size,
-            max_workers=max_workers
+            max_workers=max_workers,
         )
 
         self.relation_extractor = relation_extractor or RelationExtractor(
             domain=domain,
             min_confidence=min_confidence,
             chunk_size=chunk_size,
-            max_workers=max_workers
+            max_workers=max_workers,
         )
 
         # Initialize SpaCy extractor if available and enabled
@@ -126,7 +127,7 @@ class EnhancedGraphBuilder:
             langextract_enabled=True,
             spacy_enabled=self.spacy_enabled,
             domain=self.domain,
-            min_confidence=self.min_confidence
+            min_confidence=self.min_confidence,
         )
 
     async def process_document(
@@ -134,7 +135,7 @@ class EnhancedGraphBuilder:
         doc_id: str,
         text: str,
         metadata: Optional[Dict[str, Any]] = None,
-        force_update: bool = False
+        force_update: bool = False,
     ) -> EnhancedGraphBuildResult:
         """Process a document with enhanced extraction including LangExtract.
 
@@ -154,14 +155,16 @@ class EnhancedGraphBuilder:
             if not force_update:
                 needs_update = await self.checksum_manager.needs_update(doc_id, text)
                 if not needs_update:
-                    self.logger.info(f"Document {doc_id} unchanged, skipping processing")
+                    self.logger.info(
+                        f"Document {doc_id} unchanged, skipping processing"
+                    )
                     return EnhancedGraphBuildResult(
                         success=True,
                         doc_id=doc_id,
                         processing_time=time.time() - start_time,
                         langextract_enabled=True,
                         langextract_domain=self.domain,
-                        spacy_enabled=self.spacy_enabled
+                        spacy_enabled=self.spacy_enabled,
                     )
 
             # Clean up existing data for this document
@@ -176,11 +179,15 @@ class EnhancedGraphBuilder:
             if self.spacy_enabled and self.spacy_extractor:
                 try:
                     self.logger.debug("Extracting entities with SpaCy...")
-                    spacy_entities = await self.spacy_extractor.extract(text, source_doc_id=doc_id)
+                    spacy_entities = await self.spacy_extractor.extract(
+                        text, source_doc_id=doc_id
+                    )
 
                     # Normalize and merge SpaCy entities
                     if self.spacy_normalizer:
-                        spacy_entities = await self.spacy_normalizer.normalize_entities(spacy_entities)
+                        spacy_entities = await self.spacy_normalizer.normalize_entities(
+                            spacy_entities
+                        )
 
                 except Exception as e:
                     self.logger.error(f"SpaCy extraction failed: {e}")
@@ -190,7 +197,9 @@ class EnhancedGraphBuilder:
 
             # Step 3: Extract relations using LangExtract
             self.logger.debug("Extracting relations with LangExtract...")
-            relations = await self.relation_extractor.extract(text, entities=all_entities, source_doc_id=doc_id)
+            relations = await self.relation_extractor.extract(
+                text, entities=all_entities, source_doc_id=doc_id
+            )
 
             # Step 4: Store entities and relations
             stored_entities = 0
@@ -214,7 +223,6 @@ class EnhancedGraphBuilder:
                 entities_created=stored_entities,
                 relations_created=stored_relations,
                 processing_time=processing_time,
-
                 # LangExtract results
                 langextract_enabled=True,
                 langextract_entities_extracted=len(entities),
@@ -223,15 +231,22 @@ class EnhancedGraphBuilder:
                 langextract_metadata={
                     "entity_types": list(set(e.type for e in entities)),
                     "relation_types": list(set(r.type for r in relations)),
-                    "avg_entity_confidence": sum(e.confidence for e in entities) / len(entities) if entities else 0,
-                    "avg_relation_confidence": sum(r.confidence for r in relations) / len(relations) if relations else 0
+                    "avg_entity_confidence": sum(e.confidence for e in entities)
+                    / len(entities)
+                    if entities
+                    else 0,
+                    "avg_relation_confidence": sum(r.confidence for r in relations)
+                    / len(relations)
+                    if relations
+                    else 0,
                 },
-
                 # SpaCy results
                 spacy_enabled=self.spacy_enabled,
                 spacy_entities_extracted=len(spacy_entities),
-                spacy_entities_normalized=len(spacy_entities) if self.spacy_normalizer else 0,
-                spacy_entities_merged=len(spacy_entities)
+                spacy_entities_normalized=len(spacy_entities)
+                if self.spacy_normalizer
+                else 0,
+                spacy_entities_merged=len(spacy_entities),
             )
 
             self.logger.info(
@@ -242,7 +257,7 @@ class EnhancedGraphBuilder:
                 langextract_entities=len(entities),
                 langextract_relations=len(relations),
                 spacy_entities=len(spacy_entities),
-                processing_time=processing_time
+                processing_time=processing_time,
             )
 
             return result
@@ -256,13 +271,11 @@ class EnhancedGraphBuilder:
                 processing_time=time.time() - start_time,
                 langextract_enabled=True,
                 langextract_domain=self.domain,
-                spacy_enabled=self.spacy_enabled
+                spacy_enabled=self.spacy_enabled,
             )
 
     async def process_documents(
-        self,
-        documents: List[Dict[str, Any]],
-        force_update: bool = False
+        self, documents: List[Dict[str, Any]], force_update: bool = False
     ) -> EnhancedGraphBuildResult:
         """Process multiple documents with enhanced extraction.
 
@@ -288,10 +301,10 @@ class EnhancedGraphBuilder:
         for doc in documents:
             try:
                 result = await self.process_document(
-                    doc_id=doc['id'],
-                    text=doc['text'],
-                    metadata=doc.get('metadata'),
-                    force_update=force_update
+                    doc_id=doc["id"],
+                    text=doc["text"],
+                    metadata=doc.get("metadata"),
+                    force_update=force_update,
                 )
 
                 if result.success:
@@ -315,7 +328,9 @@ class EnhancedGraphBuilder:
                     failed_docs += 1
 
             except Exception as e:
-                self.logger.error(f"Failed to process document {doc.get('id', 'unknown')}: {e}")
+                self.logger.error(
+                    f"Failed to process document {doc.get('id', 'unknown')}: {e}"
+                )
                 failed_docs += 1
 
         processing_time = time.time() - start_time
@@ -325,22 +340,19 @@ class EnhancedGraphBuilder:
             entities_created=total_entities,
             relations_created=total_relations,
             processing_time=processing_time,
-
             # LangExtract results
             langextract_enabled=True,
             langextract_entities_extracted=total_langextract_entities,
             langextract_relations_created=total_langextract_relations,
             langextract_domain=self.domain,
             langextract_metadata=langextract_metadata,
-
             # SpaCy results
             spacy_enabled=self.spacy_enabled,
             spacy_entities_extracted=total_spacy_entities,
-
             # Additional stats
             metadata={
                 "documents_processed": len(documents),
                 "successful_documents": successful_docs,
-                "failed_documents": failed_docs
-            }
+                "failed_documents": failed_docs,
+            },
         )

@@ -1,11 +1,15 @@
 """Test video transcription format fixes."""
 
 import pytest
-
-from morag_video import VideoConverter
 from morag_audio import AudioProcessingResult, AudioTranscriptSegment
-from morag_audio.services import DiarizationResult, SpeakerSegment, SpeakerInfo
-from morag_audio.services import TopicSegmentationResult, TopicSegment
+from morag_audio.services import (
+    DiarizationResult,
+    SpeakerInfo,
+    SpeakerSegment,
+    TopicSegment,
+    TopicSegmentationResult,
+)
+from morag_video import VideoConverter
 
 
 class TestVideoTranscriptFix:
@@ -27,7 +31,7 @@ class TestVideoTranscriptFix:
                 end_time=3.0,
                 confidence=0.95,
                 speaker_id=None,
-                language="de"
+                language="de",
             ),
             AudioTranscriptSegment(
                 text="Der Fukuda-Lauftest hat verschiedene Möglichkeiten",
@@ -35,7 +39,7 @@ class TestVideoTranscriptFix:
                 end_time=7.0,
                 confidence=0.92,
                 speaker_id=None,
-                language="de"
+                language="de",
             ),
             AudioTranscriptSegment(
                 text="Zunächst testen wir immer mit geöffnetem Mund",
@@ -43,7 +47,7 @@ class TestVideoTranscriptFix:
                 end_time=11.0,
                 confidence=0.88,
                 speaker_id=None,
-                language="de"
+                language="de",
             ),
             AudioTranscriptSegment(
                 text="Das ist der Grund, warum viele Patienten zum Physiotherapeuten gehen",
@@ -51,7 +55,7 @@ class TestVideoTranscriptFix:
                 end_time=50.0,
                 confidence=0.90,
                 speaker_id=None,
-                language="de"
+                language="de",
             ),
             AudioTranscriptSegment(
                 text="Genauso ist es, wenn der Patient zubeißt",
@@ -59,20 +63,28 @@ class TestVideoTranscriptFix:
                 end_time=54.0,
                 confidence=0.87,
                 speaker_id=None,
-                language="de"
-            )
+                language="de",
+            ),
         ]
 
         # Mock speaker diarization with proper speaker IDs
         speakers = [
-            SpeakerInfo("SPEAKER_00", 35.0, 8, 4.375, [0.95, 0.92, 0.88, 0.90, 0.87, 0.85, 0.89, 0.91], 0.0, 80.0),
-            SpeakerInfo("SPEAKER_01", 15.0, 3, 5.0, [0.88, 0.92, 0.85], 45.0, 60.0)
+            SpeakerInfo(
+                "SPEAKER_00",
+                35.0,
+                8,
+                4.375,
+                [0.95, 0.92, 0.88, 0.90, 0.87, 0.85, 0.89, 0.91],
+                0.0,
+                80.0,
+            ),
+            SpeakerInfo("SPEAKER_01", 15.0, 3, 5.0, [0.88, 0.92, 0.85], 45.0, 60.0),
         ]
 
         speaker_segments = [
             SpeakerSegment("SPEAKER_00", 0.0, 40.0, 40.0, 0.95),
             SpeakerSegment("SPEAKER_01", 40.5, 55.0, 14.5, 0.92),
-            SpeakerSegment("SPEAKER_00", 55.5, 80.0, 24.5, 0.88)
+            SpeakerSegment("SPEAKER_00", 55.5, 80.0, 24.5, 0.88),
         ]
 
         diarization_result = DiarizationResult(
@@ -83,7 +95,7 @@ class TestVideoTranscriptFix:
             speaker_overlap_time=0.0,
             processing_time=2.5,
             model_used="pyannote/speaker-diarization-3.1",
-            confidence_threshold=0.5
+            confidence_threshold=0.5,
         )
 
         # Mock topic segmentation with proper timestamps
@@ -95,14 +107,14 @@ class TestVideoTranscriptFix:
                 sentences=[
                     "Also die Auswertung des Fukuda-Testes",
                     "Der Fukuda-Lauftest hat verschiedene Möglichkeiten",
-                    "Zunächst testen wir immer mit geöffnetem Mund"
+                    "Zunächst testen wir immer mit geöffnetem Mund",
                 ],
                 start_time=0.0,
                 end_time=40.0,
                 duration=40.0,
                 confidence=0.9,
                 keywords=["fukuda", "test", "auswertung"],
-                speaker_distribution={"SPEAKER_00": 100.0}
+                speaker_distribution={"SPEAKER_00": 100.0},
             ),
             TopicSegment(
                 topic_id="topic_2",
@@ -110,15 +122,15 @@ class TestVideoTranscriptFix:
                 summary="",  # No summary as requested
                 sentences=[
                     "Das ist der Grund, warum viele Patienten zum Physiotherapeuten gehen",
-                    "Genauso ist es, wenn der Patient zubeißt"
+                    "Genauso ist es, wenn der Patient zubeißt",
                 ],
                 start_time=45.0,
                 end_time=80.0,
                 duration=35.0,
                 confidence=0.85,
                 keywords=["physiotherapeut", "patient", "behandlung"],
-                speaker_distribution={"SPEAKER_01": 60.0, "SPEAKER_00": 40.0}
-            )
+                speaker_distribution={"SPEAKER_01": 60.0, "SPEAKER_00": 40.0},
+            ),
         ]
 
         topic_result = TopicSegmentationResult(
@@ -127,7 +139,7 @@ class TestVideoTranscriptFix:
             processing_time=1.2,
             model_used="all-MiniLM-L6-v2",
             similarity_threshold=0.7,
-            segmentation_method="semantic_embedding"
+            segmentation_method="semantic_embedding",
         )
 
         return AudioProcessingResult(
@@ -137,14 +149,14 @@ class TestVideoTranscriptFix:
             duration=80.0,
             segments=segments,
             metadata={
-                'filename': '13_Erklärung_zum_Fukuda-Test.mp4',
-                'model_used': 'large-v3',
-                'processor_used': 'Enhanced Audio Processor'
+                "filename": "13_Erklärung_zum_Fukuda-Test.mp4",
+                "model_used": "large-v3",
+                "processor_used": "Enhanced Audio Processor",
             },
             processing_time=3.5,
-            model_used='large-v3',
+            model_used="large-v3",
             speaker_diarization=diarization_result,
-            topic_segmentation=topic_result
+            topic_segmentation=topic_result,
         )
 
     def test_topic_timestamp_format(self, video_converter, mock_audio_result):
@@ -186,7 +198,7 @@ class TestVideoTranscriptFix:
         markdown_content = "\n".join(markdown_lines)
 
         # Check that sentences don't repeat
-        lines = [line.strip() for line in markdown_content.split('\n') if line.strip()]
+        lines = [line.strip() for line in markdown_content.split("\n") if line.strip()]
 
         # Count occurrences of each line
         line_counts = {}
@@ -225,13 +237,13 @@ class TestVideoTranscriptFix:
         markdown_content = "\n".join(markdown_lines)
 
         # Check for proper dialogue format
-        dialogue_lines = [line for line in markdown_content.split('\n') if ': ' in line]
+        dialogue_lines = [line for line in markdown_content.split("\n") if ": " in line]
 
         for line in dialogue_lines:
             # Each dialogue line should have format "SPEAKER_XX: text"
-            assert line.startswith('SPEAKER_'), f"Invalid dialogue format: {line}"
-            assert ': ' in line, f"Missing colon separator: {line}"
+            assert line.startswith("SPEAKER_"), f"Invalid dialogue format: {line}"
+            assert ": " in line, f"Missing colon separator: {line}"
 
             # Text part should not be empty
-            text_part = line.split(': ', 1)[1].strip()
+            text_part = line.split(": ", 1)[1].strip()
             assert len(text_part) > 0, f"Empty text in dialogue: {line}"

@@ -1,11 +1,11 @@
 """Enhanced fact extraction service with vector search capabilities."""
 
-import structlog
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
 
+import structlog
+from morag_graph.storage.neo4j_storage import Neo4jStorage
 from morag_reasoning.llm import LLMClient
 from morag_reasoning.recursive_fact_models import RawFact, SourceMetadata
-from morag_graph.storage.neo4j_storage import Neo4jStorage
 from morag_services.embedding import GeminiEmbeddingService
 
 
@@ -16,7 +16,7 @@ class EnhancedFactExtractionService:
         self,
         llm_client: LLMClient,
         neo4j_storage: Neo4jStorage,
-        embedding_service: Optional[GeminiEmbeddingService] = None
+        embedding_service: Optional[GeminiEmbeddingService] = None,
     ):
         """Initialize the enhanced fact extraction service.
 
@@ -35,7 +35,7 @@ class EnhancedFactExtractionService:
         user_query: str,
         entity_names: List[str],
         max_facts: int = 10000,
-        language: Optional[str] = None
+        language: Optional[str] = None,
     ) -> List[RawFact]:
         """Extract facts relevant to a query using both graph relationships and vector similarity.
 
@@ -74,7 +74,7 @@ class EnhancedFactExtractionService:
                 graph_facts=len(graph_facts),
                 vector_facts=len(vector_facts),
                 total_unique_facts=len(all_facts),
-                returned_facts=len(limited_facts)
+                returned_facts=len(limited_facts),
             )
 
             return limited_facts
@@ -84,7 +84,7 @@ class EnhancedFactExtractionService:
                 "Enhanced fact extraction failed",
                 user_query=user_query,
                 entity_names=entity_names,
-                error=str(e)
+                error=str(e),
             )
             return []
 
@@ -93,7 +93,7 @@ class EnhancedFactExtractionService:
         user_query: str,
         entity_names: List[str],
         language: Optional[str] = None,
-        query_context: Optional[str] = None
+        query_context: Optional[str] = None,
     ) -> List[RawFact]:
         """Extract facts from graph relationships (existing approach).
 
@@ -116,7 +116,9 @@ class EnhancedFactExtractionService:
             LIMIT 50
             """
 
-            result = await self.neo4j_storage._connection_ops._execute_query(query, {"entity_names": entity_names})
+            result = await self.neo4j_storage._connection_ops._execute_query(
+                query, {"entity_names": entity_names}
+            )
 
             facts = []
             for record in result:
@@ -127,7 +129,9 @@ class EnhancedFactExtractionService:
 
                 # Only include facts with proper document sources
                 if not source_info.get("source_file") and not source_info.get("title"):
-                    self.logger.warning(f"Skipping fact {record['fact_id']} - no document source found")
+                    self.logger.warning(
+                        f"Skipping fact {record['fact_id']} - no document source found"
+                    )
                     continue
 
                 fact = RawFact(
@@ -135,7 +139,9 @@ class EnhancedFactExtractionService:
                     source_node_id=record["fact_id"],
                     extracted_from_depth=0,  # Graph facts are at depth 0
                     source_metadata=SourceMetadata(
-                        document_name=source_info.get("title", source_info.get("source_file", "")),
+                        document_name=source_info.get(
+                            "title", source_info.get("source_file", "")
+                        ),
                         chunk_index=source_info.get("chunk_index", 0),
                         page_number=source_info.get("page_number"),
                         section=source_info.get("section"),
@@ -151,9 +157,9 @@ class EnhancedFactExtractionService:
                             "source_file": source_info.get("source_file", ""),
                             "title": source_info.get("title", ""),
                             "chapter": source_info.get("chapter"),
-                            "fact_id": record["fact_id"]
-                        }
-                    )
+                            "fact_id": record["fact_id"],
+                        },
+                    ),
                 )
                 facts.append(fact)
 
@@ -161,17 +167,12 @@ class EnhancedFactExtractionService:
 
         except Exception as e:
             self.logger.error(
-                "Graph fact extraction failed",
-                entity_names=entity_names,
-                error=str(e)
+                "Graph fact extraction failed", entity_names=entity_names, error=str(e)
             )
             return []
 
     async def _extract_facts_from_vector_search(
-        self,
-        user_query: str,
-        max_facts: int,
-        language: Optional[str] = None
+        self, user_query: str, max_facts: int, language: Optional[str] = None
     ) -> List[RawFact]:
         """Extract facts using vector similarity search.
 
@@ -213,7 +214,9 @@ class EnhancedFactExtractionService:
 
                 # Only include facts with proper document sources
                 if not source_info.get("source_file") and not source_info.get("title"):
-                    self.logger.warning(f"Skipping fact {fact_data['id']} - no document source found")
+                    self.logger.warning(
+                        f"Skipping fact {fact_data['id']} - no document source found"
+                    )
                     continue
 
                 fact = RawFact(
@@ -221,7 +224,9 @@ class EnhancedFactExtractionService:
                     source_node_id=fact_data["id"],
                     extracted_from_depth=0,  # Vector facts are at depth 0
                     source_metadata=SourceMetadata(
-                        document_name=source_info.get("title", source_info.get("source_file", "")),
+                        document_name=source_info.get(
+                            "title", source_info.get("source_file", "")
+                        ),
                         chunk_index=source_info.get("chunk_index", 0),
                         page_number=source_info.get("page_number"),
                         section=source_info.get("section"),
@@ -236,9 +241,9 @@ class EnhancedFactExtractionService:
                             "source_file": source_info.get("source_file", ""),
                             "title": source_info.get("title", ""),
                             "chapter": source_info.get("chapter"),
-                            "fact_id": fact_data["id"]
-                        }
-                    )
+                            "fact_id": fact_data["id"],
+                        },
+                    ),
                 )
                 facts.append(fact)
 
@@ -246,9 +251,7 @@ class EnhancedFactExtractionService:
 
         except Exception as e:
             self.logger.error(
-                "Vector fact extraction failed",
-                user_query=user_query,
-                error=str(e)
+                "Vector fact extraction failed", user_query=user_query, error=str(e)
             )
             return []
 
@@ -280,9 +283,7 @@ class EnhancedFactExtractionService:
         return ". ".join(parts) if parts else "No fact text available"
 
     def _combine_and_deduplicate_facts(
-        self,
-        graph_facts: List[RawFact],
-        vector_facts: List[RawFact]
+        self, graph_facts: List[RawFact], vector_facts: List[RawFact]
     ) -> List[RawFact]:
         """Combine facts from different sources and remove duplicates.
 
@@ -317,10 +318,10 @@ class EnhancedFactExtractionService:
 
         # Look for timestamp patterns like [28:14], [28:15 - 28:16], [31:09 - 31:13]
         timestamp_patterns = [
-            r'\[(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})\]',  # [28:15 - 28:16]
-            r'\[(\d{1,2}:\d{2})\]',  # [28:14]
-            r'\[(\d{1,2}:\d{2}:\d{2})\s*-\s*(\d{1,2}:\d{2}:\d{2})\]',  # [01:28:15 - 01:28:16]
-            r'\[(\d{1,2}:\d{2}:\d{2})\]',  # [01:28:14]
+            r"\[(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})\]",  # [28:15 - 28:16]
+            r"\[(\d{1,2}:\d{2})\]",  # [28:14]
+            r"\[(\d{1,2}:\d{2}:\d{2})\s*-\s*(\d{1,2}:\d{2}:\d{2})\]",  # [01:28:15 - 01:28:16]
+            r"\[(\d{1,2}:\d{2}:\d{2})\]",  # [01:28:14]
         ]
 
         for pattern in timestamp_patterns:
@@ -335,19 +336,26 @@ class EnhancedFactExtractionService:
 
         return None
 
-    def _extract_section_from_text(self, text: str, chunk_metadata: Dict[str, Any]) -> Optional[str]:
+    def _extract_section_from_text(
+        self, text: str, chunk_metadata: Dict[str, Any]
+    ) -> Optional[str]:
         """Extract section information from text or metadata."""
         # Check metadata first
         if chunk_metadata.get("section_title"):
             return chunk_metadata["section_title"]
 
         # For video content, try to extract topic from the beginning of the text
-        lines = text.strip().split('\n')
+        lines = text.strip().split("\n")
         if lines:
             first_line = lines[0].strip()
             # Remove timestamp if present
             import re
-            first_line = re.sub(r'\[\d{1,2}:\d{2}(?::\d{2})?\s*(?:-\s*\d{1,2}:\d{2}(?::\d{2})?)?\]', '', first_line).strip()
+
+            first_line = re.sub(
+                r"\[\d{1,2}:\d{2}(?::\d{2})?\s*(?:-\s*\d{1,2}:\d{2}(?::\d{2})?)?\]",
+                "",
+                first_line,
+            ).strip()
             if first_line and len(first_line) < 100:  # Reasonable section title length
                 return first_line
 
@@ -379,7 +387,9 @@ class EnhancedFactExtractionService:
             LIMIT 1
             """
 
-            result = await self.neo4j_storage._connection_ops._execute_query(query1, {"fact_id": fact_id})
+            result = await self.neo4j_storage._connection_ops._execute_query(
+                query1, {"fact_id": fact_id}
+            )
 
             # If no result, try approach 2: Find any related chunk
             if not result or not result[0].get("source_file"):
@@ -394,7 +404,9 @@ class EnhancedFactExtractionService:
                        d.metadata as document_metadata
                 LIMIT 1
                 """
-                result = await self.neo4j_storage._connection_ops._execute_query(query2, {"fact_id": fact_id})
+                result = await self.neo4j_storage._connection_ops._execute_query(
+                    query2, {"fact_id": fact_id}
+                )
 
             if result and result[0].get("source_file"):
                 record = result[0]
@@ -404,13 +416,18 @@ class EnhancedFactExtractionService:
 
                 # Parse JSON metadata
                 import json
+
                 try:
-                    chunk_metadata = json.loads(chunk_metadata_str) if chunk_metadata_str else {}
+                    chunk_metadata = (
+                        json.loads(chunk_metadata_str) if chunk_metadata_str else {}
+                    )
                 except:
                     chunk_metadata = {}
 
                 try:
-                    doc_metadata = json.loads(doc_metadata_str) if doc_metadata_str else {}
+                    doc_metadata = (
+                        json.loads(doc_metadata_str) if doc_metadata_str else {}
+                    )
                 except:
                     doc_metadata = {}
 
@@ -422,7 +439,9 @@ class EnhancedFactExtractionService:
                 # Extract section information
                 section = chunk_metadata.get("section_title")
                 if not section and chunk_text:
-                    section = self._extract_section_from_text(chunk_text, chunk_metadata)
+                    section = self._extract_section_from_text(
+                        chunk_text, chunk_metadata
+                    )
 
                 return {
                     "source_file": record.get("source_file", ""),
@@ -432,12 +451,14 @@ class EnhancedFactExtractionService:
                     "section": section,
                     "timestamp": timestamp,
                     "chapter": chunk_metadata.get("chapter"),
-                    "metadata": {**chunk_metadata, **doc_metadata}
+                    "metadata": {**chunk_metadata, **doc_metadata},
                 }
             else:
                 self.logger.debug(f"No document source found for fact {fact_id}")
                 return {}
 
         except Exception as e:
-            self.logger.warning(f"Failed to get source document info for fact {fact_id}: {e}")
+            self.logger.warning(
+                f"Failed to get source document info for fact {fact_id}: {e}"
+            )
             return {}

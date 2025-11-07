@@ -3,19 +3,23 @@
 YouTube processing test script for remote server debugging.
 """
 
-import requests
+import argparse
 import json
 import sys
-import argparse
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any, Dict
+
+import requests
 
 # Configuration
 REMOTE_SERVER = "http://morag.drydev.de:8000"
 LOCAL_SERVER = "http://localhost:8000"
 OUTPUT_DIR = Path("./test_outputs")
 
-def test_youtube_processing(server_url: str, youtube_url: str, config: Dict[str, Any] = None):
+
+def test_youtube_processing(
+    server_url: str, youtube_url: str, config: Dict[str, Any] = None
+):
     """Test YouTube URL processing."""
     print(f"🎥 Testing YouTube Processing")
     print(f"📡 Server: {server_url}")
@@ -31,7 +35,7 @@ def test_youtube_processing(server_url: str, youtube_url: str, config: Dict[str,
         "extract_transcript": True,
         "use_proxy": True,
         "download_audio": False,  # Skip audio download for faster testing
-        "extract_chapters": True
+        "extract_chapters": True,
     }
 
     if config:
@@ -56,10 +60,10 @@ def test_youtube_processing(server_url: str, youtube_url: str, config: Dict[str,
     stage_url = f"{server_url}/api/v1/stages/markdown-conversion/execute"
 
     data = {
-        'input_files': json.dumps([youtube_url]),
-        'config': json.dumps(default_config),
-        'output_dir': str(OUTPUT_DIR),
-        'return_content': 'true'
+        "input_files": json.dumps([youtube_url]),
+        "config": json.dumps(default_config),
+        "output_dir": str(OUTPUT_DIR),
+        "return_content": "true",
     }
 
     print(f"📤 POST {stage_url}")
@@ -76,12 +80,12 @@ def test_youtube_processing(server_url: str, youtube_url: str, config: Dict[str,
 
             # Save result
             result_file = OUTPUT_DIR / "youtube_test_result.json"
-            with open(result_file, 'w') as f:
+            with open(result_file, "w") as f:
                 json.dump(result, f, indent=2)
             print(f"💾 Result saved to {result_file}")
 
             # Download output files if session_id is available
-            session_id = result.get('session_id')
+            session_id = result.get("session_id")
             if session_id:
                 download_files(server_url, session_id)
 
@@ -91,15 +95,15 @@ def test_youtube_processing(server_url: str, youtube_url: str, config: Dict[str,
             print(f"   Processing time: {result.get('processing_time', 0):.2f}s")
             print(f"   Session ID: {session_id}")
 
-            if result.get('output_files'):
+            if result.get("output_files"):
                 print(f"   Output files: {len(result['output_files'])}")
-                for file_info in result['output_files']:
+                for file_info in result["output_files"]:
                     print(f"     - {file_info.get('filename', 'unknown')}")
 
-            if result.get('error_message'):
+            if result.get("error_message"):
                 print(f"   Error: {result['error_message']}")
 
-            return result.get('success', False)
+            return result.get("success", False)
 
         else:
             print(f"❌ Failed: {response.text}")
@@ -108,6 +112,7 @@ def test_youtube_processing(server_url: str, youtube_url: str, config: Dict[str,
     except Exception as e:
         print(f"❌ Request failed: {e}")
         return False
+
 
 def download_files(server_url: str, session_id: str):
     """Download output files for a session."""
@@ -122,28 +127,28 @@ def download_files(server_url: str, session_id: str):
             return
 
         files_data = response.json()
-        files = files_data.get('files', [])
+        files = files_data.get("files", [])
         print(f"📋 Found {len(files)} files")
 
         for file_info in files:
-            filename = file_info['filename']
+            filename = file_info["filename"]
             download_url = f"{server_url}/api/v1/files/download"
 
             try:
                 response = requests.get(
                     download_url,
                     params={"session_id": session_id, "filename": filename},
-                    timeout=60
+                    timeout=60,
                 )
 
                 if response.status_code == 200:
                     local_path = OUTPUT_DIR / f"youtube_{filename}"
-                    with open(local_path, 'wb') as f:
+                    with open(local_path, "wb") as f:
                         f.write(response.content)
                     print(f"✅ Downloaded: {local_path} ({len(response.content)} bytes)")
 
                     # Verify content if it's a text file
-                    if filename.endswith(('.md', '.txt', '.json')):
+                    if filename.endswith((".md", ".txt", ".json")):
                         verify_text_file(local_path)
 
                 else:
@@ -155,10 +160,11 @@ def download_files(server_url: str, session_id: str):
     except Exception as e:
         print(f"❌ Failed to list files: {e}")
 
+
 def verify_text_file(file_path: Path):
     """Verify a text file and show preview."""
     try:
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, "r", encoding="utf-8") as f:
             content = f.read()
 
         print(f"📄 {file_path.name}:")
@@ -180,10 +186,15 @@ def verify_text_file(file_path: Path):
     except Exception as e:
         print(f"   ❌ Could not read file: {e}")
 
+
 def main():
     parser = argparse.ArgumentParser(description="Test YouTube processing")
-    parser.add_argument("url", nargs="?", default="https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-                       help="YouTube URL to test")
+    parser.add_argument(
+        "url",
+        nargs="?",
+        default="https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        help="YouTube URL to test",
+    )
     parser.add_argument("--server", default=REMOTE_SERVER, help="Server URL")
     parser.add_argument("--local", action="store_true", help="Use local server")
     parser.add_argument("--config", help="JSON config string")
@@ -201,6 +212,7 @@ def main():
     else:
         print(f"\n❌ YouTube processing test failed!")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

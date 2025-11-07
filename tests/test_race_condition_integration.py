@@ -8,14 +8,14 @@ in the production logs and verifies that our fix resolves it.
 
 import asyncio
 import tempfile
-import time
 import threading
+import time
 from pathlib import Path
-from unittest.mock import Mock, patch, AsyncMock
-import pytest
+from unittest.mock import AsyncMock, Mock, patch
 
-from morag.utils.file_upload import FileUploadHandler, FileUploadConfig
+import pytest
 from morag.ingest_tasks import ingest_file_task
+from morag.utils.file_upload import FileUploadConfig, FileUploadHandler
 
 
 class TestRaceConditionIntegration:
@@ -44,7 +44,9 @@ class TestRaceConditionIntegration:
             await asyncio.sleep(0.5)  # Simulate some delay
 
             # File should still exist during worker processing
-            assert test_file.exists(), "File was cleaned up too early - race condition detected!"
+            assert (
+                test_file.exists()
+            ), "File was cleaned up too early - race condition detected!"
 
             # Simulate worker processing the file
             file_content = test_file.read_text()
@@ -91,7 +93,9 @@ class TestRaceConditionIntegration:
                     content = file_path.read_text()
                     return f"Processed: {content}"
                 else:
-                    raise FileNotFoundError(f"File {file_path} was cleaned up prematurely")
+                    raise FileNotFoundError(
+                        f"File {file_path} was cleaned up prematurely"
+                    )
 
             # Process all files concurrently
             tasks = [simulate_worker_processing(f) for f in test_files]
@@ -133,7 +137,9 @@ class TestRaceConditionIntegration:
             assert len(handler._cleanup_threads) == 1
             cleanup_thread = handler._cleanup_threads[0]
             assert isinstance(cleanup_thread, threading.Thread)
-            assert cleanup_thread.daemon is True, "Cleanup thread should be a daemon thread"
+            assert (
+                cleanup_thread.daemon is True
+            ), "Cleanup thread should be a daemon thread"
 
             # Daemon threads should not prevent program exit
             # This is important for proper shutdown behavior
@@ -141,7 +147,7 @@ class TestRaceConditionIntegration:
         finally:
             handler.cleanup_temp_dir()
 
-    @patch('morag.ingest_tasks.logger')
+    @patch("morag.ingest_tasks.logger")
     def test_enhanced_error_logging_on_file_not_found(self, mock_logger):
         """Test that enhanced error logging provides useful debugging information."""
         # Create a non-existent file path
@@ -159,11 +165,10 @@ class TestRaceConditionIntegration:
         # Test the enhanced error handling
         try:
             # This should trigger the enhanced error logging
-            with patch('morag.ingest_tasks.get_morag_api'):
+            with patch("morag.ingest_tasks.get_morag_api"):
                 # Call the task function directly to test error handling
                 result = ingest_file_task.apply(
-                    args=[non_existent_path, "document", {}],
-                    task_id="test-task-123"
+                    args=[non_existent_path, "document", {}], task_id="test-task-123"
                 )
         except Exception:
             # Expected to fail, we're testing the error logging
@@ -171,8 +176,11 @@ class TestRaceConditionIntegration:
 
         # Verify that error logging was called with detailed information
         # The enhanced logging should provide debugging context
-        error_calls = [call for call in mock_logger.error.call_args_list
-                      if 'file_path' in str(call)]
+        error_calls = [
+            call
+            for call in mock_logger.error.call_args_list
+            if "file_path" in str(call)
+        ]
 
         # Should have at least one detailed error log
         assert len(error_calls) > 0, "Enhanced error logging should be called"

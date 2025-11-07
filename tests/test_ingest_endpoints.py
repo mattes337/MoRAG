@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """Test script for the new ingest endpoints."""
 
-import requests
 import json
 import time
 from pathlib import Path
 
+import requests
+
 BASE_URL = "http://localhost:8000"
+
 
 def test_health():
     """Test health endpoint."""
@@ -20,6 +22,7 @@ def test_health():
         print("❌ Health check failed")
         return False
 
+
 def test_ingest_url():
     """Test URL ingestion endpoint."""
     print("\n🔍 Testing URL ingestion...")
@@ -27,16 +30,13 @@ def test_ingest_url():
     data = {
         "source_type": "web",
         "url": "https://httpbin.org/json",
-        "metadata": {
-            "test": True,
-            "category": "api_test"
-        }
+        "metadata": {"test": True, "category": "api_test"},
     }
 
     response = requests.post(
         f"{BASE_URL}/api/v1/ingest/url",
         json=data,
-        headers={"Content-Type": "application/json"}
+        headers={"Content-Type": "application/json"},
     )
 
     print(f"Status: {response.status_code}")
@@ -45,10 +45,11 @@ def test_ingest_url():
         print(f"✅ URL ingestion started")
         print(f"Task ID: {result.get('task_id')}")
         print(f"Message: {result.get('message')}")
-        return result.get('task_id')
+        return result.get("task_id")
     else:
         print(f"❌ URL ingestion failed: {response.text}")
         return None
+
 
 def test_task_status(task_id):
     """Test task status endpoint."""
@@ -71,6 +72,7 @@ def test_task_status(task_id):
         print(f"❌ Task status failed: {response.text}")
         return None
 
+
 def test_list_active_tasks():
     """Test list active tasks endpoint."""
     print("\n🔍 Testing list active tasks...")
@@ -86,6 +88,7 @@ def test_list_active_tasks():
     else:
         print(f"❌ List active tasks failed: {response.text}")
         return None
+
 
 def test_queue_stats():
     """Test queue statistics endpoint."""
@@ -104,28 +107,23 @@ def test_queue_stats():
         print(f"❌ Queue stats failed: {response.text}")
         return None
 
+
 def test_batch_ingest():
     """Test batch ingestion endpoint."""
     print("\n🔍 Testing batch ingestion...")
 
     data = {
         "items": [
-            {
-                "source_type": "web",
-                "url": "https://httpbin.org/json"
-            },
-            {
-                "source_type": "web",
-                "url": "https://httpbin.org/uuid"
-            }
+            {"source_type": "web", "url": "https://httpbin.org/json"},
+            {"source_type": "web", "url": "https://httpbin.org/uuid"},
         ],
-        "webhook_url": None
+        "webhook_url": None,
     }
 
     response = requests.post(
         f"{BASE_URL}/api/v1/ingest/batch",
         json=data,
-        headers={"Content-Type": "application/json"}
+        headers={"Content-Type": "application/json"},
     )
 
     print(f"Status: {response.status_code}")
@@ -135,10 +133,11 @@ def test_batch_ingest():
         print(f"Batch ID: {result.get('batch_id')}")
         print(f"Task IDs: {result.get('task_ids')}")
         print(f"Total items: {result.get('total_items')}")
-        return result.get('task_ids', [])
+        return result.get("task_ids", [])
     else:
         print(f"❌ Batch ingestion failed: {response.text}")
         return []
+
 
 def test_swagger_docs():
     """Test that Swagger docs are accessible."""
@@ -154,6 +153,7 @@ def test_swagger_docs():
         print("❌ Swagger docs not accessible")
         return False
 
+
 def test_openapi_schema():
     """Test OpenAPI schema endpoint."""
     print("\n🔍 Testing OpenAPI schema...")
@@ -166,8 +166,8 @@ def test_openapi_schema():
         print("✅ OpenAPI schema accessible")
 
         # Check for ingest endpoints
-        paths = schema.get('paths', {})
-        ingest_endpoints = [path for path in paths.keys() if '/api/v1/ingest/' in path]
+        paths = schema.get("paths", {})
+        ingest_endpoints = [path for path in paths.keys() if "/api/v1/ingest/" in path]
         print(f"Ingest endpoints found: {len(ingest_endpoints)}")
         for endpoint in ingest_endpoints:
             print(f"  - {endpoint}")
@@ -176,6 +176,7 @@ def test_openapi_schema():
     else:
         print("❌ OpenAPI schema not accessible")
         return False
+
 
 def main():
     """Run all tests."""
@@ -214,6 +215,7 @@ def main():
             print(f"  🔍 Single task: {BASE_URL}/api/v1/status/{task_id}")
         for tid in batch_task_ids:
             print(f"  🔍 Batch task: {BASE_URL}/api/v1/status/{tid}")
+
 
 if __name__ == "__main__":
     main()

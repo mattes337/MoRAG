@@ -3,12 +3,13 @@
 Test script to debug PDF parsing issues.
 """
 
-import sys
 import os
+import sys
 from pathlib import Path
 
 # Add the src directory to the Python path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
+
 
 def test_docling_import():
     """Test if docling can be imported."""
@@ -16,9 +17,10 @@ def test_docling_import():
     print("=" * 30)
 
     try:
-        from docling.document_converter import DocumentConverter, PdfFormatOption
         from docling.datamodel.base_models import InputFormat
         from docling.datamodel.pipeline_options import PdfPipelineOptions
+        from docling.document_converter import DocumentConverter, PdfFormatOption
+
         print("✅ Docling imports successful")
         return True
     except ImportError as e:
@@ -28,16 +30,18 @@ def test_docling_import():
         print(f"❌ Unexpected error importing docling: {e}")
         return False
 
+
 def test_unstructured_import():
     """Test if unstructured.io can be imported."""
     print("\n🔍 Testing Unstructured.io Import")
     print("=" * 35)
 
     try:
-        from unstructured.partition.pdf import partition_pdf
+        from unstructured.partition.auto import partition
         from unstructured.partition.docx import partition_docx
         from unstructured.partition.md import partition_md
-        from unstructured.partition.auto import partition
+        from unstructured.partition.pdf import partition_pdf
+
         print("✅ Unstructured.io imports successful")
         return True
     except ImportError as e:
@@ -47,20 +51,25 @@ def test_unstructured_import():
         print(f"❌ Unexpected error importing unstructured.io: {e}")
         return False
 
+
 def test_document_processor():
     """Test the document processor configuration."""
     print("\n🔍 Testing Document Processor")
     print("=" * 32)
 
     try:
-        from morag_document import document_processor, UNSTRUCTURED_AVAILABLE
+        from morag_document import UNSTRUCTURED_AVAILABLE, document_processor
+
         print(f"✅ Document processor imported")
         print(f"   - Unstructured available: {UNSTRUCTURED_AVAILABLE}")
-        print(f"   - Supported types: {list(document_processor.supported_types.keys())}")
+        print(
+            f"   - Supported types: {list(document_processor.supported_types.keys())}"
+        )
         return True
     except Exception as e:
         print(f"❌ Document processor import failed: {e}")
         return False
+
 
 def check_pdf_file():
     """Check if there's a test PDF file available."""
@@ -68,12 +77,7 @@ def check_pdf_file():
     print("=" * 33)
 
     # Look for PDF files in common locations
-    test_locations = [
-        ".",
-        "tests",
-        "test_files",
-        "samples"
-    ]
+    test_locations = [".", "tests", "test_files", "samples"]
 
     pdf_files = []
     for location in test_locations:
@@ -91,20 +95,24 @@ def check_pdf_file():
         print("⚠️  No PDF files found for testing")
         return None
 
+
 def test_pdf_parsing_with_file(pdf_file):
     """Test PDF parsing with an actual file."""
     print(f"\n🔍 Testing PDF Parsing with {pdf_file.name}")
     print("=" * 50)
 
     try:
-        from morag_document import document_processor
         import asyncio
+
+        from morag_document import document_processor
 
         async def parse_test():
             try:
                 # Test with docling
                 print("Testing with docling...")
-                result = await document_processor.parse_document(pdf_file, use_docling=True)
+                result = await document_processor.parse_document(
+                    pdf_file, use_docling=True
+                )
                 print(f"✅ Docling parsing successful:")
                 print(f"   - Chunks: {len(result.chunks)}")
                 print(f"   - Pages: {result.total_pages}")
@@ -135,6 +143,7 @@ def test_pdf_parsing_with_file(pdf_file):
     except Exception as e:
         print(f"❌ Test setup failed: {e}")
         return False
+
 
 def main():
     """Main test function."""
@@ -181,6 +190,7 @@ def main():
         print("   2. Try with a different PDF file")
         print("   3. Check the application logs for detailed error messages")
         print("   4. Verify docling and unstructured.io installations")
+
 
 if __name__ == "__main__":
     main()

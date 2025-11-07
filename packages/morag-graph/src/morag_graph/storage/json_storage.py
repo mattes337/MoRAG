@@ -3,12 +3,12 @@
 import json
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional, Any, Set
+from typing import Any, Dict, List, Optional, Set
 
 import aiofiles
 from pydantic import BaseModel
 
-from ..models import Entity, Relation, Graph
+from ..models import Entity, Graph, Relation
 from ..models.types import EntityId, RelationId
 from .base import BaseStorage
 
@@ -85,16 +85,18 @@ class JsonStorage(BaseStorage):
             return
 
         try:
-            async with aiofiles.open(self.entities_file, 'r', encoding='utf-8') as f:
+            async with aiofiles.open(self.entities_file, "r", encoding="utf-8") as f:
                 content = await f.read()
                 data = json.loads(content)
 
                 self._entities = {}
-                for entity_data in data.get('entities', []):
+                for entity_data in data.get("entities", []):
                     entity = Entity(**entity_data)
                     self._entities[entity.id] = entity
 
-                logger.info(f"Loaded {len(self._entities)} entities from {self.entities_file}")
+                logger.info(
+                    f"Loaded {len(self._entities)} entities from {self.entities_file}"
+                )
 
         except Exception as e:
             logger.warning(f"Failed to load entities: {e}")
@@ -108,13 +110,15 @@ class JsonStorage(BaseStorage):
                 await self._create_backup(self.entities_file)
 
             data = {
-                'entities': [entity.to_dict() for entity in self._entities.values()]
+                "entities": [entity.to_dict() for entity in self._entities.values()]
             }
 
-            async with aiofiles.open(self.entities_file, 'w', encoding='utf-8') as f:
+            async with aiofiles.open(self.entities_file, "w", encoding="utf-8") as f:
                 await f.write(json.dumps(data, indent=2, ensure_ascii=False))
 
-            logger.debug(f"Saved {len(self._entities)} entities to {self.entities_file}")
+            logger.debug(
+                f"Saved {len(self._entities)} entities to {self.entities_file}"
+            )
 
         except Exception as e:
             logger.error(f"Failed to save entities: {e}")
@@ -127,16 +131,18 @@ class JsonStorage(BaseStorage):
             return
 
         try:
-            async with aiofiles.open(self.relations_file, 'r', encoding='utf-8') as f:
+            async with aiofiles.open(self.relations_file, "r", encoding="utf-8") as f:
                 content = await f.read()
                 data = json.loads(content)
 
                 self._relations = {}
-                for relation_data in data.get('relations', []):
+                for relation_data in data.get("relations", []):
                     relation = Relation(**relation_data)
                     self._relations[relation.id] = relation
 
-                logger.info(f"Loaded {len(self._relations)} relations from {self.relations_file}")
+                logger.info(
+                    f"Loaded {len(self._relations)} relations from {self.relations_file}"
+                )
 
         except Exception as e:
             logger.warning(f"Failed to load relations: {e}")
@@ -150,13 +156,17 @@ class JsonStorage(BaseStorage):
                 await self._create_backup(self.relations_file)
 
             data = {
-                'relations': [relation.to_dict() for relation in self._relations.values()]
+                "relations": [
+                    relation.to_dict() for relation in self._relations.values()
+                ]
             }
 
-            async with aiofiles.open(self.relations_file, 'w', encoding='utf-8') as f:
+            async with aiofiles.open(self.relations_file, "w", encoding="utf-8") as f:
                 await f.write(json.dumps(data, indent=2, ensure_ascii=False))
 
-            logger.debug(f"Saved {len(self._relations)} relations to {self.relations_file}")
+            logger.debug(
+                f"Saved {len(self._relations)} relations to {self.relations_file}"
+            )
 
         except Exception as e:
             logger.error(f"Failed to save relations: {e}")
@@ -183,8 +193,8 @@ class JsonStorage(BaseStorage):
             if backup_file.exists():
                 backup_file.unlink()
 
-            async with aiofiles.open(file_path, 'rb') as src:
-                async with aiofiles.open(backup_file, 'wb') as dst:
+            async with aiofiles.open(file_path, "rb") as src:
+                async with aiofiles.open(backup_file, "wb") as dst:
                     await dst.write(await src.read())
 
         except Exception as e:
@@ -284,10 +294,7 @@ class JsonStorage(BaseStorage):
         return list(self._relations.values())
 
     async def search_entities(
-        self,
-        query: str,
-        entity_type: Optional[str] = None,
-        limit: int = 10
+        self, query: str, entity_type: Optional[str] = None, limit: int = 10
     ) -> List[Entity]:
         """Search for entities by name or attributes.
 
@@ -366,7 +373,10 @@ class JsonStorage(BaseStorage):
         # Remove all relations involving this entity
         relations_to_remove = []
         for relation_id, relation in self._relations.items():
-            if relation.source_entity_id == entity_id or relation.target_entity_id == entity_id:
+            if (
+                relation.source_entity_id == entity_id
+                or relation.target_entity_id == entity_id
+            ):
                 relations_to_remove.append(relation_id)
 
         for relation_id in relations_to_remove:
@@ -417,10 +427,14 @@ class JsonStorage(BaseStorage):
         for relation in relations:
             # Validate that both entities exist
             if relation.source_entity_id not in self._entities:
-                logger.warning(f"Source entity {relation.source_entity_id} not found, skipping relation")
+                logger.warning(
+                    f"Source entity {relation.source_entity_id} not found, skipping relation"
+                )
                 continue
             if relation.target_entity_id not in self._entities:
-                logger.warning(f"Target entity {relation.target_entity_id} not found, skipping relation")
+                logger.warning(
+                    f"Target entity {relation.target_entity_id} not found, skipping relation"
+                )
                 continue
 
             self._relations[relation.id] = relation
@@ -466,7 +480,7 @@ class JsonStorage(BaseStorage):
         self,
         entity_id: EntityId,
         relation_type: Optional[str] = None,
-        direction: str = "both"
+        direction: str = "both",
     ) -> List[Relation]:
         """Get all relations for an entity.
 
@@ -488,7 +502,10 @@ class JsonStorage(BaseStorage):
                 continue
             elif direction == "in" and relation.target_entity_id != entity_id:
                 continue
-            elif direction == "both" and entity_id not in [relation.source_entity_id, relation.target_entity_id]:
+            elif direction == "both" and entity_id not in [
+                relation.source_entity_id,
+                relation.target_entity_id,
+            ]:
                 continue
 
             # Check relation type
@@ -545,7 +562,7 @@ class JsonStorage(BaseStorage):
         self,
         entity_id: EntityId,
         relation_type: Optional[str] = None,
-        max_depth: int = 1
+        max_depth: int = 1,
     ) -> List[Entity]:
         """Get neighboring entities.
 
@@ -602,10 +619,7 @@ class JsonStorage(BaseStorage):
         return result
 
     async def find_path(
-        self,
-        source_entity_id: EntityId,
-        target_entity_id: EntityId,
-        max_depth: int = 3
+        self, source_entity_id: EntityId, target_entity_id: EntityId, max_depth: int = 3
     ) -> List[List[EntityId]]:
         """Find paths between two entities.
 
@@ -619,7 +633,10 @@ class JsonStorage(BaseStorage):
         """
         self._ensure_connected()
 
-        if source_entity_id not in self._entities or target_entity_id not in self._entities:
+        if (
+            source_entity_id not in self._entities
+            or target_entity_id not in self._entities
+        ):
             return []
 
         paths = []
@@ -677,10 +694,7 @@ class JsonStorage(BaseStorage):
             await self._save_entities()
             await self._save_relations()
 
-    async def get_graph(
-        self,
-        entity_ids: Optional[List[EntityId]] = None
-    ) -> Graph:
+    async def get_graph(self, entity_ids: Optional[List[EntityId]] = None) -> Graph:
         """Get a graph or subgraph.
 
         Args:
@@ -706,8 +720,10 @@ class JsonStorage(BaseStorage):
         # Add relations between included entities
         included_entity_ids = set(graph.entities.keys())
         for relation in self._relations.values():
-            if (relation.source_entity_id in included_entity_ids and
-                relation.target_entity_id in included_entity_ids):
+            if (
+                relation.source_entity_id in included_entity_ids
+                and relation.target_entity_id in included_entity_ids
+            ):
                 graph.add_relation(relation)
 
         return graph
@@ -748,16 +764,20 @@ class JsonStorage(BaseStorage):
         return {
             "entity_count": len(self._entities),
             "relation_count": len(self._relations),
-            "entity_types": [{
-                "type": entity_type,
-                "count": count
-            } for entity_type, count in sorted(entity_types.items(), key=lambda x: -x[1])],
-            "relation_types": [{
-                "type": relation_type,
-                "count": count
-            } for relation_type, count in sorted(relation_types.items(), key=lambda x: -x[1])],
+            "entity_types": [
+                {"type": entity_type, "count": count}
+                for entity_type, count in sorted(
+                    entity_types.items(), key=lambda x: -x[1]
+                )
+            ],
+            "relation_types": [
+                {"type": relation_type, "count": count}
+                for relation_type, count in sorted(
+                    relation_types.items(), key=lambda x: -x[1]
+                )
+            ],
             "storage_path": str(self.storage_path),
-            "auto_save": self.config.auto_save
+            "auto_save": self.config.auto_save,
         }
 
     # Checksum management methods
@@ -813,7 +833,7 @@ class JsonStorage(BaseStorage):
 
         entities = []
         for entity in self._entities.values():
-            if hasattr(entity, 'source_doc_id') and entity.source_doc_id == document_id:
+            if hasattr(entity, "source_doc_id") and entity.source_doc_id == document_id:
                 entities.append(entity)
 
         return entities
@@ -821,7 +841,7 @@ class JsonStorage(BaseStorage):
     async def _save_checksums(self) -> None:
         """Save document checksums to file."""
         try:
-            async with aiofiles.open(self.checksums_file, 'w') as f:
+            async with aiofiles.open(self.checksums_file, "w") as f:
                 await f.write(json.dumps(self._document_checksums, indent=2))
         except Exception as e:
             logger.error(f"Failed to save checksums: {e}")
@@ -834,9 +854,11 @@ class JsonStorage(BaseStorage):
             return
 
         try:
-            async with aiofiles.open(self.checksums_file, 'r') as f:
+            async with aiofiles.open(self.checksums_file, "r") as f:
                 content = await f.read()
-                self._document_checksums = json.loads(content) if content.strip() else {}
+                self._document_checksums = (
+                    json.loads(content) if content.strip() else {}
+                )
         except Exception as e:
             logger.warning(f"Failed to load checksums, starting with empty cache: {e}")
             self._document_checksums = {}

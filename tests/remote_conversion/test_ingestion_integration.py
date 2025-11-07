@@ -1,8 +1,12 @@
 """Tests for remote conversion integration with ingestion tasks."""
 
+from unittest.mock import AsyncMock, Mock, patch
+
 import pytest
-from unittest.mock import Mock, patch, AsyncMock
-from morag.ingest_tasks import ingest_file_task, continue_ingestion_after_remote_processing
+from morag.ingest_tasks import (
+    continue_ingestion_after_remote_processing,
+    ingest_file_task,
+)
 from morag_core.models.remote_job import RemoteJob
 
 
@@ -11,8 +15,8 @@ class TestIngestionIntegration:
 
     def test_remote_job_creation_logic(self):
         """Test the logic for creating remote jobs for audio content."""
-        from morag.services.remote_job_service import RemoteJobService
         from morag.models.remote_job_api import CreateRemoteJobRequest
+        from morag.services.remote_job_service import RemoteJobService
 
         # Test that remote job service can create jobs for audio content
         service = RemoteJobService()
@@ -22,7 +26,7 @@ class TestIngestionIntegration:
             source_file_path="/tmp/test.mp3",
             content_type="audio",
             task_options={"remote": True, "webhook_url": "http://example.com/webhook"},
-            ingestion_task_id="test-task-123"
+            ingestion_task_id="test-task-123",
         )
 
         # This tests the service layer logic
@@ -47,9 +51,9 @@ class TestIngestionIntegration:
         # This tests the core logic without needing to mock Celery tasks
 
     @pytest.mark.asyncio
-    @patch('morag.ingest_tasks.store_content_in_vector_db')
-    @patch('morag.ingest_tasks.send_webhook_notification')
-    @patch('morag.ingest_tasks.RemoteJobService')
+    @patch("morag.ingest_tasks.store_content_in_vector_db")
+    @patch("morag.ingest_tasks.send_webhook_notification")
+    @patch("morag.ingest_tasks.RemoteJobService")
     async def test_continue_ingestion_after_remote_processing(
         self, mock_service_class, mock_webhook, mock_store
     ):
@@ -65,8 +69,8 @@ class TestIngestionIntegration:
             task_options={
                 "webhook_url": "http://example.com/webhook",
                 "store_in_vector_db": True,
-                "metadata": {"source": "upload"}
-            }
+                "metadata": {"source": "upload"},
+            },
         )
         mock_service.get_job_status.return_value = mock_job
 
@@ -77,7 +81,7 @@ class TestIngestionIntegration:
             remote_job_id="remote-job-123",
             content="Processed audio transcript",
             metadata={"duration": 120.5, "speakers": ["Speaker_00", "Speaker_01"]},
-            processing_time=45.2
+            processing_time=45.2,
         )
 
         # Verify success
@@ -106,7 +110,7 @@ class TestIngestionIntegration:
         assert webhook_args[2] == "SUCCESS"
 
     @pytest.mark.asyncio
-    @patch('morag.ingest_tasks.RemoteJobService')
+    @patch("morag.ingest_tasks.RemoteJobService")
     async def test_continue_ingestion_job_not_found(self, mock_service_class):
         """Test continuation when remote job is not found."""
         # Setup mock
@@ -119,16 +123,18 @@ class TestIngestionIntegration:
             remote_job_id="nonexistent-job",
             content="Some content",
             metadata={},
-            processing_time=10.0
+            processing_time=10.0,
         )
 
         # Verify failure
         assert result == False
 
     @pytest.mark.asyncio
-    @patch('morag.ingest_tasks.store_content_in_vector_db')
-    @patch('morag.ingest_tasks.RemoteJobService')
-    async def test_continue_ingestion_storage_error(self, mock_service_class, mock_store):
+    @patch("morag.ingest_tasks.store_content_in_vector_db")
+    @patch("morag.ingest_tasks.RemoteJobService")
+    async def test_continue_ingestion_storage_error(
+        self, mock_service_class, mock_store
+    ):
         """Test continuation when vector storage fails."""
         # Setup mocks
         mock_service = Mock()
@@ -138,7 +144,7 @@ class TestIngestionIntegration:
             ingestion_task_id="test-task-123",
             source_file_path="/tmp/test.mp3",
             content_type="audio",
-            task_options={"store_in_vector_db": True}
+            task_options={"store_in_vector_db": True},
         )
         mock_service.get_job_status.return_value = mock_job
 
@@ -150,14 +156,14 @@ class TestIngestionIntegration:
             remote_job_id="remote-job-123",
             content="Processed content",
             metadata={},
-            processing_time=10.0
+            processing_time=10.0,
         )
 
         # Verify failure
         assert result == False
 
     @pytest.mark.asyncio
-    @patch('morag.ingest_tasks.RemoteJobService')
+    @patch("morag.ingest_tasks.RemoteJobService")
     async def test_continue_ingestion_no_vector_storage(self, mock_service_class):
         """Test continuation when vector storage is disabled."""
         # Setup mock
@@ -170,18 +176,18 @@ class TestIngestionIntegration:
             content_type="audio",
             task_options={
                 "store_in_vector_db": False,  # Disabled
-                "webhook_url": "http://example.com/webhook"
-            }
+                "webhook_url": "http://example.com/webhook",
+            },
         )
         mock_service.get_job_status.return_value = mock_job
 
         # Call continuation function
-        with patch('morag.ingest_tasks.send_webhook_notification') as mock_webhook:
+        with patch("morag.ingest_tasks.send_webhook_notification") as mock_webhook:
             result = await continue_ingestion_after_remote_processing(
                 remote_job_id="remote-job-123",
                 content="Processed content",
                 metadata={},
-                processing_time=10.0
+                processing_time=10.0,
             )
 
         # Verify success (even without vector storage)

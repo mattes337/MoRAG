@@ -2,14 +2,15 @@
 """Command line interface for MoRAG Remote Converter."""
 
 import argparse
-import sys
 import os
+import sys
 from pathlib import Path
+
 import structlog
 from dotenv import load_dotenv
+from remote_converter import RemoteConverter
 
 from .config import RemoteConverterConfig, setup_logging
-from remote_converter import RemoteConverter
 
 logger = structlog.get_logger(__name__)
 
@@ -27,18 +28,28 @@ def test_connection(config: dict) -> bool:
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(description="MoRAG Remote Converter")
-    parser.add_argument('--config', '-c', help='Configuration file path')
-    parser.add_argument('--worker-id', help='Unique worker identifier')
-    parser.add_argument('--api-url', help='MoRAG API base URL')
-    parser.add_argument('--api-key', help='API authentication key')
-    parser.add_argument('--content-types', help='Comma-separated list of content types to process')
-    parser.add_argument('--poll-interval', type=int, help='Polling interval in seconds')
-    parser.add_argument('--max-jobs', type=int, help='Maximum concurrent jobs')
-    parser.add_argument('--log-level', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'], help='Log level')
-    parser.add_argument('--temp-dir', help='Temporary directory for file processing')
-    parser.add_argument('--create-config', action='store_true', help='Create sample configuration file')
-    parser.add_argument('--test-connection', action='store_true', help='Test API connection and exit')
-    parser.add_argument('--show-config', action='store_true', help='Show current configuration and exit')
+    parser.add_argument("--config", "-c", help="Configuration file path")
+    parser.add_argument("--worker-id", help="Unique worker identifier")
+    parser.add_argument("--api-url", help="MoRAG API base URL")
+    parser.add_argument("--api-key", help="API authentication key")
+    parser.add_argument(
+        "--content-types", help="Comma-separated list of content types to process"
+    )
+    parser.add_argument("--poll-interval", type=int, help="Polling interval in seconds")
+    parser.add_argument("--max-jobs", type=int, help="Maximum concurrent jobs")
+    parser.add_argument(
+        "--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR"], help="Log level"
+    )
+    parser.add_argument("--temp-dir", help="Temporary directory for file processing")
+    parser.add_argument(
+        "--create-config", action="store_true", help="Create sample configuration file"
+    )
+    parser.add_argument(
+        "--test-connection", action="store_true", help="Test API connection and exit"
+    )
+    parser.add_argument(
+        "--show-config", action="store_true", help="Show current configuration and exit"
+    )
 
     args = parser.parse_args()
 
@@ -51,7 +62,9 @@ def main():
         if config_manager.create_sample_config():
             print("Sample configuration created: remote_converter_config.yaml.example")
             print("\nNext steps:")
-            print("1. Copy the example file: cp remote_converter_config.yaml.example remote_converter_config.yaml")
+            print(
+                "1. Copy the example file: cp remote_converter_config.yaml.example remote_converter_config.yaml"
+            )
             print("2. Edit the configuration file with your settings")
             print("3. Test connection: python cli.py --test-connection")
             print("4. Start the converter: python cli.py")
@@ -65,24 +78,24 @@ def main():
 
     # Override with command line arguments
     if args.worker_id:
-        config_manager.config['worker_id'] = args.worker_id
+        config_manager.config["worker_id"] = args.worker_id
     if args.api_url:
-        config_manager.config['api_base_url'] = args.api_url
+        config_manager.config["api_base_url"] = args.api_url
     if args.api_key:
-        config_manager.config['api_key'] = args.api_key
+        config_manager.config["api_key"] = args.api_key
     if args.content_types:
-        config_manager.config['content_types'] = args.content_types.split(',')
+        config_manager.config["content_types"] = args.content_types.split(",")
     if args.poll_interval:
-        config_manager.config['poll_interval'] = args.poll_interval
+        config_manager.config["poll_interval"] = args.poll_interval
     if args.max_jobs:
-        config_manager.config['max_concurrent_jobs'] = args.max_jobs
+        config_manager.config["max_concurrent_jobs"] = args.max_jobs
     if args.log_level:
-        config_manager.config['log_level'] = args.log_level
+        config_manager.config["log_level"] = args.log_level
     if args.temp_dir:
-        config_manager.config['temp_dir'] = args.temp_dir
+        config_manager.config["temp_dir"] = args.temp_dir
 
     # Set up logging
-    log_level = config_manager.config.get('log_level', 'INFO')
+    log_level = config_manager.config.get("log_level", "INFO")
     setup_logging(log_level)
 
     # Show configuration if requested
@@ -142,5 +155,5 @@ def main():
         return 1
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

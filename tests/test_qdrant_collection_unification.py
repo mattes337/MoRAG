@@ -11,22 +11,24 @@ This script tests that:
 import os
 import sys
 import tempfile
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 
 # Add the project root to the path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 
 def test_core_config_requires_collection_name():
     """Test that core config fails when collection name is not provided."""
     with patch.dict(os.environ, {}, clear=True):
         # Remove any existing QDRANT_COLLECTION_NAME
-        if 'QDRANT_COLLECTION_NAME' in os.environ:
-            del os.environ['QDRANT_COLLECTION_NAME']
+        if "QDRANT_COLLECTION_NAME" in os.environ:
+            del os.environ["QDRANT_COLLECTION_NAME"]
 
         try:
             from packages.morag_core.src.morag_core.config import Settings
+
             # This should raise ValueError
             settings = Settings()
             assert False, "Expected ValueError for missing QDRANT_COLLECTION_NAME"
@@ -39,11 +41,12 @@ def test_core_config_requires_collection_name():
 
 def test_core_config_accepts_collection_name():
     """Test that core config works when collection name is provided."""
-    with patch.dict(os.environ, {'QDRANT_COLLECTION_NAME': 'test_collection'}):
+    with patch.dict(os.environ, {"QDRANT_COLLECTION_NAME": "test_collection"}):
         try:
             from packages.morag_core.src.morag_core.config import Settings
+
             settings = Settings()
-            assert settings.qdrant_collection_name == 'test_collection'
+            assert settings.qdrant_collection_name == "test_collection"
         except ImportError:
             pytest.skip("morag-core package not available")
 
@@ -51,7 +54,9 @@ def test_core_config_accepts_collection_name():
 def test_qdrant_storage_requires_collection_name():
     """Test that QdrantVectorStorage fails when collection name is not provided."""
     try:
-        from packages.morag_services.src.morag_services.storage import QdrantVectorStorage
+        from packages.morag_services.src.morag_services.storage import (
+            QdrantVectorStorage,
+        )
 
         # This should raise ValueError
         try:
@@ -74,10 +79,12 @@ def test_qdrant_storage_requires_collection_name():
 def test_qdrant_storage_accepts_collection_name():
     """Test that QdrantVectorStorage works when collection name is provided."""
     try:
-        from packages.morag_services.src.morag_services.storage import QdrantVectorStorage
+        from packages.morag_services.src.morag_services.storage import (
+            QdrantVectorStorage,
+        )
 
-        storage = QdrantVectorStorage(collection_name='test_collection')
-        assert storage.collection_name == 'test_collection'
+        storage = QdrantVectorStorage(collection_name="test_collection")
+        assert storage.collection_name == "test_collection"
 
     except ImportError:
         pytest.skip("morag-services package not available")
@@ -87,11 +94,13 @@ def test_services_requires_collection_name():
     """Test that MoRAGServices fails when QDRANT_COLLECTION_NAME is not set."""
     with patch.dict(os.environ, {}, clear=True):
         # Remove any existing QDRANT_COLLECTION_NAME
-        if 'QDRANT_COLLECTION_NAME' in os.environ:
-            del os.environ['QDRANT_COLLECTION_NAME']
+        if "QDRANT_COLLECTION_NAME" in os.environ:
+            del os.environ["QDRANT_COLLECTION_NAME"]
 
         try:
-            from packages.morag_services.src.morag_services.services import MoRAGServices
+            from packages.morag_services.src.morag_services.services import (
+                MoRAGServices,
+            )
 
             services = MoRAGServices()
             # This should raise ValueError when trying to initialize search services
@@ -99,7 +108,9 @@ def test_services_requires_collection_name():
                 services._initialize_search_services()
                 assert False, "Expected ValueError for missing QDRANT_COLLECTION_NAME"
             except ValueError as e:
-                assert "QDRANT_COLLECTION_NAME environment variable is required" in str(e)
+                assert "QDRANT_COLLECTION_NAME environment variable is required" in str(
+                    e
+                )
 
         except ImportError:
             pytest.skip("morag-services package not available")
@@ -107,18 +118,22 @@ def test_services_requires_collection_name():
 
 def test_services_accepts_collection_name():
     """Test that MoRAGServices works when QDRANT_COLLECTION_NAME is set."""
-    with patch.dict(os.environ, {'QDRANT_COLLECTION_NAME': 'test_collection'}):
+    with patch.dict(os.environ, {"QDRANT_COLLECTION_NAME": "test_collection"}):
         try:
-            from packages.morag_services.src.morag_services.services import MoRAGServices
+            from packages.morag_services.src.morag_services.services import (
+                MoRAGServices,
+            )
 
             services = MoRAGServices()
             # Mock the QdrantVectorStorage to avoid actual connection
-            with patch('packages.morag_services.src.morag_services.services.QdrantVectorStorage') as mock_storage:
+            with patch(
+                "packages.morag_services.src.morag_services.services.QdrantVectorStorage"
+            ) as mock_storage:
                 services._initialize_search_services()
                 # Verify that QdrantVectorStorage was called with the correct collection name
                 mock_storage.assert_called_once()
                 call_kwargs = mock_storage.call_args[1]
-                assert call_kwargs['collection_name'] == 'test_collection'
+                assert call_kwargs["collection_name"] == "test_collection"
 
         except ImportError:
             pytest.skip("morag-services package not available")
@@ -128,14 +143,14 @@ def test_ingest_tasks_requires_collection_name():
     """Test that ingest tasks fail when QDRANT_COLLECTION_NAME is not set."""
     with patch.dict(os.environ, {}, clear=True):
         # Remove any existing QDRANT_COLLECTION_NAME
-        if 'QDRANT_COLLECTION_NAME' in os.environ:
-            del os.environ['QDRANT_COLLECTION_NAME']
+        if "QDRANT_COLLECTION_NAME" in os.environ:
+            del os.environ["QDRANT_COLLECTION_NAME"]
 
         try:
             from packages.morag.src.morag.ingest_tasks import ingest_file_task
 
             # Mock the file and other dependencies
-            with tempfile.NamedTemporaryFile(suffix='.txt') as temp_file:
+            with tempfile.NamedTemporaryFile(suffix=".txt") as temp_file:
                 temp_file.write(b"test content")
                 temp_file.flush()
 
@@ -143,14 +158,20 @@ def test_ingest_tasks_requires_collection_name():
                 try:
                     # Use asyncio.run to handle the async function
                     import asyncio
-                    asyncio.run(ingest_file_task(
-                        temp_file.name,
-                        source_type='document',
-                        task_options={}
-                    ))
-                    assert False, "Expected ValueError for missing QDRANT_COLLECTION_NAME"
+
+                    asyncio.run(
+                        ingest_file_task(
+                            temp_file.name, source_type="document", task_options={}
+                        )
+                    )
+                    assert (
+                        False
+                    ), "Expected ValueError for missing QDRANT_COLLECTION_NAME"
                 except ValueError as e:
-                    assert "QDRANT_COLLECTION_NAME environment variable is required" in str(e)
+                    assert (
+                        "QDRANT_COLLECTION_NAME environment variable is required"
+                        in str(e)
+                    )
 
         except ImportError:
             pytest.skip("morag package not available")
@@ -158,12 +179,13 @@ def test_ingest_tasks_requires_collection_name():
 
 def test_collection_name_consistency():
     """Test that all components use the same collection name when provided."""
-    test_collection = 'unified_test_collection'
+    test_collection = "unified_test_collection"
 
-    with patch.dict(os.environ, {'QDRANT_COLLECTION_NAME': test_collection}):
+    with patch.dict(os.environ, {"QDRANT_COLLECTION_NAME": test_collection}):
         # Test core config
         try:
             from packages.morag_core.src.morag_core.config import Settings
+
             settings = Settings()
             assert settings.qdrant_collection_name == test_collection
         except ImportError:
@@ -171,7 +193,10 @@ def test_collection_name_consistency():
 
         # Test storage
         try:
-            from packages.morag_services.src.morag_services.storage import QdrantVectorStorage
+            from packages.morag_services.src.morag_services.storage import (
+                QdrantVectorStorage,
+            )
+
             storage = QdrantVectorStorage(collection_name=test_collection)
             assert storage.collection_name == test_collection
         except ImportError:
@@ -179,29 +204,33 @@ def test_collection_name_consistency():
 
         # Test services initialization
         try:
-            from packages.morag_services.src.morag_services.services import MoRAGServices
+            from packages.morag_services.src.morag_services.services import (
+                MoRAGServices,
+            )
+
             services = MoRAGServices()
-            with patch('packages.morag_services.src.morag_services.services.QdrantVectorStorage') as mock_storage:
+            with patch(
+                "packages.morag_services.src.morag_services.services.QdrantVectorStorage"
+            ) as mock_storage:
                 services._initialize_search_services()
                 call_kwargs = mock_storage.call_args[1]
-                assert call_kwargs['collection_name'] == test_collection
+                assert call_kwargs["collection_name"] == test_collection
         except ImportError:
             pass
 
 
 def test_environment_files_consistency():
     """Test that environment example files use consistent collection names."""
-    env_files = [
-        '.env.example',
-        '.env.prod.example'
-    ]
+    env_files = [".env.example", ".env.prod.example"]
 
     for env_file in env_files:
         if os.path.exists(env_file):
-            with open(env_file, 'r') as f:
+            with open(env_file, "r") as f:
                 content = f.read()
                 # Check that the file contains QDRANT_COLLECTION_NAME=morag_documents
-                assert 'QDRANT_COLLECTION_NAME=morag_documents' in content, f"Inconsistent collection name in {env_file}"
+                assert (
+                    "QDRANT_COLLECTION_NAME=morag_documents" in content
+                ), f"Inconsistent collection name in {env_file}"
 
 
 if __name__ == "__main__":
@@ -217,7 +246,7 @@ if __name__ == "__main__":
         test_services_accepts_collection_name,
         test_ingest_tasks_requires_collection_name,
         test_collection_name_consistency,
-        test_environment_files_consistency
+        test_environment_files_consistency,
     ]
 
     passed = 0
@@ -242,4 +271,6 @@ if __name__ == "__main__":
     if failed > 0:
         sys.exit(1)
     else:
-        print("✅ All tests passed! Qdrant collection name unification is working correctly.")
+        print(
+            "✅ All tests passed! Qdrant collection name unification is working correctly."
+        )

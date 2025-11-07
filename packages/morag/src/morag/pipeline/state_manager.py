@@ -2,13 +2,13 @@
 
 import asyncio
 import json
-from typing import Dict, Any, Optional, List
-from dataclasses import dataclass, asdict
-from pathlib import Path
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from enum import Enum
-import structlog
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
+import structlog
 from morag_core.config import get_settings
 from morag_core.exceptions import ProcessingError
 
@@ -17,6 +17,7 @@ logger = structlog.get_logger(__name__)
 
 class PipelineStatus(Enum):
     """Pipeline execution status."""
+
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -27,6 +28,7 @@ class PipelineStatus(Enum):
 
 class StageStatus(Enum):
     """Stage execution status."""
+
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -37,6 +39,7 @@ class StageStatus(Enum):
 @dataclass
 class StageState:
     """State information for a pipeline stage."""
+
     stage_name: str
     status: StageStatus
     start_time: Optional[str]
@@ -52,6 +55,7 @@ class StageState:
 @dataclass
 class PipelineState:
     """Complete pipeline execution state."""
+
     pipeline_id: str
     pipeline_type: str
     status: PipelineStatus
@@ -70,6 +74,7 @@ class PipelineState:
 @dataclass
 class CheckpointData:
     """Checkpoint data for pipeline recovery."""
+
     pipeline_state: PipelineState
     checkpoint_time: str
     recovery_data: Dict[str, Any]
@@ -80,9 +85,7 @@ class PipelineStateManager:
     """Manages pipeline execution state and recovery."""
 
     def __init__(
-        self,
-        state_dir: Optional[Path] = None,
-        config: Optional[Dict[str, Any]] = None
+        self, state_dir: Optional[Path] = None, config: Optional[Dict[str, Any]] = None
     ):
         """Initialize the pipeline state manager.
 
@@ -98,18 +101,20 @@ class PipelineStateManager:
         self.state_dir.mkdir(exist_ok=True)
 
         # State management settings
-        self.auto_checkpoint = self.config.get('auto_checkpoint', True)
-        self.checkpoint_interval = self.config.get('checkpoint_interval', 30.0)  # seconds
-        self.max_retries = self.config.get('max_retries', 3)
-        self.retention_days = self.config.get('retention_days', 7)
+        self.auto_checkpoint = self.config.get("auto_checkpoint", True)
+        self.checkpoint_interval = self.config.get(
+            "checkpoint_interval", 30.0
+        )  # seconds
+        self.max_retries = self.config.get("max_retries", 3)
+        self.retention_days = self.config.get("retention_days", 7)
 
         # Recovery settings
-        self.enable_recovery = self.config.get('enable_recovery', True)
-        self.recovery_timeout = self.config.get('recovery_timeout', 300.0)  # seconds
+        self.enable_recovery = self.config.get("enable_recovery", True)
+        self.recovery_timeout = self.config.get("recovery_timeout", 300.0)  # seconds
 
         # Performance settings
-        self.async_saves = self.config.get('async_saves', True)
-        self.compress_state = self.config.get('compress_state', False)
+        self.async_saves = self.config.get("async_saves", True)
+        self.compress_state = self.config.get("compress_state", False)
 
         # Active pipelines tracking
         self.active_pipelines: Dict[str, PipelineState] = {}
@@ -120,7 +125,7 @@ class PipelineStateManager:
             state_dir=str(self.state_dir),
             auto_checkpoint=self.auto_checkpoint,
             checkpoint_interval=self.checkpoint_interval,
-            enable_recovery=self.enable_recovery
+            enable_recovery=self.enable_recovery,
         )
 
     async def create_pipeline(
@@ -128,7 +133,7 @@ class PipelineStateManager:
         pipeline_id: str,
         pipeline_type: str,
         input_parameters: Dict[str, Any],
-        stages: List[str]
+        stages: List[str],
     ) -> PipelineState:
         """Create a new pipeline execution state.
 
@@ -155,7 +160,7 @@ class PipelineStateManager:
                     output_data={},
                     error_message=None,
                     retry_count=0,
-                    metadata={}
+                    metadata={},
                 )
 
             # Create pipeline state
@@ -172,7 +177,7 @@ class PipelineStateManager:
                 output_results={},
                 error_message=None,
                 retry_count=0,
-                metadata={}
+                metadata={},
             )
 
             # Register active pipeline
@@ -189,7 +194,7 @@ class PipelineStateManager:
                 "Pipeline created",
                 pipeline_id=pipeline_id,
                 pipeline_type=pipeline_type,
-                stages=len(stages)
+                stages=len(stages),
             )
 
             return pipeline_state
@@ -199,10 +204,7 @@ class PipelineStateManager:
             raise ProcessingError(f"Failed to create pipeline: {e}")
 
     async def start_stage(
-        self,
-        pipeline_id: str,
-        stage_name: str,
-        input_data: Dict[str, Any]
+        self, pipeline_id: str, stage_name: str, input_data: Dict[str, Any]
     ) -> None:
         """Start execution of a pipeline stage.
 
@@ -231,11 +233,7 @@ class PipelineStateManager:
             if pipeline_state.status == PipelineStatus.PENDING:
                 pipeline_state.status = PipelineStatus.RUNNING
 
-            logger.info(
-                "Stage started",
-                pipeline_id=pipeline_id,
-                stage_name=stage_name
-            )
+            logger.info("Stage started", pipeline_id=pipeline_id, stage_name=stage_name)
 
         except Exception as e:
             logger.error(f"Failed to start stage {stage_name}: {e}")
@@ -246,7 +244,7 @@ class PipelineStateManager:
         pipeline_id: str,
         stage_name: str,
         output_data: Dict[str, Any],
-        processing_time: float
+        processing_time: float,
     ) -> None:
         """Complete execution of a pipeline stage.
 
@@ -288,7 +286,7 @@ class PipelineStateManager:
                 "Stage completed",
                 pipeline_id=pipeline_id,
                 stage_name=stage_name,
-                processing_time=processing_time
+                processing_time=processing_time,
             )
 
         except Exception as e:
@@ -296,11 +294,7 @@ class PipelineStateManager:
             raise ProcessingError(f"Failed to complete stage: {e}")
 
     async def fail_stage(
-        self,
-        pipeline_id: str,
-        stage_name: str,
-        error_message: str,
-        retry: bool = True
+        self, pipeline_id: str, stage_name: str, error_message: str, retry: bool = True
     ) -> bool:
         """Mark a stage as failed and optionally retry.
 
@@ -327,8 +321,7 @@ class PipelineStateManager:
             stage_state.error_message = error_message
 
             # Check if we should retry
-            should_retry = (retry and
-                           stage_state.retry_count <= self.max_retries)
+            should_retry = retry and stage_state.retry_count <= self.max_retries
 
             if should_retry:
                 stage_state.status = StageStatus.PENDING
@@ -337,7 +330,7 @@ class PipelineStateManager:
                     pipeline_id=pipeline_id,
                     stage_name=stage_name,
                     retry_count=stage_state.retry_count,
-                    error=error_message
+                    error=error_message,
                 )
                 return True
             else:
@@ -345,14 +338,16 @@ class PipelineStateManager:
                 stage_state.end_time = datetime.now(timezone.utc).isoformat()
 
                 # Fail the entire pipeline
-                await self._fail_pipeline(pipeline_id, f"Stage {stage_name} failed: {error_message}")
+                await self._fail_pipeline(
+                    pipeline_id, f"Stage {stage_name} failed: {error_message}"
+                )
 
                 logger.error(
                     "Stage failed permanently",
                     pipeline_id=pipeline_id,
                     stage_name=stage_name,
                     retry_count=stage_state.retry_count,
-                    error=error_message
+                    error=error_message,
                 )
                 return False
 
@@ -361,10 +356,7 @@ class PipelineStateManager:
             return False
 
     async def save_checkpoint(
-        self,
-        pipeline_id: str,
-        stage: str,
-        state: Dict[str, Any]
+        self, pipeline_id: str, stage: str, state: Dict[str, Any]
     ) -> None:
         """Save pipeline state checkpoint for recovery.
 
@@ -384,7 +376,7 @@ class PipelineStateManager:
                 pipeline_state=pipeline_state,
                 checkpoint_time=datetime.now(timezone.utc).isoformat(),
                 recovery_data=state,
-                file_references=[]  # Could be populated with intermediate file paths
+                file_references=[],  # Could be populated with intermediate file paths
             )
 
             # Save checkpoint to file
@@ -395,11 +387,7 @@ class PipelineStateManager:
             else:
                 await self._save_checkpoint_sync(checkpoint_file, checkpoint)
 
-            logger.debug(
-                "Checkpoint saved",
-                pipeline_id=pipeline_id,
-                stage=stage
-            )
+            logger.debug("Checkpoint saved", pipeline_id=pipeline_id, stage=stage)
 
         except Exception as e:
             logger.warning(f"Failed to save checkpoint for {pipeline_id}: {e}")
@@ -444,7 +432,7 @@ class PipelineStateManager:
             logger.info(
                 "Pipeline resumed from checkpoint",
                 pipeline_id=pipeline_id,
-                checkpoint_time=checkpoint.checkpoint_time
+                checkpoint_time=checkpoint.checkpoint_time,
             )
 
             return pipeline_state
@@ -483,11 +471,16 @@ class PipelineStateManager:
             pipelines_to_remove = []
 
             for pipeline_id, pipeline_state in self.active_pipelines.items():
-                if pipeline_state.status in [PipelineStatus.COMPLETED, PipelineStatus.FAILED]:
+                if pipeline_state.status in [
+                    PipelineStatus.COMPLETED,
+                    PipelineStatus.FAILED,
+                ]:
                     # Check if pipeline is old enough to clean up
                     if pipeline_state.end_time:
                         end_time = datetime.fromisoformat(pipeline_state.end_time)
-                        cutoff_time = datetime.now(timezone.utc).timestamp() - (self.retention_days * 24 * 3600)
+                        cutoff_time = datetime.now(timezone.utc).timestamp() - (
+                            self.retention_days * 24 * 3600
+                        )
 
                         if end_time.timestamp() < cutoff_time:
                             pipelines_to_remove.append(pipeline_id)
@@ -544,8 +537,13 @@ class PipelineStateManager:
                     await asyncio.sleep(self.checkpoint_interval)
 
                     pipeline_state = self.active_pipelines.get(pipeline_id)
-                    if pipeline_state and pipeline_state.status == PipelineStatus.RUNNING:
-                        await self.save_checkpoint(pipeline_id, pipeline_state.current_stage or "unknown", {})
+                    if (
+                        pipeline_state
+                        and pipeline_state.status == PipelineStatus.RUNNING
+                    ):
+                        await self.save_checkpoint(
+                            pipeline_id, pipeline_state.current_stage or "unknown", {}
+                        )
 
                 except asyncio.CancelledError:
                     break
@@ -566,44 +564,51 @@ class PipelineStateManager:
                 pass
             del self.checkpoint_tasks[pipeline_id]
 
-    async def _save_checkpoint_async(self, file_path: Path, checkpoint: CheckpointData) -> None:
+    async def _save_checkpoint_async(
+        self, file_path: Path, checkpoint: CheckpointData
+    ) -> None:
         """Save checkpoint asynchronously."""
         try:
             import aiofiles
-            async with aiofiles.open(file_path, 'w', encoding='utf-8') as f:
+
+            async with aiofiles.open(file_path, "w", encoding="utf-8") as f:
                 await f.write(json.dumps(asdict(checkpoint), indent=2, default=str))
         except ImportError:
             await self._save_checkpoint_sync(file_path, checkpoint)
 
-    async def _save_checkpoint_sync(self, file_path: Path, checkpoint: CheckpointData) -> None:
+    async def _save_checkpoint_sync(
+        self, file_path: Path, checkpoint: CheckpointData
+    ) -> None:
         """Save checkpoint synchronously."""
-        with open(file_path, 'w', encoding='utf-8') as f:
+        with open(file_path, "w", encoding="utf-8") as f:
             json.dump(asdict(checkpoint), f, indent=2, default=str)
 
     async def _load_checkpoint(self, file_path: Path) -> Optional[CheckpointData]:
         """Load checkpoint from file."""
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
 
             # Reconstruct checkpoint data
-            pipeline_state_data = data['pipeline_state']
+            pipeline_state_data = data["pipeline_state"]
 
             # Reconstruct stage states
             stages = {}
-            for stage_name, stage_data in pipeline_state_data['stages'].items():
+            for stage_name, stage_data in pipeline_state_data["stages"].items():
                 stages[stage_name] = StageState(**stage_data)
 
-            pipeline_state_data['stages'] = stages
-            pipeline_state_data['status'] = PipelineStatus(pipeline_state_data['status'])
+            pipeline_state_data["stages"] = stages
+            pipeline_state_data["status"] = PipelineStatus(
+                pipeline_state_data["status"]
+            )
 
             pipeline_state = PipelineState(**pipeline_state_data)
 
             checkpoint = CheckpointData(
                 pipeline_state=pipeline_state,
-                checkpoint_time=data['checkpoint_time'],
-                recovery_data=data['recovery_data'],
-                file_references=data['file_references']
+                checkpoint_time=data["checkpoint_time"],
+                recovery_data=data["recovery_data"],
+                file_references=data["file_references"],
             )
 
             return checkpoint

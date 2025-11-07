@@ -1,10 +1,10 @@
 """Apify YouTube transcription service client."""
 
 import os
-from typing import Dict, Any, Optional, List
+from typing import Any, Dict, List, Optional
+
 import structlog
 from apify_client import ApifyClient
-
 from morag_core.exceptions import ProcessingError
 
 logger = structlog.get_logger(__name__)
@@ -21,7 +21,7 @@ class ApifyYouTubeService:
         self,
         api_token: Optional[str] = None,
         actor_id: Optional[str] = None,
-        timeout: int = 600
+        timeout: int = 600,
     ):
         """Initialize the Apify service client.
 
@@ -31,11 +31,15 @@ class ApifyYouTubeService:
             timeout: Request timeout in seconds (default: 10 minutes)
         """
         self.api_token = api_token or os.getenv("APIFY_API_TOKEN")
-        self.actor_id = actor_id or os.getenv("APIFY_YOUTUBE_ACTOR_ID", "SWvgAAm9FpfWHRrUm")
+        self.actor_id = actor_id or os.getenv(
+            "APIFY_YOUTUBE_ACTOR_ID", "SWvgAAm9FpfWHRrUm"
+        )
         self.timeout = timeout
 
         if not self.api_token:
-            raise ApifyYouTubeServiceError("Apify API token is required. Set APIFY_API_TOKEN environment variable.")
+            raise ApifyYouTubeServiceError(
+                "Apify API token is required. Set APIFY_API_TOKEN environment variable."
+            )
 
         self.client = ApifyClient(self.api_token)
 
@@ -66,7 +70,7 @@ class ApifyYouTubeService:
         video_urls: List[str],
         extract_metadata: bool = True,
         extract_transcript: bool = True,
-        use_proxy: bool = True
+        use_proxy: bool = True,
     ) -> List[Dict[str, Any]]:
         """Transcribe multiple YouTube videos using Apify service.
 
@@ -83,10 +87,12 @@ class ApifyYouTubeService:
             ApifyYouTubeServiceError: If the service request fails
         """
         try:
-            logger.info("Starting Apify YouTube transcription",
-                       video_count=len(video_urls),
-                       extract_metadata=extract_metadata,
-                       extract_transcript=extract_transcript)
+            logger.info(
+                "Starting Apify YouTube transcription",
+                video_count=len(video_urls),
+                extract_metadata=extract_metadata,
+                extract_transcript=extract_transcript,
+            )
 
             # Prepare actor input
             run_input = {
@@ -99,14 +105,18 @@ class ApifyYouTubeService:
                 run_input["proxyConfiguration"] = {"useApifyProxy": True}
 
             # Run the actor and wait for completion
-            logger.debug("Sending request to Apify actor",
-                        actor_id=self.actor_id,
-                        input_data=run_input)
+            logger.debug(
+                "Sending request to Apify actor",
+                actor_id=self.actor_id,
+                input_data=run_input,
+            )
 
             run = self.client.actor(self.actor_id).call(run_input=run_input)
 
             if not run or "defaultDatasetId" not in run:
-                raise ApifyYouTubeServiceError("Apify actor run failed or returned invalid response")
+                raise ApifyYouTubeServiceError(
+                    "Apify actor run failed or returned invalid response"
+                )
 
             # Fetch results from the dataset
             results = []
@@ -115,22 +125,26 @@ class ApifyYouTubeService:
             for item in dataset.iterate_items():
                 results.append(item)
 
-            logger.info("Apify YouTube transcription completed successfully",
-                       video_count=len(video_urls),
-                       results_count=len(results))
+            logger.info(
+                "Apify YouTube transcription completed successfully",
+                video_count=len(video_urls),
+                results_count=len(results),
+            )
 
             return results
 
         except Exception as e:
             logger.error("Apify YouTube transcription failed", error=str(e))
-            raise ApifyYouTubeServiceError(f"Apify service request failed: {str(e)}") from e
+            raise ApifyYouTubeServiceError(
+                f"Apify service request failed: {str(e)}"
+            ) from e
 
     async def transcribe_video(
         self,
         video_url: str,
         extract_metadata: bool = True,
         extract_transcript: bool = True,
-        use_proxy: bool = True
+        use_proxy: bool = True,
     ) -> Dict[str, Any]:
         """Transcribe a single YouTube video using Apify service.
 
@@ -150,11 +164,13 @@ class ApifyYouTubeService:
             [video_url],
             extract_metadata=extract_metadata,
             extract_transcript=extract_transcript,
-            use_proxy=use_proxy
+            use_proxy=use_proxy,
         )
 
         if not results:
-            raise ApifyYouTubeServiceError(f"No results returned for video: {video_url}")
+            raise ApifyYouTubeServiceError(
+                f"No results returned for video: {video_url}"
+            )
 
         return results[0]
 
@@ -168,7 +184,7 @@ class ApifyYouTubeService:
             Video ID string
         """
         import re
-        from urllib.parse import urlparse, parse_qs
+        from urllib.parse import parse_qs, urlparse
 
         # Handle different YouTube URL formats
         if "youtu.be/" in url:
@@ -180,5 +196,5 @@ class ApifyYouTubeService:
             return url.split("youtube.com/embed/")[1].split("?")[0]
         else:
             # Try to extract 11-character video ID pattern
-            match = re.search(r'[a-zA-Z0-9_-]{11}', url)
+            match = re.search(r"[a-zA-Z0-9_-]{11}", url)
             return match.group(0) if match else "unknown"

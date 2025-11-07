@@ -43,7 +43,7 @@ def check_dependencies() -> bool:
         "httpx": "httpx",
         "pydantic": "pydantic",
         "python-dotenv": "dotenv",
-        "aiofiles": "aiofiles"
+        "aiofiles": "aiofiles",
     }
 
     missing_packages = []
@@ -80,7 +80,9 @@ def setup_environment(api_key: Optional[str] = None) -> bool:
 
     if not api_key:
         print("❌ Gemini API key is required for testing.")
-        print("   Set it via --api-key argument or GEMINI_API_KEY environment variable.")
+        print(
+            "   Set it via --api-key argument or GEMINI_API_KEY environment variable."
+        )
         return False
 
     # Set environment variable for tests
@@ -95,7 +97,9 @@ def setup_environment(api_key: Optional[str] = None) -> bool:
     return True
 
 
-def run_pytest(test_files: List[str], verbose: bool = False, quick: bool = False) -> int:
+def run_pytest(
+    test_files: List[str], verbose: bool = False, quick: bool = False
+) -> int:
     """Run pytest with the specified test files.
 
     Args:
@@ -128,7 +132,7 @@ def run_pytest(test_files: List[str], verbose: bool = False, quick: bool = False
     cmd.extend(["-s"])
 
     print(f"🧪 Running tests: {' '.join(cmd)}")
-    print("" + "="*60)
+    print("" + "=" * 60)
 
     try:
         result = subprocess.run(cmd, check=False)
@@ -175,7 +179,9 @@ def run_relation_tests(verbose: bool = False, quick: bool = False) -> int:
 
     if quick:
         # Run only basic tests for quick validation
-        test_files = ["tests/test_relation_extraction.py::test_relation_extraction_basic"]
+        test_files = [
+            "tests/test_relation_extraction.py::test_relation_extraction_basic"
+        ]
 
     return run_pytest(test_files, verbose, quick)
 
@@ -192,14 +198,14 @@ def run_all_tests(verbose: bool = False, quick: bool = False) -> int:
     """
     test_files = [
         "tests/test_entity_extraction.py",
-        "tests/test_relation_extraction.py"
+        "tests/test_relation_extraction.py",
     ]
 
     if quick:
         # Run only basic tests for quick validation
         test_files = [
             "tests/test_entity_extraction.py::test_entity_extraction_basic",
-            "tests/test_relation_extraction.py::test_relation_extraction_basic"
+            "tests/test_relation_extraction.py::test_relation_extraction_basic",
         ]
 
     return run_pytest(test_files, verbose, quick)
@@ -222,10 +228,17 @@ def run_demo(api_key: Optional[str] = None, model: str = "gpt-3.5-turbo") -> int
         print("❌ OpenAI API key is required for demo.")
         return 1
 
-    cmd = ["python", "examples/extraction_demo.py", "--api-key", api_key, "--model", model]
+    cmd = [
+        "python",
+        "examples/extraction_demo.py",
+        "--api-key",
+        api_key,
+        "--model",
+        model,
+    ]
 
     print(f"🚀 Running demo: {' '.join(cmd[:-2])} --api-key *** --model {model}")
-    print("" + "="*60)
+    print("" + "=" * 60)
 
     try:
         result = subprocess.run(cmd, check=False)
@@ -251,56 +264,50 @@ Examples:
   python run_tests.py --quick            # Run quick validation tests
   python run_tests.py --demo             # Run extraction demo
   python run_tests.py --verbose          # Show detailed output
-"""
+""",
     )
 
     parser.add_argument(
         "--api-key",
         type=str,
-        help="Gemini API key (can also be set via GEMINI_API_KEY environment variable)"
+        help="Gemini API key (can also be set via GEMINI_API_KEY environment variable)",
     )
 
     parser.add_argument(
-        "--entity-only",
-        action="store_true",
-        help="Run only entity extraction tests"
+        "--entity-only", action="store_true", help="Run only entity extraction tests"
     )
 
     parser.add_argument(
         "--relation-only",
         action="store_true",
-        help="Run only relation extraction tests"
+        help="Run only relation extraction tests",
     )
 
     parser.add_argument(
         "--quick",
         action="store_true",
-        help="Run a subset of tests for quick validation"
+        help="Run a subset of tests for quick validation",
     )
 
     parser.add_argument(
-        "--verbose",
-        action="store_true",
-        help="Show detailed test output"
+        "--verbose", action="store_true", help="Show detailed test output"
     )
 
     parser.add_argument(
-        "--demo",
-        action="store_true",
-        help="Run the extraction demo instead of tests"
+        "--demo", action="store_true", help="Run the extraction demo instead of tests"
     )
 
     parser.add_argument(
         "--model",
         type=str,
         default="gemini-1.5-flash",
-        help="LLM model to use for demo (default: gemini-1.5-flash)"
+        help="LLM model to use for demo (default: gemini-1.5-flash)",
     )
 
     args = parser.parse_args()
 
     print("🧪 MoRAG Graph - Entity and Relation Extraction Test Runner")
-    print("" + "="*60)
+    print("" + "=" * 60)
 
     # Check dependencies
     if not check_dependencies():
@@ -330,7 +337,7 @@ Examples:
             print("🧪 Running all extraction tests...")
             exit_code = run_all_tests(args.verbose, args.quick)
 
-        print("" + "="*60)
+        print("" + "=" * 60)
         if exit_code == 0:
             print("✅ All tests passed!")
         else:

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Test runner for remote conversion system."""
 
-import sys
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 # Add the project root to Python path
@@ -12,6 +12,7 @@ sys.path.insert(0, str(project_root))
 sys.path.insert(0, str(project_root / "packages" / "morag-core" / "src"))
 sys.path.insert(0, str(project_root / "packages" / "morag" / "src"))
 sys.path.insert(0, str(project_root / "packages" / "morag-services" / "src"))
+
 
 def run_tests():
     """Run all remote conversion tests."""
@@ -26,7 +27,7 @@ def run_tests():
         "test_remote_job_repository.py",
         "test_remote_job_service.py",
         "test_remote_job_api.py",
-        "test_ingestion_integration.py"
+        "test_ingestion_integration.py",
     ]
 
     total_tests = 0
@@ -44,17 +45,17 @@ def run_tests():
 
         try:
             # Run pytest on the specific file
-            result = subprocess.run([
-                sys.executable, "-m", "pytest",
-                str(test_path),
-                "-v",
-                "--tb=short"
-            ], capture_output=True, text=True, cwd=project_root)
+            result = subprocess.run(
+                [sys.executable, "-m", "pytest", str(test_path), "-v", "--tb=short"],
+                capture_output=True,
+                text=True,
+                cwd=project_root,
+            )
 
             if result.returncode == 0:
                 print(f"✅ {test_file} - All tests passed")
                 # Count passed tests from output
-                lines = result.stdout.split('\n')
+                lines = result.stdout.split("\n")
                 for line in lines:
                     if "passed" in line and "failed" not in line:
                         try:
@@ -87,6 +88,7 @@ def run_tests():
     else:
         print("💥 Some tests failed!")
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(run_tests())

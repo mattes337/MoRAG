@@ -4,8 +4,8 @@ import asyncio
 import threading
 import time
 from typing import Optional
-import structlog
 
+import structlog
 from morag.utils.file_upload import get_upload_handler
 
 logger = structlog.get_logger(__name__)
@@ -18,7 +18,7 @@ class PeriodicCleanupService:
         self,
         cleanup_interval_hours: int = 1,
         max_file_age_hours: int = 24,
-        max_disk_usage_mb: int = 10000
+        max_disk_usage_mb: int = 10000,
     ):
         """Initialize the cleanup service.
 
@@ -34,10 +34,12 @@ class PeriodicCleanupService:
         self._stop_event = threading.Event()
         self._running = False
 
-        logger.info("PeriodicCleanupService initialized",
-                   cleanup_interval_hours=cleanup_interval_hours,
-                   max_file_age_hours=max_file_age_hours,
-                   max_disk_usage_mb=max_disk_usage_mb)
+        logger.info(
+            "PeriodicCleanupService initialized",
+            cleanup_interval_hours=cleanup_interval_hours,
+            max_file_age_hours=max_file_age_hours,
+            max_disk_usage_mb=max_disk_usage_mb,
+        )
 
     def start(self) -> None:
         """Start the periodic cleanup service."""
@@ -49,9 +51,7 @@ class PeriodicCleanupService:
         self._running = True
 
         self._cleanup_thread = threading.Thread(
-            target=self._cleanup_loop,
-            daemon=True,
-            name="PeriodicCleanupService"
+            target=self._cleanup_loop, daemon=True, name="PeriodicCleanupService"
         )
         self._cleanup_thread.start()
 
@@ -101,14 +101,16 @@ class PeriodicCleanupService:
 
             deleted_count = upload_handler.cleanup_old_files(
                 max_age_hours=self.max_file_age_hours,
-                max_disk_usage_mb=self.max_disk_usage_mb
+                max_disk_usage_mb=self.max_disk_usage_mb,
             )
 
             if deleted_count > 0:
-                logger.info("Periodic cleanup completed",
-                           files_deleted=deleted_count,
-                           max_age_hours=self.max_file_age_hours,
-                           max_disk_usage_mb=self.max_disk_usage_mb)
+                logger.info(
+                    "Periodic cleanup completed",
+                    files_deleted=deleted_count,
+                    max_age_hours=self.max_file_age_hours,
+                    max_disk_usage_mb=self.max_disk_usage_mb,
+                )
             else:
                 logger.debug("Periodic cleanup completed - no files to delete")
 
@@ -125,7 +127,7 @@ class PeriodicCleanupService:
             upload_handler = get_upload_handler()
             deleted_count = upload_handler.cleanup_old_files(
                 max_age_hours=self.max_file_age_hours,
-                max_disk_usage_mb=self.max_disk_usage_mb
+                max_disk_usage_mb=self.max_disk_usage_mb,
             )
 
             logger.info("Forced cleanup completed", files_deleted=deleted_count)
@@ -138,7 +140,9 @@ class PeriodicCleanupService:
     @property
     def is_running(self) -> bool:
         """Check if the cleanup service is running."""
-        return self._running and self._cleanup_thread and self._cleanup_thread.is_alive()
+        return (
+            self._running and self._cleanup_thread and self._cleanup_thread.is_alive()
+        )
 
 
 # Global cleanup service instance
@@ -156,7 +160,7 @@ def get_cleanup_service() -> PeriodicCleanupService:
 def start_cleanup_service(
     cleanup_interval_hours: int = 1,
     max_file_age_hours: int = 24,
-    max_disk_usage_mb: int = 10000
+    max_disk_usage_mb: int = 10000,
 ) -> None:
     """Start the global cleanup service with specified parameters."""
     global _cleanup_service
@@ -168,7 +172,7 @@ def start_cleanup_service(
     _cleanup_service = PeriodicCleanupService(
         cleanup_interval_hours=cleanup_interval_hours,
         max_file_age_hours=max_file_age_hours,
-        max_disk_usage_mb=max_disk_usage_mb
+        max_disk_usage_mb=max_disk_usage_mb,
     )
     _cleanup_service.start()
 

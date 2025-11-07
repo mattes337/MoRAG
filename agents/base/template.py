@@ -1,14 +1,15 @@
 """Prompt template system for MoRAG agents."""
 
-import re
 import os
-import yaml
-from typing import Dict, Any, List, Optional, Union
+import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from jinja2 import Template, Environment, BaseLoader
+from typing import Any, Dict, List, Optional, Union
+
 import structlog
+import yaml
+from jinja2 import BaseLoader, Environment, Template
 
 from .config import AgentConfig, PromptConfig
 from .exceptions import PromptGenerationError
@@ -43,10 +44,12 @@ class GlobalPromptLoader:
                 self._prompts = {}
                 return
 
-            with open(prompts_file, 'r', encoding='utf-8') as f:
+            with open(prompts_file, "r", encoding="utf-8") as f:
                 self._prompts = yaml.safe_load(f) or {}
 
-            logger.info(f"Loaded {len(self._prompts)} agent prompts from {prompts_file}")
+            logger.info(
+                f"Loaded {len(self._prompts)} agent prompts from {prompts_file}"
+            )
 
         except Exception as e:
             logger.error(f"Failed to load global prompts: {e}")
@@ -70,12 +73,14 @@ class GlobalPromptLoader:
             logger.warning(f"No prompts found for agent: {agent_name}")
             return {
                 "system_prompt": f"You are a {agent_name} agent.",
-                "user_prompt": "Process: {{ input }}"
+                "user_prompt": "Process: {{ input }}",
             }
 
         return {
-            "system_prompt": agent_prompts.get("system_prompt", f"You are a {agent_name} agent."),
-            "user_prompt": agent_prompts.get("user_prompt", "Process: {{ input }}")
+            "system_prompt": agent_prompts.get(
+                "system_prompt", f"You are a {agent_name} agent."
+            ),
+            "user_prompt": agent_prompts.get("user_prompt", "Process: {{ input }}"),
         }
 
     def reload_prompts(self):
@@ -87,6 +92,7 @@ class GlobalPromptLoader:
 @dataclass
 class PromptExample:
     """Example for few-shot prompting."""
+
     input: str
     output: str
     explanation: Optional[str] = None
@@ -173,7 +179,9 @@ class PromptTemplate(ABC):
         formatted = ["## Instructions\n", instructions]
 
         if self.config.custom_instructions:
-            formatted.extend(["\n### Additional Instructions", self.config.custom_instructions])
+            formatted.extend(
+                ["\n### Additional Instructions", self.config.custom_instructions]
+            )
 
         return "\n".join(formatted)
 
@@ -188,15 +196,21 @@ class PromptTemplate(ABC):
         if self.config.output_format == "json":
             requirements.append("- Respond with valid JSON only")
             if self.config.strict_json:
-                requirements.append("- Do not include any text outside the JSON structure")
+                requirements.append(
+                    "- Do not include any text outside the JSON structure"
+                )
                 requirements.append("- Ensure all JSON keys are properly quoted")
 
         if self.config.include_confidence:
             requirements.append("- Include confidence scores (0.0-1.0) for all outputs")
-            requirements.append(f"- Minimum confidence threshold: {self.config.min_confidence}")
+            requirements.append(
+                f"- Minimum confidence threshold: {self.config.min_confidence}"
+            )
 
         if self.config.max_output_length:
-            requirements.append(f"- Maximum output length: {self.config.max_output_length} characters")
+            requirements.append(
+                f"- Maximum output length: {self.config.max_output_length} characters"
+            )
 
         requirements.append(f"- Target language: {self.config.language}")
         requirements.append(f"- Domain context: {self.config.domain}")
@@ -235,7 +249,7 @@ class PromptTemplate(ABC):
             return False
 
         # Check for template variables that weren't replaced
-        if re.search(r'\{\{.*?\}\}', prompt):
+        if re.search(r"\{\{.*?\}\}", prompt):
             self.logger.warning("Prompt contains unreplaced template variables")
             return False
 
@@ -268,10 +282,7 @@ class PromptTemplate(ABC):
             if not self.validate_prompt(user_prompt):
                 raise PromptGenerationError("Invalid user prompt generated")
 
-            return {
-                "system": system_prompt,
-                "user": user_prompt
-            }
+            return {"system": system_prompt, "user": user_prompt}
 
         except Exception as e:
             if isinstance(e, PromptGenerationError):
@@ -282,7 +293,13 @@ class PromptTemplate(ABC):
 class ConfigurablePromptTemplate(PromptTemplate):
     """A prompt template that can be configured via the config object."""
 
-    def __init__(self, config: PromptConfig, system_template: str, user_template: str, agent_config: Optional[Dict[str, Any]] = None):
+    def __init__(
+        self,
+        config: PromptConfig,
+        system_template: str,
+        user_template: str,
+        agent_config: Optional[Dict[str, Any]] = None,
+    ):
         """Initialize with template strings.
 
         Args:
@@ -299,29 +316,28 @@ class ConfigurablePromptTemplate(PromptTemplate):
     def get_system_prompt(self, **kwargs) -> str:
         """Generate system prompt from template."""
         # Create a config object that includes agent_config for template access
-        config_with_agent = type('ConfigWithAgent', (), {
-            **self.config.model_dump(),
-            'agent_config': self.agent_config
-        })()
+        config_with_agent = type(
+            "ConfigWithAgent",
+            (),
+            {**self.config.model_dump(), "agent_config": self.agent_config},
+        )()
 
         context = {
-            'config': config_with_agent,
-            'examples': self.format_examples(),
-            'output_requirements': self.format_output_requirements(),
-            **kwargs
+            "config": config_with_agent,
+            "examples": self.format_examples(),
+            "output_requirements": self.format_output_requirements(),
+            **kwargs,
         }
         return self.render_template(self.system_template, **context)
 
     def get_user_prompt(self, **kwargs) -> str:
         """Generate user prompt from template."""
         # Create a config object that includes agent_config for template access
-        config_with_agent = type('ConfigWithAgent', (), {
-            **self.config.model_dump(),
-            'agent_config': self.agent_config
-        })()
+        config_with_agent = type(
+            "ConfigWithAgent",
+            (),
+            {**self.config.model_dump(), "agent_config": self.agent_config},
+        )()
 
-        context = {
-            'config': config_with_agent,
-            **kwargs
-        }
+        context = {"config": config_with_agent, **kwargs}
         return self.render_template(self.user_template, **context)

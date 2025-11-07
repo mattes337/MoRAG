@@ -1,9 +1,9 @@
 """Integration tests for LangExtract-based extraction system."""
 
-import pytest
 import asyncio
 from unittest.mock import Mock, patch
 
+import pytest
 from morag_graph.extraction import EntityExtractor, RelationExtractor
 from morag_graph.models import Entity, Relation
 
@@ -17,8 +17,8 @@ class TestLangExtractIntegration:
         extractor = EntityExtractor(domain="medical")
 
         assert extractor.domain == "medical"
-        assert hasattr(extractor, 'extract')
-        assert hasattr(extractor, 'get_system_prompt')
+        assert hasattr(extractor, "extract")
+        assert hasattr(extractor, "get_system_prompt")
 
     @pytest.mark.asyncio
     async def test_relation_extractor_initialization(self):
@@ -26,8 +26,8 @@ class TestLangExtractIntegration:
         extractor = RelationExtractor(domain="technical")
 
         assert extractor.domain == "technical"
-        assert hasattr(extractor, 'extract')
-        assert hasattr(extractor, 'get_system_prompt')
+        assert hasattr(extractor, "extract")
+        assert hasattr(extractor, "get_system_prompt")
 
     @pytest.mark.asyncio
     async def test_entity_extraction_without_api_key(self):
@@ -46,7 +46,7 @@ class TestLangExtractIntegration:
         # Create mock entities
         entities = [
             Entity(name="John", type="PERSON", source_doc_id="test"),
-            Entity(name="Google", type="ORGANIZATION", source_doc_id="test")
+            Entity(name="Google", type="ORGANIZATION", source_doc_id="test"),
         ]
 
         # Should return empty list when no API key is available
@@ -56,17 +56,19 @@ class TestLangExtractIntegration:
     @pytest.mark.asyncio
     async def test_extractors_with_custom_types(self):
         """Test extractors with custom entity and relation types."""
-        entity_types = {"medication": "Pharmaceutical drugs", "symptom": "Medical symptoms"}
-        relation_types = {"treats": "Treatment relationship", "causes": "Causation relationship"}
+        entity_types = {
+            "medication": "Pharmaceutical drugs",
+            "symptom": "Medical symptoms",
+        }
+        relation_types = {
+            "treats": "Treatment relationship",
+            "causes": "Causation relationship",
+        }
 
-        entity_extractor = EntityExtractor(
-            domain="medical",
-            entity_types=entity_types
-        )
+        entity_extractor = EntityExtractor(domain="medical", entity_types=entity_types)
 
         relation_extractor = RelationExtractor(
-            domain="medical",
-            relation_types=relation_types
+            domain="medical", relation_types=relation_types
         )
 
         assert entity_extractor.entity_types == entity_types
@@ -98,8 +100,6 @@ class TestLangExtractIntegration:
                 assert len(entity_extractor.entity_types) > 0
                 assert len(relation_extractor.relation_types) > 0
 
-
-
     @pytest.mark.asyncio
     async def test_system_prompts(self):
         """Test that system prompts are generated correctly."""
@@ -116,7 +116,9 @@ class TestLangExtractIntegration:
 
         # Check that medical domain is reflected in prompts
         assert "medical" in entity_prompt.lower() or "health" in entity_prompt.lower()
-        assert "medical" in relation_prompt.lower() or "health" in relation_prompt.lower()
+        assert (
+            "medical" in relation_prompt.lower() or "health" in relation_prompt.lower()
+        )
 
 
 class TestLangExtractVisualization:
@@ -126,6 +128,7 @@ class TestLangExtractVisualization:
         """Test that visualizer can be imported."""
         try:
             from morag_graph.visualization import LangExtractVisualizer
+
             assert LangExtractVisualizer is not None
         except ImportError:
             # Skip if LangExtract is not available
@@ -148,7 +151,7 @@ class TestGraphBuilderIntegration:
 
     def test_graph_builder_import(self):
         """Test that graph builders can be imported."""
-        from morag_graph.builders import GraphBuilder, EnhancedGraphBuilder
+        from morag_graph.builders import EnhancedGraphBuilder, GraphBuilder
 
         assert GraphBuilder is not None
         assert EnhancedGraphBuilder is not None
@@ -164,8 +167,8 @@ class TestGraphBuilderIntegration:
         # Test basic initialization
         builder = GraphBuilder(storage=storage)
         assert builder.storage == storage
-        assert hasattr(builder, 'entity_extractor')
-        assert hasattr(builder, 'relation_extractor')
+        assert hasattr(builder, "entity_extractor")
+        assert hasattr(builder, "relation_extractor")
 
         # Test with domain
         builder_with_domain = GraphBuilder(storage=storage, domain="medical")
@@ -184,8 +187,8 @@ class TestGraphBuilderIntegration:
         # Test basic initialization
         builder = EnhancedGraphBuilder(storage=storage)
         assert builder.storage == storage
-        assert hasattr(builder, 'entity_extractor')
-        assert hasattr(builder, 'relation_extractor')
+        assert hasattr(builder, "entity_extractor")
+        assert hasattr(builder, "relation_extractor")
 
         # Test with custom parameters
         builder_custom = EnhancedGraphBuilder(
@@ -193,7 +196,7 @@ class TestGraphBuilderIntegration:
             domain="technical",
             min_confidence=0.8,
             chunk_size=1500,
-            max_workers=5
+            max_workers=5,
         )
         assert builder_custom.domain == "technical"
         assert builder_custom.min_confidence == 0.8
@@ -216,7 +219,9 @@ async def test_end_to_end_extraction_flow():
     assert isinstance(entities, list)
 
     # Extract relations (will return empty without API key)
-    relations = await relation_extractor.extract(text, entities=entities, source_doc_id="test_doc")
+    relations = await relation_extractor.extract(
+        text, entities=entities, source_doc_id="test_doc"
+    )
     assert isinstance(relations, list)
 
     # Test that the flow completes without errors

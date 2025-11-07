@@ -4,18 +4,18 @@ Simple syntax checker that focuses on critical import and syntax errors.
 This is designed to catch the most common build-breaking issues.
 """
 
-import ast
-import sys
-import re
-from pathlib import Path
-from typing import List, Dict, Any, Tuple
 import argparse
+import ast
+import re
+import sys
+from pathlib import Path
+from typing import Any, Dict, List, Tuple
 
 
 def check_syntax_errors(filepath: Path) -> List[str]:
     """Check for Python syntax errors."""
     try:
-        with open(filepath, 'r', encoding='utf-8') as f:
+        with open(filepath, "r", encoding="utf-8") as f:
             content = f.read()
 
         ast.parse(content, filename=str(filepath))
@@ -30,11 +30,11 @@ def check_syntax_errors(filepath: Path) -> List[str]:
 def check_obvious_import_errors(filepath: Path) -> List[str]:
     """Check for obvious import errors using regex patterns."""
     try:
-        with open(filepath, 'r', encoding='utf-8') as f:
+        with open(filepath, "r", encoding="utf-8") as f:
             content = f.read()
 
         errors = []
-        lines = content.split('\n')
+        lines = content.split("\n")
 
         # Get all imports
         imports = set()
@@ -44,17 +44,17 @@ def check_obvious_import_errors(filepath: Path) -> List[str]:
             line = line.strip()
 
             # Match import statements
-            import_match = re.match(r'^import\s+(\w+)', line)
+            import_match = re.match(r"^import\s+(\w+)", line)
             if import_match:
                 imports.add(import_match.group(1))
 
             # Match from imports
-            from_match = re.match(r'^from\s+\S+\s+import\s+(.+)', line)
+            from_match = re.match(r"^from\s+\S+\s+import\s+(.+)", line)
             if from_match:
                 imported_names = from_match.group(1)
-                for name in imported_names.split(','):
-                    name = name.strip().split(' as ')[0].strip()
-                    if name != '*':
+                for name in imported_names.split(","):
+                    name = name.strip().split(" as ")[0].strip()
+                    if name != "*":
                         from_imports.add(name)
 
         all_imports = imports | from_imports
@@ -62,28 +62,43 @@ def check_obvious_import_errors(filepath: Path) -> List[str]:
         # Check for common patterns that indicate missing imports
         for line_num, line in enumerate(lines, 1):
             # Check for re.something without re import
-            if re.search(r'\bre\.[a-zA-Z_]', line) and 're' not in all_imports:
-                errors.append(f"{filepath}:{line_num}: Using 're' module without import")
+            if re.search(r"\bre\.[a-zA-Z_]", line) and "re" not in all_imports:
+                errors.append(
+                    f"{filepath}:{line_num}: Using 're' module without import"
+                )
 
             # Check for os.something without os import
-            if re.search(r'\bos\.[a-zA-Z_]', line) and 'os' not in all_imports:
-                errors.append(f"{filepath}:{line_num}: Using 'os' module without import")
+            if re.search(r"\bos\.[a-zA-Z_]", line) and "os" not in all_imports:
+                errors.append(
+                    f"{filepath}:{line_num}: Using 'os' module without import"
+                )
 
             # Check for json.something without json import
-            if re.search(r'\bjson\.[a-zA-Z_]', line) and 'json' not in all_imports:
-                errors.append(f"{filepath}:{line_num}: Using 'json' module without import")
+            if re.search(r"\bjson\.[a-zA-Z_]", line) and "json" not in all_imports:
+                errors.append(
+                    f"{filepath}:{line_num}: Using 'json' module without import"
+                )
 
             # Check for sys.something without sys import
-            if re.search(r'\bsys\.[a-zA-Z_]', line) and 'sys' not in all_imports:
-                errors.append(f"{filepath}:{line_num}: Using 'sys' module without import")
+            if re.search(r"\bsys\.[a-zA-Z_]", line) and "sys" not in all_imports:
+                errors.append(
+                    f"{filepath}:{line_num}: Using 'sys' module without import"
+                )
 
             # Check for datetime.something without datetime import
-            if re.search(r'\bdatetime\.[a-zA-Z_]', line) and 'datetime' not in all_imports:
-                errors.append(f"{filepath}:{line_num}: Using 'datetime' module without import")
+            if (
+                re.search(r"\bdatetime\.[a-zA-Z_]", line)
+                and "datetime" not in all_imports
+            ):
+                errors.append(
+                    f"{filepath}:{line_num}: Using 'datetime' module without import"
+                )
 
             # Check for Path usage without pathlib import
-            if re.search(r'\bPath\(', line) and 'Path' not in all_imports:
-                errors.append(f"{filepath}:{line_num}: Using 'Path' without import from pathlib")
+            if re.search(r"\bPath\(", line) and "Path" not in all_imports:
+                errors.append(
+                    f"{filepath}:{line_num}: Using 'Path' without import from pathlib"
+                )
 
         return errors
 
@@ -111,14 +126,22 @@ def check_file(filepath: Path) -> Tuple[List[str], List[str]]:
 def find_python_files(directory: Path) -> List[Path]:
     """Find all Python files in a directory."""
     exclude_patterns = [
-        '__pycache__', '.git', '.venv', 'venv', 'env',
-        '.pytest_cache', 'node_modules', '.mypy_cache',
-        'build', 'dist', '.tox'
+        "__pycache__",
+        ".git",
+        ".venv",
+        "venv",
+        "env",
+        ".pytest_cache",
+        "node_modules",
+        ".mypy_cache",
+        "build",
+        "dist",
+        ".tox",
     ]
 
     python_files = []
 
-    for py_file in directory.rglob('*.py'):
+    for py_file in directory.rglob("*.py"):
         # Skip excluded directories
         if any(pattern in str(py_file) for pattern in exclude_patterns):
             continue
@@ -129,11 +152,17 @@ def find_python_files(directory: Path) -> List[Path]:
 
 def main():
     """Main function."""
-    parser = argparse.ArgumentParser(description='Check Python files for critical syntax and import issues')
-    parser.add_argument('paths', nargs='*', default=['.'],
-                       help='Paths to check (files or directories)')
-    parser.add_argument('--exit-on-error', action='store_true',
-                       help='Exit with non-zero code if errors found')
+    parser = argparse.ArgumentParser(
+        description="Check Python files for critical syntax and import issues"
+    )
+    parser.add_argument(
+        "paths", nargs="*", default=["."], help="Paths to check (files or directories)"
+    )
+    parser.add_argument(
+        "--exit-on-error",
+        action="store_true",
+        help="Exit with non-zero code if errors found",
+    )
 
     args = parser.parse_args()
 
@@ -143,7 +172,7 @@ def main():
     for path_str in args.paths:
         path = Path(path_str)
 
-        if path.is_file() and path.suffix == '.py':
+        if path.is_file() and path.suffix == ".py":
             files_to_check = [path]
         elif path.is_dir():
             files_to_check = find_python_files(path)
@@ -178,5 +207,5 @@ def main():
     return len(all_errors)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

@@ -8,12 +8,12 @@ a running API server, and that they properly use GEMINI_API_KEY.
 Usage: python tests/cli/validate-standalone-cli.py
 """
 
-import sys
-import os
 import asyncio
+import os
 import subprocess
+import sys
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Any, Dict, List
 
 # Add the project root to the path
 project_root = Path(__file__).parent.parent
@@ -21,12 +21,14 @@ sys.path.insert(0, str(project_root))
 
 # Load environment variables from the project root
 from dotenv import load_dotenv
-env_path = project_root / '.env'
+
+env_path = project_root / ".env"
 load_dotenv(env_path)
 
 # Load environment variables from the project root
 from dotenv import load_dotenv
-env_path = project_root / '.env'
+
+env_path = project_root / ".env"
 load_dotenv(env_path)
 
 
@@ -63,8 +65,8 @@ def check_environment() -> bool:
         return False
 
     # Check for GEMINI_API_KEY
-    gemini_key = os.getenv('GEMINI_API_KEY')
-    google_key = os.getenv('GOOGLE_API_KEY')
+    gemini_key = os.getenv("GEMINI_API_KEY")
+    google_key = os.getenv("GOOGLE_API_KEY")
 
     if gemini_key:
         print_result("GEMINI_API_KEY", "[OK] Set")
@@ -92,7 +94,7 @@ def find_test_files() -> Dict[str, Path]:
         "audio": ["*.mp3", "*.wav", "*.m4a"],
         "document": ["*.pdf", "*.txt"],
         "image": ["*.jpg", "*.jpeg", "*.png"],
-        "video": ["*.mp4", "*.avi", "*.mov"]
+        "video": ["*.mp4", "*.avi", "*.mov"],
     }
 
     for file_type, patterns in file_patterns.items():
@@ -124,7 +126,7 @@ def run_cli_test(script_name: str, file_path: Path, mode: str = "processing") ->
             capture_output=True,
             text=True,
             timeout=60,  # 1 minute timeout
-            cwd=project_root
+            cwd=project_root,
         )
 
         if result.returncode == 0:
@@ -143,7 +145,9 @@ def run_cli_test(script_name: str, file_path: Path, mode: str = "processing") ->
         return False
 
 
-def validate_standalone_functionality(test_files: Dict[str, Path]) -> Dict[str, Dict[str, bool]]:
+def validate_standalone_functionality(
+    test_files: Dict[str, Path]
+) -> Dict[str, Dict[str, bool]]:
     """Validate that CLI scripts work standalone."""
     print_section("Standalone CLI Validation")
 
@@ -152,7 +156,7 @@ def validate_standalone_functionality(test_files: Dict[str, Path]) -> Dict[str, 
         "test-audio.py": "audio",
         "test-document.py": "document",
         "test-image.py": "image",
-        "test-video.py": "video"
+        "test-video.py": "video",
     }
 
     results = {}
@@ -166,7 +170,9 @@ def validate_standalone_functionality(test_files: Dict[str, Path]) -> Dict[str, 
         script_results = {}
 
         # Test processing mode
-        script_results["processing"] = run_cli_test(script_name, file_path, "processing")
+        script_results["processing"] = run_cli_test(
+            script_name, file_path, "processing"
+        )
 
         # Test ingestion mode (the new standalone functionality)
         script_results["ingestion"] = run_cli_test(script_name, file_path, "ingestion")
@@ -188,7 +194,9 @@ def main():
     # Find test files
     test_files = find_test_files()
     if not test_files:
-        print("\n[FAIL] No test files found. Please add some files to the uploads/ directory.")
+        print(
+            "\n[FAIL] No test files found. Please add some files to the uploads/ directory."
+        )
         return False
 
     # Validate standalone functionality
@@ -233,5 +241,6 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\n[FAIL] Fatal error: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)

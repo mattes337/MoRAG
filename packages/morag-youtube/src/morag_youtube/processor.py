@@ -1,19 +1,25 @@
 """YouTube processing using Apify transcription service."""
 
 import time
-from typing import Dict, Any, List, Optional
-from pathlib import Path
 from dataclasses import dataclass, field
-import structlog
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
+import structlog
 from morag_core.exceptions import ProcessingError
-from morag_core.interfaces.processor import BaseProcessor, ProcessingConfig, ProcessingResult
+from morag_core.interfaces.processor import (
+    BaseProcessor,
+    ProcessingConfig,
+    ProcessingResult,
+)
 
 logger = structlog.get_logger(__name__)
+
 
 @dataclass
 class YouTubeConfig(ProcessingConfig):
     """Configuration for YouTube processing using Apify service."""
+
     # Apify service options
     apify_timeout: int = 600  # Timeout in seconds (10 minutes default)
     use_proxy: bool = True  # Whether to use Apify proxy
@@ -26,11 +32,15 @@ class YouTubeConfig(ProcessingConfig):
     pre_transcribed: bool = False  # Whether video is already transcribed
     provided_metadata: Optional[Dict[str, Any]] = None  # Pre-provided metadata
     provided_transcript: Optional[str] = None  # Pre-provided transcript text
-    provided_transcript_segments: Optional[List[Dict[str, Any]]] = None  # Pre-provided transcript segments
+    provided_transcript_segments: Optional[
+        List[Dict[str, Any]]
+    ] = None  # Pre-provided transcript segments
+
 
 @dataclass
 class YouTubeMetadata:
     """YouTube video metadata."""
+
     id: str
     title: str
     description: str
@@ -50,9 +60,11 @@ class YouTubeMetadata:
     playlist_title: Optional[str]
     playlist_index: Optional[int]
 
+
 @dataclass
 class YouTubeDownloadResult(ProcessingResult):
     """Result of YouTube processing operation using external service."""
+
     # External service response data
     metadata: Optional[YouTubeMetadata] = None
     transcript: Optional[Dict[str, Any]] = None
@@ -75,12 +87,14 @@ class YouTubeDownloadResult(ProcessingResult):
     transcript_text: Optional[str] = None
     transcript_language: Optional[str] = None
 
+
 class YouTubeProcessor(BaseProcessor):
     """YouTube processing service using Apify transcription API."""
 
     def __init__(self):
         """Initialize YouTube processor."""
         from .apify_service import ApifyYouTubeServiceError
+
         self.apify_service = None  # Initialize on demand
         self.ApifyYouTubeServiceError = ApifyYouTubeServiceError
         logger.info("YouTube processor initialized with Apify service")
@@ -97,22 +111,27 @@ class YouTubeProcessor(BaseProcessor):
         if self.apify_service is None:
             try:
                 from .apify_service import ApifyYouTubeService
+
                 self.apify_service = ApifyYouTubeService()
             except self.ApifyYouTubeServiceError as e:
-                raise ProcessingError(f"Failed to initialize Apify service: {e}. Please check your APIFY_API_TOKEN configuration.")
+                raise ProcessingError(
+                    f"Failed to initialize Apify service: {e}. Please check your APIFY_API_TOKEN configuration."
+                )
         return self.apify_service
 
     async def process_url(
-        self,
-        url: str,
-        config: Optional[YouTubeConfig] = None
+        self, url: str, config: Optional[YouTubeConfig] = None
     ) -> YouTubeDownloadResult:
         """Process YouTube URL using Apify transcription service."""
         start_time = time.time()
         config = config or YouTubeConfig()
 
         try:
-            logger.info("Starting YouTube processing with Apify service", url=url, pre_transcribed=config.pre_transcribed)
+            logger.info(
+                "Starting YouTube processing with Apify service",
+                url=url,
+                pre_transcribed=config.pre_transcribed,
+            )
 
             # Handle pre-transcribed videos
             if config.pre_transcribed:
@@ -125,23 +144,27 @@ class YouTubeProcessor(BaseProcessor):
             # Check service health
             is_healthy = await apify_service.health_check()
             if not is_healthy:
-                raise ProcessingError("Apify service is not available. Please check your APIFY_API_TOKEN configuration.")
+                raise ProcessingError(
+                    "Apify service is not available. Please check your APIFY_API_TOKEN configuration."
+                )
 
             # Call Apify service
             service_result = await apify_service.transcribe_video(
                 video_url=url,
                 extract_metadata=config.extract_metadata,
                 extract_transcript=config.extract_transcript,
-                use_proxy=config.use_proxy
+                use_proxy=config.use_proxy,
             )
 
             # Convert Apify service response to our result format
             result = self._convert_apify_result(service_result, start_time)
 
-            logger.info("YouTube processing completed successfully",
-                       url=url,
-                       has_transcript=bool(result.transcript),
-                       has_metadata=bool(result.metadata))
+            logger.info(
+                "YouTube processing completed successfully",
+                url=url,
+                has_transcript=bool(result.transcript),
+                has_metadata=bool(result.metadata),
+            )
 
             return result
 
@@ -159,7 +182,7 @@ class YouTubeProcessor(BaseProcessor):
                 video_download=None,
                 processing_time=time.time() - start_time,
                 success=False,
-                error_message=error_msg
+                error_message=error_msg,
             )
         except ProcessingError as e:
             logger.error("Processing error", url=url, error=str(e))
@@ -174,7 +197,7 @@ class YouTubeProcessor(BaseProcessor):
                 video_download=None,
                 processing_time=time.time() - start_time,
                 success=False,
-                error_message=str(e)
+                error_message=str(e),
             )
         except Exception as e:
             error_msg = f"Unexpected error: {str(e)}"
@@ -190,14 +213,11 @@ class YouTubeProcessor(BaseProcessor):
                 video_download=None,
                 processing_time=time.time() - start_time,
                 success=False,
-                error_message=error_msg
+                error_message=error_msg,
             )
 
     def _process_pre_transcribed_video(
-        self,
-        url: str,
-        config: YouTubeConfig,
-        start_time: float
+        self, url: str, config: YouTubeConfig, start_time: float
     ) -> YouTubeDownloadResult:
         """Process a pre-transcribed video using provided metadata and transcript.
 
@@ -219,23 +239,23 @@ class YouTubeProcessor(BaseProcessor):
         if config.provided_metadata:
             metadata = YouTubeMetadata(
                 id=video_id,
-                title=config.provided_metadata.get('title', 'Unknown Title'),
-                description=config.provided_metadata.get('description', ''),
-                uploader=config.provided_metadata.get('channel', 'Unknown Channel'),
-                upload_date=config.provided_metadata.get('uploadDate', ''),
-                duration=float(config.provided_metadata.get('duration', 0)),
-                view_count=int(config.provided_metadata.get('viewCount', 0)),
-                like_count=config.provided_metadata.get('likeCount'),
-                comment_count=config.provided_metadata.get('commentCount'),
-                tags=config.provided_metadata.get('tags', []),
-                categories=config.provided_metadata.get('categories', []),
-                thumbnail_url=config.provided_metadata.get('thumbnail', ''),
+                title=config.provided_metadata.get("title", "Unknown Title"),
+                description=config.provided_metadata.get("description", ""),
+                uploader=config.provided_metadata.get("channel", "Unknown Channel"),
+                upload_date=config.provided_metadata.get("uploadDate", ""),
+                duration=float(config.provided_metadata.get("duration", 0)),
+                view_count=int(config.provided_metadata.get("viewCount", 0)),
+                like_count=config.provided_metadata.get("likeCount"),
+                comment_count=config.provided_metadata.get("commentCount"),
+                tags=config.provided_metadata.get("tags", []),
+                categories=config.provided_metadata.get("categories", []),
+                thumbnail_url=config.provided_metadata.get("thumbnail", ""),
                 webpage_url=f"https://www.youtube.com/watch?v={video_id}",
-                channel_id=config.provided_metadata.get('channelId', ''),
-                channel_url=config.provided_metadata.get('channelUrl', ''),
+                channel_id=config.provided_metadata.get("channelId", ""),
+                channel_url=config.provided_metadata.get("channelUrl", ""),
                 playlist_id=None,
                 playlist_title=None,
-                playlist_index=None
+                playlist_index=None,
             )
 
         # Use provided transcript
@@ -243,15 +263,12 @@ class YouTubeProcessor(BaseProcessor):
         transcript_segments = config.provided_transcript_segments or []
 
         # Store transcript segments in the transcript field as a dict
-        transcript_data = {
-            "text": transcript,
-            "segments": transcript_segments
-        }
+        transcript_data = {"text": transcript, "segments": transcript_segments}
 
         return YouTubeDownloadResult(
             metadata=metadata,
             transcript=transcript_data,
-            transcript_languages=['en'],  # Default to English
+            transcript_languages=["en"],  # Default to English
             formats=[],
             total_formats=0,
             video_path=None,
@@ -260,7 +277,7 @@ class YouTubeProcessor(BaseProcessor):
             transcript_text=transcript,  # Legacy field
             processing_time=time.time() - start_time,
             success=True,
-            error_message=None
+            error_message=None,
         )
 
     def _extract_video_id(self, url: str) -> str:
@@ -273,7 +290,7 @@ class YouTubeProcessor(BaseProcessor):
             Video ID string
         """
         import re
-        from urllib.parse import urlparse, parse_qs
+        from urllib.parse import parse_qs, urlparse
 
         # Handle different YouTube URL formats
         if "youtu.be/" in url:
@@ -285,10 +302,12 @@ class YouTubeProcessor(BaseProcessor):
             return url.split("youtube.com/embed/")[1].split("?")[0]
         else:
             # Try to extract 11-character video ID pattern
-            match = re.search(r'[a-zA-Z0-9_-]{11}', url)
+            match = re.search(r"[a-zA-Z0-9_-]{11}", url)
             return match.group(0) if match else "unknown"
 
-    def _convert_apify_result(self, service_result: Dict[str, Any], start_time: float) -> YouTubeDownloadResult:
+    def _convert_apify_result(
+        self, service_result: Dict[str, Any], start_time: float
+    ) -> YouTubeDownloadResult:
         """Convert Apify service result to YouTubeDownloadResult format.
 
         Args:
@@ -313,7 +332,7 @@ class YouTubeProcessor(BaseProcessor):
                 video_download=None,
                 processing_time=time.time() - start_time,
                 success=False,
-                error_message=error_message
+                error_message=error_message,
             )
 
         # Check if we have any meaningful content (metadata or transcript)
@@ -322,7 +341,9 @@ class YouTubeProcessor(BaseProcessor):
 
         if not has_metadata and not has_transcript:
             error_msg = "No metadata or transcript found in Apify result"
-            logger.error("Apify result is empty", result_keys=list(service_result.keys()))
+            logger.error(
+                "Apify result is empty", result_keys=list(service_result.keys())
+            )
             return YouTubeDownloadResult(
                 metadata=None,
                 transcript=None,
@@ -334,7 +355,7 @@ class YouTubeProcessor(BaseProcessor):
                 video_download=None,
                 processing_time=time.time() - start_time,
                 success=False,
-                error_message=error_msg
+                error_message=error_msg,
             )
 
         # Convert metadata if available
@@ -365,14 +386,16 @@ class YouTubeProcessor(BaseProcessor):
                 like_count=metadata_dict.get("likeCount"),
                 comment_count=metadata_dict.get("commentCount"),
                 tags=metadata_dict.get("keywords", []),
-                categories=[metadata_dict.get("category", "")] if metadata_dict.get("category") else [],
+                categories=[metadata_dict.get("category", "")]
+                if metadata_dict.get("category")
+                else [],
                 thumbnail_url=thumbnail_url,
                 webpage_url=metadata_dict.get("url", ""),
                 channel_id=metadata_dict.get("channelId", ""),
                 channel_url=metadata_dict.get("channelUrl", ""),
                 playlist_id=None,
                 playlist_title=None,
-                playlist_index=None
+                playlist_index=None,
             )
 
         # Process transcript
@@ -388,21 +411,22 @@ class YouTubeProcessor(BaseProcessor):
                 if isinstance(transcript_segments_data, list):
                     transcript_segments = transcript_segments_data
                     # Format with timecodes like audio/video files
-                    transcript_text = self._format_transcript_with_timecodes(transcript_segments_data)
+                    transcript_text = self._format_transcript_with_timecodes(
+                        transcript_segments_data
+                    )
             elif isinstance(transcript_data, list):
                 # Handle segment format
                 transcript_segments = transcript_data
                 # Format with timecodes like audio/video files
-                transcript_text = self._format_transcript_with_timecodes(transcript_data)
+                transcript_text = self._format_transcript_with_timecodes(
+                    transcript_data
+                )
             elif isinstance(transcript_data, str):
                 # Handle plain text format
                 transcript_text = transcript_data
 
         # Store transcript data in the expected format
-        transcript_result = {
-            "text": transcript_text,
-            "segments": transcript_segments
-        }
+        transcript_result = {"text": transcript_text, "segments": transcript_segments}
 
         return YouTubeDownloadResult(
             metadata=metadata,
@@ -418,7 +442,7 @@ class YouTubeProcessor(BaseProcessor):
             transcript_language="en",
             processing_time=time.time() - start_time,
             success=True,
-            error_message=None
+            error_message=None,
         )
 
     def _parse_duration(self, duration_str: str) -> float:
@@ -475,12 +499,10 @@ class YouTubeProcessor(BaseProcessor):
                     # If no timing info, just add the text
                     formatted_lines.append(text)
 
-        return '\n'.join(formatted_lines) if formatted_lines else ""
+        return "\n".join(formatted_lines) if formatted_lines else ""
 
     async def process_playlist(
-        self,
-        playlist_url: str,
-        config: Optional[YouTubeConfig] = None
+        self, playlist_url: str, config: Optional[YouTubeConfig] = None
     ) -> List[YouTubeDownloadResult]:
         """Process YouTube playlist using Apify service.
 
@@ -497,14 +519,18 @@ class YouTubeProcessor(BaseProcessor):
         # This would require extracting individual video URLs and processing them
         # or using a specialized Apify actor for playlist processing
         logger.warning("Playlist processing not yet implemented with Apify service")
-        raise ProcessingError("Playlist processing is not currently supported. Please process individual video URLs.")
+        raise ProcessingError(
+            "Playlist processing is not currently supported. Please process individual video URLs."
+        )
 
     def cleanup(self, result: YouTubeDownloadResult) -> None:
         """Clean up temporary files."""
         # For Apify service, cleanup is minimal since files are managed by Apify
         logger.debug("Cleanup completed for Apify service result")
 
-    async def process(self, file_path: Path, config: Optional[ProcessingConfig] = None) -> ProcessingResult:
+    async def process(
+        self, file_path: Path, config: Optional[ProcessingConfig] = None
+    ) -> ProcessingResult:
         """Process content from file.
 
         This method is required by the BaseProcessor interface but is not applicable
@@ -513,7 +539,9 @@ class YouTubeProcessor(BaseProcessor):
         Raises:
             ProcessingError: Always raises this error as this method is not supported
         """
-        raise ProcessingError("YouTubeProcessor does not support file processing. Use process_url instead.")
+        raise ProcessingError(
+            "YouTubeProcessor does not support file processing. Use process_url instead."
+        )
 
     def supports_format(self, format_type: str) -> bool:
         """Check if processor supports the given format.
@@ -524,4 +552,4 @@ class YouTubeProcessor(BaseProcessor):
         Returns:
             True if format is supported, False otherwise
         """
-        return format_type.lower() in ['youtube', 'yt']
+        return format_type.lower() in ["youtube", "yt"]

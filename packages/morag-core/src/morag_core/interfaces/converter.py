@@ -26,6 +26,7 @@ class UnsupportedFormatError(ConversionError):
 
 class ChunkingStrategy(str, Enum):
     """Strategy for chunking converted content."""
+
     PAGE = "page"  # Chunk by page boundaries
     CHAPTER = "chapter"  # Chunk by chapter boundaries with page numbers
     PARAGRAPH = "paragraph"  # Chunk by paragraphs
@@ -41,6 +42,7 @@ class ChunkingStrategy(str, Enum):
 @dataclass
 class ConversionOptions:
     """Options for document conversion."""
+
     # General options
     format_type: Optional[str] = None
     chunking_strategy: ChunkingStrategy = ChunkingStrategy.PARAGRAPH
@@ -71,23 +73,23 @@ class ConversionOptions:
     format_options: Dict[str, Any] = field(default_factory=dict)
 
     @classmethod
-    def for_format(cls, format_type: str) -> 'ConversionOptions':
+    def for_format(cls, format_type: str) -> "ConversionOptions":
         """Create format-specific conversion options."""
         options = cls()
 
-        if format_type == 'pdf':
+        if format_type == "pdf":
             options.extract_images = True
             options.extract_tables = True
             options.include_page_numbers = True
-        elif format_type in ['audio', 'video']:
+        elif format_type in ["audio", "video"]:
             options.chunking_strategy = ChunkingStrategy.SEMANTIC
             options.extract_metadata = True
             options.extract_images = False
             options.extract_tables = False
-        elif format_type in ['word', 'excel', 'powerpoint']:
+        elif format_type in ["word", "excel", "powerpoint"]:
             options.extract_images = True
             options.extract_tables = True
-        elif format_type == 'web':
+        elif format_type == "web":
             options.extract_images = True
             options.extract_tables = True
             options.extract_links = True
@@ -98,6 +100,7 @@ class ConversionOptions:
 @dataclass
 class QualityScore:
     """Quality assessment of conversion result."""
+
     overall_score: float = 0.0
     text_quality: float = 0.0
     structure_preservation: float = 0.0
@@ -110,6 +113,7 @@ class QualityScore:
 @dataclass
 class ConversionResult:
     """Result of document conversion."""
+
     success: bool
     content: str
     metadata: Dict[str, Any]
@@ -129,7 +133,9 @@ class BaseConverter(ABC):
     """Base class for document converters."""
 
     @abstractmethod
-    async def convert(self, file_path: Union[str, Path], options: ConversionOptions) -> ConversionResult:
+    async def convert(
+        self, file_path: Union[str, Path], options: ConversionOptions
+    ) -> ConversionResult:
         """Convert document to markdown.
 
         Args:
@@ -194,52 +200,48 @@ class BaseConverter(ABC):
             Format type string
         """
         file_path = Path(file_path)
-        extension = file_path.suffix.lower().lstrip('.')
+        extension = file_path.suffix.lower().lstrip(".")
 
         # Map common extensions to format types
         format_map = {
             # Documents
-            'pdf': 'pdf',
-            'txt': 'text',
-            'md': 'markdown',
-            'html': 'html',
-            'htm': 'html',
-            'xml': 'xml',
-            'json': 'json',
-            'csv': 'csv',
-
+            "pdf": "pdf",
+            "txt": "text",
+            "md": "markdown",
+            "html": "html",
+            "htm": "html",
+            "xml": "xml",
+            "json": "json",
+            "csv": "csv",
             # Office
-            'doc': 'word',
-            'docx': 'word',
-            'xls': 'excel',
-            'xlsx': 'excel',
-            'ppt': 'powerpoint',
-            'pptx': 'powerpoint',
-
+            "doc": "word",
+            "docx": "word",
+            "xls": "excel",
+            "xlsx": "excel",
+            "ppt": "powerpoint",
+            "pptx": "powerpoint",
             # Audio
-            'mp3': 'audio',
-            'wav': 'audio',
-            'ogg': 'audio',
-            'flac': 'audio',
-            'm4a': 'audio',
-
+            "mp3": "audio",
+            "wav": "audio",
+            "ogg": "audio",
+            "flac": "audio",
+            "m4a": "audio",
             # Video
-            'mp4': 'video',
-            'avi': 'video',
-            'mov': 'video',
-            'mkv': 'video',
-            'webm': 'video',
-
+            "mp4": "video",
+            "avi": "video",
+            "mov": "video",
+            "mkv": "video",
+            "webm": "video",
             # Images
-            'jpg': 'image',
-            'jpeg': 'image',
-            'png': 'image',
-            'gif': 'image',
-            'bmp': 'image',
-            'webp': 'image',
+            "jpg": "image",
+            "jpeg": "image",
+            "png": "image",
+            "gif": "image",
+            "bmp": "image",
+            "webp": "image",
         }
 
-        return format_map.get(extension, 'unknown')
+        return format_map.get(extension, "unknown")
 
     def validate_input(self, file_path: Union[str, Path]) -> None:
         """Validate input file.

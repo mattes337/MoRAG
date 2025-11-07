@@ -1,10 +1,14 @@
 """Tests for path selection components."""
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock
 
-from morag_reasoning.path_selection import PathSelectionAgent, ReasoningPathFinder, PathRelevanceScore
+import pytest
 from morag_graph.operations import GraphPath
+from morag_reasoning.path_selection import (
+    PathRelevanceScore,
+    PathSelectionAgent,
+    ReasoningPathFinder,
+)
 
 
 class TestPathSelectionAgent:
@@ -66,7 +70,9 @@ class TestPathSelectionAgent:
         assert scores == sorted(scores, reverse=True)
 
     @pytest.mark.asyncio
-    async def test_select_paths_with_strategy(self, path_selection_agent, sample_graph_paths):
+    async def test_select_paths_with_strategy(
+        self, path_selection_agent, sample_graph_paths
+    ):
         """Test path selection with specific strategy."""
         query = "Find connection between entities"
         result = await path_selection_agent.select_paths(
@@ -83,7 +89,9 @@ class TestPathSelectionAgent:
         assert "Apple Inc." in description
         assert "Single entity" in description
 
-    def test_describe_path_multiple_entities(self, path_selection_agent, sample_graph_paths):
+    def test_describe_path_multiple_entities(
+        self, path_selection_agent, sample_graph_paths
+    ):
         """Test path description for multiple entities."""
         path = sample_graph_paths[0]  # Apple -> Steve Jobs
         description = path_selection_agent._describe_path(path)
@@ -105,20 +113,22 @@ class TestPathSelectionAgent:
         assert isinstance(result, list)
         assert len(result) <= path_selection_agent.max_paths
         assert all(isinstance(path, PathRelevanceScore) for path in result)
-        assert all(path.confidence == 5.0 for path in result)  # Medium confidence for fallback
+        assert all(
+            path.confidence == 5.0 for path in result
+        )  # Medium confidence for fallback
         assert all("Fallback scoring" in path.reasoning for path in result)
 
     @pytest.mark.asyncio
-    async def test_score_paths_forward_chaining(self, path_selection_agent, sample_graph_paths):
+    async def test_score_paths_forward_chaining(
+        self, path_selection_agent, sample_graph_paths
+    ):
         """Test path scoring with forward chaining strategy."""
         # Create initial path scores
         path_scores = [
             PathRelevanceScore(
-                path=path,
-                relevance_score=5.0,
-                confidence=7.0,
-                reasoning="Test path"
-            ) for path in sample_graph_paths
+                path=path, relevance_score=5.0, confidence=7.0, reasoning="Test path"
+            )
+            for path in sample_graph_paths
         ]
 
         result = await path_selection_agent._score_paths(
@@ -129,15 +139,14 @@ class TestPathSelectionAgent:
         assert all(isinstance(score, PathRelevanceScore) for score in result)
 
     @pytest.mark.asyncio
-    async def test_score_paths_length_penalty(self, path_selection_agent, sample_graph_paths):
+    async def test_score_paths_length_penalty(
+        self, path_selection_agent, sample_graph_paths
+    ):
         """Test path scoring with length penalty."""
         # Create a long path that should be penalized
         long_path = sample_graph_paths[-1]  # 3-entity path
         path_score = PathRelevanceScore(
-            path=long_path,
-            relevance_score=8.0,
-            confidence=9.0,
-            reasoning="Long path"
+            path=long_path, relevance_score=8.0, confidence=9.0, reasoning="Long path"
         )
 
         result = await path_selection_agent._score_paths(
@@ -147,10 +156,14 @@ class TestPathSelectionAgent:
         # Score should remain the same since path length equals max_depth
         assert result[0].relevance_score == 8.0
 
-    def test_create_path_selection_prompt(self, path_selection_agent, sample_graph_paths):
+    def test_create_path_selection_prompt(
+        self, path_selection_agent, sample_graph_paths
+    ):
         """Test creation of path selection prompt."""
         query = "Test query"
-        prompt = path_selection_agent._create_path_selection_prompt(query, sample_graph_paths)
+        prompt = path_selection_agent._create_path_selection_prompt(
+            query, sample_graph_paths
+        )
 
         assert query in prompt
         assert "Available Paths:" in prompt
@@ -173,7 +186,9 @@ class TestReasoningPathFinder:
     async def test_find_reasoning_paths_no_paths(self, reasoning_path_finder):
         """Test path finding when no paths are discovered."""
         # Mock graph engine to return no paths
-        reasoning_path_finder.graph_engine.traverse = AsyncMock(return_value={"paths": []})
+        reasoning_path_finder.graph_engine.traverse = AsyncMock(
+            return_value={"paths": []}
+        )
 
         result = await reasoning_path_finder.find_reasoning_paths(
             "test query", ["entity1"], strategy="forward_chaining"
@@ -182,7 +197,9 @@ class TestReasoningPathFinder:
         assert result == []
 
     @pytest.mark.asyncio
-    async def test_find_reasoning_paths_forward_chaining(self, reasoning_path_finder, sample_graph_paths):
+    async def test_find_reasoning_paths_forward_chaining(
+        self, reasoning_path_finder, sample_graph_paths
+    ):
         """Test path finding with forward chaining strategy."""
         # Mock graph engine to return paths
         reasoning_path_finder.graph_engine.traverse = AsyncMock(
@@ -196,7 +213,7 @@ class TestReasoningPathFinder:
                     path=sample_graph_paths[0],
                     relevance_score=8.5,
                     confidence=9.0,
-                    reasoning="Test path"
+                    reasoning="Test path",
                 )
             ]
         )
@@ -210,7 +227,9 @@ class TestReasoningPathFinder:
         reasoning_path_finder.path_selector.select_paths.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_find_reasoning_paths_bidirectional(self, reasoning_path_finder, sample_graph_paths):
+    async def test_find_reasoning_paths_bidirectional(
+        self, reasoning_path_finder, sample_graph_paths
+    ):
         """Test path finding with bidirectional strategy."""
         # Mock bidirectional path finding
         reasoning_path_finder.graph_engine.find_bidirectional_paths = AsyncMock(
@@ -221,14 +240,16 @@ class TestReasoningPathFinder:
             "test query",
             ["Apple Inc."],
             target_entities=["Steve Jobs"],
-            strategy="bidirectional"
+            strategy="bidirectional",
         )
 
         assert isinstance(result, list)
         reasoning_path_finder.graph_engine.find_bidirectional_paths.assert_called()
 
     @pytest.mark.asyncio
-    async def test_find_reasoning_paths_backward_chaining(self, reasoning_path_finder, sample_graph_paths):
+    async def test_find_reasoning_paths_backward_chaining(
+        self, reasoning_path_finder, sample_graph_paths
+    ):
         """Test path finding with backward chaining strategy."""
         # Mock backward traversal
         reasoning_path_finder.graph_engine.traverse_backward = AsyncMock(
@@ -239,23 +260,27 @@ class TestReasoningPathFinder:
             "test query",
             ["Apple Inc."],
             target_entities=["Steve Jobs"],
-            strategy="backward_chaining"
+            strategy="backward_chaining",
         )
 
         assert isinstance(result, list)
         reasoning_path_finder.graph_engine.traverse_backward.assert_called()
 
     @pytest.mark.asyncio
-    async def test_find_reasoning_paths_fallback_methods(self, reasoning_path_finder, sample_graph_paths):
+    async def test_find_reasoning_paths_fallback_methods(
+        self, reasoning_path_finder, sample_graph_paths
+    ):
         """Test path finding with fallback methods when advanced methods not available."""
         # Remove advanced methods to test fallbacks
-        delattr(reasoning_path_finder.graph_engine, 'find_bidirectional_paths')
-        delattr(reasoning_path_finder.graph_engine, 'traverse_backward')
-        delattr(reasoning_path_finder.graph_engine, 'traverse')
+        delattr(reasoning_path_finder.graph_engine, "find_bidirectional_paths")
+        delattr(reasoning_path_finder.graph_engine, "traverse_backward")
+        delattr(reasoning_path_finder.graph_engine, "traverse")
 
         # Mock fallback methods
         reasoning_path_finder.graph_engine.find_neighbors = AsyncMock(
-            return_value=[sample_graph_paths[0].entities[1]]  # Return Steve Jobs as neighbor
+            return_value=[
+                sample_graph_paths[0].entities[1]
+            ]  # Return Steve Jobs as neighbor
         )
         reasoning_path_finder.graph_engine.find_shortest_path = AsyncMock(
             return_value=sample_graph_paths[0]
@@ -286,7 +311,9 @@ class TestReasoningPathFinder:
             sequences.add(sequence)
 
     @pytest.mark.asyncio
-    async def test_discover_paths_max_paths_limit(self, reasoning_path_finder, sample_graph_paths):
+    async def test_discover_paths_max_paths_limit(
+        self, reasoning_path_finder, sample_graph_paths
+    ):
         """Test that path discovery respects max_paths limit."""
         # Mock to return many paths
         many_paths = sample_graph_paths * 20  # 80 paths

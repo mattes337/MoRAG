@@ -1,36 +1,42 @@
 """Main service coordinator for MoRAG system."""
 
 import asyncio
-from dataclasses import dataclass, field
-from typing import Dict, List, Any, Optional, Union, Tuple, Set
-from pathlib import Path
-from enum import Enum
 import os
-import structlog
-from pydantic import BaseModel
+from dataclasses import dataclass, field
+from enum import Enum
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
-from morag_core.interfaces.service import BaseService
-from morag_core.interfaces import IServiceCoordinator
-from morag_core.models import ProcessingConfig
+import structlog
+from morag_audio.service import AudioService
 from morag_core.exceptions import ProcessingError, UnsupportedFormatError
+from morag_core.interfaces import IServiceCoordinator
+from morag_core.interfaces.service import BaseService
+from morag_core.models import ProcessingConfig
 
 # Import specialized services
 from morag_document.service import DocumentService
-from morag_audio.service import AudioService
-from morag_video.service import VideoService
-from morag_image.service import ImageService
 from morag_embedding import GeminiEmbeddingService
+from morag_image.service import ImageService
+from morag_video.service import VideoService
 from morag_web.service import WebService
 from morag_youtube.service import YouTubeService
+from pydantic import BaseModel
 
 # Import graph processing
-from .graph_processor import GraphProcessor, GraphProcessingConfig, GraphProcessingResult
+from .graph_processor import (
+    GraphProcessingConfig,
+    GraphProcessingResult,
+    GraphProcessor,
+)
 
 logger = structlog.get_logger(__name__)
+
 
 @dataclass
 class ServiceConfig:
     """Configuration for MoRAG services."""
+
     document_config: Optional[ProcessingConfig] = None
     audio_config: Optional[ProcessingConfig] = None
     video_config: Optional[ProcessingConfig] = None
@@ -40,8 +46,10 @@ class ServiceConfig:
     youtube_config: Optional[ProcessingConfig] = None
     max_concurrent_tasks: int = 5
 
+
 class ContentType(str, Enum):
     """Content type enum."""
+
     DOCUMENT = "document"
     AUDIO = "audio"
     VIDEO = "video"
@@ -50,8 +58,10 @@ class ContentType(str, Enum):
     YOUTUBE = "youtube"
     UNKNOWN = "unknown"
 
+
 class ProcessingResult(BaseModel):
     """Processing result from MoRAG services."""
+
     content_type: str
     success: bool
     text_content: Optional[str] = None
@@ -64,7 +74,12 @@ class ProcessingResult(BaseModel):
 class MoRAGServiceCoordinator(IServiceCoordinator):
     """Main coordinator for all MoRAG processing services."""
 
-    def __init__(self, config: Optional[ServiceConfig] = None, graph_config: Optional[GraphProcessingConfig] = None, data_output_dir: Optional[str] = None):
+    def __init__(
+        self,
+        config: Optional[ServiceConfig] = None,
+        graph_config: Optional[GraphProcessingConfig] = None,
+        data_output_dir: Optional[str] = None,
+    ):
         """Initialize MoRAG services coordinator.
 
         Args:
@@ -94,7 +109,10 @@ class MoRAGServiceCoordinator(IServiceCoordinator):
         # Concurrency control
         self._semaphore = asyncio.Semaphore(self.config.max_concurrent_tasks)
 
-        logger.info("MoRAG services coordinator initialized", max_concurrent_tasks=self.config.max_concurrent_tasks)
+        logger.info(
+            "MoRAG services coordinator initialized",
+            max_concurrent_tasks=self.config.max_concurrent_tasks,
+        )
 
     async def get_service(self, service_type: str) -> Any:
         """Get a service instance by type.
@@ -119,7 +137,7 @@ class MoRAGServiceCoordinator(IServiceCoordinator):
             "embedding": lambda: self.embedding_service,
             "web": lambda: self.web_service,
             "youtube": lambda: self.youtube_service,
-            "graph": lambda: self.graph_processor
+            "graph": lambda: self.graph_processor,
         }
 
         if service_type not in service_map:
@@ -134,12 +152,13 @@ class MoRAGServiceCoordinator(IServiceCoordinator):
     def _get_fact_extractor(self):
         """Get or create fact extractor service."""
         # Try to get from graph processor first
-        if self.graph_processor and hasattr(self.graph_processor, 'fact_extractor'):
+        if self.graph_processor and hasattr(self.graph_processor, "fact_extractor"):
             return self.graph_processor.fact_extractor
 
         # Fallback: create a basic fact extractor
         try:
             from morag_graph.extraction import FactExtractor
+
             return FactExtractor()
         except ImportError:
             logger.warning("FactExtractor not available")
@@ -148,12 +167,13 @@ class MoRAGServiceCoordinator(IServiceCoordinator):
     def _get_entity_normalizer(self):
         """Get or create entity normalizer service."""
         # Try to get from graph processor first
-        if self.graph_processor and hasattr(self.graph_processor, 'entity_normalizer'):
+        if self.graph_processor and hasattr(self.graph_processor, "entity_normalizer"):
             return self.graph_processor.entity_normalizer
 
         # Fallback: create a basic entity normalizer
         try:
             from morag_graph.extraction import EntityNormalizer
+
             return EntityNormalizer()
         except ImportError:
             logger.warning("EntityNormalizer not available")
@@ -162,14 +182,17 @@ class MoRAGServiceCoordinator(IServiceCoordinator):
     def _get_fact_extraction_agent(self):
         """Get or create fact extraction agent."""
         # Try to get from graph processor first
-        if self.graph_processor and hasattr(self.graph_processor, 'agent'):
+        if self.graph_processor and hasattr(self.graph_processor, "agent"):
             return self.graph_processor.agent
 
         # Fallback: create using AI services
         try:
-            from morag_core.ai import create_agent, AgentConfig
+            from morag_core.ai import AgentConfig, create_agent
+
             # This would need proper configuration - for now, return None
-            logger.warning("Fact extraction agent creation requires proper configuration")
+            logger.warning(
+                "Fact extraction agent creation requires proper configuration"
+            )
             return None
         except ImportError:
             logger.warning("AI services not available for fact extraction agent")
@@ -190,7 +213,9 @@ class MoRAGServiceCoordinator(IServiceCoordinator):
 
             # Initialize document service
             if self.config.document_config:
-                self.document_service = DocumentService(config=self.config.document_config)
+                self.document_service = DocumentService(
+                    config=self.config.document_config
+                )
                 await self.document_service.initialize()
                 logger.debug("Document service initialized")
 
@@ -232,8 +257,7 @@ class MoRAGServiceCoordinator(IServiceCoordinator):
             # Initialize graph processor if config provided
             if self.graph_config:
                 self.graph_processor = GraphProcessor(
-                    config=self.graph_config,
-                    data_output_dir=self.data_output_dir
+                    config=self.graph_config, data_output_dir=self.data_output_dir
                 )
                 await self.graph_processor.initialize()
                 logger.debug("Graph processor initialized")
@@ -256,11 +280,11 @@ class MoRAGServiceCoordinator(IServiceCoordinator):
             self.video_service,
             self.image_service,
             self.web_service,
-            self.youtube_service
+            self.youtube_service,
         ]
 
         for service in search_capable_services:
-            if service and hasattr(service, 'search'):
+            if service and hasattr(service, "search"):
                 self.search_services.add(service)
 
         logger.debug(f"Initialized {len(self.search_services)} search services")
@@ -277,15 +301,19 @@ class MoRAGServiceCoordinator(IServiceCoordinator):
             self.embedding_service,
             self.web_service,
             self.youtube_service,
-            self.graph_processor
+            self.graph_processor,
         ]
 
         for service in services_to_shutdown:
-            if service and hasattr(service, 'shutdown'):
+            if service and hasattr(service, "shutdown"):
                 try:
                     await service.shutdown()
                 except Exception as e:
-                    logger.warning("Error shutting down service", service=type(service).__name__, error=str(e))
+                    logger.warning(
+                        "Error shutting down service",
+                        service=type(service).__name__,
+                        error=str(e),
+                    )
 
         logger.info("MoRAG services shutdown complete")
 
@@ -295,7 +323,9 @@ class MoRAGServiceCoordinator(IServiceCoordinator):
             "coordinator": "healthy",
             "services": {},
             "graph_processor": None,
-            "timestamp": structlog.processors.TimeStamper()(None, None, {"event": "health_check"})["timestamp"]
+            "timestamp": structlog.processors.TimeStamper()(
+                None, None, {"event": "health_check"}
+            )["timestamp"],
         }
 
         # Check individual services
@@ -306,14 +336,16 @@ class MoRAGServiceCoordinator(IServiceCoordinator):
             "image": self.image_service,
             "embedding": self.embedding_service,
             "web": self.web_service,
-            "youtube": self.youtube_service
+            "youtube": self.youtube_service,
         }
 
         for name, service in service_map.items():
             if service:
                 try:
-                    if hasattr(service, 'get_health_status'):
-                        health_status["services"][name] = await service.get_health_status()
+                    if hasattr(service, "get_health_status"):
+                        health_status["services"][
+                            name
+                        ] = await service.get_health_status()
                     else:
                         health_status["services"][name] = "healthy"
                 except Exception as e:
@@ -324,13 +356,17 @@ class MoRAGServiceCoordinator(IServiceCoordinator):
         # Check graph processor
         if self.graph_processor:
             try:
-                health_status["graph_processor"] = await self.graph_processor.get_health_status()
+                health_status[
+                    "graph_processor"
+                ] = await self.graph_processor.get_health_status()
             except Exception as e:
                 health_status["graph_processor"] = f"error: {str(e)}"
 
         return health_status
 
-    async def generate_embeddings(self, text: Union[str, List[str]]) -> Union[List[float], List[List[float]]]:
+    async def generate_embeddings(
+        self, text: Union[str, List[str]]
+    ) -> Union[List[float], List[List[float]]]:
         """Generate embeddings using the embedding service.
 
         Args:
@@ -352,4 +388,9 @@ class MoRAGServiceCoordinator(IServiceCoordinator):
             raise ProcessingError(f"Embedding generation failed: {str(e)}")
 
 
-__all__ = ["MoRAGServiceCoordinator", "ServiceConfig", "ContentType", "ProcessingResult"]
+__all__ = [
+    "MoRAGServiceCoordinator",
+    "ServiceConfig",
+    "ContentType",
+    "ProcessingResult",
+]

@@ -1,11 +1,11 @@
 """Advanced result fusion strategies for hybrid retrieval."""
 
 import logging
-from typing import List, Dict, Any, Optional
 from abc import ABC, abstractmethod
+from typing import Any, Dict, List, Optional
 
 from ..query.models import QueryAnalysis
-from .models import RetrievalResult, HybridRetrievalConfig
+from .models import HybridRetrievalConfig, RetrievalResult
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +19,7 @@ class FusionStrategy(ABC):
         vector_results: List[RetrievalResult],
         graph_results: List[RetrievalResult],
         query_analysis: QueryAnalysis,
-        config: HybridRetrievalConfig
+        config: HybridRetrievalConfig,
     ) -> List[RetrievalResult]:
         """Fuse vector and graph results.
 
@@ -43,7 +43,7 @@ class WeightedCombinationFusion(FusionStrategy):
         vector_results: List[RetrievalResult],
         graph_results: List[RetrievalResult],
         query_analysis: QueryAnalysis,
-        config: HybridRetrievalConfig
+        config: HybridRetrievalConfig,
     ) -> List[RetrievalResult]:
         """Fuse results using weighted combination of scores."""
         # Adjust weights based on query characteristics
@@ -65,7 +65,9 @@ class WeightedCombinationFusion(FusionStrategy):
         vector_weight /= total_weight
         graph_weight /= total_weight
 
-        logger.debug(f"Using weights: vector={vector_weight:.3f}, graph={graph_weight:.3f}")
+        logger.debug(
+            f"Using weights: vector={vector_weight:.3f}, graph={graph_weight:.3f}"
+        )
 
         # Combine and deduplicate results
         all_results = []
@@ -80,7 +82,7 @@ class WeightedCombinationFusion(FusionStrategy):
                     score=result.score * vector_weight,
                     metadata=result.metadata,
                     entities=result.entities,
-                    reasoning=result.reasoning
+                    reasoning=result.reasoning,
                 )
                 all_results.append(new_result)
                 content_seen.add(result.content)
@@ -94,7 +96,7 @@ class WeightedCombinationFusion(FusionStrategy):
                     score=result.score * graph_weight,
                     metadata=result.metadata,
                     entities=result.entities,
-                    reasoning=result.reasoning
+                    reasoning=result.reasoning,
                 )
                 all_results.append(new_result)
                 content_seen.add(result.content)
@@ -106,9 +108,9 @@ class WeightedCombinationFusion(FusionStrategy):
                         existing_result.source = "hybrid_both"
                         existing_result.reasoning += f" + {result.reasoning}"
                         if result.entities:
-                            existing_result.entities = list(set(
-                                (existing_result.entities or []) + result.entities
-                            ))
+                            existing_result.entities = list(
+                                set((existing_result.entities or []) + result.entities)
+                            )
                         break
 
         return all_results
@@ -130,7 +132,7 @@ class ReciprocalRankFusion(FusionStrategy):
         vector_results: List[RetrievalResult],
         graph_results: List[RetrievalResult],
         query_analysis: QueryAnalysis,
-        config: HybridRetrievalConfig
+        config: HybridRetrievalConfig,
     ) -> List[RetrievalResult]:
         """Fuse results using reciprocal rank fusion."""
         content_to_results = {}
@@ -139,26 +141,28 @@ class ReciprocalRankFusion(FusionStrategy):
         for rank, result in enumerate(vector_results):
             if result.content not in content_to_results:
                 content_to_results[result.content] = {
-                    'result': result,
-                    'vector_rank': rank + 1,
-                    'graph_rank': None
+                    "result": result,
+                    "vector_rank": rank + 1,
+                    "graph_rank": None,
                 }
 
         # Process graph results
         for rank, result in enumerate(graph_results):
             if result.content in content_to_results:
-                content_to_results[result.content]['graph_rank'] = rank + 1
+                content_to_results[result.content]["graph_rank"] = rank + 1
                 # Merge entities from both sources
-                existing_entities = content_to_results[result.content]['result'].entities or []
+                existing_entities = (
+                    content_to_results[result.content]["result"].entities or []
+                )
                 new_entities = result.entities or []
-                content_to_results[result.content]['result'].entities = list(set(
-                    existing_entities + new_entities
-                ))
+                content_to_results[result.content]["result"].entities = list(
+                    set(existing_entities + new_entities)
+                )
             else:
                 content_to_results[result.content] = {
-                    'result': result,
-                    'vector_rank': None,
-                    'graph_rank': rank + 1
+                    "result": result,
+                    "vector_rank": None,
+                    "graph_rank": rank + 1,
                 }
 
         # Calculate RRF scores
@@ -166,20 +170,20 @@ class ReciprocalRankFusion(FusionStrategy):
         for content, data in content_to_results.items():
             rrf_score = 0.0
 
-            if data['vector_rank'] is not None:
-                rrf_score += 1.0 / (self.k + data['vector_rank'])
+            if data["vector_rank"] is not None:
+                rrf_score += 1.0 / (self.k + data["vector_rank"])
 
-            if data['graph_rank'] is not None:
-                rrf_score += 1.0 / (self.k + data['graph_rank'])
+            if data["graph_rank"] is not None:
+                rrf_score += 1.0 / (self.k + data["graph_rank"])
 
-            result = data['result']
+            result = data["result"]
             new_result = RetrievalResult(
                 content=result.content,
                 source="rrf_fusion",
                 score=rrf_score,
                 metadata=result.metadata,
                 entities=result.entities,
-                reasoning=f"RRF fusion (k={self.k}): {result.reasoning}"
+                reasoning=f"RRF fusion (k={self.k}): {result.reasoning}",
             )
             fused_results.append(new_result)
 
@@ -200,7 +204,7 @@ class AdaptiveFusion(FusionStrategy):
         vector_results: List[RetrievalResult],
         graph_results: List[RetrievalResult],
         query_analysis: QueryAnalysis,
-        config: HybridRetrievalConfig
+        config: HybridRetrievalConfig,
     ) -> List[RetrievalResult]:
         """Adaptively choose fusion strategy based on query characteristics."""
         # Use weighted combination for complex queries with many entities
@@ -234,7 +238,7 @@ class ResultFusionEngine:
             "weighted_combination": WeightedCombinationFusion(),
             "rank_fusion": ReciprocalRankFusion(),
             "rrf": ReciprocalRankFusion(),
-            "adaptive": AdaptiveFusion()
+            "adaptive": AdaptiveFusion(),
         }
         self.logger = logging.getLogger(__name__)
 
@@ -243,7 +247,7 @@ class ResultFusionEngine:
         vector_results: List[RetrievalResult],
         graph_results: List[RetrievalResult],
         query_analysis: QueryAnalysis,
-        config: HybridRetrievalConfig
+        config: HybridRetrievalConfig,
     ) -> List[RetrievalResult]:
         """Fuse results using the configured strategy.
 
@@ -259,7 +263,9 @@ class ResultFusionEngine:
         strategy_name = config.fusion_strategy
 
         if strategy_name not in self.strategies:
-            self.logger.warning(f"Unknown fusion strategy: {strategy_name}, using weighted_combination")
+            self.logger.warning(
+                f"Unknown fusion strategy: {strategy_name}, using weighted_combination"
+            )
             strategy_name = "weighted_combination"
 
         strategy = self.strategies[strategy_name]
@@ -282,9 +288,7 @@ class ResultFusionEngine:
             return self._simple_fallback_fusion(vector_results, graph_results)
 
     def _rank_and_filter_results(
-        self,
-        results: List[RetrievalResult],
-        config: HybridRetrievalConfig
+        self, results: List[RetrievalResult], config: HybridRetrievalConfig
     ) -> List[RetrievalResult]:
         """Rank and filter results based on configuration.
 
@@ -297,23 +301,18 @@ class ResultFusionEngine:
         """
         # Filter by minimum confidence
         filtered_results = [
-            r for r in results
-            if r.score >= config.min_confidence_threshold
+            r for r in results if r.score >= config.min_confidence_threshold
         ]
 
         # Sort by score (descending)
-        sorted_results = sorted(
-            filtered_results,
-            key=lambda r: r.score,
-            reverse=True
-        )
+        sorted_results = sorted(filtered_results, key=lambda r: r.score, reverse=True)
 
         return sorted_results
 
     def _simple_fallback_fusion(
         self,
         vector_results: List[RetrievalResult],
-        graph_results: List[RetrievalResult]
+        graph_results: List[RetrievalResult],
     ) -> List[RetrievalResult]:
         """Simple fallback fusion by concatenation with deduplication.
 

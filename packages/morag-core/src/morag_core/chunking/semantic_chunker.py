@@ -1,12 +1,15 @@
 """Semantic chunker implementation using PydanticAI."""
 
 import asyncio
-from typing import List, Optional, Dict, Any
+from typing import Any, Dict, List, Optional
+
 import structlog
 
 from .config import ChunkingConfig, ChunkingStrategy
+
 try:
     from agents import get_agent
+
     AGENTS_AVAILABLE = True
 except ImportError:
     AGENTS_AVAILABLE = False
@@ -55,7 +58,7 @@ class SemanticChunker:
             text_length=len(text),
             strategy=effective_config.strategy,
             max_chunk_size=effective_config.max_chunk_size,
-            content_type=effective_config.content_type
+            content_type=effective_config.content_type,
         )
 
         try:
@@ -64,14 +67,14 @@ class SemanticChunker:
                     text=text,
                     max_chunk_size=effective_config.max_chunk_size,
                     min_chunk_size=effective_config.min_chunk_size,
-                    strategy="semantic"
+                    strategy="semantic",
                 )
             elif effective_config.strategy == ChunkingStrategy.HYBRID and self.agent:
                 chunks = await self.agent.chunk_text(
                     text=text,
                     max_chunk_size=effective_config.max_chunk_size,
                     min_chunk_size=effective_config.min_chunk_size,
-                    strategy="hybrid"
+                    strategy="hybrid",
                 )
             elif effective_config.strategy == ChunkingStrategy.TOPIC_BASED:
                 chunks = await self._topic_based_chunking(text, effective_config)
@@ -90,17 +93,23 @@ class SemanticChunker:
                 "Text chunking completed",
                 original_length=len(text),
                 num_chunks=len(chunks),
-                avg_chunk_size=sum(len(c) for c in chunks) // len(chunks) if chunks else 0
+                avg_chunk_size=sum(len(c) for c in chunks) // len(chunks)
+                if chunks
+                else 0,
             )
 
             return chunks
 
         except Exception as e:
-            self.logger.error("Text chunking failed", error=str(e), error_type=type(e).__name__)
+            self.logger.error(
+                "Text chunking failed", error=str(e), error_type=type(e).__name__
+            )
             # Fallback to size-based chunking
             return self._size_based_chunking(text, effective_config)
 
-    async def _topic_based_chunking(self, text: str, config: ChunkingConfig) -> List[str]:
+    async def _topic_based_chunking(
+        self, text: str, config: ChunkingConfig
+    ) -> List[str]:
         """Chunk text based on topic boundaries."""
         if self.agent:
             # Use AI agent for topic detection
@@ -108,7 +117,7 @@ class SemanticChunker:
                 text=text,
                 max_chunk_size=config.max_chunk_size,
                 min_chunk_size=config.min_chunk_size,
-                strategy="semantic"
+                strategy="semantic",
             )
         else:
             # Fallback to paragraph-based chunking
@@ -119,14 +128,17 @@ class SemanticChunker:
         import re
 
         # Split on sentence boundaries
-        sentences = re.split(r'(?<=[.!?])\s+', text)
+        sentences = re.split(r"(?<=[.!?])\s+", text)
 
         chunks = []
         current_chunk = ""
 
         for sentence in sentences:
             # Check if adding this sentence would exceed max size
-            if current_chunk and len(current_chunk) + len(sentence) + 1 > config.max_chunk_size:
+            if (
+                current_chunk
+                and len(current_chunk) + len(sentence) + 1 > config.max_chunk_size
+            ):
                 if current_chunk.strip():
                     chunks.append(current_chunk.strip())
                 current_chunk = sentence
@@ -145,7 +157,7 @@ class SemanticChunker:
     def _paragraph_based_chunking(self, text: str, config: ChunkingConfig) -> List[str]:
         """Chunk text at paragraph boundaries."""
         # Split on paragraph boundaries (double newlines)
-        paragraphs = text.split('\n\n')
+        paragraphs = text.split("\n\n")
 
         chunks = []
         current_chunk = ""
@@ -156,7 +168,10 @@ class SemanticChunker:
                 continue
 
             # Check if adding this paragraph would exceed max size
-            if current_chunk and len(current_chunk) + len(paragraph) + 2 > config.max_chunk_size:
+            if (
+                current_chunk
+                and len(current_chunk) + len(paragraph) + 2 > config.max_chunk_size
+            ):
                 if current_chunk.strip():
                     chunks.append(current_chunk.strip())
                 current_chunk = paragraph
@@ -191,16 +206,19 @@ class SemanticChunker:
             # Find word boundary if configured
             if config.respect_sentence_boundaries:
                 # Try to find sentence boundary
-                while end > start and text[end] not in '.!?':
+                while end > start and text[end] not in ".!?":
                     end -= 1
                 if end > start:
                     end += 1  # Include the punctuation
                 else:
                     end = start + config.max_chunk_size
 
-            if config.respect_sentence_boundaries and end == start + config.max_chunk_size:
+            if (
+                config.respect_sentence_boundaries
+                and end == start + config.max_chunk_size
+            ):
                 # No sentence boundary found, try word boundary
-                while end > start and text[end] not in ' \n\t':
+                while end > start and text[end] not in " \n\t":
                     end -= 1
 
                 if end == start:
@@ -212,7 +230,9 @@ class SemanticChunker:
 
         return chunks
 
-    def _validate_chunk_sizes(self, chunks: List[str], config: ChunkingConfig) -> List[str]:
+    def _validate_chunk_sizes(
+        self, chunks: List[str], config: ChunkingConfig
+    ) -> List[str]:
         """Validate and adjust chunk sizes."""
         validated_chunks = []
 
@@ -228,7 +248,10 @@ class SemanticChunker:
             # If chunk is too small, try to merge with next chunk
             if len(chunk) < config.min_chunk_size and i + 1 < len(chunks):
                 next_chunk = chunks[i + 1].strip()
-                if next_chunk and len(chunk) + len(next_chunk) + 1 <= config.max_chunk_size:
+                if (
+                    next_chunk
+                    and len(chunk) + len(next_chunk) + 1 <= config.max_chunk_size
+                ):
                     merged_chunk = chunk + " " + next_chunk
                     validated_chunks.append(merged_chunk)
                     i += 2  # Skip next chunk as it's been merged
@@ -269,14 +292,14 @@ class SemanticChunker:
             # Find a good break point (sentence or word boundary)
             if end < len(chunk):
                 # Look for sentence boundary first
-                for punct in ['. ', '! ', '? ']:
+                for punct in [". ", "! ", "? "]:
                     last_punct = chunk.rfind(punct, start, end)
                     if last_punct > start + config.min_chunk_size:
                         end = last_punct + 2
                         break
                 else:
                     # Look for word boundary
-                    last_space = chunk.rfind(' ', start + config.min_chunk_size, end)
+                    last_space = chunk.rfind(" ", start + config.min_chunk_size, end)
                     if last_space > start:
                         end = last_space
 
@@ -308,13 +331,15 @@ class SemanticChunker:
                     # Find word boundary for clean overlap
                     overlap_text = prev_chunk[-overlap_size:]
                     # Find the start of the first complete word in overlap
-                    first_space = overlap_text.find(' ')
+                    first_space = overlap_text.find(" ")
                     if first_space > 0:
-                        overlap_text = overlap_text[first_space + 1:]
+                        overlap_text = overlap_text[first_space + 1 :]
 
                     # Only add overlap if it doesn't make chunk too large
                     potential_chunk = overlap_text + " " + chunk
-                    if len(potential_chunk) <= self.config.max_chunk_size * 1.2:  # Allow 20% over
+                    if (
+                        len(potential_chunk) <= self.config.max_chunk_size * 1.2
+                    ):  # Allow 20% over
                         overlapped_chunks.append(potential_chunk)
                     else:
                         # Skip overlap if it would make chunk too large

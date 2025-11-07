@@ -3,11 +3,12 @@
 Automated test for configurable quality gates in fact generation.
 Based on test_configurable_quality_gates.py and test_simple_quality_gates.py
 """
+import json
+import os
+import tempfile
+
 import pytest
 import requests
-import json
-import tempfile
-import os
 
 
 class TestQualityGatesConfiguration:
@@ -37,7 +38,9 @@ AI and ML are used in various industries including healthcare, finance, transpor
     @pytest.fixture
     def temp_file(self, test_content):
         """Create temporary test file."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as f:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".txt", delete=False, encoding="utf-8"
+        ) as f:
             f.write(test_content)
             return f.name
 
@@ -48,20 +51,24 @@ AI and ML are used in various industries including healthcare, finance, transpor
                 files = {"file": ("test.txt", f, "text/plain")}
                 data = {
                     "stages": '["markdown-conversion", "chunker", "fact-generator"]',
-                    "stage_configs": json.dumps({
-                        "fact-generator": {
-                            "min_confidence": 0.7,
-                            "strict_validation": True,
-                            "allow_vague_language": False,
-                            "require_entities": True,
-                            "min_fact_length": 25
+                    "stage_configs": json.dumps(
+                        {
+                            "fact-generator": {
+                                "min_confidence": 0.7,
+                                "strict_validation": True,
+                                "allow_vague_language": False,
+                                "require_entities": True,
+                                "min_fact_length": 25,
+                            }
                         }
-                    })
+                    ),
                 }
 
                 response = requests.post(api_url, files=files, data=data, timeout=120)
 
-                assert response.status_code == 200, f"Request failed: {response.status_code}"
+                assert (
+                    response.status_code == 200
+                ), f"Request failed: {response.status_code}"
 
                 result = response.json()
                 facts_count = self._count_facts(result)
@@ -75,7 +82,9 @@ AI and ML are used in various industries including healthcare, finance, transpor
 
     def test_lenient_validation(self, api_url, test_content):
         """Test lenient validation settings allow more facts."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as f:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".txt", delete=False, encoding="utf-8"
+        ) as f:
             f.write(test_content)
             temp_file = f.name
 
@@ -84,26 +93,32 @@ AI and ML are used in various industries including healthcare, finance, transpor
                 files = {"file": ("test.txt", f, "text/plain")}
                 data = {
                     "stages": '["markdown-conversion", "chunker", "fact-generator"]',
-                    "stage_configs": json.dumps({
-                        "fact-generator": {
-                            "min_confidence": 0.3,
-                            "strict_validation": False,
-                            "allow_vague_language": True,
-                            "require_entities": False,
-                            "min_fact_length": 10
+                    "stage_configs": json.dumps(
+                        {
+                            "fact-generator": {
+                                "min_confidence": 0.3,
+                                "strict_validation": False,
+                                "allow_vague_language": True,
+                                "require_entities": False,
+                                "min_fact_length": 10,
+                            }
                         }
-                    })
+                    ),
                 }
 
                 response = requests.post(api_url, files=files, data=data, timeout=120)
 
-                assert response.status_code == 200, f"Request failed: {response.status_code}"
+                assert (
+                    response.status_code == 200
+                ), f"Request failed: {response.status_code}"
 
                 result = response.json()
                 facts_count = self._count_facts(result)
 
                 # Lenient validation should allow more facts
-                assert facts_count >= 0, "Should extract some facts with lenient settings"
+                assert (
+                    facts_count >= 0
+                ), "Should extract some facts with lenient settings"
 
                 return facts_count
 
@@ -112,7 +127,9 @@ AI and ML are used in various industries including healthcare, finance, transpor
 
     def test_default_validation(self, api_url, test_content):
         """Test default validation settings."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as f:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".txt", delete=False, encoding="utf-8"
+        ) as f:
             f.write(test_content)
             temp_file = f.name
 
@@ -126,7 +143,9 @@ AI and ML are used in various industries including healthcare, finance, transpor
 
                 response = requests.post(api_url, files=files, data=data, timeout=120)
 
-                assert response.status_code == 200, f"Request failed: {response.status_code}"
+                assert (
+                    response.status_code == 200
+                ), f"Request failed: {response.status_code}"
 
                 result = response.json()
                 facts_count = self._count_facts(result)
@@ -141,7 +160,9 @@ AI and ML are used in various industries including healthcare, finance, transpor
 
     def test_custom_balanced_validation(self, api_url, test_content):
         """Test custom balanced validation settings."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as f:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".txt", delete=False, encoding="utf-8"
+        ) as f:
             f.write(test_content)
             temp_file = f.name
 
@@ -150,20 +171,24 @@ AI and ML are used in various industries including healthcare, finance, transpor
                 files = {"file": ("test.txt", f, "text/plain")}
                 data = {
                     "stages": '["markdown-conversion", "chunker", "fact-generator"]',
-                    "stage_configs": json.dumps({
-                        "fact-generator": {
-                            "min_confidence": 0.4,
-                            "strict_validation": False,
-                            "allow_vague_language": True,
-                            "require_entities": True,
-                            "min_fact_length": 15
+                    "stage_configs": json.dumps(
+                        {
+                            "fact-generator": {
+                                "min_confidence": 0.4,
+                                "strict_validation": False,
+                                "allow_vague_language": True,
+                                "require_entities": True,
+                                "min_fact_length": 15,
+                            }
                         }
-                    })
+                    ),
                 }
 
                 response = requests.post(api_url, files=files, data=data, timeout=120)
 
-                assert response.status_code == 200, f"Request failed: {response.status_code}"
+                assert (
+                    response.status_code == 200
+                ), f"Request failed: {response.status_code}"
 
                 result = response.json()
                 facts_count = self._count_facts(result)
@@ -187,20 +212,22 @@ AI and ML are used in various industries including healthcare, finance, transpor
                 "strict_validation": True,
                 "allow_vague_language": False,
                 "require_entities": True,
-                "min_fact_length": 25
+                "min_fact_length": 25,
             },
             "lenient": {
                 "min_confidence": 0.3,
                 "strict_validation": False,
                 "allow_vague_language": True,
                 "require_entities": False,
-                "min_fact_length": 10
+                "min_fact_length": 10,
             },
-            "default": None  # No config = default
+            "default": None,  # No config = default
         }
 
         for config_name, config in configs.items():
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as f:
+            with tempfile.NamedTemporaryFile(
+                mode="w", suffix=".txt", delete=False, encoding="utf-8"
+            ) as f:
                 f.write(test_content)
                 temp_file = f.name
 
@@ -214,9 +241,13 @@ AI and ML are used in various industries including healthcare, finance, transpor
                     if config:
                         data["stage_configs"] = json.dumps({"fact-generator": config})
 
-                    response = requests.post(api_url, files=files, data=data, timeout=120)
+                    response = requests.post(
+                        api_url, files=files, data=data, timeout=120
+                    )
 
-                    assert response.status_code == 200, f"{config_name} request failed: {response.status_code}"
+                    assert (
+                        response.status_code == 200
+                    ), f"{config_name} request failed: {response.status_code}"
 
                     result = response.json()
                     facts_count = self._count_facts(result)
@@ -227,12 +258,15 @@ AI and ML are used in various industries including healthcare, finance, transpor
 
         # Verify that configurations produce different behaviors
         # Lenient should generally allow more facts than strict
-        assert results["lenient"] >= results["strict"], \
-            f"Lenient ({results['lenient']}) should allow at least as many facts as strict ({results['strict']})"
+        assert (
+            results["lenient"] >= results["strict"]
+        ), f"Lenient ({results['lenient']}) should allow at least as many facts as strict ({results['strict']})"
 
         # All configurations should be functional
         for config_name, count in results.items():
-            assert count >= 0, f"{config_name} configuration failed to extract any facts"
+            assert (
+                count >= 0
+            ), f"{config_name} configuration failed to extract any facts"
 
     def test_vague_language_detection(self, api_url):
         """Test that vague language is properly detected and handled."""
@@ -240,7 +274,9 @@ AI and ML are used in various industries including healthcare, finance, transpor
 
         Machine learning is generally considered a subset of AI. Neural networks are usually effective for pattern recognition. Deep learning often produces good results. Computer vision sometimes works well for image analysis."""
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as f:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".txt", delete=False, encoding="utf-8"
+        ) as f:
             f.write(vague_content)
             temp_file = f.name
 
@@ -249,20 +285,24 @@ AI and ML are used in various industries including healthcare, finance, transpor
                 files = {"file": ("test.txt", f, "text/plain")}
                 data = {
                     "stages": '["markdown-conversion", "chunker", "fact-generator"]',
-                    "stage_configs": json.dumps({
-                        "fact-generator": {
-                            "min_confidence": 0.3,
-                            "strict_validation": False,
-                            "allow_vague_language": True,
-                            "require_entities": False,
-                            "min_fact_length": 10
+                    "stage_configs": json.dumps(
+                        {
+                            "fact-generator": {
+                                "min_confidence": 0.3,
+                                "strict_validation": False,
+                                "allow_vague_language": True,
+                                "require_entities": False,
+                                "min_fact_length": 10,
+                            }
                         }
-                    })
+                    ),
                 }
 
                 response = requests.post(api_url, files=files, data=data, timeout=120)
 
-                assert response.status_code == 200, f"Request failed: {response.status_code}"
+                assert (
+                    response.status_code == 200
+                ), f"Request failed: {response.status_code}"
 
                 result = response.json()
                 facts = self._extract_facts_from_response(result)
@@ -271,13 +311,18 @@ AI and ML are used in various industries including healthcare, finance, transpor
                 assert len(facts) >= 0, "Should handle vague language content"
 
                 # Check if any facts have vague language remarks
-                vague_remarks = [fact for fact in facts
-                               if 'vague language' in fact.get('remarks', '').lower()]
+                vague_remarks = [
+                    fact
+                    for fact in facts
+                    if "vague language" in fact.get("remarks", "").lower()
+                ]
 
                 # With content containing "generally", "usually", "often", "sometimes"
                 # we expect some vague language detection
                 if len(facts) > 0:
-                    assert len(vague_remarks) >= 0, "Should detect vague language patterns"
+                    assert (
+                        len(vague_remarks) >= 0
+                    ), "Should detect vague language patterns"
 
         finally:
             os.unlink(temp_file)
@@ -285,15 +330,15 @@ AI and ML are used in various industries including healthcare, finance, transpor
     def _count_facts(self, result):
         """Count facts in API response."""
         try:
-            for stage in result.get('stages_executed', []):
-                if stage.get('stage_type') == 'fact-generator':
-                    output_files = stage.get('output_files', [])
+            for stage in result.get("stages_executed", []):
+                if stage.get("stage_type") == "fact-generator":
+                    output_files = stage.get("output_files", [])
                     for file_info in output_files:
-                        if 'facts' in file_info.get('filename', ''):
-                            content = file_info.get('content')
+                        if "facts" in file_info.get("filename", ""):
+                            content = file_info.get("content")
                             if content:
                                 facts_data = json.loads(content)
-                                return len(facts_data.get('facts', []))
+                                return len(facts_data.get("facts", []))
             return 0
         except Exception:
             return 0

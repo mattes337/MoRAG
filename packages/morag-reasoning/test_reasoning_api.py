@@ -25,7 +25,7 @@ import json
 import sys
 import time
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
 
 import httpx
 
@@ -70,9 +70,15 @@ async def check_reasoning_status(api_url: str, verbose: bool = False) -> bool:
 
                     config = status_data.get("configuration", {})
                     if config:
-                        print(f"   Max paths: {config.get('max_paths_default', 'unknown')}")
-                        print(f"   Max iterations: {config.get('max_iterations_default', 'unknown')}")
-                        print(f"   Strategies: {config.get('supported_strategies', [])}")
+                        print(
+                            f"   Max paths: {config.get('max_paths_default', 'unknown')}"
+                        )
+                        print(
+                            f"   Max iterations: {config.get('max_iterations_default', 'unknown')}"
+                        )
+                        print(
+                            f"   Strategies: {config.get('supported_strategies', [])}"
+                        )
 
                 return reasoning_available
             else:
@@ -90,7 +96,7 @@ async def test_multi_hop_reasoning_api(
     strategy: str = "forward_chaining",
     max_paths: int = 50,
     max_iterations: int = 5,
-    verbose: bool = False
+    verbose: bool = False,
 ) -> Dict[str, Any]:
     """Test multi-hop reasoning via API."""
 
@@ -109,7 +115,7 @@ async def test_multi_hop_reasoning_api(
         "reasoning_paths": [],
         "refined_context": {},
         "performance": {},
-        "success": False
+        "success": False,
     }
 
     try:
@@ -124,12 +130,11 @@ async def test_multi_hop_reasoning_api(
                 "query": query,
                 "start_entities": ["Apple Inc.", "AI research", "Stanford University"],
                 "strategy": strategy,
-                "max_paths": max_paths
+                "max_paths": max_paths,
             }
 
             response = await client.post(
-                f"{api_url}/reasoning/find-paths",
-                json=path_request
+                f"{api_url}/reasoning/find-paths", json=path_request
             )
 
             if response.status_code != 200:
@@ -150,11 +155,13 @@ async def test_multi_hop_reasoning_api(
             reasoning_paths = path_data.get("paths", [])
 
             if verbose:
-                print(f"✅ Found {len(reasoning_paths)} reasoning paths in {path_finding_time:.2f}s")
+                print(
+                    f"✅ Found {len(reasoning_paths)} reasoning paths in {path_finding_time:.2f}s"
+                )
                 for i, path in enumerate(reasoning_paths[:3]):  # Show top 3
                     print(f"   Path {i+1}: Score {path.get('relevance_score', 0):.2f}")
                     print(f"      Entities: {' -> '.join(path.get('entities', []))}")
-                    if path.get('reasoning'):
+                    if path.get("reasoning"):
                         print(f"      Reasoning: {path['reasoning']}")
 
             results["reasoning_paths"] = reasoning_paths
@@ -170,7 +177,7 @@ async def test_multi_hop_reasoning_api(
                 "entities": {},
                 "relations": [],
                 "documents": [],
-                "paths": reasoning_paths[:5]  # Use top 5 paths
+                "paths": reasoning_paths[:5],  # Use top 5 paths
             }
 
             # Add entities from paths
@@ -181,12 +188,11 @@ async def test_multi_hop_reasoning_api(
             refinement_request = {
                 "query": query,
                 "initial_context": initial_context,
-                "max_iterations": max_iterations
+                "max_iterations": max_iterations,
             }
 
             response = await client.post(
-                f"{api_url}/reasoning/refine-context",
-                json=refinement_request
+                f"{api_url}/reasoning/refine-context", json=refinement_request
             )
 
             if response.status_code != 200:
@@ -208,20 +214,32 @@ async def test_multi_hop_reasoning_api(
 
                 if verbose:
                     print(f"✅ Context refinement completed in {refinement_time:.2f}s")
-                    print(f"   Iterations used: {refined_context.get('iterations_used', 0)}")
-                    print(f"   Final entities: {len(refined_context.get('entities', {}))}")
-                    print(f"   Final documents: {len(refined_context.get('documents', []))}")
+                    print(
+                        f"   Iterations used: {refined_context.get('iterations_used', 0)}"
+                    )
+                    print(
+                        f"   Final entities: {len(refined_context.get('entities', {}))}"
+                    )
+                    print(
+                        f"   Final documents: {len(refined_context.get('documents', []))}"
+                    )
 
-                    final_analysis = refined_context.get('final_analysis')
+                    final_analysis = refined_context.get("final_analysis")
                     if final_analysis:
-                        print(f"   Final confidence: {final_analysis.get('confidence', 0):.2f}")
-                        print(f"   Context sufficient: {final_analysis.get('is_sufficient', False)}")
+                        print(
+                            f"   Final confidence: {final_analysis.get('confidence', 0):.2f}"
+                        )
+                        print(
+                            f"   Context sufficient: {final_analysis.get('is_sufficient', False)}"
+                        )
 
                 results["refined_context"] = refined_context
                 results["performance"]["refinement_time"] = refinement_time
 
             results["performance"]["path_finding_time"] = path_finding_time
-            results["performance"]["total_time"] = path_finding_time + results["performance"].get("refinement_time", 0)
+            results["performance"]["total_time"] = path_finding_time + results[
+                "performance"
+            ].get("refinement_time", 0)
 
             results["success"] = True
 
@@ -240,15 +258,14 @@ async def test_multi_hop_reasoning_api(
         results["error"] = error_msg
         if verbose:
             import traceback
+
             traceback.print_exc()
 
     return results
 
 
 async def test_reasoning_query_endpoint(
-    query: str,
-    api_url: str,
-    verbose: bool = False
+    query: str, api_url: str, verbose: bool = False
 ) -> Dict[str, Any]:
     """Test the unified reasoning query endpoint."""
 
@@ -264,12 +281,11 @@ async def test_reasoning_query_endpoint(
                 "query": query,
                 "use_reasoning": True,
                 "reasoning_strategy": "bidirectional",
-                "max_reasoning_paths": 20
+                "max_reasoning_paths": 20,
             }
 
             response = await client.post(
-                f"{api_url}/reasoning/query",
-                json=request_data
+                f"{api_url}/reasoning/query", json=request_data
             )
 
             query_time = time.time() - start_time
@@ -291,13 +307,21 @@ async def test_reasoning_query_endpoint(
                 print(f"✅ Reasoning query completed in {query_time:.2f}s")
                 print(f"   Answer: {result_data.get('answer', 'No answer')[:200]}...")
                 print(f"   Sources: {len(result_data.get('sources', []))}")
-                print(f"   Reasoning paths used: {len(result_data.get('reasoning_paths', []))}")
+                print(
+                    f"   Reasoning paths used: {len(result_data.get('reasoning_paths', []))}"
+                )
 
-                reasoning_metadata = result_data.get('reasoning_metadata', {})
+                reasoning_metadata = result_data.get("reasoning_metadata", {})
                 if reasoning_metadata:
-                    print(f"   Strategy used: {reasoning_metadata.get('strategy', 'unknown')}")
-                    print(f"   Paths evaluated: {reasoning_metadata.get('paths_evaluated', 0)}")
-                    print(f"   Context iterations: {reasoning_metadata.get('context_iterations', 0)}")
+                    print(
+                        f"   Strategy used: {reasoning_metadata.get('strategy', 'unknown')}"
+                    )
+                    print(
+                        f"   Paths evaluated: {reasoning_metadata.get('paths_evaluated', 0)}"
+                    )
+                    print(
+                        f"   Context iterations: {reasoning_metadata.get('context_iterations', 0)}"
+                    )
 
             return {
                 "success": True,
@@ -305,7 +329,7 @@ async def test_reasoning_query_endpoint(
                 "answer": result_data.get("answer", ""),
                 "sources": result_data.get("sources", []),
                 "reasoning_paths": result_data.get("reasoning_paths", []),
-                "reasoning_metadata": result_data.get("reasoning_metadata", {})
+                "reasoning_metadata": result_data.get("reasoning_metadata", {}),
             }
 
     except Exception as e:
@@ -314,10 +338,12 @@ async def test_reasoning_query_endpoint(
         return {"success": False, "error": error_msg}
 
 
-def save_results(results: Dict[str, Any], output_file: Path, verbose: bool = False) -> bool:
+def save_results(
+    results: Dict[str, Any], output_file: Path, verbose: bool = False
+) -> bool:
     """Save test results to JSON file."""
     try:
-        with open(output_file, 'w', encoding='utf-8') as f:
+        with open(output_file, "w", encoding="utf-8") as f:
             json.dump(results, f, indent=2, ensure_ascii=False)
 
         if verbose:
@@ -339,20 +365,16 @@ async def main():
   python test_reasoning_api.py "How are Apple's AI research efforts related to their partnership with universities?"
   python test_reasoning_api.py "What connects Steve Jobs to iPhone development?" --strategy bidirectional
   python test_reasoning_api.py "How does AI research influence product development?" --verbose --output results.json
-"""
+""",
     )
 
-    parser.add_argument(
-        "query",
-        type=str,
-        help="Multi-hop reasoning query to test"
-    )
+    parser.add_argument("query", type=str, help="Multi-hop reasoning query to test")
 
     parser.add_argument(
         "--api-url",
         type=str,
         default="http://localhost:8000",
-        help="MoRAG API base URL (default: http://localhost:8000)"
+        help="MoRAG API base URL (default: http://localhost:8000)",
     )
 
     parser.add_argument(
@@ -360,39 +382,33 @@ async def main():
         type=str,
         choices=["forward_chaining", "backward_chaining", "bidirectional"],
         default="forward_chaining",
-        help="Reasoning strategy to use (default: forward_chaining)"
+        help="Reasoning strategy to use (default: forward_chaining)",
     )
 
     parser.add_argument(
         "--max-paths",
         type=int,
         default=50,
-        help="Maximum number of paths to discover (default: 50)"
+        help="Maximum number of paths to discover (default: 50)",
     )
 
     parser.add_argument(
         "--max-iterations",
         type=int,
         default=5,
-        help="Maximum context refinement iterations (default: 5)"
+        help="Maximum context refinement iterations (default: 5)",
     )
 
     parser.add_argument(
-        "--verbose",
-        action="store_true",
-        help="Show detailed reasoning output"
+        "--verbose", action="store_true", help="Show detailed reasoning output"
     )
 
-    parser.add_argument(
-        "--output",
-        type=str,
-        help="Save results to JSON file"
-    )
+    parser.add_argument("--output", type=str, help="Save results to JSON file")
 
     parser.add_argument(
         "--test-unified",
         action="store_true",
-        help="Test the unified reasoning query endpoint instead of individual components"
+        help="Test the unified reasoning query endpoint instead of individual components",
     )
 
     args = parser.parse_args()
@@ -415,9 +431,7 @@ async def main():
         if args.test_unified:
             # Test unified reasoning endpoint
             results = await test_reasoning_query_endpoint(
-                query=args.query,
-                api_url=args.api_url,
-                verbose=args.verbose
+                query=args.query, api_url=args.api_url, verbose=args.verbose
             )
         else:
             # Test individual reasoning components
@@ -427,7 +441,7 @@ async def main():
                 strategy=args.strategy,
                 max_paths=args.max_paths,
                 max_iterations=args.max_iterations,
-                verbose=args.verbose
+                verbose=args.verbose,
             )
 
         if not results.get("success", False):
@@ -452,6 +466,7 @@ async def main():
         print(f"\n❌ Test failed: {e}")
         if args.verbose:
             import traceback
+
             traceback.print_exc()
         return 1
 

@@ -1,11 +1,11 @@
 """Unit tests for BaseStorage class."""
 
-import pytest
 from typing import List, Optional
 
-from morag_graph.storage.base import BaseStorage
-from morag_graph.models import Entity, Relation, Graph
+import pytest
+from morag_graph.models import Entity, Graph, Relation
 from morag_graph.models.types import EntityId, RelationId
+from morag_graph.storage.base import BaseStorage
 
 
 class MockStorage(BaseStorage):
@@ -58,10 +58,7 @@ class MockStorage(BaseStorage):
         return entities
 
     async def search_entities(
-        self,
-        query: str,
-        entity_type: Optional[str] = None,
-        limit: int = 10
+        self, query: str, entity_type: Optional[str] = None, limit: int = 10
     ) -> List[Entity]:
         """Search for entities by name or attributes."""
         results = []
@@ -127,7 +124,7 @@ class MockStorage(BaseStorage):
         self,
         entity_id: EntityId,
         relation_type: Optional[str] = None,
-        direction: str = "both"
+        direction: str = "both",
     ) -> List[Relation]:
         """Get all relations for an entity."""
         relation_ids = self._entity_relations.get(entity_id, [])
@@ -168,14 +165,18 @@ class MockStorage(BaseStorage):
         self,
         entity_id: EntityId,
         relation_type: Optional[str] = None,
-        max_depth: int = 1
+        max_depth: int = 1,
     ) -> List[Entity]:
         """Get neighboring entities."""
         neighbors = []
         relations = await self.get_entity_relations(entity_id, relation_type)
 
         for relation in relations:
-            neighbor_id = relation.target_id if relation.source_id == entity_id else relation.source_id
+            neighbor_id = (
+                relation.target_id
+                if relation.source_id == entity_id
+                else relation.source_id
+            )
             neighbor = await self.get_entity(neighbor_id)
             if neighbor:
                 neighbors.append(neighbor)
@@ -183,10 +184,7 @@ class MockStorage(BaseStorage):
         return neighbors
 
     async def find_path(
-        self,
-        source_entity_id: EntityId,
-        target_entity_id: EntityId,
-        max_depth: int = 3
+        self, source_entity_id: EntityId, target_entity_id: EntityId, max_depth: int = 3
     ) -> List[List[EntityId]]:
         """Find paths between two entities."""
         # Simple implementation for testing
@@ -211,7 +209,10 @@ class MockStorage(BaseStorage):
             # Get relations between these entities
             relations = []
             for relation in self._relations.values():
-                if relation.source_id in entity_ids and relation.target_id in entity_ids:
+                if (
+                    relation.source_id in entity_ids
+                    and relation.target_id in entity_ids
+                ):
                     relations.append(relation)
 
         return Graph(entities=entities, relations=relations)
@@ -227,7 +228,7 @@ class MockStorage(BaseStorage):
         return {
             "entity_count": len(self._entities),
             "relation_count": len(self._relations),
-            "connected": self._connected
+            "connected": self._connected,
         }
 
 
@@ -248,7 +249,7 @@ class TestBaseStorage:
             id="test_entity",
             name="Test Entity",
             type="Person",
-            attributes={"age": 30, "occupation": "Engineer"}
+            attributes={"age": 30, "occupation": "Engineer"},
         )
 
     @pytest.fixture
@@ -259,7 +260,7 @@ class TestBaseStorage:
             source_id="entity_1",
             target_id="entity_2",
             type="WORKS_WITH",
-            attributes={"since": "2020"}
+            attributes={"since": "2020"},
         )
 
     async def test_connection_lifecycle(self):
@@ -305,7 +306,7 @@ class TestBaseStorage:
         entities = [
             Entity(id="e1", name="Entity 1", type="Person"),
             Entity(id="e2", name="Entity 2", type="Company"),
-            Entity(id="e3", name="Entity 3", type="Location")
+            Entity(id="e3", name="Entity 3", type="Location"),
         ]
 
         entity_ids = await mock_storage.store_entities(entities)
@@ -328,7 +329,7 @@ class TestBaseStorage:
         entities = [
             Entity(id="e1", name="John Doe", type="Person"),
             Entity(id="e2", name="Jane Doe", type="Person"),
-            Entity(id="e3", name="Acme Corp", type="Company")
+            Entity(id="e3", name="Acme Corp", type="Company"),
         ]
         await mock_storage.store_entities(entities)
 
@@ -353,10 +354,7 @@ class TestBaseStorage:
 
         # Update entity
         updated_entity = Entity(
-            id=entity_id,
-            name="Updated Entity",
-            type="Person",
-            attributes={"age": 31}
+            id=entity_id, name="Updated Entity", type="Person", attributes={"age": 31}
         )
 
         result = await mock_storage.update_entity(updated_entity)
@@ -421,8 +419,12 @@ class TestBaseStorage:
         entity2_id = await mock_storage.store_entity(entity2)
 
         # Store relations
-        relation1 = Relation(id="r1", source_id=entity1_id, target_id=entity2_id, type="KNOWS")
-        relation2 = Relation(id="r2", source_id=entity2_id, target_id=entity1_id, type="WORKS_WITH")
+        relation1 = Relation(
+            id="r1", source_id=entity1_id, target_id=entity2_id, type="KNOWS"
+        )
+        relation2 = Relation(
+            id="r2", source_id=entity2_id, target_id=entity1_id, type="WORKS_WITH"
+        )
         await mock_storage.store_relation(relation1)
         await mock_storage.store_relation(relation2)
 
@@ -431,17 +433,23 @@ class TestBaseStorage:
         assert len(relations) == 2
 
         # Get outgoing relations only
-        out_relations = await mock_storage.get_entity_relations(entity1_id, direction="out")
+        out_relations = await mock_storage.get_entity_relations(
+            entity1_id, direction="out"
+        )
         assert len(out_relations) == 1
         assert out_relations[0].source_id == entity1_id
 
         # Get incoming relations only
-        in_relations = await mock_storage.get_entity_relations(entity1_id, direction="in")
+        in_relations = await mock_storage.get_entity_relations(
+            entity1_id, direction="in"
+        )
         assert len(in_relations) == 1
         assert in_relations[0].target_id == entity1_id
 
         # Filter by relation type
-        knows_relations = await mock_storage.get_entity_relations(entity1_id, relation_type="KNOWS")
+        knows_relations = await mock_storage.get_entity_relations(
+            entity1_id, relation_type="KNOWS"
+        )
         assert len(knows_relations) == 1
         assert knows_relations[0].type == "KNOWS"
 
@@ -456,8 +464,12 @@ class TestBaseStorage:
         entity3_id = await mock_storage.store_entity(entity3)
 
         # Store relations
-        relation1 = Relation(id="r1", source_id=entity1_id, target_id=entity2_id, type="KNOWS")
-        relation2 = Relation(id="r2", source_id=entity1_id, target_id=entity3_id, type="WORKS_FOR")
+        relation1 = Relation(
+            id="r1", source_id=entity1_id, target_id=entity2_id, type="KNOWS"
+        )
+        relation2 = Relation(
+            id="r2", source_id=entity1_id, target_id=entity3_id, type="WORKS_FOR"
+        )
         await mock_storage.store_relation(relation1)
         await mock_storage.store_relation(relation2)
 
@@ -466,7 +478,9 @@ class TestBaseStorage:
         assert len(neighbors) == 2
 
         # Get neighbors by relation type
-        work_neighbors = await mock_storage.get_neighbors(entity1_id, relation_type="WORKS_FOR")
+        work_neighbors = await mock_storage.get_neighbors(
+            entity1_id, relation_type="WORKS_FOR"
+        )
         assert len(work_neighbors) == 1
         assert work_neighbors[0].type == "Company"
 
@@ -505,11 +519,9 @@ class TestBaseStorage:
         # Create a sample graph
         entities = [
             Entity(id="e1", name="Entity 1", type="Person"),
-            Entity(id="e2", name="Entity 2", type="Person")
+            Entity(id="e2", name="Entity 2", type="Person"),
         ]
-        relations = [
-            Relation(id="r1", source_id="e1", target_id="e2", type="KNOWS")
-        ]
+        relations = [Relation(id="r1", source_id="e1", target_id="e2", type="KNOWS")]
         graph = Graph(entities=entities, relations=relations)
 
         # Store the graph

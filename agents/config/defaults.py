@@ -1,7 +1,8 @@
 """Default configurations for agents."""
 
 from typing import Dict
-from ..base.config import AgentConfig, PromptConfig, ModelConfig, RetryConfig
+
+from ..base.config import AgentConfig, ModelConfig, PromptConfig, RetryConfig
 from .entity_types import get_agent_entity_types
 
 
@@ -18,13 +19,9 @@ class DefaultConfigs:
                 provider="gemini",
                 model="gemini-1.5-flash",
                 temperature=0.1,
-                max_tokens=4000
+                max_tokens=4000,
             ),
-            retry=RetryConfig(
-                max_retries=3,
-                base_delay=1.0,
-                max_delay=60.0
-            ),
+            retry=RetryConfig(max_retries=3, base_delay=1.0, max_delay=60.0),
             prompt=PromptConfig(
                 domain="general",
                 include_examples=True,
@@ -32,14 +29,14 @@ class DefaultConfigs:
                 output_format="json",
                 strict_json=True,
                 include_confidence=True,
-                min_confidence=0.3
+                min_confidence=0.3,
             ),
             agent_config={
                 "max_facts": 20,
                 "focus_on_actionable": True,
                 "include_technical_details": True,
-                "filter_generic_advice": True
-            }
+                "filter_generic_advice": True,
+            },
         )
 
     @staticmethod
@@ -52,21 +49,21 @@ class DefaultConfigs:
                 provider="gemini",
                 model="gemini-1.5-flash",
                 temperature=0.1,
-                max_tokens=4000
+                max_tokens=4000,
             ),
             prompt=PromptConfig(
                 domain="general",
                 include_examples=True,
                 output_format="json",
                 strict_json=True,
-                min_confidence=0.4
+                min_confidence=0.4,
             ),
             agent_config={
                 "entity_types": get_agent_entity_types("entity_extraction"),
                 "include_offsets": True,
                 "normalize_entities": True,
-                "min_entity_length": 2
-            }
+                "min_entity_length": 2,
+            },
         )
 
     @staticmethod
@@ -79,21 +76,21 @@ class DefaultConfigs:
                 provider="gemini",
                 model="gemini-1.5-flash",
                 temperature=0.1,
-                max_tokens=2000
+                max_tokens=2000,
             ),
             prompt=PromptConfig(
                 domain="general",
                 include_examples=True,
                 output_format="json",
                 strict_json=True,
-                min_confidence=0.7
+                min_confidence=0.7,
             ),
             agent_config={
                 "extract_entities": True,
                 "extract_keywords": True,
                 "analyze_complexity": True,
-                "detect_temporal_context": True
-            }
+                "detect_temporal_context": True,
+            },
         )
 
     @staticmethod
@@ -106,20 +103,20 @@ class DefaultConfigs:
                 provider="gemini",
                 model="gemini-1.5-flash",
                 temperature=0.2,
-                max_tokens=2000
+                max_tokens=2000,
             ),
             prompt=PromptConfig(
                 domain="general",
                 include_examples=True,
                 output_format="json",
-                strict_json=True
+                strict_json=True,
             ),
             agent_config={
                 "max_summary_length": 1000,
                 "summary_type": "abstractive",
                 "include_key_points": True,
-                "compression_ratio": 0.3
-            }
+                "compression_ratio": 0.3,
+            },
         )
 
     @staticmethod
@@ -132,20 +129,20 @@ class DefaultConfigs:
                 provider="gemini",
                 model="gemini-1.5-flash",
                 temperature=0.1,
-                max_tokens=3000
+                max_tokens=3000,
             ),
             prompt=PromptConfig(
                 domain="general",
                 include_examples=True,
                 output_format="json",
-                strict_json=True
+                strict_json=True,
             ),
             agent_config={
                 "max_paths": 10,
                 "strategy": "bidirectional",
                 "min_relevance_threshold": 0.6,
-                "consider_path_length": True
-            }
+                "consider_path_length": True,
+            },
         )
 
     @staticmethod
@@ -290,8 +287,8 @@ class DefaultConfigs:
             agent_config={
                 "max_chunk_size": 4000,
                 "min_chunk_size": 500,
-                "overlap": 100
-            }
+                "overlap": 100,
+            },
         )
 
     @staticmethod

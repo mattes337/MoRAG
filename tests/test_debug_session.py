@@ -1,13 +1,14 @@
 """Tests for the PowerShell debug session script."""
 
-import pytest
+import os
 import subprocess
 import sys
-import os
 import time
-import requests
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
+import pytest
+import requests
 
 
 class TestDebugSession:
@@ -26,9 +27,11 @@ class TestDebugSession:
     def test_script_has_execution_policy(self):
         """Test that the script can be executed."""
         # Check if script has proper PowerShell shebang
-        with open(self.script_path, 'r', encoding='utf-8') as f:
+        with open(self.script_path, "r", encoding="utf-8") as f:
             first_line = f.readline().strip()
-            assert first_line.startswith('#!/usr/bin/env pwsh'), "Script should have PowerShell shebang"
+            assert first_line.startswith(
+                "#!/usr/bin/env pwsh"
+            ), "Script should have PowerShell shebang"
 
     def test_script_help_parameter(self):
         """Test that the script shows help when -Help parameter is used."""
@@ -36,14 +39,25 @@ class TestDebugSession:
             pytest.skip("PowerShell tests only run on Windows")
 
         try:
-            result = subprocess.run([
-                "powershell", "-ExecutionPolicy", "Bypass",
-                "-File", str(self.script_path), "-Help"
-            ], capture_output=True, text=True, timeout=30)
+            result = subprocess.run(
+                [
+                    "powershell",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(self.script_path),
+                    "-Help",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
 
             # Should exit with code 0 and show help
             assert result.returncode == 0, f"Help should succeed, got: {result.stderr}"
-            assert "SYNOPSIS" in result.stdout or "DESCRIPTION" in result.stdout, "Should show help content"
+            assert (
+                "SYNOPSIS" in result.stdout or "DESCRIPTION" in result.stdout
+            ), "Should show help content"
 
         except subprocess.TimeoutExpired:
             pytest.fail("Script help timed out")
@@ -57,13 +71,23 @@ class TestDebugSession:
 
         try:
             # Use PowerShell to validate syntax without executing
-            result = subprocess.run([
-                "powershell", "-ExecutionPolicy", "Bypass",
-                "-Command", f"Get-Content '{self.script_path}' | Out-String | Invoke-Expression"
-            ], capture_output=True, text=True, timeout=10)
+            result = subprocess.run(
+                [
+                    "powershell",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-Command",
+                    f"Get-Content '{self.script_path}' | Out-String | Invoke-Expression",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
 
             # Should not have syntax errors
-            assert "syntax error" not in result.stderr.lower(), f"Syntax error found: {result.stderr}"
+            assert (
+                "syntax error" not in result.stderr.lower()
+            ), f"Syntax error found: {result.stderr}"
 
         except subprocess.TimeoutExpired:
             pytest.fail("Syntax validation timed out")
@@ -79,6 +103,7 @@ class TestDebugSession:
             dir_path = Path(dir_name)
             if dir_path.exists():
                 import shutil
+
                 shutil.rmtree(dir_path, ignore_errors=True)
 
         # Mock the script execution for directory creation
@@ -96,7 +121,7 @@ class TestDebugSession:
     def test_prerequisites_check(self):
         """Test the prerequisites checking functionality."""
         # Mock the prerequisites check
-        with patch('subprocess.run') as mock_run:
+        with patch("subprocess.run") as mock_run:
             # Mock successful Python check
             mock_run.return_value.returncode = 0
             mock_run.return_value.stdout = "Python 3.11.0"
@@ -116,10 +141,11 @@ class TestDebugSession:
         # Clean up any existing test venv
         if venv_path.exists():
             import shutil
+
             shutil.rmtree(venv_path, ignore_errors=True)
 
         # Mock venv creation
-        with patch('subprocess.run') as mock_run:
+        with patch("subprocess.run") as mock_run:
             mock_run.return_value.returncode = 0
 
             from scripts.debug_session_functions import setup_virtual_environment
@@ -133,11 +159,12 @@ class TestDebugSession:
         # Clean up
         if venv_path.exists():
             import shutil
+
             shutil.rmtree(venv_path, ignore_errors=True)
 
     def test_dependency_installation(self):
         """Test dependency installation process."""
-        with patch('subprocess.run') as mock_run:
+        with patch("subprocess.run") as mock_run:
             mock_run.return_value.returncode = 0
 
             from scripts.debug_session_functions import install_dependencies
@@ -156,7 +183,7 @@ class TestDebugSession:
         from scripts.debug_session_functions import check_service_health
 
         # Test Redis health check
-        with patch('subprocess.run') as mock_run:
+        with patch("subprocess.run") as mock_run:
             mock_run.return_value.stdout = "PONG"
             mock_run.return_value.returncode = 0
 
@@ -164,7 +191,7 @@ class TestDebugSession:
             assert result is True, "Redis health check should pass with PONG response"
 
         # Test Qdrant health check
-        with patch('requests.get') as mock_get:
+        with patch("requests.get") as mock_get:
             mock_response = MagicMock()
             mock_response.status_code = 200
             mock_response.json.return_value = {"status": "ok"}
@@ -181,14 +208,18 @@ class TestDebugSession:
         env_vars = setup_environment_variables(test_mode=False, log_level="DEBUG")
 
         assert env_vars["LOG_LEVEL"] == "DEBUG", "Log level should be set correctly"
-        assert env_vars["LOG_FORMAT"] == "console", "Log format should be console for debugging"
+        assert (
+            env_vars["LOG_FORMAT"] == "console"
+        ), "Log format should be console for debugging"
         assert "PYTHONPATH" in env_vars, "PYTHONPATH should be set"
 
         # Test test mode
         env_vars = setup_environment_variables(test_mode=True, log_level="INFO")
 
         assert "test" in env_vars["REDIS_URL"], "Test mode should use test Redis DB"
-        assert "test" in env_vars["QDRANT_COLLECTION_NAME"], "Test mode should use test collection"
+        assert (
+            "test" in env_vars["QDRANT_COLLECTION_NAME"]
+        ), "Test mode should use test collection"
 
     def test_logging_functionality(self):
         """Test the logging functionality."""
@@ -209,7 +240,7 @@ class TestDebugSession:
         # Verify log file was created and contains message
         assert log_file.exists(), "Log file should be created"
 
-        with open(log_file, 'r') as f:
+        with open(log_file, "r") as f:
             content = f.read()
             assert "Test message" in content, "Log message should be in file"
             assert "[INFO]" in content, "Log level should be in file"
@@ -222,11 +253,11 @@ class TestDebugSession:
         """Test error handling and cleanup."""
         from scripts.debug_session_functions import handle_error, stop_services
 
-        with patch('subprocess.run') as mock_run:
+        with patch("subprocess.run") as mock_run:
             mock_run.return_value.returncode = 0
 
             # Test error handling calls cleanup
-            with patch('scripts.debug_session_functions.stop_services') as mock_stop:
+            with patch("scripts.debug_session_functions.stop_services") as mock_stop:
                 try:
                     handle_error("Test error", "Test context")
                 except SystemExit:
@@ -242,15 +273,28 @@ class TestDebugSession:
 
         try:
             # Run script in test mode with short timeout
-            result = subprocess.run([
-                "powershell", "-ExecutionPolicy", "Bypass",
-                "-File", str(self.script_path),
-                "-TestMode", "-SkipDependencies", "-SkipServices"
-            ], capture_output=True, text=True, timeout=60)
+            result = subprocess.run(
+                [
+                    "powershell",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(self.script_path),
+                    "-TestMode",
+                    "-SkipDependencies",
+                    "-SkipServices",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
 
             # Should complete without major errors
             # (May have warnings but shouldn't crash)
-            assert result.returncode in [0, 1], f"Script should complete, got: {result.stderr}"
+            assert result.returncode in [
+                0,
+                1,
+            ], f"Script should complete, got: {result.stderr}"
 
         except subprocess.TimeoutExpired:
             pytest.fail("Script execution timed out")
@@ -274,8 +318,9 @@ class DebugSessionFunctions:
     def test_prerequisites():
         """Check if prerequisites are available."""
         try:
-            result = subprocess.run(["python", "--version"],
-                                  capture_output=True, text=True)
+            result = subprocess.run(
+                ["python", "--version"], capture_output=True, text=True
+            )
             if result.returncode != 0:
                 raise SystemExit("Python not found")
         except FileNotFoundError:
@@ -297,8 +342,11 @@ class DebugSessionFunctions:
     def check_service_health(service):
         """Check service health."""
         if service == "redis":
-            result = subprocess.run(["docker", "exec", "morag-redis", "redis-cli", "ping"],
-                                  capture_output=True, text=True)
+            result = subprocess.run(
+                ["docker", "exec", "morag-redis", "redis-cli", "ping"],
+                capture_output=True,
+                text=True,
+            )
             return result.stdout.strip() == "PONG"
         elif service == "qdrant":
             try:
@@ -314,14 +362,16 @@ class DebugSessionFunctions:
         env_vars = {
             "LOG_LEVEL": log_level,
             "LOG_FORMAT": "console",
-            "PYTHONPATH": str(Path.cwd() / "src")
+            "PYTHONPATH": str(Path.cwd() / "src"),
         }
 
         if test_mode:
-            env_vars.update({
-                "REDIS_URL": "redis://localhost:6379/15",
-                "QDRANT_COLLECTION_NAME": "test_morag_documents"
-            })
+            env_vars.update(
+                {
+                    "REDIS_URL": "redis://localhost:6379/15",
+                    "QDRANT_COLLECTION_NAME": "test_morag_documents",
+                }
+            )
 
         return env_vars
 
@@ -334,7 +384,7 @@ class DebugSessionFunctions:
         log_entry = f"[{timestamp}] [{level}] {message}\n"
 
         Path(log_file).parent.mkdir(exist_ok=True)
-        with open(log_file, 'a', encoding='utf-8') as f:
+        with open(log_file, "a", encoding="utf-8") as f:
             f.write(log_entry)
 
     @staticmethod
@@ -348,14 +398,19 @@ class DebugSessionFunctions:
     def stop_services():
         """Stop Docker services."""
         try:
-            subprocess.run(["docker-compose", "-f", "docker/docker-compose.redis.yml", "down"],
-                         capture_output=True)
-            subprocess.run(["docker-compose", "-f", "docker/docker-compose.qdrant.yml", "down"],
-                         capture_output=True)
+            subprocess.run(
+                ["docker-compose", "-f", "docker/docker-compose.redis.yml", "down"],
+                capture_output=True,
+            )
+            subprocess.run(
+                ["docker-compose", "-f", "docker/docker-compose.qdrant.yml", "down"],
+                capture_output=True,
+            )
         except:
             pass
 
 
 # Make functions available for import
 import sys
-sys.modules['scripts.debug_session_functions'] = DebugSessionFunctions
+
+sys.modules["scripts.debug_session_functions"] = DebugSessionFunctions

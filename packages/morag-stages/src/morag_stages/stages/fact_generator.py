@@ -8,9 +8,10 @@ The main functionality is now distributed across:
 This file provides backward compatibility.
 """
 
+from .fact_extraction_engine import FactExtractionEngine
+
 # Re-export the split components for backward compatibility
 from .fact_generation_stage import FactGeneratorStage
-from .fact_extraction_engine import FactExtractionEngine
 
 # Maintain backward compatibility by exporting the main class
 __all__ = ["FactGeneratorStage", "FactExtractionEngine"]

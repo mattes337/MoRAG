@@ -1,45 +1,48 @@
 """Tests for the YouTube processor module."""
 
-import pytest
 import os
-from pathlib import Path
 import tempfile
-from unittest.mock import patch, MagicMock
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 
-from morag_youtube.processor import YouTubeProcessor, YouTubeConfig, YouTubeMetadata
+import pytest
+from morag_youtube.processor import YouTubeConfig, YouTubeMetadata, YouTubeProcessor
 
 # Sample metadata for mocking
 SAMPLE_METADATA = {
-    'id': 'dQw4w9WgXcQ',
-    'title': 'Rick Astley - Never Gonna Give You Up (Official Music Video)',
-    'description': 'Sample description',
-    'uploader': 'Rick Astley',
-    'upload_date': '20091025',
-    'duration': 213.0,
-    'view_count': 1000000,
-    'like_count': 50000,
-    'comment_count': 10000,
-    'tags': ['Rick Astley', 'Never Gonna Give You Up'],
-    'categories': ['Music'],
-    'thumbnail_url': 'https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg',
-    'webpage_url': 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
-    'channel_id': 'UCuAXFkgsw1L7xaCfnd5JJOw',
-    'channel_url': 'https://www.youtube.com/channel/UCuAXFkgsw1L7xaCfnd5JJOw',
-    'playlist_id': None,
-    'playlist_title': None,
-    'playlist_index': None,
+    "id": "dQw4w9WgXcQ",
+    "title": "Rick Astley - Never Gonna Give You Up (Official Music Video)",
+    "description": "Sample description",
+    "uploader": "Rick Astley",
+    "upload_date": "20091025",
+    "duration": 213.0,
+    "view_count": 1000000,
+    "like_count": 50000,
+    "comment_count": 10000,
+    "tags": ["Rick Astley", "Never Gonna Give You Up"],
+    "categories": ["Music"],
+    "thumbnail_url": "https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg",
+    "webpage_url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    "channel_id": "UCuAXFkgsw1L7xaCfnd5JJOw",
+    "channel_url": "https://www.youtube.com/channel/UCuAXFkgsw1L7xaCfnd5JJOw",
+    "playlist_id": None,
+    "playlist_title": None,
+    "playlist_index": None,
 }
+
 
 @pytest.fixture
 def youtube_processor():
     """Create a YouTubeProcessor instance for testing."""
     return YouTubeProcessor()
 
+
 @pytest.fixture
 def temp_dir():
     """Create a temporary directory for test files."""
     with tempfile.TemporaryDirectory() as tmpdirname:
         yield Path(tmpdirname)
+
 
 @pytest.mark.asyncio
 async def test_youtube_config_defaults():
@@ -61,6 +64,7 @@ async def test_youtube_config_defaults():
     assert config.cookies_file is None
     assert config.transcript_only is False
 
+
 @pytest.mark.asyncio
 async def test_supports_format(youtube_processor):
     """Test that the processor correctly identifies supported formats."""
@@ -70,14 +74,16 @@ async def test_supports_format(youtube_processor):
     assert youtube_processor.supports_format("video") is False
     assert youtube_processor.supports_format("mp4") is False
 
+
 @pytest.mark.asyncio
 async def test_process_file_not_supported(youtube_processor):
     """Test that process() method raises an error as expected."""
     with pytest.raises(Exception):
         await youtube_processor.process(Path("test.txt"))
 
+
 @pytest.mark.asyncio
-@patch('morag_youtube.external_service.YouTubeExternalService.transcribe_video')
+@patch("morag_youtube.external_service.YouTubeExternalService.transcribe_video")
 async def test_process_url_transcribe_only(mock_transcribe, youtube_processor):
     """Test processing URL for transcription only."""
     # Configure the mock
@@ -89,7 +95,7 @@ async def test_process_url_transcribe_only(mock_transcribe, youtube_processor):
                 {"text": "Never gonna give you up", "start": 0.0, "duration": 3.0}
             ]
         },
-        "transcript_languages": [{"language": "en"}]
+        "transcript_languages": [{"language": "en"}],
     }
 
     # Call the method
@@ -99,17 +105,18 @@ async def test_process_url_transcribe_only(mock_transcribe, youtube_processor):
 
     # Verify the result
     assert result.success
-    assert result.metadata.id == SAMPLE_METADATA['id']
-    assert result.metadata.title == SAMPLE_METADATA['title']
+    assert result.metadata.id == SAMPLE_METADATA["id"]
+    assert result.metadata.title == SAMPLE_METADATA["title"]
     assert result.transcript is not None
 
     # Verify the mock was called correctly
     mock_transcribe.assert_called_once()
     mock_instance.extract_info.assert_called_once_with(url, download=False)
 
+
 @pytest.mark.asyncio
-@patch('morag_youtube.processor.YouTubeProcessor._extract_metadata_only')
-@patch('morag_youtube.processor.YouTubeProcessor._download_video')
+@patch("morag_youtube.processor.YouTubeProcessor._extract_metadata_only")
+@patch("morag_youtube.processor.YouTubeProcessor._download_video")
 async def test_process_url(mock_download, mock_metadata, youtube_processor):
     """Test processing a URL with both metadata extraction and download."""
     # Configure the mocks
@@ -117,12 +124,12 @@ async def test_process_url(mock_download, mock_metadata, youtube_processor):
     mock_metadata.return_value = metadata
 
     mock_download.return_value = {
-        'video_path': Path('/tmp/video.mp4'),
-        'audio_path': Path('/tmp/audio.mp3'),
-        'subtitle_paths': [Path('/tmp/subs.vtt')],
-        'thumbnail_paths': [Path('/tmp/thumb.jpg')],
-        'file_size': 10000,
-        'temp_files': [Path('/tmp/video.mp4'), Path('/tmp/audio.mp3')]
+        "video_path": Path("/tmp/video.mp4"),
+        "audio_path": Path("/tmp/audio.mp3"),
+        "subtitle_paths": [Path("/tmp/subs.vtt")],
+        "thumbnail_paths": [Path("/tmp/thumb.jpg")],
+        "file_size": 10000,
+        "temp_files": [Path("/tmp/video.mp4"), Path("/tmp/audio.mp3")],
     }
 
     # Call the method
@@ -132,20 +139,21 @@ async def test_process_url(mock_download, mock_metadata, youtube_processor):
     # Verify the result
     assert result.success is True
     assert result.metadata == metadata
-    assert result.video_path == Path('/tmp/video.mp4')
-    assert result.audio_path == Path('/tmp/audio.mp3')
+    assert result.video_path == Path("/tmp/video.mp4")
+    assert result.audio_path == Path("/tmp/audio.mp3")
     assert len(result.subtitle_paths) == 1
-    assert result.subtitle_paths[0] == Path('/tmp/subs.vtt')
+    assert result.subtitle_paths[0] == Path("/tmp/subs.vtt")
     assert len(result.thumbnail_paths) == 1
-    assert result.thumbnail_paths[0] == Path('/tmp/thumb.jpg')
+    assert result.thumbnail_paths[0] == Path("/tmp/thumb.jpg")
     assert result.file_size == 10000
 
     # Verify the mocks were called correctly
     mock_metadata.assert_called_once_with(url)
     mock_download.assert_called_once()
 
+
 @pytest.mark.asyncio
-@patch('morag_youtube.processor.YouTubeProcessor._extract_metadata_only')
+@patch("morag_youtube.processor.YouTubeProcessor._extract_metadata_only")
 async def test_process_url_metadata_only(mock_metadata, youtube_processor):
     """Test processing a URL with metadata extraction only."""
     # Configure the mock
@@ -169,9 +177,10 @@ async def test_process_url_metadata_only(mock_metadata, youtube_processor):
     # Verify the mock was called correctly
     mock_metadata.assert_called_once_with(url)
 
+
 @pytest.mark.asyncio
-@patch('yt_dlp.YoutubeDL')
-@patch('asyncio.to_thread')
+@patch("yt_dlp.YoutubeDL")
+@patch("asyncio.to_thread")
 async def test_download_video(mock_to_thread, mock_ytdl, youtube_processor, temp_dir):
     """Test downloading a video."""
     # Create test files to simulate download
@@ -191,38 +200,39 @@ async def test_download_video(mock_to_thread, mock_ytdl, youtube_processor, temp
     mock_to_thread.return_value = SAMPLE_METADATA
 
     # Patch the temp_dir to use our test directory
-    with patch.object(youtube_processor, 'temp_dir', temp_dir):
+    with patch.object(youtube_processor, "temp_dir", temp_dir):
         # Call the method
         url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
         config = YouTubeConfig()
         result = await youtube_processor._download_video(url, config)
 
         # Verify the result contains the expected files
-        assert 'video_path' in result
-        assert 'audio_path' in result
-        assert 'subtitle_paths' in result
-        assert 'thumbnail_paths' in result
-        assert 'file_size' in result
-        assert 'temp_files' in result
+        assert "video_path" in result
+        assert "audio_path" in result
+        assert "subtitle_paths" in result
+        assert "thumbnail_paths" in result
+        assert "file_size" in result
+        assert "temp_files" in result
 
         # Verify the mock was called correctly
         mock_ytdl.assert_called_once()
         mock_to_thread.assert_called_once()
 
+
 @pytest.mark.asyncio
-@patch('morag_youtube.processor.YouTubeProcessor.process_url')
+@patch("morag_youtube.processor.YouTubeProcessor.process_url")
 async def test_process_playlist(mock_process_url, youtube_processor):
     """Test processing a playlist."""
     # Configure the mock for extract_info to return playlist info
     playlist_info = {
-        'entries': [
-            {'url': 'https://www.youtube.com/watch?v=video1'},
-            {'url': 'https://www.youtube.com/watch?v=video2'},
+        "entries": [
+            {"url": "https://www.youtube.com/watch?v=video1"},
+            {"url": "https://www.youtube.com/watch?v=video2"},
         ]
     }
 
     # Mock YoutubeDL for playlist extraction
-    with patch('yt_dlp.YoutubeDL') as mock_ytdl:
+    with patch("yt_dlp.YoutubeDL") as mock_ytdl:
         mock_instance = MagicMock()
         mock_ytdl.return_value.__enter__.return_value = mock_instance
         mock_instance.extract_info.return_value = playlist_info
@@ -244,8 +254,12 @@ async def test_process_playlist(mock_process_url, youtube_processor):
 
         # Verify process_url was called for each video
         assert mock_process_url.call_count == 2
-        mock_process_url.assert_any_call('https://www.youtube.com/watch?v=video1', config)
-        mock_process_url.assert_any_call('https://www.youtube.com/watch?v=video2', config)
+        mock_process_url.assert_any_call(
+            "https://www.youtube.com/watch?v=video1", config
+        )
+        mock_process_url.assert_any_call(
+            "https://www.youtube.com/watch?v=video2", config
+        )
 
 
 def test_convert_apify_result_with_nested_transcript():
@@ -271,9 +285,9 @@ def test_convert_apify_result_with_nested_transcript():
                 {
                     "url": "https://i.ytimg.com/vi/siBSKuWmV8s/maxresdefault.jpg",
                     "width": 1920,
-                    "height": 1080
+                    "height": 1080,
                 }
-            ]
+            ],
         },
         "transcript": {
             "transcript": [
@@ -282,17 +296,17 @@ def test_convert_apify_result_with_nested_transcript():
                     "text": "In this video, we're going to look into",
                     "start": 0.08,
                     "duration": 1.28,
-                    "end": 1.36
+                    "end": 1.36,
                 },
                 {
                     "index": 1,
                     "text": "how to make a conversational AI agent",
                     "start": 1.36,
                     "duration": 2.079,
-                    "end": 3.439
-                }
+                    "end": 3.439,
+                },
             ]
-        }
+        },
     }
 
     # Convert the result
@@ -300,10 +314,19 @@ def test_convert_apify_result_with_nested_transcript():
 
     # Verify transcript was extracted correctly
     assert result.transcript is not None
-    assert result.transcript["text"] == "In this video, we're going to look into how to make a conversational AI agent"
+    assert (
+        result.transcript["text"]
+        == "In this video, we're going to look into how to make a conversational AI agent"
+    )
     assert len(result.transcript["segments"]) == 2
-    assert result.transcript["segments"][0]["text"] == "In this video, we're going to look into"
-    assert result.transcript["segments"][1]["text"] == "how to make a conversational AI agent"
+    assert (
+        result.transcript["segments"][0]["text"]
+        == "In this video, we're going to look into"
+    )
+    assert (
+        result.transcript["segments"][1]["text"]
+        == "how to make a conversational AI agent"
+    )
 
     # Verify metadata was extracted correctly
     assert result.metadata is not None
@@ -313,8 +336,14 @@ def test_convert_apify_result_with_nested_transcript():
     assert result.metadata.view_count == 102
     assert result.metadata.like_count == 4
     assert result.metadata.channel_id == "UCb-qWVAUsVZ_HnMY3xn43Nw"
-    assert result.metadata.thumbnail_url == "https://i.ytimg.com/vi/siBSKuWmV8s/maxresdefault.jpg"
+    assert (
+        result.metadata.thumbnail_url
+        == "https://i.ytimg.com/vi/siBSKuWmV8s/maxresdefault.jpg"
+    )
     assert result.metadata.categories == ["Science & Technology"]
 
     # Verify legacy transcript_text field is set
-    assert result.transcript_text == "In this video, we're going to look into how to make a conversational AI agent"
+    assert (
+        result.transcript_text
+        == "In this video, we're going to look into how to make a conversational AI agent"
+    )

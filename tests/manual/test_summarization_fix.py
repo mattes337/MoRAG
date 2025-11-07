@@ -4,15 +4,20 @@ Test script to verify the summarization fix works correctly.
 """
 
 import asyncio
-import sys
 import os
+import sys
 from pathlib import Path
 
 # Add the src directory to the Python path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from morag_services.embedding import gemini_service
-from morag_services.processing import enhanced_summarization_service, SummaryConfig, SummaryStrategy
+from morag_services.processing import (
+    SummaryConfig,
+    SummaryStrategy,
+    enhanced_summarization_service,
+)
+
 
 async def test_summarization_fix():
     """Test that summarization produces proper summaries instead of truncated text."""
@@ -29,9 +34,7 @@ async def test_summarization_fix():
     print("\n--- Testing Basic Summarization ---")
     try:
         basic_result = await gemini_service.generate_summary(
-            test_text,
-            max_length=50,
-            style="concise"
+            test_text, max_length=50, style="concise"
         )
 
         print(f"Basic summary: {basic_result.summary}")
@@ -54,12 +57,11 @@ async def test_summarization_fix():
             strategy=SummaryStrategy.ABSTRACTIVE,
             max_length=50,
             style="concise",
-            enable_refinement=False  # Disable refinement for faster testing
+            enable_refinement=False,  # Disable refinement for faster testing
         )
 
         enhanced_result = await enhanced_summarization_service.generate_summary(
-            test_text,
-            config=config
+            test_text, config=config
         )
 
         print(f"Enhanced summary: {enhanced_result.summary}")
@@ -111,7 +113,9 @@ async def test_summarization_fix():
     print(f"- Direct Text Generation: {'✅ PASS' if direct_success else '❌ FAIL'}")
 
     overall_success = basic_success and enhanced_success and direct_success
-    print(f"\n🎯 Overall Result: {'✅ ALL TESTS PASSED' if overall_success else '❌ SOME TESTS FAILED'}")
+    print(
+        f"\n🎯 Overall Result: {'✅ ALL TESTS PASSED' if overall_success else '❌ SOME TESTS FAILED'}"
+    )
 
     if not overall_success:
         print("\n💡 Next Steps:")
@@ -121,6 +125,7 @@ async def test_summarization_fix():
         print("4. Check the application logs for detailed error messages")
 
     return overall_success
+
 
 if __name__ == "__main__":
     success = asyncio.run(test_summarization_fix())

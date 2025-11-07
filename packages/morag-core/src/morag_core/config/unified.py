@@ -2,12 +2,13 @@
 
 import os
 from typing import Any, Dict, Optional, Type, TypeVar, Union, get_type_hints
-from pydantic import BaseModel, Field
+
 import structlog
+from pydantic import BaseModel, Field
 
 logger = structlog.get_logger(__name__)
 
-T = TypeVar('T', bound=BaseModel)
+T = TypeVar("T", bound=BaseModel)
 
 
 class ConfigMixin:
@@ -17,7 +18,7 @@ class ConfigMixin:
     def from_env_and_overrides(
         cls: Type[T],
         overrides: Optional[Dict[str, Any]] = None,
-        prefix: Optional[str] = None
+        prefix: Optional[str] = None,
     ) -> T:
         """Create configuration from environment variables with optional overrides.
 
@@ -29,10 +30,10 @@ class ConfigMixin:
             Configuration instance with environment variables and overrides applied
         """
         if prefix is None:
-            prefix = getattr(cls, '_env_prefix', 'MORAG_')
+            prefix = getattr(cls, "_env_prefix", "MORAG_")
 
         # Get field information from the model
-        field_info = cls.model_fields if hasattr(cls, 'model_fields') else {}
+        field_info = cls.model_fields if hasattr(cls, "model_fields") else {}
         type_hints = get_type_hints(cls)
 
         # Load from environment variables
@@ -47,15 +48,22 @@ class ConfigMixin:
                     field_type = type_hints.get(field_name, str)
 
                     # Handle Optional types
-                    if hasattr(field_type, '__origin__') and field_type.__origin__ is Union:
+                    if (
+                        hasattr(field_type, "__origin__")
+                        and field_type.__origin__ is Union
+                    ):
                         # Extract the non-None type from Optional[T]
                         args = field_type.__args__
-                        field_type = next((arg for arg in args if arg is not type(None)), str)
+                        field_type = next(
+                            (arg for arg in args if arg is not type(None)), str
+                        )
 
                     converted_value = cls._convert_env_value(env_value, field_type)
                     env_config[field_name] = converted_value
                 except (ValueError, TypeError) as e:
-                    logger.warning(f"Invalid value for {env_var}: {env_value}", error=str(e))
+                    logger.warning(
+                        f"Invalid value for {env_var}: {env_value}", error=str(e)
+                    )
 
         # Apply overrides
         if overrides:
@@ -67,7 +75,7 @@ class ConfigMixin:
     def _convert_env_value(value: str, target_type: Type) -> Any:
         """Convert environment variable string to target type."""
         if target_type == bool:
-            return value.lower() in ('true', '1', 'yes', 'on')
+            return value.lower() in ("true", "1", "yes", "on")
         elif target_type == int:
             return int(value)
         elif target_type == float:
@@ -90,7 +98,9 @@ class LLMConfig(BaseModel, ConfigMixin):
     api_key: Optional[str] = Field(default=None, description="API key")
 
     # Generation parameters
-    temperature: float = Field(default=0.1, ge=0.0, le=2.0, description="LLM temperature")
+    temperature: float = Field(
+        default=0.1, ge=0.0, le=2.0, description="LLM temperature"
+    )
     max_tokens: int = Field(default=4000, ge=1, description="Maximum tokens")
     timeout: int = Field(default=30, ge=1, description="Request timeout in seconds")
 
@@ -101,38 +111,38 @@ class LLMConfig(BaseModel, ConfigMixin):
 
     @classmethod
     def from_env_and_overrides(
-        cls,
-        overrides: Optional[Dict[str, Any]] = None,
-        prefix: Optional[str] = None
-    ) -> 'LLMConfig':
+        cls, overrides: Optional[Dict[str, Any]] = None, prefix: Optional[str] = None
+    ) -> "LLMConfig":
         """Create LLM config with proper fallbacks to MORAG_GEMINI_MODEL."""
         # Load base configuration from environment variables
         config_dict = {}
 
         # Load from environment with fallbacks
-        config_dict['provider'] = os.environ.get("MORAG_LLM_PROVIDER", "gemini")
+        config_dict["provider"] = os.environ.get("MORAG_LLM_PROVIDER", "gemini")
 
         # Model fallback chain: MORAG_LLM_MODEL -> MORAG_GEMINI_MODEL -> default
-        config_dict['model'] = (
-            os.environ.get("MORAG_LLM_MODEL") or
-            os.environ.get("MORAG_GEMINI_MODEL") or
-            "gemini-1.5-flash"
+        config_dict["model"] = (
+            os.environ.get("MORAG_LLM_MODEL")
+            or os.environ.get("MORAG_GEMINI_MODEL")
+            or "gemini-1.5-flash"
         )
 
         # API key fallback chain
-        config_dict['api_key'] = (
-            os.environ.get("MORAG_LLM_API_KEY") or
-            os.environ.get("GEMINI_API_KEY") or
-            os.environ.get("GOOGLE_API_KEY")
+        config_dict["api_key"] = (
+            os.environ.get("MORAG_LLM_API_KEY")
+            or os.environ.get("GEMINI_API_KEY")
+            or os.environ.get("GOOGLE_API_KEY")
         )
 
         # Load other environment variables with defaults
-        config_dict['temperature'] = float(os.environ.get("MORAG_LLM_TEMPERATURE", "0.1"))
-        config_dict['max_tokens'] = int(os.environ.get("MORAG_LLM_MAX_TOKENS", "4000"))
-        config_dict['timeout'] = int(os.environ.get("MORAG_LLM_TIMEOUT", "30"))
-        config_dict['max_retries'] = int(os.environ.get("MORAG_LLM_MAX_RETRIES", "5"))
-        config_dict['base_delay'] = float(os.environ.get("MORAG_LLM_BASE_DELAY", "2.0"))
-        config_dict['max_delay'] = float(os.environ.get("MORAG_LLM_MAX_DELAY", "120.0"))
+        config_dict["temperature"] = float(
+            os.environ.get("MORAG_LLM_TEMPERATURE", "0.1")
+        )
+        config_dict["max_tokens"] = int(os.environ.get("MORAG_LLM_MAX_TOKENS", "4000"))
+        config_dict["timeout"] = int(os.environ.get("MORAG_LLM_TIMEOUT", "30"))
+        config_dict["max_retries"] = int(os.environ.get("MORAG_LLM_MAX_RETRIES", "5"))
+        config_dict["base_delay"] = float(os.environ.get("MORAG_LLM_BASE_DELAY", "2.0"))
+        config_dict["max_delay"] = float(os.environ.get("MORAG_LLM_MAX_DELAY", "120.0"))
 
         # Apply overrides
         if overrides:
@@ -149,49 +159,59 @@ class MarkdownOptimizerConfig(BaseModel, ConfigMixin):
     # LLM configuration (inherits from global LLM config)
     model: Optional[str] = Field(default=None, description="LLM model override")
     provider: Optional[str] = Field(default=None, description="LLM provider override")
-    temperature: Optional[float] = Field(default=None, description="LLM temperature override")
+    temperature: Optional[float] = Field(
+        default=None, description="LLM temperature override"
+    )
     max_tokens: Optional[int] = Field(default=None, description="Max tokens override")
     max_retries: Optional[int] = Field(default=None, description="Max retries override")
 
     # Text splitting configuration
-    max_chunk_size: int = Field(default=50000, ge=1000, description="Maximum characters per chunk")
-    enable_splitting: bool = Field(default=True, description="Enable text splitting for large files")
+    max_chunk_size: int = Field(
+        default=50000, ge=1000, description="Maximum characters per chunk"
+    )
+    enable_splitting: bool = Field(
+        default=True, description="Enable text splitting for large files"
+    )
 
     # Optimization settings
-    fix_transcription_errors: bool = Field(default=True, description="Fix transcription errors")
-    improve_structure: bool = Field(default=True, description="Improve document structure")
-    preserve_timestamps: bool = Field(default=True, description="Preserve timestamp information")
-    preserve_metadata: bool = Field(default=True, description="Preserve metadata headers")
+    fix_transcription_errors: bool = Field(
+        default=True, description="Fix transcription errors"
+    )
+    improve_structure: bool = Field(
+        default=True, description="Improve document structure"
+    )
+    preserve_timestamps: bool = Field(
+        default=True, description="Preserve timestamp information"
+    )
+    preserve_metadata: bool = Field(
+        default=True, description="Preserve metadata headers"
+    )
 
     @classmethod
     def from_env_and_overrides(
-        cls,
-        overrides: Optional[Dict[str, Any]] = None,
-        prefix: Optional[str] = None
-    ) -> 'MarkdownOptimizerConfig':
+        cls, overrides: Optional[Dict[str, Any]] = None, prefix: Optional[str] = None
+    ) -> "MarkdownOptimizerConfig":
         """Create configuration from environment variables with overrides."""
         if prefix is None:
             prefix = "MORAG_MARKDOWN_OPTIMIZER_"
-
-
 
         # Load from environment variables
         env_config = {}
 
         # Define field mappings with types
         field_mappings = {
-            'enabled': ('ENABLED', bool),
-            'model': ('MODEL', str),
-            'provider': ('PROVIDER', str),
-            'temperature': ('TEMPERATURE', float),
-            'max_tokens': ('MAX_TOKENS', int),
-            'max_retries': ('MAX_RETRIES', int),
-            'max_chunk_size': ('MAX_CHUNK_SIZE', int),
-            'enable_splitting': ('ENABLE_SPLITTING', bool),
-            'fix_transcription_errors': ('FIX_TRANSCRIPTION_ERRORS', bool),
-            'improve_structure': ('IMPROVE_STRUCTURE', bool),
-            'preserve_timestamps': ('PRESERVE_TIMESTAMPS', bool),
-            'preserve_metadata': ('PRESERVE_METADATA', bool),
+            "enabled": ("ENABLED", bool),
+            "model": ("MODEL", str),
+            "provider": ("PROVIDER", str),
+            "temperature": ("TEMPERATURE", float),
+            "max_tokens": ("MAX_TOKENS", int),
+            "max_retries": ("MAX_RETRIES", int),
+            "max_chunk_size": ("MAX_CHUNK_SIZE", int),
+            "enable_splitting": ("ENABLE_SPLITTING", bool),
+            "fix_transcription_errors": ("FIX_TRANSCRIPTION_ERRORS", bool),
+            "improve_structure": ("IMPROVE_STRUCTURE", bool),
+            "preserve_timestamps": ("PRESERVE_TIMESTAMPS", bool),
+            "preserve_metadata": ("PRESERVE_METADATA", bool),
         }
 
         for field_name, (env_suffix, field_type) in field_mappings.items():
@@ -204,7 +224,9 @@ class MarkdownOptimizerConfig(BaseModel, ConfigMixin):
                     env_config[field_name] = converted_value
 
                 except (ValueError, TypeError) as e:
-                    logger.warning(f"Invalid value for {env_var}: {env_value}", error=str(e))
+                    logger.warning(
+                        f"Invalid value for {env_var}: {env_value}", error=str(e)
+                    )
 
         # Apply overrides
         if overrides:
@@ -220,15 +242,15 @@ class MarkdownOptimizerConfig(BaseModel, ConfigMixin):
         # Create overrides dict with non-None values
         overrides = {}
         if self.model is not None:
-            overrides['model'] = self.model
+            overrides["model"] = self.model
         if self.provider is not None:
-            overrides['provider'] = self.provider
+            overrides["provider"] = self.provider
         if self.temperature is not None:
-            overrides['temperature'] = self.temperature
+            overrides["temperature"] = self.temperature
         if self.max_tokens is not None:
-            overrides['max_tokens'] = self.max_tokens
+            overrides["max_tokens"] = self.max_tokens
         if self.max_retries is not None:
-            overrides['max_retries'] = self.max_retries
+            overrides["max_retries"] = self.max_retries
 
         # Apply overrides to base config
         config_dict = base_llm_config.model_dump()
@@ -247,13 +269,24 @@ class FactGeneratorConfig(BaseModel, ConfigMixin):
     provider: Optional[str] = Field(default=None, description="LLM provider override")
 
     # Quality validation settings
-    min_confidence: float = Field(default=0.3, description="Minimum confidence threshold for facts")
-    allow_vague_language: bool = Field(default=True, description="Allow facts with vague language (typically, usually, etc.)")
-    require_entities: bool = Field(default=False, description="Require primary entities in structured metadata")
+    min_confidence: float = Field(
+        default=0.3, description="Minimum confidence threshold for facts"
+    )
+    allow_vague_language: bool = Field(
+        default=True,
+        description="Allow facts with vague language (typically, usually, etc.)",
+    )
+    require_entities: bool = Field(
+        default=False, description="Require primary entities in structured metadata"
+    )
     min_fact_length: int = Field(default=20, description="Minimum fact text length")
-    strict_validation: bool = Field(default=True, description="Enable strict quality validation")
+    strict_validation: bool = Field(
+        default=True, description="Enable strict quality validation"
+    )
 
-    temperature: Optional[float] = Field(default=None, description="LLM temperature override")
+    temperature: Optional[float] = Field(
+        default=None, description="LLM temperature override"
+    )
     max_tokens: Optional[int] = Field(default=None, description="Max tokens override")
 
     # Extraction settings
@@ -264,15 +297,17 @@ class FactGeneratorConfig(BaseModel, ConfigMixin):
 
     # Quality settings
     # min_confidence already defined above - removed duplicate
-    max_entities_per_chunk: int = Field(default=20, ge=1, description="Maximum entities per chunk")
-    max_relations_per_chunk: int = Field(default=15, ge=1, description="Maximum relations per chunk")
+    max_entities_per_chunk: int = Field(
+        default=20, ge=1, description="Maximum entities per chunk"
+    )
+    max_relations_per_chunk: int = Field(
+        default=15, ge=1, description="Maximum relations per chunk"
+    )
 
     @classmethod
     def from_env_and_overrides(
-        cls,
-        overrides: Optional[Dict[str, Any]] = None,
-        prefix: Optional[str] = None
-    ) -> 'FactGeneratorConfig':
+        cls, overrides: Optional[Dict[str, Any]] = None, prefix: Optional[str] = None
+    ) -> "FactGeneratorConfig":
         """Create configuration from environment variables with overrides."""
         if prefix is None:
             prefix = "MORAG_FACT_GENERATOR_"
@@ -282,18 +317,18 @@ class FactGeneratorConfig(BaseModel, ConfigMixin):
 
         # Define field mappings with types
         field_mappings = {
-            'enabled': ('ENABLED', bool),
-            'model': ('MODEL', str),
-            'provider': ('PROVIDER', str),
-            'temperature': ('TEMPERATURE', float),
-            'max_tokens': ('MAX_TOKENS', int),
-            'extract_entities': ('EXTRACT_ENTITIES', bool),
-            'extract_relations': ('EXTRACT_RELATIONS', bool),
-            'extract_keywords': ('EXTRACT_KEYWORDS', bool),
-            'domain': ('DOMAIN', str),
-            'min_confidence': ('MIN_CONFIDENCE', float),
-            'max_entities_per_chunk': ('MAX_ENTITIES_PER_CHUNK', int),
-            'max_relations_per_chunk': ('MAX_RELATIONS_PER_CHUNK', int),
+            "enabled": ("ENABLED", bool),
+            "model": ("MODEL", str),
+            "provider": ("PROVIDER", str),
+            "temperature": ("TEMPERATURE", float),
+            "max_tokens": ("MAX_TOKENS", int),
+            "extract_entities": ("EXTRACT_ENTITIES", bool),
+            "extract_relations": ("EXTRACT_RELATIONS", bool),
+            "extract_keywords": ("EXTRACT_KEYWORDS", bool),
+            "domain": ("DOMAIN", str),
+            "min_confidence": ("MIN_CONFIDENCE", float),
+            "max_entities_per_chunk": ("MAX_ENTITIES_PER_CHUNK", int),
+            "max_relations_per_chunk": ("MAX_RELATIONS_PER_CHUNK", int),
         }
 
         for field_name, (env_suffix, field_type) in field_mappings.items():
@@ -305,7 +340,9 @@ class FactGeneratorConfig(BaseModel, ConfigMixin):
                     converted_value = cls._convert_env_value(env_value, field_type)
                     env_config[field_name] = converted_value
                 except (ValueError, TypeError) as e:
-                    logger.warning(f"Invalid value for {env_var}: {env_value}", error=str(e))
+                    logger.warning(
+                        f"Invalid value for {env_var}: {env_value}", error=str(e)
+                    )
 
         # Apply overrides
         if overrides:
@@ -321,13 +358,13 @@ class FactGeneratorConfig(BaseModel, ConfigMixin):
         # Create overrides dict with non-None values
         overrides = {}
         if self.model is not None:
-            overrides['model'] = self.model
+            overrides["model"] = self.model
         if self.provider is not None:
-            overrides['provider'] = self.provider
+            overrides["provider"] = self.provider
         if self.temperature is not None:
-            overrides['temperature'] = self.temperature
+            overrides["temperature"] = self.temperature
         if self.max_tokens is not None:
-            overrides['max_tokens'] = self.max_tokens
+            overrides["max_tokens"] = self.max_tokens
 
         # Apply overrides to base config
         config_dict = base_llm_config.model_dump()
@@ -352,10 +389,8 @@ class ChunkerConfig(BaseModel, ConfigMixin):
 
     @classmethod
     def from_env_and_overrides(
-        cls,
-        overrides: Optional[Dict[str, Any]] = None,
-        prefix: Optional[str] = None
-    ) -> 'ChunkerConfig':
+        cls, overrides: Optional[Dict[str, Any]] = None, prefix: Optional[str] = None
+    ) -> "ChunkerConfig":
         """Create configuration from environment variables with overrides."""
         if prefix is None:
             prefix = "MORAG_CHUNKER_"
@@ -365,12 +400,12 @@ class ChunkerConfig(BaseModel, ConfigMixin):
 
         # Define field mappings with types
         field_mappings = {
-            'enabled': ('ENABLED', bool),
-            'chunk_strategy': ('CHUNK_STRATEGY', str),
-            'chunk_size': ('CHUNK_SIZE', int),
-            'overlap': ('OVERLAP', int),
-            'generate_summary': ('GENERATE_SUMMARY', bool),
-            'extract_metadata': ('EXTRACT_METADATA', bool),
+            "enabled": ("ENABLED", bool),
+            "chunk_strategy": ("CHUNK_STRATEGY", str),
+            "chunk_size": ("CHUNK_SIZE", int),
+            "overlap": ("OVERLAP", int),
+            "generate_summary": ("GENERATE_SUMMARY", bool),
+            "extract_metadata": ("EXTRACT_METADATA", bool),
         }
 
         for field_name, (env_suffix, field_type) in field_mappings.items():
@@ -382,7 +417,9 @@ class ChunkerConfig(BaseModel, ConfigMixin):
                     converted_value = cls._convert_env_value(env_value, field_type)
                     env_config[field_name] = converted_value
                 except (ValueError, TypeError) as e:
-                    logger.warning(f"Invalid value for {env_var}: {env_value}", error=str(e))
+                    logger.warning(
+                        f"Invalid value for {env_var}: {env_value}", error=str(e)
+                    )
 
         # Apply overrides
         if overrides:
@@ -402,14 +439,14 @@ class IngestorConfig(BaseModel, ConfigMixin):
 
     # Processing options
     generate_embeddings: bool = Field(default=True, description="Generate embeddings")
-    validate_data: bool = Field(default=True, description="Validate data before ingestion")
+    validate_data: bool = Field(
+        default=True, description="Validate data before ingestion"
+    )
 
     @classmethod
     def from_env_and_overrides(
-        cls,
-        overrides: Optional[Dict[str, Any]] = None,
-        prefix: Optional[str] = None
-    ) -> 'IngestorConfig':
+        cls, overrides: Optional[Dict[str, Any]] = None, prefix: Optional[str] = None
+    ) -> "IngestorConfig":
         """Create configuration from environment variables with overrides."""
         if prefix is None:
             prefix = "MORAG_INGESTOR_"
@@ -419,10 +456,10 @@ class IngestorConfig(BaseModel, ConfigMixin):
 
         # Define field mappings with types
         field_mappings = {
-            'enabled': ('ENABLED', bool),
-            'batch_size': ('BATCH_SIZE', int),
-            'generate_embeddings': ('GENERATE_EMBEDDINGS', bool),
-            'validate_data': ('VALIDATE_DATA', bool),
+            "enabled": ("ENABLED", bool),
+            "batch_size": ("BATCH_SIZE", int),
+            "generate_embeddings": ("GENERATE_EMBEDDINGS", bool),
+            "validate_data": ("VALIDATE_DATA", bool),
         }
 
         for field_name, (env_suffix, field_type) in field_mappings.items():
@@ -434,20 +471,28 @@ class IngestorConfig(BaseModel, ConfigMixin):
                     converted_value = cls._convert_env_value(env_value, field_type)
                     env_config[field_name] = converted_value
                 except (ValueError, TypeError) as e:
-                    logger.warning(f"Invalid value for {env_var}: {env_value}", error=str(e))
+                    logger.warning(
+                        f"Invalid value for {env_var}: {env_value}", error=str(e)
+                    )
 
         # Handle databases list separately
         databases_env = os.environ.get(f"{prefix}DATABASES")
         if databases_env:
             try:
                 # Parse as JSON array or comma-separated list
-                if databases_env.startswith('['):
+                if databases_env.startswith("["):
                     import json
-                    env_config['databases'] = json.loads(databases_env)
+
+                    env_config["databases"] = json.loads(databases_env)
                 else:
-                    env_config['databases'] = [db.strip() for db in databases_env.split(',')]
+                    env_config["databases"] = [
+                        db.strip() for db in databases_env.split(",")
+                    ]
             except (ValueError, TypeError) as e:
-                logger.warning(f"Invalid value for {prefix}DATABASES: {databases_env}", error=str(e))
+                logger.warning(
+                    f"Invalid value for {prefix}DATABASES: {databases_env}",
+                    error=str(e),
+                )
 
         # Apply overrides
         if overrides:

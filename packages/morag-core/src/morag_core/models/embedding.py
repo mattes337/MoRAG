@@ -1,14 +1,15 @@
 """Embedding models for MoRAG."""
 
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Union
-import uuid
 
 
 @dataclass
 class EmbeddingResult:
     """Result of embedding generation."""
+
     text: str
     embedding: List[float]
     model: str
@@ -35,6 +36,7 @@ class EmbeddingResult:
 @dataclass
 class BatchEmbeddingResult:
     """Result of batch embedding generation."""
+
     texts: List[str]
     embeddings: List[List[float]]
     model: str
@@ -71,7 +73,7 @@ class BatchEmbeddingResult:
                 metadata={
                     **self.metadata,
                     "batch_index": i,
-                }
+                },
             )
             results.append(result)
         return results
@@ -80,6 +82,7 @@ class BatchEmbeddingResult:
 @dataclass
 class SummaryResult:
     """Result of text summarization."""
+
     original_text: str
     summary: str
     model: str

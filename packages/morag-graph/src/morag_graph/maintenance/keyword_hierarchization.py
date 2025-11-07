@@ -18,9 +18,9 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
 import structlog
+from morag_graph.storage import Neo4jConfig, Neo4jStorage
 
-from morag_graph.storage import Neo4jStorage, Neo4jConfig
-from .base import MaintenanceJobBase, validate_positive_int, validate_float_range
+from .base import MaintenanceJobBase, validate_float_range, validate_positive_int
 from .query_optimizer import QueryOptimizer
 
 logger = structlog.get_logger(__name__)
@@ -33,7 +33,9 @@ class HierarchizationConfig:
     max_new_keywords: int = 6
     min_per_new_keyword: int = 5
     max_move_ratio: float = 0.8  # keep some facts on original
-    cooccurrence_min_share: float = 0.18  # proposal must cover >= 18% of keyword's facts
+    cooccurrence_min_share: float = (
+        0.18  # proposal must cover >= 18% of keyword's facts
+    )
     batch_size: int = 200
     dry_run: bool = True
     detach_moved: bool = True
@@ -56,18 +58,20 @@ class KeywordHierarchizationService(MaintenanceJobBase):
     as a fact attachment. We propose co-occurring Entities as candidates.
     """
 
-    def __init__(self, storage: Neo4jStorage, config: Optional[HierarchizationConfig] = None):
+    def __init__(
+        self, storage: Neo4jStorage, config: Optional[HierarchizationConfig] = None
+    ):
         self.storage = storage
         self.hier_config = config or HierarchizationConfig()
         self.hier_config.ensure_defaults()
 
         # Initialize base class with config dict
         config_dict = {
-            'job_tag': self.hier_config.job_tag,
-            'dry_run': self.hier_config.dry_run,
-            'batch_size': self.hier_config.batch_size,
-            'circuit_breaker_threshold': self.hier_config.circuit_breaker_threshold,
-            'circuit_breaker_timeout': self.hier_config.circuit_breaker_timeout,
+            "job_tag": self.hier_config.job_tag,
+            "dry_run": self.hier_config.dry_run,
+            "batch_size": self.hier_config.batch_size,
+            "circuit_breaker_threshold": self.hier_config.circuit_breaker_threshold,
+            "circuit_breaker_timeout": self.hier_config.circuit_breaker_timeout,
         }
         super().__init__(config_dict)
 
@@ -79,15 +83,61 @@ class KeywordHierarchizationService(MaintenanceJobBase):
         errors = []
 
         # Validate integer parameters
-        errors.extend(validate_positive_int(self.hier_config.threshold_min_facts, "threshold_min_facts", min_value=1, max_value=10000))
-        errors.extend(validate_positive_int(self.hier_config.min_new_keywords, "min_new_keywords", min_value=1, max_value=20))
-        errors.extend(validate_positive_int(self.hier_config.max_new_keywords, "max_new_keywords", min_value=1, max_value=50))
-        errors.extend(validate_positive_int(self.hier_config.min_per_new_keyword, "min_per_new_keyword", min_value=1, max_value=1000))
-        errors.extend(validate_positive_int(self.hier_config.batch_size, "batch_size", min_value=1, max_value=10000))
+        errors.extend(
+            validate_positive_int(
+                self.hier_config.threshold_min_facts,
+                "threshold_min_facts",
+                min_value=1,
+                max_value=10000,
+            )
+        )
+        errors.extend(
+            validate_positive_int(
+                self.hier_config.min_new_keywords,
+                "min_new_keywords",
+                min_value=1,
+                max_value=20,
+            )
+        )
+        errors.extend(
+            validate_positive_int(
+                self.hier_config.max_new_keywords,
+                "max_new_keywords",
+                min_value=1,
+                max_value=50,
+            )
+        )
+        errors.extend(
+            validate_positive_int(
+                self.hier_config.min_per_new_keyword,
+                "min_per_new_keyword",
+                min_value=1,
+                max_value=1000,
+            )
+        )
+        errors.extend(
+            validate_positive_int(
+                self.hier_config.batch_size, "batch_size", min_value=1, max_value=10000
+            )
+        )
 
         # Validate float parameters
-        errors.extend(validate_float_range(self.hier_config.max_move_ratio, "max_move_ratio", min_value=0.0, max_value=1.0))
-        errors.extend(validate_float_range(self.hier_config.cooccurrence_min_share, "cooccurrence_min_share", min_value=0.0, max_value=1.0))
+        errors.extend(
+            validate_float_range(
+                self.hier_config.max_move_ratio,
+                "max_move_ratio",
+                min_value=0.0,
+                max_value=1.0,
+            )
+        )
+        errors.extend(
+            validate_float_range(
+                self.hier_config.cooccurrence_min_share,
+                "cooccurrence_min_share",
+                min_value=0.0,
+                max_value=1.0,
+            )
+        )
 
         # Validate logical constraints
         if self.hier_config.min_new_keywords > self.hier_config.max_new_keywords:
@@ -101,11 +151,15 @@ class KeywordHierarchizationService(MaintenanceJobBase):
             return self._llm_client
         try:
             from morag_reasoning.llm import LLMClient  # type: ignore
+
             # Pass None to use environment variables for configuration
             self._llm_client = LLMClient(None)
             return self._llm_client
         except Exception as e:
-            logger.warning("LLM client unavailable for entity link typing; will use fallback type", error=str(e))
+            logger.warning(
+                "LLM client unavailable for entity link typing; will use fallback type",
+                error=str(e),
+            )
             return None
 
     async def run(self, limit_keywords: int = 5) -> Dict[str, Any]:
@@ -143,18 +197,27 @@ class KeywordHierarchizationService(MaintenanceJobBase):
     async def _find_candidates(self, limit_keywords: int) -> List[Dict[str, Any]]:
         """Find entity candidates with high fact counts using optimized query."""
         return await self.query_optimizer.find_entities_by_fact_count(
-            min_facts=self.hier_config.threshold_min_facts,
-            limit=limit_keywords
+            min_facts=self.hier_config.threshold_min_facts, limit=limit_keywords
         )
 
-    async def _process_keyword(self, k_id: str, k_name: str, total_facts: int) -> Dict[str, Any]:
+    async def _process_keyword(
+        self, k_id: str, k_name: str, total_facts: int
+    ) -> Dict[str, Any]:
         # Propose related entities via co-occurrence on shared facts
         proposals = await self._propose_keywords(k_id, total_facts)
         if not proposals:
-            return {"keyword": k_name, "total_facts": total_facts, "proposals": [], "moved": 0, "kept": total_facts}
+            return {
+                "keyword": k_name,
+                "total_facts": total_facts,
+                "proposals": [],
+                "moved": 0,
+                "kept": total_facts,
+            }
 
         # Determine, per fact, which proposals it explicitly mentions
-        fact_map = await self._map_facts_to_proposals(k_id, [p["e_id"] for p in proposals])
+        fact_map = await self._map_facts_to_proposals(
+            k_id, [p["e_id"] for p in proposals]
+        )
         # Obtain the relationship type from (f)-[r]->(k) so we can mirror it to proposal
         reltypes = await self._get_reltypes_to_keyword(k_id)
 
@@ -174,7 +237,13 @@ class KeywordHierarchizationService(MaintenanceJobBase):
 
         moved_count = sum(len(v) for v in assignments.values())
         if self.hier_config.dry_run:
-            logger.info("[DRY-RUN] Hierarchization plan", keyword=k_name, proposals=[p["e_name"] for p in proposals], moved=moved_count, kept=total_facts - moved_count)
+            logger.info(
+                "[DRY-RUN] Hierarchization plan",
+                keyword=k_name,
+                proposals=[p["e_name"] for p in proposals],
+                moved=moved_count,
+                kept=total_facts - moved_count,
+            )
             return {
                 "keyword": k_name,
                 "total_facts": total_facts,
@@ -185,7 +254,9 @@ class KeywordHierarchizationService(MaintenanceJobBase):
             }
 
         # Apply changes in small batches
-        await self._apply_rewiring(k_id, assignments, reltypes, detach=self.hier_config.detach_moved)
+        await self._apply_rewiring(
+            k_id, assignments, reltypes, detach=self.hier_config.detach_moved
+        )
         # Optionally create entity-to-entity links from parent to proposals that received assignments
         if self.hier_config.link_entities:
             await self._link_parent_to_proposals(k_id, proposals, assignments)
@@ -199,7 +270,9 @@ class KeywordHierarchizationService(MaintenanceJobBase):
             "job_tag": self.hier_config.job_tag,
         }
 
-    async def _propose_keywords(self, k_id: str, total_facts: int) -> List[Dict[str, Any]]:
+    async def _propose_keywords(
+        self, k_id: str, total_facts: int
+    ) -> List[Dict[str, Any]]:
         q = """
         MATCH (k:Entity {id: $k_id})
         MATCH (f:Fact)-[r1]->(k)
@@ -239,7 +312,9 @@ class KeywordHierarchizationService(MaintenanceJobBase):
             return []
         return trimmed
 
-    async def _map_facts_to_proposals(self, k_id: str, proposal_ids: List[str]) -> Dict[str, Dict[str, Any]]:
+    async def _map_facts_to_proposals(
+        self, k_id: str, proposal_ids: List[str]
+    ) -> Dict[str, Dict[str, Any]]:
         if not proposal_ids:
             return {}
         q = """
@@ -249,8 +324,15 @@ class KeywordHierarchizationService(MaintenanceJobBase):
         WITH f, collect(DISTINCT p.id) AS proposal_ids
         RETURN f.id AS fact_id, proposal_ids
         """
-        rows = await self.storage._connection_ops._execute_query(q, {"k_id": k_id, "proposal_ids": proposal_ids})
-        return {row["fact_id"]: {"proposal_ids": [pid for pid in row["proposal_ids"] if pid]} for row in rows}
+        rows = await self.storage._connection_ops._execute_query(
+            q, {"k_id": k_id, "proposal_ids": proposal_ids}
+        )
+        return {
+            row["fact_id"]: {
+                "proposal_ids": [pid for pid in row["proposal_ids"] if pid]
+            }
+            for row in rows
+        }
 
     async def _get_reltypes_to_keyword(self, k_id: str) -> Dict[str, str]:
         q = """
@@ -260,9 +342,15 @@ class KeywordHierarchizationService(MaintenanceJobBase):
         rows = await self.storage._connection_ops._execute_query(q, {"k_id": k_id})
         return {row["fact_id"]: row["reltype"] for row in rows}
 
-    def _enforce_balance(self, assignments: Dict[str, List[str]], total_facts: int) -> Dict[str, List[str]]:
+    def _enforce_balance(
+        self, assignments: Dict[str, List[str]], total_facts: int
+    ) -> Dict[str, List[str]]:
         # Remove proposals that do not meet minimum assigned facts
-        filtered = {pid: facts for pid, facts in assignments.items() if len(facts) >= self.hier_config.min_per_new_keyword}
+        filtered = {
+            pid: facts
+            for pid, facts in assignments.items()
+            if len(facts) >= self.hier_config.min_per_new_keyword
+        }
         # Enforce max move ratio
         max_moves = int(self.hier_config.max_move_ratio * total_facts)
         moved_so_far = 0
@@ -319,7 +407,9 @@ class KeywordHierarchizationService(MaintenanceJobBase):
         # Group proposals by pid for quick lookup
         pid_to_name: Dict[str, str] = {p["e_id"]: p["e_name"] for p in proposals}
 
-    async def _infer_entity_link_type(self, parent_name: str, child_name: str, samples: List[str]) -> str:
+    async def _infer_entity_link_type(
+        self, parent_name: str, child_name: str, samples: List[str]
+    ) -> str:
         client = await self._get_llm_client()
         fallback = "ASSOCIATED_WITH"
         # If no LLM available, fallback
@@ -338,7 +428,9 @@ class KeywordHierarchizationService(MaintenanceJobBase):
                 "JSON only."
             )
             text = await client.generate(prompt)
-            import json, re
+            import json
+            import re
+
             m = re.search(r"\{.*\}", text, re.S)
             data = json.loads(m.group(0)) if m else json.loads(text)
             rtype = str(data.get("relation_type", "")).strip().upper().replace(" ", "_")
@@ -354,7 +446,10 @@ class KeywordHierarchizationService(MaintenanceJobBase):
         try:
             return await self.safe_llm_call(llm_inference)
         except Exception as e:
-            logger.warning("LLM inference failed for entity link type; using fallback", error=str(e))
+            logger.warning(
+                "LLM inference failed for entity link type; using fallback",
+                error=str(e),
+            )
             return f"{fallback}|A_TO_B"
 
     async def _sample_cofacts(self, parent_id: str, child_id: str) -> List[str]:
@@ -366,18 +461,24 @@ class KeywordHierarchizationService(MaintenanceJobBase):
                COALESCE(f.remarks, '') AS txt
         LIMIT 3
         """
-        rows = await self.storage._connection_ops._execute_query(q, {"parent_id": parent_id, "child_id": child_id})
+        rows = await self.storage._connection_ops._execute_query(
+            q, {"parent_id": parent_id, "child_id": child_id}
+        )
         return [r.get("txt", "").strip() for r in rows if r.get("txt", "").strip()]
         # For each active proposal, infer relation type + direction and create link
-        parent_name = (await self.storage._connection_ops._execute_query(
-            "MATCH (k:Entity {id: $k_id}) RETURN k.name AS name", {"k_id": k_id}
-        ))[0].get("name", k_id)
+        parent_name = (
+            await self.storage._connection_ops._execute_query(
+                "MATCH (k:Entity {id: $k_id}) RETURN k.name AS name", {"k_id": k_id}
+            )
+        )[0].get("name", k_id)
 
         total_linked = 0
         for pid in active_pids:
             child_name = pid_to_name.get(pid, pid)
             samples = await self._sample_cofacts(k_id, pid)
-            type_and_dir = await self._infer_entity_link_type(parent_name, child_name, samples)
+            type_and_dir = await self._infer_entity_link_type(
+                parent_name, child_name, samples
+            )
             rtype, direction = type_and_dir.split("|", 1)
             if direction == "A_TO_B":
                 q = f"""
@@ -395,8 +496,10 @@ class KeywordHierarchizationService(MaintenanceJobBase):
                 SET h.job_tag = $job_tag, h.created_from = 'keyword_hierarchization'
                 RETURN count(h) AS linked
                 """
-            res = await self.storage._connection_ops._execute_query(q, {"parent": k_id, "child": pid, "job_tag": self.hier_config.job_tag})
-            total_linked += (res[0]["linked"] if res else 0)
+            res = await self.storage._connection_ops._execute_query(
+                q, {"parent": k_id, "child": pid, "job_tag": self.hier_config.job_tag}
+            )
+            total_linked += res[0]["linked"] if res else 0
 
         logger.info(
             "Entity links created",
@@ -406,10 +509,15 @@ class KeywordHierarchizationService(MaintenanceJobBase):
             total_linked=total_linked,
         )
 
-    async def _batch_attach(self, k_id: str, pid: str, fid_batch: List[str], reltypes: Dict[str, str]) -> None:
+    async def _batch_attach(
+        self, k_id: str, pid: str, fid_batch: List[str], reltypes: Dict[str, str]
+    ) -> None:
         # We must apply the original reltype per fact
         # Build rows as {fid, p_id, reltype}
-        rows = [{"fid": fid, "pid": pid, "reltype": reltypes.get(fid, "RELATES_TO") } for fid in fid_batch]
+        rows = [
+            {"fid": fid, "pid": pid, "reltype": reltypes.get(fid, "RELATES_TO")}
+            for fid in fid_batch
+        ]
         # Execute write: MERGE relationship of dynamic type
         # We need to UNWIND and use apoc.create.relationship alternative if APOC available; else run per-reltype groups
         # Group by reltype to construct static-type queries
@@ -426,7 +534,9 @@ class KeywordHierarchizationService(MaintenanceJobBase):
             SET r.job_tag = $job_tag, r.created_from = 'keyword_hierarchization'
             RETURN count(r) AS created
             """
-            await self.storage._connection_ops._execute_query(q, {"items": items, "job_tag": self.hier_config.job_tag})
+            await self.storage._connection_ops._execute_query(
+                q, {"items": items, "job_tag": self.hier_config.job_tag}
+            )
 
     async def _batch_detach_from_keyword(self, k_id: str, fid_batch: List[str]) -> None:
         q = """
@@ -437,20 +547,28 @@ class KeywordHierarchizationService(MaintenanceJobBase):
         RETURN count(*) AS deleted
         """
         # LIMIT to keep transactions small (server can still stream)
-        await self.storage._connection_ops._execute_query(q, {"k_id": k_id, "fids": fid_batch})
+        await self.storage._connection_ops._execute_query(
+            q, {"k_id": k_id, "fids": fid_batch}
+        )
 
 
-async def run_keyword_hierarchization(config_overrides: Optional[Dict[str, Any]] = None, limit_keywords: int = 5) -> Dict[str, Any]:
+async def run_keyword_hierarchization(
+    config_overrides: Optional[Dict[str, Any]] = None, limit_keywords: int = 5
+) -> Dict[str, Any]:
     """Convenience entrypoint for running inside workers/CLI."""
     # Load Neo4j from environment
     import os
+
     neo_config = Neo4jConfig(
         uri=os.getenv("NEO4J_URI", "neo4j://localhost:7687"),
         username=os.getenv("NEO4J_USERNAME", "neo4j"),
         password=os.getenv("NEO4J_PASSWORD", "password"),
         database=os.getenv("NEO4J_DATABASE", "neo4j"),
         verify_ssl=os.getenv("NEO4J_VERIFY_SSL", "true").lower() == "true",
-        trust_all_certificates=os.getenv("NEO4J_TRUST_ALL_CERTIFICATES", "false").lower() == "true",
+        trust_all_certificates=os.getenv(
+            "NEO4J_TRUST_ALL_CERTIFICATES", "false"
+        ).lower()
+        == "true",
     )
     storage = Neo4jStorage(neo_config)
     await storage.connect()
@@ -468,19 +586,27 @@ async def run_keyword_hierarchization(config_overrides: Optional[Dict[str, Any]]
 
 
 def main():
-    import argparse, json
-    parser = argparse.ArgumentParser(description="Run Keyword Hierarchization maintenance job")
+    import argparse
+    import json
+
+    parser = argparse.ArgumentParser(
+        description="Run Keyword Hierarchization maintenance job"
+    )
     parser.add_argument("--threshold", type=int, default=50)
     parser.add_argument("--min-new", type=int, default=3)
     parser.add_argument("--max-new", type=int, default=6)
     parser.add_argument("--min-per", type=int, default=5)
     parser.add_argument("--max-move-ratio", type=float, default=0.8)
-    parser.add_argument("--share", type=float, default=0.18, help="Min co-occurrence share")
+    parser.add_argument(
+        "--share", type=float, default=0.18, help="Min co-occurrence share"
+    )
     parser.add_argument("--batch-size", type=int, default=200)
     parser.add_argument("--limit-keywords", type=int, default=5)
     parser.add_argument("--detach-moved", action="store_true", default=False)
     # Linking is enabled by default and uses LLM to determine type; no flags needed
-    parser.add_argument("--apply", action="store_true", help="Actually apply changes (disable dry-run)")
+    parser.add_argument(
+        "--apply", action="store_true", help="Actually apply changes (disable dry-run)"
+    )
     parser.add_argument("--job-tag", type=str, default="")
     args = parser.parse_args()
 
@@ -499,7 +625,9 @@ def main():
         "job_tag": args.job_tag,
     }
 
-    result = asyncio.run(run_keyword_hierarchization(overrides, limit_keywords=args.limit_keywords))
+    result = asyncio.run(
+        run_keyword_hierarchization(overrides, limit_keywords=args.limit_keywords)
+    )
     print(json.dumps(result, indent=2))
 
 

@@ -1,17 +1,17 @@
 """Tests for web processor."""
 
-import pytest
 from unittest.mock import AsyncMock, Mock, patch
-import httpx
-from bs4 import BeautifulSoup
 
+import httpx
+import pytest
+from bs4 import BeautifulSoup
+from src.morag.core.exceptions import ProcessingError, ValidationError
 from src.morag.processors.web import (
+    WebContent,
     WebProcessor,
     WebScrapingConfig,
-    WebContent,
-    WebScrapingResult
+    WebScrapingResult,
 )
-from src.morag.core.exceptions import ValidationError, ProcessingError
 
 
 class TestWebProcessor:
@@ -65,14 +65,19 @@ class TestWebProcessor:
     def test_validate_url_valid(self, web_processor):
         """Test URL validation with valid URLs."""
         # Test with protocol
-        assert web_processor._validate_url("https://example.com") == "https://example.com"
+        assert (
+            web_processor._validate_url("https://example.com") == "https://example.com"
+        )
         assert web_processor._validate_url("http://example.com") == "http://example.com"
 
         # Test without protocol (should add https)
         assert web_processor._validate_url("example.com") == "https://example.com"
 
         # Test with path
-        assert web_processor._validate_url("example.com/path") == "https://example.com/path"
+        assert (
+            web_processor._validate_url("example.com/path")
+            == "https://example.com/path"
+        )
 
     def test_validate_url_invalid(self, web_processor):
         """Test URL validation with invalid URLs."""
@@ -90,44 +95,44 @@ class TestWebProcessor:
 
     def test_extract_metadata(self, web_processor, sample_html):
         """Test metadata extraction from HTML."""
-        soup = BeautifulSoup(sample_html, 'html.parser')
+        soup = BeautifulSoup(sample_html, "html.parser")
         metadata = web_processor._extract_metadata(soup, "https://example.com")
 
-        assert metadata['url'] == "https://example.com"
-        assert metadata['domain'] == "example.com"
-        assert metadata['title'] == "Test Page"
-        assert metadata['description'] == "A test page for web scraping"
-        assert metadata['keywords'] == "test, web, scraping"
-        assert metadata['og_title'] == "Test Page OG"
-        assert metadata['twitter_card'] == "summary"
-        assert 'extracted_at' in metadata
+        assert metadata["url"] == "https://example.com"
+        assert metadata["domain"] == "example.com"
+        assert metadata["title"] == "Test Page"
+        assert metadata["description"] == "A test page for web scraping"
+        assert metadata["keywords"] == "test, web, scraping"
+        assert metadata["og_title"] == "Test Page OG"
+        assert metadata["twitter_card"] == "summary"
+        assert "extracted_at" in metadata
 
     def test_clean_html(self, web_processor, sample_html):
         """Test HTML cleaning functionality."""
-        soup = BeautifulSoup(sample_html, 'html.parser')
+        soup = BeautifulSoup(sample_html, "html.parser")
         config = WebScrapingConfig(remove_navigation=True, remove_footer=True)
 
         cleaned_soup = web_processor._clean_html(soup, config)
 
         # Navigation should be removed
-        assert not cleaned_soup.find('nav')
+        assert not cleaned_soup.find("nav")
 
         # Footer should be removed
-        assert not cleaned_soup.find('footer')
+        assert not cleaned_soup.find("footer")
 
         # Main content should remain
-        assert cleaned_soup.find('main')
-        assert cleaned_soup.find('h1')
+        assert cleaned_soup.find("main")
+        assert cleaned_soup.find("h1")
 
     def test_extract_links(self, web_processor, sample_html):
         """Test link extraction from HTML."""
-        soup = BeautifulSoup(sample_html, 'html.parser')
+        soup = BeautifulSoup(sample_html, "html.parser")
         links = web_processor._extract_links(soup, "https://example.com")
 
         expected_links = [
             "https://example.com/home",
             "https://example.com/about",
-            "https://example.com"  # External link should be converted to absolute
+            "https://example.com",  # External link should be converted to absolute
         ]
 
         # Check that all expected links are found
@@ -136,19 +141,19 @@ class TestWebProcessor:
 
     def test_extract_images(self, web_processor, sample_html):
         """Test image extraction from HTML."""
-        soup = BeautifulSoup(sample_html, 'html.parser')
+        soup = BeautifulSoup(sample_html, "html.parser")
         images = web_processor._extract_images(soup, "https://example.com")
 
         assert "https://example.com/image.jpg" in images
 
     def test_extract_main_content(self, web_processor, sample_html):
         """Test main content extraction."""
-        soup = BeautifulSoup(sample_html, 'html.parser')
+        soup = BeautifulSoup(sample_html, "html.parser")
         main_content = web_processor._extract_main_content(soup)
 
         # Should find the main tag
-        assert main_content.name == 'main'
-        assert main_content.find('h1')
+        assert main_content.name == "main"
+        assert main_content.find("h1")
         assert "Main Title" in main_content.get_text()
 
     def test_convert_to_markdown(self, web_processor):
@@ -220,12 +225,14 @@ class TestWebProcessor:
         # Mock httpx response
         mock_response = Mock()
         mock_response.text = sample_html
-        mock_response.headers = {'content-type': 'text/html'}
+        mock_response.headers = {"content-type": "text/html"}
         mock_response.content = sample_html.encode()
         mock_response.raise_for_status = Mock()
 
-        with patch('httpx.AsyncClient') as mock_client:
-            mock_client.return_value.__aenter__.return_value.get = AsyncMock(return_value=mock_response)
+        with patch("httpx.AsyncClient") as mock_client:
+            mock_client.return_value.__aenter__.return_value.get = AsyncMock(
+                return_value=mock_response
+            )
 
             content, content_type, headers = await web_processor._fetch_content(
                 "https://example.com", config
@@ -233,7 +240,7 @@ class TestWebProcessor:
 
             assert content == sample_html
             assert "text/html" in content_type
-            assert headers['content-type'] == 'text/html'
+            assert headers["content-type"] == "text/html"
 
     @pytest.mark.asyncio
     async def test_fetch_content_http_error(self, web_processor):
@@ -244,9 +251,11 @@ class TestWebProcessor:
         mock_response = Mock()
         mock_response.status_code = 404
 
-        with patch('httpx.AsyncClient') as mock_client:
+        with patch("httpx.AsyncClient") as mock_client:
             mock_client.return_value.__aenter__.return_value.get = AsyncMock(
-                side_effect=httpx.HTTPStatusError("Not Found", request=Mock(), response=mock_response)
+                side_effect=httpx.HTTPStatusError(
+                    "Not Found", request=Mock(), response=mock_response
+                )
             )
 
             with pytest.raises(ProcessingError):
@@ -259,12 +268,14 @@ class TestWebProcessor:
 
         # Mock response with unsupported content type
         mock_response = Mock()
-        mock_response.headers = {'content-type': 'application/pdf'}
+        mock_response.headers = {"content-type": "application/pdf"}
         mock_response.content = b"PDF content"
         mock_response.raise_for_status = Mock()
 
-        with patch('httpx.AsyncClient') as mock_client:
-            mock_client.return_value.__aenter__.return_value.get = AsyncMock(return_value=mock_response)
+        with patch("httpx.AsyncClient") as mock_client:
+            mock_client.return_value.__aenter__.return_value.get = AsyncMock(
+                return_value=mock_response
+            )
 
             with pytest.raises(ValidationError, match="Unsupported content type"):
                 await web_processor._fetch_content("https://example.com", config)
@@ -277,12 +288,14 @@ class TestWebProcessor:
         # Mock response with large content
         large_content = "x" * 200
         mock_response = Mock()
-        mock_response.headers = {'content-type': 'text/html'}
+        mock_response.headers = {"content-type": "text/html"}
         mock_response.content = large_content.encode()
         mock_response.raise_for_status = Mock()
 
-        with patch('httpx.AsyncClient') as mock_client:
-            mock_client.return_value.__aenter__.return_value.get = AsyncMock(return_value=mock_response)
+        with patch("httpx.AsyncClient") as mock_client:
+            mock_client.return_value.__aenter__.return_value.get = AsyncMock(
+                return_value=mock_response
+            )
 
             with pytest.raises(ValidationError, match="Content too large"):
                 await web_processor._fetch_content("https://example.com", config)
@@ -295,7 +308,7 @@ class TestWebProcessor:
         # Mock httpx response
         mock_response = Mock()
         mock_response.text = sample_html
-        mock_response.headers = {'content-type': 'text/html'}
+        mock_response.headers = {"content-type": "text/html"}
         mock_response.content = sample_html.encode()
         mock_response.raise_for_status = Mock()
 
@@ -309,7 +322,7 @@ class TestWebProcessor:
                 word_count=1,
                 entities=[],
                 topics=[],
-                chunk_type="text"
+                chunk_type="text",
             ),
             Mock(
                 text="chunk2",
@@ -319,13 +332,17 @@ class TestWebProcessor:
                 word_count=1,
                 entities=[],
                 topics=[],
-                chunk_type="text"
-            )
+                chunk_type="text",
+            ),
         ]
-        web_processor.chunking_service.chunk_with_metadata = AsyncMock(return_value=mock_chunk_infos)
+        web_processor.chunking_service.chunk_with_metadata = AsyncMock(
+            return_value=mock_chunk_infos
+        )
 
-        with patch('httpx.AsyncClient') as mock_client:
-            mock_client.return_value.__aenter__.return_value.get = AsyncMock(return_value=mock_response)
+        with patch("httpx.AsyncClient") as mock_client:
+            mock_client.return_value.__aenter__.return_value.get = AsyncMock(
+                return_value=mock_response
+            )
 
             result = await web_processor.process_url("https://example.com", config)
 
@@ -341,7 +358,7 @@ class TestWebProcessor:
         """Test URL processing failure."""
         config = WebScrapingConfig()
 
-        with patch('httpx.AsyncClient') as mock_client:
+        with patch("httpx.AsyncClient") as mock_client:
             mock_client.return_value.__aenter__.return_value.get = AsyncMock(
                 side_effect=httpx.RequestError("Network error")
             )
@@ -362,25 +379,31 @@ class TestWebProcessor:
         # Mock httpx response
         mock_response = Mock()
         mock_response.text = sample_html
-        mock_response.headers = {'content-type': 'text/html'}
+        mock_response.headers = {"content-type": "text/html"}
         mock_response.content = sample_html.encode()
         mock_response.raise_for_status = Mock()
 
         # Mock chunking service
-        mock_chunk_infos = [Mock(
-            text="chunk1",
-            start_char=0,
-            end_char=6,
-            sentence_count=1,
-            word_count=1,
-            entities=[],
-            topics=[],
-            chunk_type="text"
-        )]
-        web_processor.chunking_service.chunk_with_metadata = AsyncMock(return_value=mock_chunk_infos)
+        mock_chunk_infos = [
+            Mock(
+                text="chunk1",
+                start_char=0,
+                end_char=6,
+                sentence_count=1,
+                word_count=1,
+                entities=[],
+                topics=[],
+                chunk_type="text",
+            )
+        ]
+        web_processor.chunking_service.chunk_with_metadata = AsyncMock(
+            return_value=mock_chunk_infos
+        )
 
-        with patch('httpx.AsyncClient') as mock_client:
-            mock_client.return_value.__aenter__.return_value.get = AsyncMock(return_value=mock_response)
+        with patch("httpx.AsyncClient") as mock_client:
+            mock_client.return_value.__aenter__.return_value.get = AsyncMock(
+                return_value=mock_response
+            )
 
             results = await web_processor.process_urls(urls, config)
 
@@ -398,7 +421,7 @@ class TestWebProcessor:
         # Mock responses - first succeeds, second fails
         mock_success_response = Mock()
         mock_success_response.text = sample_html
-        mock_success_response.headers = {'content-type': 'text/html'}
+        mock_success_response.headers = {"content-type": "text/html"}
         mock_success_response.content = sample_html.encode()
         mock_success_response.raise_for_status = Mock()
 
@@ -408,8 +431,10 @@ class TestWebProcessor:
         mock_chunks = [Mock(text="chunk1")]
         web_processor.chunking_service.chunk_text = AsyncMock(return_value=mock_chunks)
 
-        with patch('httpx.AsyncClient') as mock_client:
-            mock_client.return_value.__aenter__.return_value.get = AsyncMock(side_effect=responses)
+        with patch("httpx.AsyncClient") as mock_client:
+            mock_client.return_value.__aenter__.return_value.get = AsyncMock(
+                side_effect=responses
+            )
 
             results = await web_processor.process_urls(urls, config)
 
@@ -432,7 +457,7 @@ class TestWebScrapingConfig:
         assert config.rate_limit_delay == 1.0
         assert "MoRAG" in config.user_agent
         assert config.max_content_length == 10 * 1024 * 1024
-        assert 'text/html' in config.allowed_content_types
+        assert "text/html" in config.allowed_content_types
         assert config.extract_links is True
         assert config.convert_to_markdown is True
         assert config.clean_content is True
@@ -440,10 +465,7 @@ class TestWebScrapingConfig:
     def test_custom_config(self):
         """Test custom configuration values."""
         config = WebScrapingConfig(
-            timeout=60,
-            max_retries=5,
-            rate_limit_delay=2.0,
-            extract_links=False
+            timeout=60, max_retries=5, rate_limit_delay=2.0, extract_links=False
         )
 
         assert config.timeout == 60
@@ -467,7 +489,7 @@ class TestWebContent:
             images=["https://image1.jpg"],
             extraction_time=1.5,
             content_length=100,
-            content_type="text/html"
+            content_type="text/html",
         )
 
         assert content.url == "https://example.com"
@@ -497,7 +519,7 @@ class TestWebScrapingResult:
             images=[],
             extraction_time=1.0,
             content_length=50,
-            content_type="text/html"
+            content_type="text/html",
         )
 
         result = WebScrapingResult(
@@ -505,7 +527,7 @@ class TestWebScrapingResult:
             content=content,
             chunks=[],
             processing_time=2.0,
-            success=True
+            success=True,
         )
 
         assert result.success is True
@@ -523,7 +545,7 @@ class TestWebScrapingResult:
             chunks=[],
             processing_time=1.0,
             success=False,
-            error_message="Network error"
+            error_message="Network error",
         )
 
         assert result.success is False

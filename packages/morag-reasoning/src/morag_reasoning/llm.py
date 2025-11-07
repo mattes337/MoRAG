@@ -33,7 +33,9 @@ class LLMConfig(BaseModel):
     batch_size: int = 10  # Number of prompts to batch together
     enable_batching: bool = True  # Enable batch processing
     batch_delay: float = 1.0  # Delay between batch requests
-    max_batch_tokens: int = 800000  # Max tokens per batch (considering 1M context limit)
+    max_batch_tokens: int = (
+        800000  # Max tokens per batch (considering 1M context limit)
+    )
     batch_timeout: int = 120  # Timeout for batch requests
 
 
@@ -61,7 +63,8 @@ class LLMClient:
                 base_delay=float(os.getenv("MORAG_LLM_BASE_DELAY", "2.0")),
                 max_delay=float(os.getenv("MORAG_LLM_MAX_DELAY", "120.0")),
                 batch_size=int(os.getenv("MORAG_LLM_BATCH_SIZE", "10")),
-                enable_batching=os.getenv("MORAG_ENABLE_LLM_BATCHING", "true").lower() == "true",
+                enable_batching=os.getenv("MORAG_ENABLE_LLM_BATCHING", "true").lower()
+                == "true",
                 batch_delay=float(os.getenv("MORAG_LLM_BATCH_DELAY", "1.0")),
                 max_batch_tokens=int(os.getenv("MORAG_LLM_MAX_BATCH_TOKENS", "800000")),
                 batch_timeout=int(os.getenv("MORAG_LLM_BATCH_TIMEOUT", "120")),
@@ -102,7 +105,7 @@ class LLMClient:
         prompt: str,
         max_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
-        **kwargs
+        **kwargs,
     ) -> str:
         """Generate text from a prompt with quota-aware retry.
 
@@ -128,9 +131,7 @@ class LLMClient:
                 )
 
             return await retry_with_quota_handling(
-                generate_with_retry,
-                max_retries=15,
-                operation_name="text generation"
+                generate_with_retry, max_retries=15, operation_name="text generation"
             )
 
         except ImportError:
@@ -145,7 +146,7 @@ class LLMClient:
         messages: List[Dict[str, str]],
         max_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
-        **kwargs
+        **kwargs,
     ) -> str:
         """Generate text from a list of messages.
 
@@ -173,10 +174,7 @@ class LLMClient:
             raise ValueError(f"Unsupported LLM provider: {self.config.provider}")
 
     async def _call_openai(
-        self,
-        messages: List[Dict[str, str]],
-        max_tokens: int,
-        temperature: float
+        self, messages: List[Dict[str, str]], max_tokens: int, temperature: float
     ) -> str:
         """Call OpenAI API with exponential backoff retry logic."""
         headers = {
@@ -214,16 +212,19 @@ class LLMClient:
 
                 # Check if this is a retryable error
                 is_retryable = (
-                    "503" in error_str or
-                    "overload" in error_str or
-                    "rate limit" in error_str or
-                    "quota" in error_str or
-                    "too many requests" in error_str or
-                    "service unavailable" in error_str or
-                    "temporarily unavailable" in error_str or
-                    "server error" in error_str or
-                    (hasattr(e, 'response') and hasattr(e.response, 'status_code') and
-                     e.response.status_code in [503, 429, 500, 502, 504])
+                    "503" in error_str
+                    or "overload" in error_str
+                    or "rate limit" in error_str
+                    or "quota" in error_str
+                    or "too many requests" in error_str
+                    or "service unavailable" in error_str
+                    or "temporarily unavailable" in error_str
+                    or "server error" in error_str
+                    or (
+                        hasattr(e, "response")
+                        and hasattr(e.response, "status_code")
+                        and e.response.status_code in [503, 429, 500, 502, 504]
+                    )
                 )
 
                 if attempt < self.config.max_retries and is_retryable:
@@ -234,39 +235,41 @@ class LLMClient:
                     )
                     await asyncio.sleep(delay)
                 elif not is_retryable:
-                    self.logger.error(f"OpenAI API call failed with non-retryable error: {str(e)}")
+                    self.logger.error(
+                        f"OpenAI API call failed with non-retryable error: {str(e)}"
+                    )
                     break
                 else:
                     break
 
-        self.logger.error(f"OpenAI API call failed after {self.config.max_retries} attempts")
+        self.logger.error(
+            f"OpenAI API call failed after {self.config.max_retries} attempts"
+        )
         raise last_error
 
     async def _call_gemini(
-        self,
-        messages: List[Dict[str, str]],
-        max_tokens: int,
-        temperature: float
+        self, messages: List[Dict[str, str]], max_tokens: int, temperature: float
     ) -> str:
         """Call Google Gemini API with exponential backoff retry logic."""
         # Convert messages to Gemini format
         gemini_contents = []
         for message in messages:
             role = "user" if message["role"] in ["user", "system"] else "model"
-            gemini_contents.append({
-                "role": role,
-                "parts": [{"text": message["content"]}]
-            })
+            gemini_contents.append(
+                {"role": role, "parts": [{"text": message["content"]}]}
+            )
 
         payload = {
             "contents": gemini_contents,
             "generationConfig": {
                 "temperature": temperature,
                 "maxOutputTokens": max_tokens,
-            }
+            },
         }
 
-        base_url = self.config.base_url or "https://generativelanguage.googleapis.com/v1beta"
+        base_url = (
+            self.config.base_url or "https://generativelanguage.googleapis.com/v1beta"
+        )
         url = f"{base_url}/models/{self.config.model}:generateContent?key={self.config.api_key}"
 
         headers = {
@@ -301,16 +304,19 @@ class LLMClient:
 
                 # Check if this is a retryable error
                 is_retryable = (
-                    "503" in error_str or
-                    "overload" in error_str or
-                    "rate limit" in error_str or
-                    "quota" in error_str or
-                    "too many requests" in error_str or
-                    "service unavailable" in error_str or
-                    "temporarily unavailable" in error_str or
-                    "server error" in error_str or
-                    (hasattr(e, 'response') and hasattr(e.response, 'status_code') and
-                     e.response.status_code in [503, 429, 500, 502, 504])
+                    "503" in error_str
+                    or "overload" in error_str
+                    or "rate limit" in error_str
+                    or "quota" in error_str
+                    or "too many requests" in error_str
+                    or "service unavailable" in error_str
+                    or "temporarily unavailable" in error_str
+                    or "server error" in error_str
+                    or (
+                        hasattr(e, "response")
+                        and hasattr(e.response, "status_code")
+                        and e.response.status_code in [503, 429, 500, 502, 504]
+                    )
                 )
 
                 if attempt < self.config.max_retries and is_retryable:
@@ -321,24 +327,29 @@ class LLMClient:
                     )
                     await asyncio.sleep(delay)
                 elif not is_retryable:
-                    self.logger.error(f"Gemini API call failed with non-retryable error: {str(e)}")
+                    self.logger.error(
+                        f"Gemini API call failed with non-retryable error: {str(e)}"
+                    )
                     break
                 else:
                     break
 
-        self.logger.error(f"Gemini API call failed after {self.config.max_retries} attempts")
+        self.logger.error(
+            f"Gemini API call failed after {self.config.max_retries} attempts"
+        )
         raise last_error
 
     def _calculate_delay(self, attempt: int) -> float:
         """Calculate delay for exponential backoff with jitter."""
         delay = min(
             self.config.base_delay * (self.config.exponential_base ** (attempt - 1)),
-            self.config.max_delay
+            self.config.max_delay,
         )
 
         if self.config.jitter:
             import random
-            delay *= (0.5 + random.random() * 0.5)  # Add 0-50% jitter
+
+            delay *= 0.5 + random.random() * 0.5  # Add 0-50% jitter
 
         return delay
 
@@ -346,7 +357,7 @@ class LLMClient:
         self,
         prompts: List[str],
         max_tokens: Optional[int] = None,
-        temperature: Optional[float] = None
+        temperature: Optional[float] = None,
     ) -> List[str]:
         """Process a batch of prompts in a single API call.
 
@@ -362,27 +373,37 @@ class LLMClient:
         estimated_tokens = self._estimate_batch_tokens(prompts, max_tokens)
 
         if estimated_tokens > self.config.max_batch_tokens:
-            logger.warning(f"Batch token estimate ({estimated_tokens}) exceeds limit "
-                         f"({self.config.max_batch_tokens}), splitting batch")
+            logger.warning(
+                f"Batch token estimate ({estimated_tokens}) exceeds limit "
+                f"({self.config.max_batch_tokens}), splitting batch"
+            )
             # Split the batch and process recursively
             mid = len(prompts) // 2
-            first_half = await self._process_batch(prompts[:mid], max_tokens, temperature)
-            second_half = await self._process_batch(prompts[mid:], max_tokens, temperature)
+            first_half = await self._process_batch(
+                prompts[:mid], max_tokens, temperature
+            )
+            second_half = await self._process_batch(
+                prompts[mid:], max_tokens, temperature
+            )
             return first_half + second_half
 
         if self.config.provider == "gemini":
             return await self._process_batch_gemini(prompts, max_tokens, temperature)
         else:
             # For other providers, fall back to individual calls
-            logger.warning(f"Batch processing not implemented for provider {self.config.provider}, "
-                         "falling back to individual calls")
+            logger.warning(
+                f"Batch processing not implemented for provider {self.config.provider}, "
+                "falling back to individual calls"
+            )
             results = []
             for prompt in prompts:
                 response = await self.generate_text(prompt, max_tokens, temperature)
                 results.append(response)
             return results
 
-    def _estimate_batch_tokens(self, prompts: List[str], max_tokens: Optional[int] = None) -> int:
+    def _estimate_batch_tokens(
+        self, prompts: List[str], max_tokens: Optional[int] = None
+    ) -> int:
         """Estimate total tokens for a batch of prompts.
 
         Args:
@@ -405,7 +426,7 @@ class LLMClient:
         self,
         prompts: List[str],
         max_tokens: Optional[int] = None,
-        temperature: Optional[float] = None
+        temperature: Optional[float] = None,
     ) -> List[str]:
         """Process a batch of prompts using Gemini's large context window.
 
@@ -430,19 +451,14 @@ class LLMClient:
         combined_prompt = self._create_batch_prompt(prompts, delimiter)
 
         # Convert to message format
-        messages = [
-            {
-                "role": "user",
-                "content": combined_prompt
-            }
-        ]
+        messages = [{"role": "user", "content": combined_prompt}]
 
         # Call Gemini with the combined prompt
         try:
             response = await self._call_gemini(
                 messages,
                 max_tokens * len(prompts),  # Increase max tokens for batch
-                temperature
+                temperature,
             )
 
             # Parse the response to extract individual answers
@@ -498,10 +514,7 @@ RESPONSE 2:
         return batch_prompt
 
     def _parse_batch_response(
-        self,
-        response: str,
-        original_prompts: List[str],
-        delimiter: str
+        self, response: str, original_prompts: List[str], delimiter: str
     ) -> List[str]:
         """Parse a batch response into individual responses.
 
@@ -526,7 +539,7 @@ RESPONSE 2:
 
                 # Look for "RESPONSE X:" pattern and extract content after it
                 if "RESPONSE" in part.upper():
-                    lines = part.split('\n')
+                    lines = part.split("\n")
                     response_content = []
                     found_response_marker = False
 
@@ -538,8 +551,11 @@ RESPONSE 2:
                             response_content.append(line)
 
                     if response_content:
-                        responses.append('\n'.join(response_content).strip())
-                elif part and not any(keyword in part.upper() for keyword in ["TASK", "PLEASE", "IMPORTANT"]):
+                        responses.append("\n".join(response_content).strip())
+                elif part and not any(
+                    keyword in part.upper()
+                    for keyword in ["TASK", "PLEASE", "IMPORTANT"]
+                ):
                     # If it doesn't look like instructions, treat it as a response
                     responses.append(part)
 
@@ -548,13 +564,17 @@ RESPONSE 2:
                 return responses
             elif len(responses) > len(original_prompts):
                 # Too many responses, take the first N
-                logger.warning(f"Got {len(responses)} responses for {len(original_prompts)} prompts, "
-                             "taking first {len(original_prompts)}")
-                return responses[:len(original_prompts)]
+                logger.warning(
+                    f"Got {len(responses)} responses for {len(original_prompts)} prompts, "
+                    "taking first {len(original_prompts)}"
+                )
+                return responses[: len(original_prompts)]
             else:
                 # Too few responses, pad with error messages
-                logger.warning(f"Got {len(responses)} responses for {len(original_prompts)} prompts, "
-                             "padding with error messages")
+                logger.warning(
+                    f"Got {len(responses)} responses for {len(original_prompts)} prompts, "
+                    "padding with error messages"
+                )
                 while len(responses) < len(original_prompts):
                     responses.append("Error: No response generated for this prompt")
                 return responses
@@ -569,7 +589,7 @@ RESPONSE 2:
         message_lists: List[List[Dict[str, str]]],
         max_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
-        batch_size: Optional[int] = None
+        batch_size: Optional[int] = None,
     ) -> List[str]:
         """Generate responses for multiple message conversations using batch processing.
 
@@ -609,7 +629,7 @@ RESPONSE 2:
         prompts: List[str],
         max_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
-        batch_size: Optional[int] = None
+        batch_size: Optional[int] = None,
     ) -> List[str]:
         """Generate responses for multiple prompts using batch processing.
 
@@ -640,55 +660,66 @@ RESPONSE 2:
         # Use provided batch size or config default
         effective_batch_size = batch_size or self.config.batch_size
 
-        logger.info(f"Processing {len(prompts)} prompts in batches of {effective_batch_size}")
+        logger.info(
+            f"Processing {len(prompts)} prompts in batches of {effective_batch_size}"
+        )
 
         all_results = []
 
         # Process prompts in batches with quota-aware retry
         for i in range(0, len(prompts), effective_batch_size):
-            batch_prompts = prompts[i:i + effective_batch_size]
-            batch_num = i//effective_batch_size + 1
+            batch_prompts = prompts[i : i + effective_batch_size]
+            batch_num = i // effective_batch_size + 1
 
             try:
                 # Use quota-aware retry for batch processing
                 from morag_graph.utils.quota_retry import retry_with_quota_handling
 
                 async def process_this_batch():
-                    return await self._process_batch(batch_prompts, max_tokens, temperature)
+                    return await self._process_batch(
+                        batch_prompts, max_tokens, temperature
+                    )
 
                 batch_results = await retry_with_quota_handling(
                     process_this_batch,
                     max_retries=15,  # More retries for quota issues
-                    operation_name=f"batch processing (batch {batch_num})"
+                    operation_name=f"batch processing (batch {batch_num})",
                 )
 
                 all_results.extend(batch_results)
 
-                logger.debug(f"Processed batch {batch_num}, "
-                           f"completed {len(all_results)}/{len(prompts)} prompts")
+                logger.debug(
+                    f"Processed batch {batch_num}, "
+                    f"completed {len(all_results)}/{len(prompts)} prompts"
+                )
 
                 # Add delay between batches if not the last batch
                 if i + effective_batch_size < len(prompts):
                     await asyncio.sleep(self.config.batch_delay)
 
             except Exception as e:
-                logger.error(f"Batch processing failed for batch {batch_num} after retries: {str(e)}")
+                logger.error(
+                    f"Batch processing failed for batch {batch_num} after retries: {str(e)}"
+                )
 
                 # Fall back to individual processing with quota handling for this batch
                 for j, prompt in enumerate(batch_prompts):
                     try:
+
                         async def process_individual():
                             return await self.generate(prompt, max_tokens, temperature)
 
                         response = await retry_with_quota_handling(
                             process_individual,
                             max_retries=10,
-                            operation_name=f"individual prompt (batch {batch_num}, item {j+1})"
+                            operation_name=f"individual prompt (batch {batch_num}, item {j+1})",
                         )
                         all_results.append(response)
 
                     except Exception as individual_error:
-                        logger.error(f"Individual prompt processing failed after retries: {str(individual_error)}")
+                        logger.error(
+                            f"Individual prompt processing failed after retries: {str(individual_error)}"
+                        )
                         all_results.append(f"Error: {str(individual_error)}")
 
         return all_results

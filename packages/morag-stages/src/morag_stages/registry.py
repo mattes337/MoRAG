@@ -1,10 +1,11 @@
 """Stage registry for managing available stages."""
 
-from typing import Dict, List, Optional, Type, Set
+from typing import Dict, List, Optional, Set, Type
+
 import structlog
 
+from .exceptions import StageDependencyError, StageError
 from .models import Stage, StageType
-from .exceptions import StageError, StageDependencyError
 
 logger = structlog.get_logger(__name__)
 
@@ -31,15 +32,15 @@ class StageRegistry:
         stage_type = None
 
         # Try to infer stage type from class name
-        if 'markdown_conversion' in class_name or 'markdownconversion' in class_name:
+        if "markdown_conversion" in class_name or "markdownconversion" in class_name:
             stage_type = StageType.MARKDOWN_CONVERSION
-        elif 'markdown_optimizer' in class_name or 'markdownoptimizer' in class_name:
+        elif "markdown_optimizer" in class_name or "markdownoptimizer" in class_name:
             stage_type = StageType.MARKDOWN_OPTIMIZER
-        elif 'chunker' in class_name:
+        elif "chunker" in class_name:
             stage_type = StageType.CHUNKER
-        elif 'fact_generator' in class_name or 'factgenerator' in class_name:
+        elif "fact_generator" in class_name or "factgenerator" in class_name:
             stage_type = StageType.FACT_GENERATOR
-        elif 'ingestor' in class_name:
+        elif "ingestor" in class_name:
             stage_type = StageType.INGESTOR
         else:
             # Default fallback
@@ -53,7 +54,11 @@ class StageRegistry:
             raise StageError(f"Stage type {stage_type.value} is already registered")
 
         self._stages[stage_type] = stage_class
-        logger.info("Stage registered", stage_type=stage_type.value, stage_class=stage_class.__name__)
+        logger.info(
+            "Stage registered",
+            stage_type=stage_type.value,
+            stage_class=stage_class.__name__,
+        )
 
     def unregister_stage(self, stage_type: StageType) -> None:
         """Unregister a stage type.
@@ -139,7 +144,7 @@ class StageRegistry:
                 raise StageDependencyError(
                     f"Stage {stage_type.value} has unsatisfied dependencies: {missing_names}",
                     stage_type=stage_type.value,
-                    missing_dependencies=missing_names
+                    missing_dependencies=missing_names,
                 )
 
             completed_stages.add(stage_type)
@@ -181,7 +186,8 @@ class StageRegistry:
         while remaining:
             # Find stages with no unresolved dependencies within the requested set
             ready = [
-                stage_type for stage_type in remaining
+                stage_type
+                for stage_type in remaining
                 if dependencies[stage_type].issubset(set(ordered))
             ]
 

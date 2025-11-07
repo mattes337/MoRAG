@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """Test CLI script for recursive fact retrieval using direct code calls."""
 
+import argparse
 import asyncio
 import json
-import argparse
-import sys
 import os
+import sys
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
+
 import structlog
 from dotenv import load_dotenv
 
@@ -22,21 +23,29 @@ else:
     load_dotenv()
 
 # Add the packages to the path
-sys.path.insert(0, str(Path(__file__).parent.parent / "packages" / "morag-reasoning" / "src"))
-sys.path.insert(0, str(Path(__file__).parent.parent / "packages" / "morag-graph" / "src"))
-sys.path.insert(0, str(Path(__file__).parent.parent / "packages" / "morag-vector" / "src"))
-sys.path.insert(0, str(Path(__file__).parent.parent / "packages" / "morag-services" / "src"))
+sys.path.insert(
+    0, str(Path(__file__).parent.parent / "packages" / "morag-reasoning" / "src")
+)
+sys.path.insert(
+    0, str(Path(__file__).parent.parent / "packages" / "morag-graph" / "src")
+)
+sys.path.insert(
+    0, str(Path(__file__).parent.parent / "packages" / "morag-vector" / "src")
+)
+sys.path.insert(
+    0, str(Path(__file__).parent.parent / "packages" / "morag-services" / "src")
+)
 
+from morag_graph.storage.neo4j_storage import Neo4jConfig, Neo4jStorage
 from morag_reasoning import (
-    RecursiveFactRetrievalService,
+    LLMClient,
+    LLMConfig,
     RecursiveFactRetrievalRequest,
     RecursiveFactRetrievalResponse,
-    LLMClient,
-    LLMConfig
+    RecursiveFactRetrievalService,
 )
-from morag_graph.storage.neo4j_storage import Neo4jStorage, Neo4jConfig
-from morag_services.storage import QdrantVectorStorage
 from morag_services.embedding import GeminiEmbeddingService
+from morag_services.storage import QdrantVectorStorage
 
 # Configure logging
 structlog.configure(
@@ -49,7 +58,7 @@ structlog.configure(
         structlog.processors.StackInfoRenderer(),
         structlog.processors.format_exc_info,
         structlog.processors.UnicodeDecoder(),
-        structlog.processors.JSONRenderer()
+        structlog.processors.JSONRenderer(),
     ],
     context_class=dict,
     logger_factory=structlog.stdlib.LoggerFactory(),
@@ -74,7 +83,7 @@ class RecursiveFactRetrievalTester:
         qdrant_collection: str = None,
         gemini_api_key: Optional[str] = None,
         gemini_model: str = None,
-        stronger_gemini_model: str = None
+        stronger_gemini_model: str = None,
     ):
         """Initialize the tester.
 
@@ -101,19 +110,28 @@ class RecursiveFactRetrievalTester:
         if qdrant_url and not qdrant_host:
             # Extract host and port from URL
             from urllib.parse import urlparse
+
             parsed = urlparse(qdrant_url)
             self.qdrant_host = parsed.hostname
-            self.qdrant_port = parsed.port or (443 if parsed.scheme == "https" else 6333)
+            self.qdrant_port = parsed.port or (
+                443 if parsed.scheme == "https" else 6333
+            )
             self.qdrant_use_ssl = parsed.scheme == "https"
         else:
             self.qdrant_host = qdrant_host or os.getenv("QDRANT_HOST", "localhost")
             self.qdrant_port = qdrant_port or int(os.getenv("QDRANT_PORT", "6333"))
             self.qdrant_use_ssl = False
 
-        self.qdrant_collection = qdrant_collection or os.getenv("MORAG_QDRANT_COLLECTION", "morag_chunks")
+        self.qdrant_collection = qdrant_collection or os.getenv(
+            "MORAG_QDRANT_COLLECTION", "morag_chunks"
+        )
         self.gemini_api_key = gemini_api_key or os.getenv("GEMINI_API_KEY")
-        self.gemini_model = gemini_model or os.getenv("MORAG_GEMINI_MODEL", "gemini-1.5-flash")
-        self.stronger_gemini_model = stronger_gemini_model or os.getenv("MORAG_STRONGER_GEMINI_MODEL", "gemini-1.5-pro")
+        self.gemini_model = gemini_model or os.getenv(
+            "MORAG_GEMINI_MODEL", "gemini-1.5-flash"
+        )
+        self.stronger_gemini_model = stronger_gemini_model or os.getenv(
+            "MORAG_STRONGER_GEMINI_MODEL", "gemini-1.5-pro"
+        )
 
         self.service = None
 
@@ -130,16 +148,12 @@ class RecursiveFactRetrievalTester:
                 return False
 
             # Regular LLM client for GTA/FCA
-            llm_config = LLMConfig(
-                api_key=self.gemini_api_key,
-                model=self.gemini_model
-            )
+            llm_config = LLMConfig(api_key=self.gemini_api_key, model=self.gemini_model)
             llm_client = LLMClient(llm_config)
 
             # Stronger LLM client for final synthesis
             stronger_llm_config = LLMConfig(
-                api_key=self.gemini_api_key,
-                model=self.stronger_gemini_model
+                api_key=self.gemini_api_key, model=self.stronger_gemini_model
             )
             stronger_llm_client = LLMClient(stronger_llm_config)
 
@@ -148,7 +162,7 @@ class RecursiveFactRetrievalTester:
                 uri=self.neo4j_uri,
                 user=self.neo4j_user,
                 password=self.neo4j_password,
-                database=self.neo4j_database
+                database=self.neo4j_database,
             )
             neo4j_storage = Neo4jStorage(neo4j_config)
             await neo4j_storage.connect()
@@ -159,14 +173,16 @@ class RecursiveFactRetrievalTester:
                 port=self.qdrant_port,
                 collection_name=self.qdrant_collection,
                 api_key=os.getenv("QDRANT_API_KEY"),
-                verify_ssl=self.qdrant_use_ssl
+                verify_ssl=self.qdrant_use_ssl,
             )
             await qdrant_storage.connect()
 
             # Initialize embedding service
             embedding_service = GeminiEmbeddingService(
                 api_key=os.getenv("GEMINI_API_KEY"),
-                embedding_model=os.getenv("GEMINI_EMBEDDING_MODEL", "text-embedding-004")
+                embedding_model=os.getenv(
+                    "GEMINI_EMBEDDING_MODEL", "text-embedding-004"
+                ),
             )
 
             # Initialize recursive fact retrieval service
@@ -175,7 +191,7 @@ class RecursiveFactRetrievalTester:
                 neo4j_storage=neo4j_storage,
                 qdrant_storage=qdrant_storage,
                 stronger_llm_client=stronger_llm_client,
-                embedding_service=embedding_service
+                embedding_service=embedding_service,
             )
 
             logger.info("Recursive fact retrieval service initialized successfully")
@@ -192,15 +208,9 @@ class RecursiveFactRetrievalTester:
             Health status information
         """
         if not self.service:
-            return {
-                "status": "unhealthy",
-                "error": "Service not initialized"
-            }
+            return {"status": "unhealthy", "error": "Service not initialized"}
 
-        health = {
-            "status": "healthy",
-            "services": {}
-        }
+        health = {"status": "healthy", "services": {}}
 
         try:
             # Check Neo4j connection
@@ -221,7 +231,9 @@ class RecursiveFactRetrievalTester:
 
             # Check LLM clients
             health["services"]["llm_client"] = self.service.llm_client is not None
-            health["services"]["stronger_llm_client"] = self.service.stronger_llm_client is not None
+            health["services"]["stronger_llm_client"] = (
+                self.service.stronger_llm_client is not None
+            )
 
             # Overall status
             if not all(health["services"].values()):
@@ -243,7 +255,7 @@ class RecursiveFactRetrievalTester:
         max_total_facts: int = 50,
         language: Optional[str] = None,
         facts_only: bool = False,
-        skip_fact_evaluation: bool = False
+        skip_fact_evaluation: bool = False,
     ) -> Dict[str, Any]:
         """Test the recursive fact retrieval service.
 
@@ -262,10 +274,7 @@ class RecursiveFactRetrievalTester:
             Response from the service
         """
         if not self.service:
-            return {
-                "success": False,
-                "error": "Service not initialized"
-            }
+            return {"success": False, "error": "Service not initialized"}
 
         try:
             # Create request
@@ -280,31 +289,25 @@ class RecursiveFactRetrievalTester:
                 qdrant_collection=self.qdrant_collection,
                 language=language,
                 facts_only=facts_only,
-                skip_fact_evaluation=skip_fact_evaluation
+                skip_fact_evaluation=skip_fact_evaluation,
             )
 
             # Run recursive fact retrieval
             response = await self.service.retrieve_facts_recursively(request)
 
-            return {
-                "success": True,
-                "data": response.model_dump()
-            }
+            return {"success": True, "data": response.model_dump()}
 
         except Exception as e:
             logger.error("Recursive fact retrieval test failed", error=str(e))
-            return {
-                "success": False,
-                "error": str(e)
-            }
+            return {"success": False, "error": str(e)}
 
     async def cleanup(self):
         """Clean up resources."""
         if self.service:
             try:
-                if hasattr(self.service.neo4j_storage, 'close'):
+                if hasattr(self.service.neo4j_storage, "close"):
                     await self.service.neo4j_storage.close()
-                if hasattr(self.service.qdrant_storage, 'close'):
+                if hasattr(self.service.qdrant_storage, "close"):
                     await self.service.qdrant_storage.close()
             except Exception as e:
                 logger.warning("Error during cleanup", error=str(e))
@@ -333,26 +336,32 @@ class RecursiveFactRetrievalTester:
         print(f"   Raw facts extracted: {data['total_raw_facts']}")
         print(f"   Scored facts: {data['total_scored_facts']}")
         print(f"   Final facts: {len(data['final_facts'])}")
-        print(f"   LLM calls - GTA: {data['gta_llm_calls']}, FCA: {data['fca_llm_calls']}, Final: {data['final_llm_calls']}")
+        print(
+            f"   LLM calls - GTA: {data['gta_llm_calls']}, FCA: {data['fca_llm_calls']}, Final: {data['final_llm_calls']}"
+        )
         print(f"   Confidence score: {data['confidence_score']:.2f}")
 
         # Print traversal steps
-        if data['traversal_steps'] and verbose:
+        if data["traversal_steps"] and verbose:
             print("\n[PROCESSING] Traversal Steps:")
-            for step in data['traversal_steps']:
-                print(f"   Depth {step['depth']}: {step['node_name']} (ID: {step['node_id']})")
+            for step in data["traversal_steps"]:
+                print(
+                    f"   Depth {step['depth']}: {step['node_name']} (ID: {step['node_id']})"
+                )
                 print(f"     Facts extracted: {step['facts_extracted']}")
                 print(f"     Decision: {step['next_nodes_decision']}")
-                if step['reasoning']:
+                if step["reasoning"]:
                     print(f"     Reasoning: {step['reasoning'][:100]}...")
                 print()
 
         # Print final facts
-        if data['final_facts']:
+        if data["final_facts"]:
             print("\n[INFO] Final Facts:")
-            for i, fact in enumerate(data['final_facts'][:10], 1):  # Show top 10 facts
+            for i, fact in enumerate(data["final_facts"][:10], 1):  # Show top 10 facts
                 print(f"   {i}. {fact['fact_text']}")
-                print(f"      Score: {fact['final_decayed_score']:.3f} (original: {fact['score']:.3f})")
+                print(
+                    f"      Score: {fact['final_decayed_score']:.3f} (original: {fact['score']:.3f})"
+                )
                 print(f"      Depth: {fact['extracted_from_depth']}")
                 print(f"      Source: {fact['source_description']}")
                 print()
@@ -373,8 +382,12 @@ def show_environment_config():
     else:
         print("   📄 Loaded from: current directory or system environment")
 
-    print(f"   GEMINI_API_KEY: {'[OK] Set' if os.getenv('GEMINI_API_KEY') else '[FAIL] Not set'}")
-    print(f"   MORAG_GEMINI_MODEL: {os.getenv('MORAG_GEMINI_MODEL', 'gemini-1.5-flash')}")
+    print(
+        f"   GEMINI_API_KEY: {'[OK] Set' if os.getenv('GEMINI_API_KEY') else '[FAIL] Not set'}"
+    )
+    print(
+        f"   MORAG_GEMINI_MODEL: {os.getenv('MORAG_GEMINI_MODEL', 'gemini-1.5-flash')}"
+    )
     print(f"   NEO4J_URI: {os.getenv('NEO4J_URI', 'bolt://localhost:7687')}")
     print(f"   NEO4J_USERNAME: {os.getenv('NEO4J_USERNAME', 'neo4j')}")
     print(f"   NEO4J_DATABASE: {os.getenv('NEO4J_DATABASE', 'neo4j')}")
@@ -386,7 +399,9 @@ def show_environment_config():
         print(f"   QDRANT_HOST: {os.getenv('QDRANT_HOST', 'localhost')}")
         print(f"   QDRANT_PORT: {os.getenv('QDRANT_PORT', '6333')}")
 
-    print(f"   MORAG_QDRANT_COLLECTION: {os.getenv('MORAG_QDRANT_COLLECTION', 'morag_chunks')}")
+    print(
+        f"   MORAG_QDRANT_COLLECTION: {os.getenv('MORAG_QDRANT_COLLECTION', 'morag_chunks')}"
+    )
     print()
 
 
@@ -395,49 +410,116 @@ async def main():
     parser = argparse.ArgumentParser(
         description="Test recursive fact retrieval using direct code calls",
         epilog="Environment variables are loaded from .env file in project root. "
-               "Command line arguments override environment variables."
+        "Command line arguments override environment variables.",
     )
-    parser.add_argument("query", nargs="?", help="Query to test (optional when using --show-config)")
+    parser.add_argument(
+        "query", nargs="?", help="Query to test (optional when using --show-config)"
+    )
 
     # Database configuration
-    parser.add_argument("--neo4j-uri", default=os.getenv("NEO4J_URI", "bolt://localhost:7687"),
-                       help=f"Neo4j URI (env: NEO4J_URI, current: {os.getenv('NEO4J_URI', 'bolt://localhost:7687')})")
-    parser.add_argument("--neo4j-user", default=os.getenv("NEO4J_USERNAME", "neo4j"),
-                       help=f"Neo4j username (env: NEO4J_USERNAME, current: {os.getenv('NEO4J_USERNAME', 'neo4j')})")
-    parser.add_argument("--neo4j-password", default=os.getenv("NEO4J_PASSWORD", "password"),
-                       help="Neo4j password (env: NEO4J_PASSWORD)")
-    parser.add_argument("--neo4j-database", default=os.getenv("NEO4J_DATABASE", "neo4j"),
-                       help=f"Neo4j database (env: NEO4J_DATABASE, current: {os.getenv('NEO4J_DATABASE', 'neo4j')})")
-    parser.add_argument("--qdrant-host",
-                       help="Qdrant host (auto-detected from QDRANT_URL if not specified)")
-    parser.add_argument("--qdrant-port", type=int,
-                       help="Qdrant port (auto-detected from QDRANT_URL if not specified)")
-    parser.add_argument("--qdrant-collection", default=os.getenv("MORAG_QDRANT_COLLECTION", "morag_chunks"),
-                       help=f"Qdrant collection (env: MORAG_QDRANT_COLLECTION, current: {os.getenv('MORAG_QDRANT_COLLECTION', 'morag_chunks')})")
+    parser.add_argument(
+        "--neo4j-uri",
+        default=os.getenv("NEO4J_URI", "bolt://localhost:7687"),
+        help=f"Neo4j URI (env: NEO4J_URI, current: {os.getenv('NEO4J_URI', 'bolt://localhost:7687')})",
+    )
+    parser.add_argument(
+        "--neo4j-user",
+        default=os.getenv("NEO4J_USERNAME", "neo4j"),
+        help=f"Neo4j username (env: NEO4J_USERNAME, current: {os.getenv('NEO4J_USERNAME', 'neo4j')})",
+    )
+    parser.add_argument(
+        "--neo4j-password",
+        default=os.getenv("NEO4J_PASSWORD", "password"),
+        help="Neo4j password (env: NEO4J_PASSWORD)",
+    )
+    parser.add_argument(
+        "--neo4j-database",
+        default=os.getenv("NEO4J_DATABASE", "neo4j"),
+        help=f"Neo4j database (env: NEO4J_DATABASE, current: {os.getenv('NEO4J_DATABASE', 'neo4j')})",
+    )
+    parser.add_argument(
+        "--qdrant-host",
+        help="Qdrant host (auto-detected from QDRANT_URL if not specified)",
+    )
+    parser.add_argument(
+        "--qdrant-port",
+        type=int,
+        help="Qdrant port (auto-detected from QDRANT_URL if not specified)",
+    )
+    parser.add_argument(
+        "--qdrant-collection",
+        default=os.getenv("MORAG_QDRANT_COLLECTION", "morag_chunks"),
+        help=f"Qdrant collection (env: MORAG_QDRANT_COLLECTION, current: {os.getenv('MORAG_QDRANT_COLLECTION', 'morag_chunks')})",
+    )
 
     # LLM configuration
-    parser.add_argument("--gemini-api-key", default=os.getenv("GEMINI_API_KEY"),
-                       help=f"Gemini API key (env: GEMINI_API_KEY, {'[OK] set' if os.getenv('GEMINI_API_KEY') else '[FAIL] not set'})")
-    parser.add_argument("--gemini-model", default=os.getenv("MORAG_GEMINI_MODEL", "gemini-1.5-flash"),
-                       help=f"Gemini model for GTA/FCA (env: MORAG_GEMINI_MODEL, current: {os.getenv('MORAG_GEMINI_MODEL', 'gemini-1.5-flash')})")
-    parser.add_argument("--stronger-gemini-model", default=os.getenv("MORAG_STRONGER_GEMINI_MODEL", "gemini-1.5-pro"),
-                       help=f"Stronger Gemini model for final synthesis (env: MORAG_STRONGER_GEMINI_MODEL, current: {os.getenv('MORAG_STRONGER_GEMINI_MODEL', 'gemini-1.5-pro')})")
+    parser.add_argument(
+        "--gemini-api-key",
+        default=os.getenv("GEMINI_API_KEY"),
+        help=f"Gemini API key (env: GEMINI_API_KEY, {'[OK] set' if os.getenv('GEMINI_API_KEY') else '[FAIL] not set'})",
+    )
+    parser.add_argument(
+        "--gemini-model",
+        default=os.getenv("MORAG_GEMINI_MODEL", "gemini-1.5-flash"),
+        help=f"Gemini model for GTA/FCA (env: MORAG_GEMINI_MODEL, current: {os.getenv('MORAG_GEMINI_MODEL', 'gemini-1.5-flash')})",
+    )
+    parser.add_argument(
+        "--stronger-gemini-model",
+        default=os.getenv("MORAG_STRONGER_GEMINI_MODEL", "gemini-1.5-pro"),
+        help=f"Stronger Gemini model for final synthesis (env: MORAG_STRONGER_GEMINI_MODEL, current: {os.getenv('MORAG_STRONGER_GEMINI_MODEL', 'gemini-1.5-pro')})",
+    )
 
     # Retrieval parameters
-    parser.add_argument("--max-depth", type=int, default=3, help="Maximum traversal depth")
-    parser.add_argument("--decay-rate", type=float, default=0.2, help="Rate of score decay per depth level")
-    parser.add_argument("--max-facts-per-node", type=int, default=100, help="Maximum facts to extract per node")
-    parser.add_argument("--min-fact-score", type=float, default=0.1, help="Minimum score threshold for facts")
-    parser.add_argument("--max-total-facts", type=int, default=100, help="Maximum total facts to collect")
+    parser.add_argument(
+        "--max-depth", type=int, default=3, help="Maximum traversal depth"
+    )
+    parser.add_argument(
+        "--decay-rate",
+        type=float,
+        default=0.2,
+        help="Rate of score decay per depth level",
+    )
+    parser.add_argument(
+        "--max-facts-per-node",
+        type=int,
+        default=100,
+        help="Maximum facts to extract per node",
+    )
+    parser.add_argument(
+        "--min-fact-score",
+        type=float,
+        default=0.1,
+        help="Minimum score threshold for facts",
+    )
+    parser.add_argument(
+        "--max-total-facts",
+        type=int,
+        default=100,
+        help="Maximum total facts to collect",
+    )
     parser.add_argument("--language", help="Language for processing")
-    parser.add_argument("--facts-only", action="store_true", help="Return only facts without final answer synthesis")
-    parser.add_argument("--skip-fact-evaluation", action="store_true", help="Skip fact evaluation and return all raw facts without scoring")
+    parser.add_argument(
+        "--facts-only",
+        action="store_true",
+        help="Return only facts without final answer synthesis",
+    )
+    parser.add_argument(
+        "--skip-fact-evaluation",
+        action="store_true",
+        help="Skip fact evaluation and return all raw facts without scoring",
+    )
 
     # Output options
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
-    parser.add_argument("--check-health", action="store_true", help="Check service health")
+    parser.add_argument(
+        "--check-health", action="store_true", help="Check service health"
+    )
     parser.add_argument("--output-json", help="Save results to JSON file")
-    parser.add_argument("--show-config", action="store_true", help="Show current environment configuration and exit")
+    parser.add_argument(
+        "--show-config",
+        action="store_true",
+        help="Show current environment configuration and exit",
+    )
 
     args = parser.parse_args()
 
@@ -461,7 +543,7 @@ async def main():
         qdrant_collection=args.qdrant_collection,
         gemini_api_key=args.gemini_api_key,
         gemini_model=args.gemini_model,
-        stronger_gemini_model=args.stronger_gemini_model
+        stronger_gemini_model=args.stronger_gemini_model,
     )
 
     try:
@@ -480,11 +562,13 @@ async def main():
             print("🏥 Checking service health...")
             health = await tester.check_health()
             print(f"Health status: {health.get('status', 'unknown')}")
-            if health.get('services'):
-                for service, status in health['services'].items():
+            if health.get("services"):
+                for service, status in health["services"].items():
                     status_icon = "[OK]" if status else "[FAIL]"
-                    print(f"  {status_icon} {service}: {'available' if status else 'unavailable'}")
-            if health.get('error'):
+                    print(
+                        f"  {status_icon} {service}: {'available' if status else 'unavailable'}"
+                    )
+            if health.get("error"):
                 print(f"Error: {health['error']}")
             print()
 
@@ -512,7 +596,7 @@ async def main():
             max_total_facts=args.max_total_facts,
             language=args.language,
             facts_only=args.facts_only,
-            skip_fact_evaluation=args.skip_fact_evaluation
+            skip_fact_evaluation=args.skip_fact_evaluation,
         )
 
         # Print results
@@ -520,7 +604,7 @@ async def main():
 
         # Save to JSON if requested
         if args.output_json:
-            with open(args.output_json, 'w') as f:
+            with open(args.output_json, "w") as f:
                 json.dump(results, f, indent=2)
             print(f"\n💾 Results saved to {args.output_json}")
 

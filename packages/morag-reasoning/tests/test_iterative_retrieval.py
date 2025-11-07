@@ -1,10 +1,13 @@
 """Tests for iterative retrieval components."""
 
-import pytest
 from unittest.mock import AsyncMock
 
+import pytest
 from morag_reasoning.iterative_retrieval import (
-    IterativeRetriever, ContextGap, ContextAnalysis, RetrievalContext
+    ContextAnalysis,
+    ContextGap,
+    IterativeRetriever,
+    RetrievalContext,
 )
 
 
@@ -17,7 +20,7 @@ class TestContextGap:
             gap_type="missing_entity",
             description="Need more information about Apple",
             entities_needed=["Apple Inc."],
-            priority=0.8
+            priority=0.8,
         )
 
         assert gap.gap_type == "missing_entity"
@@ -36,7 +39,7 @@ class TestContextAnalysis:
             ContextGap(
                 gap_type="missing_entity",
                 description="Need entity info",
-                entities_needed=["entity1"]
+                entities_needed=["entity1"],
             )
         ]
 
@@ -45,7 +48,7 @@ class TestContextAnalysis:
             confidence=0.6,
             gaps=gaps,
             reasoning="Missing key information",
-            suggested_queries=["What is entity1?"]
+            suggested_queries=["What is entity1?"],
         )
 
         assert not analysis.is_sufficient
@@ -62,9 +65,11 @@ class TestRetrievalContext:
         """Test creating a retrieval context."""
         context = RetrievalContext(
             entities={"Apple": {"type": "ORG"}},
-            relations=[{"subject": "Apple", "predicate": "FOUNDED_BY", "object": "Steve Jobs"}],
+            relations=[
+                {"subject": "Apple", "predicate": "FOUNDED_BY", "object": "Steve Jobs"}
+            ],
             documents=[{"id": "doc1", "content": "Apple is a company"}],
-            metadata={"source": "test"}
+            metadata={"source": "test"},
         )
 
         assert len(context.entities) == 1
@@ -94,7 +99,7 @@ class TestIterativeRetriever:
             graph_engine=mock_graph_engine,
             vector_retriever=mock_vector_retriever,
             max_iterations=3,
-            sufficiency_threshold=0.7
+            sufficiency_threshold=0.7,
         )
 
         assert retriever.llm_client == mock_llm_client
@@ -104,29 +109,35 @@ class TestIterativeRetriever:
         assert retriever.sufficiency_threshold == 0.7
 
     @pytest.mark.asyncio
-    async def test_refine_context_sufficient_immediately(self, iterative_retriever, sample_retrieval_context):
+    async def test_refine_context_sufficient_immediately(
+        self, iterative_retriever, sample_retrieval_context
+    ):
         """Test context refinement when context is sufficient immediately."""
         # Mock analysis to return sufficient context
         sufficient_analysis = ContextAnalysis(
             is_sufficient=True,
             confidence=0.9,
             gaps=[],
-            reasoning="Context is sufficient"
+            reasoning="Context is sufficient",
         )
 
-        iterative_retriever._analyze_context = AsyncMock(return_value=sufficient_analysis)
+        iterative_retriever._analyze_context = AsyncMock(
+            return_value=sufficient_analysis
+        )
 
         result = await iterative_retriever.refine_context(
             "What is Apple?", sample_retrieval_context
         )
 
-        assert result.metadata['final_analysis'] == sufficient_analysis
-        assert result.metadata['iterations_used'] == 1
+        assert result.metadata["final_analysis"] == sufficient_analysis
+        assert result.metadata["iterations_used"] == 1
         # Should have called analysis twice (once during iteration, once for final analysis)
         assert iterative_retriever._analyze_context.call_count == 2
 
     @pytest.mark.asyncio
-    async def test_refine_context_multiple_iterations(self, iterative_retriever, sample_retrieval_context):
+    async def test_refine_context_multiple_iterations(
+        self, iterative_retriever, sample_retrieval_context
+    ):
         """Test context refinement with multiple iterations."""
         # Mock analysis to return insufficient context first, then sufficient
         insufficient_analysis = ContextAnalysis(
@@ -136,21 +147,22 @@ class TestIterativeRetriever:
                 ContextGap(
                     gap_type="missing_entity",
                     description="Need more info",
-                    entities_needed=["entity1"]
+                    entities_needed=["entity1"],
                 )
             ],
-            reasoning="Need more information"
+            reasoning="Need more information",
         )
 
         sufficient_analysis = ContextAnalysis(
-            is_sufficient=True,
-            confidence=0.9,
-            gaps=[],
-            reasoning="Now sufficient"
+            is_sufficient=True, confidence=0.9, gaps=[], reasoning="Now sufficient"
         )
 
         iterative_retriever._analyze_context = AsyncMock(
-            side_effect=[insufficient_analysis, sufficient_analysis, sufficient_analysis]  # Add extra for final analysis
+            side_effect=[
+                insufficient_analysis,
+                sufficient_analysis,
+                sufficient_analysis,
+            ]  # Add extra for final analysis
         )
         iterative_retriever._retrieve_additional = AsyncMock(
             return_value=RetrievalContext(entities={"entity1": {"type": "TEST"}})
@@ -160,37 +172,47 @@ class TestIterativeRetriever:
             "What is Apple?", sample_retrieval_context
         )
 
-        assert result.metadata['iterations_used'] == 2
+        assert result.metadata["iterations_used"] == 2
         assert "entity1" in result.entities
         iterative_retriever._retrieve_additional.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_refine_context_max_iterations(self, iterative_retriever, sample_retrieval_context):
+    async def test_refine_context_max_iterations(
+        self, iterative_retriever, sample_retrieval_context
+    ):
         """Test context refinement hitting max iterations."""
         # Mock analysis to always return insufficient context
         insufficient_analysis = ContextAnalysis(
-            is_sufficient=False,
-            confidence=0.5,
-            gaps=[],
-            reasoning="Never sufficient"
+            is_sufficient=False, confidence=0.5, gaps=[], reasoning="Never sufficient"
         )
 
-        iterative_retriever._analyze_context = AsyncMock(return_value=insufficient_analysis)
-        iterative_retriever._retrieve_additional = AsyncMock(return_value=RetrievalContext())
+        iterative_retriever._analyze_context = AsyncMock(
+            return_value=insufficient_analysis
+        )
+        iterative_retriever._retrieve_additional = AsyncMock(
+            return_value=RetrievalContext()
+        )
 
         result = await iterative_retriever.refine_context(
             "What is Apple?", sample_retrieval_context
         )
 
-        assert result.metadata['iterations_used'] == iterative_retriever.max_iterations
-        assert iterative_retriever._analyze_context.call_count == iterative_retriever.max_iterations + 1  # +1 for final analysis
+        assert result.metadata["iterations_used"] == iterative_retriever.max_iterations
+        assert (
+            iterative_retriever._analyze_context.call_count
+            == iterative_retriever.max_iterations + 1
+        )  # +1 for final analysis
 
     @pytest.mark.asyncio
-    async def test_analyze_context_success(self, iterative_retriever, sample_retrieval_context):
+    async def test_analyze_context_success(
+        self, iterative_retriever, sample_retrieval_context
+    ):
         """Test successful context analysis."""
         query = "What is Apple?"
 
-        result = await iterative_retriever._analyze_context(query, sample_retrieval_context)
+        result = await iterative_retriever._analyze_context(
+            query, sample_retrieval_context
+        )
 
         assert isinstance(result, ContextAnalysis)
         assert isinstance(result.is_sufficient, bool)
@@ -199,26 +221,38 @@ class TestIterativeRetriever:
         assert isinstance(result.reasoning, str)
 
     @pytest.mark.asyncio
-    async def test_analyze_context_llm_error(self, iterative_retriever, sample_retrieval_context):
+    async def test_analyze_context_llm_error(
+        self, iterative_retriever, sample_retrieval_context
+    ):
         """Test context analysis with LLM error (fallback)."""
         # Mock LLM to raise an error
-        iterative_retriever.llm_client.generate = AsyncMock(side_effect=Exception("LLM error"))
+        iterative_retriever.llm_client.generate = AsyncMock(
+            side_effect=Exception("LLM error")
+        )
 
-        result = await iterative_retriever._analyze_context("test query", sample_retrieval_context)
+        result = await iterative_retriever._analyze_context(
+            "test query", sample_retrieval_context
+        )
 
         assert isinstance(result, ContextAnalysis)
         assert result.confidence == 0.5  # Fallback confidence
         assert "Fallback analysis" in result.reasoning
 
-    def test_create_analysis_prompt(self, iterative_retriever, sample_retrieval_context):
+    def test_create_analysis_prompt(
+        self, iterative_retriever, sample_retrieval_context
+    ):
         """Test creation of context analysis prompt."""
         query = "What is Apple?"
-        prompt = iterative_retriever._create_analysis_prompt(query, sample_retrieval_context)
+        prompt = iterative_retriever._create_analysis_prompt(
+            query, sample_retrieval_context
+        )
 
         assert query in prompt
         assert "Apple" in prompt  # Entity should be mentioned
         assert "FOUNDED_BY" in prompt  # Relation should be mentioned
-        assert "Apple Inc. is a technology company" in prompt  # Document content should be mentioned
+        assert (
+            "Apple Inc. is a technology company" in prompt
+        )  # Document content should be mentioned
         assert "JSON" in prompt
         assert "is_sufficient" in prompt
         assert "confidence" in prompt
@@ -226,7 +260,7 @@ class TestIterativeRetriever:
 
     def test_parse_context_analysis_success(self, iterative_retriever):
         """Test successful parsing of context analysis."""
-        response = '''
+        response = """
         {
           "is_sufficient": false,
           "confidence": 6.5,
@@ -241,7 +275,7 @@ class TestIterativeRetriever:
           ],
           "suggested_queries": ["What is entity X?"]
         }
-        '''
+        """
 
         result = iterative_retriever._parse_context_analysis(response)
 
@@ -272,7 +306,7 @@ class TestIterativeRetriever:
                 gap_type="missing_entity",
                 description="Need entity info",
                 entities_needed=["test_entity"],
-                priority=0.9
+                priority=0.9,
             )
         ]
 
@@ -287,7 +321,9 @@ class TestIterativeRetriever:
 
         assert "test_entity" in result.entities
         assert result.entities["test_entity"]["type"] == "ORG"
-        iterative_retriever.graph_engine.get_entity_details.assert_called_with("test_entity")
+        iterative_retriever.graph_engine.get_entity_details.assert_called_with(
+            "test_entity"
+        )
 
     @pytest.mark.asyncio
     async def test_retrieve_additional_insufficient_detail(self, iterative_retriever):
@@ -296,7 +332,7 @@ class TestIterativeRetriever:
             ContextGap(
                 gap_type="insufficient_detail",
                 description="Need more details about topic",
-                priority=0.8
+                priority=0.8,
             )
         ]
 
@@ -313,19 +349,19 @@ class TestIterativeRetriever:
         current_context = RetrievalContext(
             entities={"entity1": {"type": "ORG"}},
             relations=[{"subject": "A", "predicate": "REL1", "object": "B"}],
-            documents=[{"id": "doc1", "content": "Document 1"}]
+            documents=[{"id": "doc1", "content": "Document 1"}],
         )
 
         additional_context = RetrievalContext(
             entities={"entity2": {"type": "PERSON"}},
             relations=[
                 {"subject": "A", "predicate": "REL1", "object": "B"},  # Duplicate
-                {"subject": "C", "predicate": "REL2", "object": "D"}   # New
+                {"subject": "C", "predicate": "REL2", "object": "D"},  # New
             ],
             documents=[
                 {"id": "doc1", "content": "Document 1"},  # Duplicate
-                {"id": "doc2", "content": "Document 2"}   # New
-            ]
+                {"id": "doc2", "content": "Document 2"},  # New
+            ],
         )
 
         result = iterative_retriever._merge_context(current_context, additional_context)

@@ -13,11 +13,9 @@ from pathlib import Path
 from typing import Dict, List
 
 import pytest
-
 from morag_graph.extraction import EntityExtractor, RelationExtractor
-from morag_graph.models import Entity, Relation, Graph
+from morag_graph.models import Entity, Graph, Relation
 from morag_graph.storage import JsonStorage
-
 
 # Sample documents for testing
 SAMPLE_DOCUMENTS = [
@@ -30,7 +28,7 @@ SAMPLE_DOCUMENTS = [
         Tim Cook is the current CEO of Apple, having taken over from Steve Jobs in 2011.
         Apple is known for its innovative products including the iPhone, iPad, Mac computers, and Apple Watch.
         The company's headquarters, Apple Park, opened in 2017 and can accommodate 12,000 employees.
-        """
+        """,
     },
     {
         "id": "doc_2",
@@ -40,7 +38,7 @@ SAMPLE_DOCUMENTS = [
         The company is headquartered in Redmond, Washington. Satya Nadella serves as the current CEO since 2014.
         Microsoft is best known for its Windows operating system, Office productivity suite, and Azure cloud platform.
         The company has been a major competitor to Apple in various technology sectors.
-        """
+        """,
     },
     {
         "id": "doc_3",
@@ -50,8 +48,8 @@ SAMPLE_DOCUMENTS = [
         Apple and Microsoft have collaborated on various projects, including Office applications for Mac and iPad.
         Both companies compete in the cloud computing space, with Apple's iCloud and Microsoft's Azure.
         Steve Jobs and Bill Gates had a complex relationship, sometimes collaborating and sometimes competing.
-        """
-    }
+        """,
+    },
 ]
 
 
@@ -81,7 +79,7 @@ class IntegrationTestSuite:
                 "provider": "gemini",
                 "api_key": self.api_key,
                 "model": "gemini-1.5-flash",
-                "temperature": 0.1
+                "temperature": 0.1,
             }
         )
 
@@ -90,13 +88,14 @@ class IntegrationTestSuite:
                 "provider": "gemini",
                 "api_key": self.api_key,
                 "model": "gemini-1.5-flash",
-                "temperature": 0.1
+                "temperature": 0.1,
             }
         )
 
         # Initialize storage
         storage_path = Path(self.temp_dir)
         from morag_graph.storage.json_storage import JsonConfig
+
         config = JsonConfig(storage_path=str(storage_path))
         self.storage = JsonStorage(config)
         await self.storage.connect()
@@ -109,6 +108,7 @@ class IntegrationTestSuite:
         # Clean up temporary directory
         if self.temp_dir:
             import shutil
+
             shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     async def extract_entities_from_documents(self) -> List[Entity]:
@@ -125,7 +125,7 @@ class IntegrationTestSuite:
             entities = await self.entity_extractor.extract(
                 text=doc["content"],
                 source_doc_id=doc["id"],
-                additional_context=f"Document title: {doc['title']}"
+                additional_context=f"Document title: {doc['title']}",
             )
 
             print(f"   Found {len(entities)} entities")
@@ -137,7 +137,9 @@ class IntegrationTestSuite:
 
         return all_entities
 
-    async def extract_relations_from_documents(self, entities: List[Entity]) -> List[Relation]:
+    async def extract_relations_from_documents(
+        self, entities: List[Entity]
+    ) -> List[Relation]:
         """Extract relations from all sample documents.
 
         Args:
@@ -158,22 +160,30 @@ class IntegrationTestSuite:
                 text=doc["content"],
                 entities=doc_entities,
                 source_doc_id=doc["id"],
-                additional_context=f"Document title: {doc['title']}"
+                additional_context=f"Document title: {doc['title']}",
             )
 
             print(f"   Found {len(relations)} relations")
             for relation in relations:
-                source_entity = next((e for e in entities if e.id == relation.source_entity_id), None)
-                target_entity = next((e for e in entities if e.id == relation.target_entity_id), None)
+                source_entity = next(
+                    (e for e in entities if e.id == relation.source_entity_id), None
+                )
+                target_entity = next(
+                    (e for e in entities if e.id == relation.target_entity_id), None
+                )
                 if source_entity and target_entity:
                     relation_type = str(relation.type)
-                    print(f"   • {source_entity.name} --[{relation_type}]--> {target_entity.name}")
+                    print(
+                        f"   • {source_entity.name} --[{relation_type}]--> {target_entity.name}"
+                    )
 
             all_relations.extend(relations)
 
         return all_relations
 
-    async def build_knowledge_graph(self, entities: List[Entity], relations: List[Relation]) -> Graph:
+    async def build_knowledge_graph(
+        self, entities: List[Entity], relations: List[Relation]
+    ) -> Graph:
         """Build a knowledge graph from extracted entities and relations.
 
         Args:
@@ -195,7 +205,9 @@ class IntegrationTestSuite:
         for relation in relations:
             graph.add_relation(relation)
 
-        print(f"   Graph contains {len(graph.entities)} entities and {len(graph.relations)} relations")
+        print(
+            f"   Graph contains {len(graph.entities)} entities and {len(graph.relations)} relations"
+        )
 
         return graph
 
@@ -237,42 +249,56 @@ class IntegrationTestSuite:
             "entity_types": {},
             "relation_types": {},
             "most_connected_entities": [],
-            "entity_pairs_with_multiple_relations": []
+            "entity_pairs_with_multiple_relations": [],
         }
 
         # Count entity types
         for entity in graph.entities.values():
             entity_type = str(entity.type)
-            analysis["entity_types"][entity_type] = analysis["entity_types"].get(entity_type, 0) + 1
+            analysis["entity_types"][entity_type] = (
+                analysis["entity_types"].get(entity_type, 0) + 1
+            )
 
         # Count relation types
         for relation in graph.relations.values():
             relation_type = str(relation.type)
-            analysis["relation_types"][relation_type] = analysis["relation_types"].get(relation_type, 0) + 1
+            analysis["relation_types"][relation_type] = (
+                analysis["relation_types"].get(relation_type, 0) + 1
+            )
 
         # Find most connected entities
         entity_connections = {}
         for relation in graph.relations.values():
-            entity_connections[relation.source_entity_id] = entity_connections.get(relation.source_entity_id, 0) + 1
-            entity_connections[relation.target_entity_id] = entity_connections.get(relation.target_entity_id, 0) + 1
+            entity_connections[relation.source_entity_id] = (
+                entity_connections.get(relation.source_entity_id, 0) + 1
+            )
+            entity_connections[relation.target_entity_id] = (
+                entity_connections.get(relation.target_entity_id, 0) + 1
+            )
 
         # Sort by connection count
-        sorted_connections = sorted(entity_connections.items(), key=lambda x: x[1], reverse=True)
+        sorted_connections = sorted(
+            entity_connections.items(), key=lambda x: x[1], reverse=True
+        )
 
         for entity_id, connection_count in sorted_connections[:5]:  # Top 5
             entity = graph.entities.get(entity_id)
             if entity:
                 entity_type = str(entity.type)
-                analysis["most_connected_entities"].append({
-                    "name": entity.name,
-                    "type": entity_type,
-                    "connections": connection_count
-                })
+                analysis["most_connected_entities"].append(
+                    {
+                        "name": entity.name,
+                        "type": entity_type,
+                        "connections": connection_count,
+                    }
+                )
 
         # Find entity pairs with multiple relations
         entity_pair_relations = {}
         for relation in graph.relations.values():
-            pair_key = tuple(sorted([relation.source_entity_id, relation.target_entity_id]))
+            pair_key = tuple(
+                sorted([relation.source_entity_id, relation.target_entity_id])
+            )
             if pair_key not in entity_pair_relations:
                 entity_pair_relations[pair_key] = []
             entity_pair_relations[pair_key].append(relation)
@@ -282,12 +308,14 @@ class IntegrationTestSuite:
                 entity1 = graph.entities.get(pair_key[0])
                 entity2 = graph.entities.get(pair_key[1])
                 if entity1 and entity2:
-                    analysis["entity_pairs_with_multiple_relations"].append({
-                        "entity1": entity1.name,
-                        "entity2": entity2.name,
-                        "relation_count": len(relations),
-                        "relation_types": [str(r.type) for r in relations]
-                    })
+                    analysis["entity_pairs_with_multiple_relations"].append(
+                        {
+                            "entity1": entity1.name,
+                            "entity2": entity2.name,
+                            "relation_count": len(relations),
+                            "relation_types": [str(r.type) for r in relations],
+                        }
+                    )
 
         # Print analysis results
         print(f"   Total entities: {analysis['total_entities']}")
@@ -300,7 +328,9 @@ class IntegrationTestSuite:
             print(f"     • {relation_type}: {count}")
         print("   Most connected entities:")
         for entity_info in analysis["most_connected_entities"]:
-            print(f"     • {entity_info['name']} ({entity_info['type']}): {entity_info['connections']} connections")
+            print(
+                f"     • {entity_info['name']} ({entity_info['type']}): {entity_info['connections']} connections"
+            )
 
         return analysis
 
@@ -330,12 +360,20 @@ class IntegrationTestSuite:
                     if rel.source_entity_id == person.id:
                         target_entity = graph.entities.get(rel.target_entity_id)
                         if target_entity:
-                            rel_type = rel.type.value if hasattr(rel.type, 'value') else rel.type
+                            rel_type = (
+                                rel.type.value
+                                if hasattr(rel.type, "value")
+                                else rel.type
+                            )
                             roles.append(f"{rel_type} {target_entity.name}")
-            print(f"     • {person.name}: {', '.join(roles) if roles else 'No specific roles found'}")
+            print(
+                f"     • {person.name}: {', '.join(roles) if roles else 'No specific roles found'}"
+            )
 
         # Test 3: Find competitors
-        competitor_relations = [r for r in graph.relations.values() if r.type == "COMPETES_WITH"]
+        competitor_relations = [
+            r for r in graph.relations.values() if r.type == "COMPETES_WITH"
+        ]
         print(f"   Found {len(competitor_relations)} competitor relationships:")
         for rel in competitor_relations:
             source_entity = graph.entities.get(rel.source_entity_id)
@@ -351,7 +389,11 @@ class IntegrationTestSuite:
             for neighbor_id in neighbors:
                 neighbor = graph.entities.get(neighbor_id)
                 if neighbor:
-                    neighbor_type = neighbor.type.value if hasattr(neighbor.type, 'value') else neighbor.type
+                    neighbor_type = (
+                        neighbor.type.value
+                        if hasattr(neighbor.type, "value")
+                        else neighbor.type
+                    )
                     print(f"     • {neighbor.name} ({neighbor_type})")
 
     async def run_complete_workflow(self) -> Dict:
@@ -361,7 +403,7 @@ class IntegrationTestSuite:
             Test results and analysis
         """
         print("🚀 Starting complete integration test workflow...")
-        print("" + "="*60)
+        print("" + "=" * 60)
 
         try:
             # Step 1: Extract entities
@@ -393,37 +435,48 @@ class IntegrationTestSuite:
 
             print(f"   Retrieved {len(stored_entities)} entities from storage")
             print(f"   Retrieved {len(stored_relations)} relations from storage")
-            print(f"   Retrieved graph with {len(stored_graph.entities)} entities and {len(stored_graph.relations)} relations")
+            print(
+                f"   Retrieved graph with {len(stored_graph.entities)} entities and {len(stored_graph.relations)} relations"
+            )
 
             # Verify data consistency
             # Note: Entity and relation counts may differ due to deduplication during graph building
-            assert len(stored_entities) == len(graph.entities), "Entity count mismatch between graph and storage"
-            assert len(stored_relations) == len(graph.relations), "Relation count mismatch between graph and storage"
-            assert len(stored_graph.entities) == len(graph.entities), "Graph entity count mismatch"
-            assert len(stored_graph.relations) == len(graph.relations), "Graph relation count mismatch"
+            assert len(stored_entities) == len(
+                graph.entities
+            ), "Entity count mismatch between graph and storage"
+            assert len(stored_relations) == len(
+                graph.relations
+            ), "Relation count mismatch between graph and storage"
+            assert len(stored_graph.entities) == len(
+                graph.entities
+            ), "Graph entity count mismatch"
+            assert len(stored_graph.relations) == len(
+                graph.relations
+            ), "Graph relation count mismatch"
 
             # Verify that deduplication is working (stored count should be <= extracted count)
-            assert len(stored_entities) <= len(entities), "More entities in storage than extracted (unexpected)"
-            assert len(stored_relations) <= len(relations), "More relations in storage than extracted (unexpected)"
+            assert len(stored_entities) <= len(
+                entities
+            ), "More entities in storage than extracted (unexpected)"
+            assert len(stored_relations) <= len(
+                relations
+            ), "More relations in storage than extracted (unexpected)"
 
             print("\n✅ Integration test completed successfully!")
-            print("" + "="*60)
+            print("" + "=" * 60)
 
             return {
                 "success": True,
                 "entities_extracted": len(entities),
                 "relations_extracted": len(relations),
                 "graph_analysis": analysis,
-                "storage_verified": True
+                "storage_verified": True,
             }
 
         except Exception as e:
             print(f"\n❌ Integration test failed: {e}")
-            print("" + "="*60)
-            return {
-                "success": False,
-                "error": str(e)
-            }
+            print("" + "=" * 60)
+            return {"success": False, "error": str(e)}
 
 
 # Pytest fixtures and tests
@@ -454,7 +507,9 @@ async def test_complete_integration_workflow(integration_suite):
     results = await integration_suite.run_complete_workflow()
 
     # Verify results
-    assert results["success"], f"Integration test failed: {results.get('error', 'Unknown error')}"
+    assert results[
+        "success"
+    ], f"Integration test failed: {results.get('error', 'Unknown error')}"
     assert results["entities_extracted"] > 0, "No entities were extracted"
     assert results["storage_verified"], "Storage verification failed"
 
@@ -502,7 +557,9 @@ async def test_relation_extraction_integration(integration_suite):
         assert relation.target_entity_id, "Relation target entity ID is empty"
         assert relation.type, "Relation type is not set"
         assert 0 <= relation.confidence <= 1, "Relation confidence is out of range"
-        assert relation.source_entity_id != relation.target_entity_id, "Self-referencing relation"
+        assert (
+            relation.source_entity_id != relation.target_entity_id
+        ), "Self-referencing relation"
 
     print(f"\n✅ Relation extraction test passed: {len(relations)} relations extracted")
 
@@ -515,7 +572,7 @@ async def test_storage_integration(integration_suite):
         name="Test Company",
         type="ORGANIZATION",
         source_doc_id="test_doc",
-        confidence=0.9
+        confidence=0.9,
     )
 
     test_relation = Relation(
@@ -523,7 +580,7 @@ async def test_storage_integration(integration_suite):
         target_entity_id=test_entity.id,  # Self-reference for testing
         type="CUSTOM",
         source_doc_id="test_doc",
-        confidence=0.8
+        confidence=0.8,
     )
 
     # Test storage operations
@@ -563,7 +620,9 @@ if __name__ == "__main__":
                 print("\n🎉 All integration tests passed!")
                 return 0
             else:
-                print(f"\n❌ Integration tests failed: {results.get('error', 'Unknown error')}")
+                print(
+                    f"\n❌ Integration tests failed: {results.get('error', 'Unknown error')}"
+                )
                 return 1
         finally:
             await suite.teardown()

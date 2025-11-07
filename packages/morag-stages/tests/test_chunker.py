@@ -1,10 +1,11 @@
 """Tests for chunker stage."""
 
 import json
-import pytest
 from pathlib import Path
 
+import pytest
 from morag_stages import StageType
+
 from .test_framework import StageTestFramework
 
 
@@ -17,36 +18,36 @@ async def test_chunker_basic_functionality(stage_test_framework: StageTestFramew
 
     # Execute chunker stage
     result = await stage_test_framework.execute_stage_test(
-        StageType.CHUNKER,
-        [test_file]
+        StageType.CHUNKER, [test_file]
     )
 
     # Assert success
     stage_test_framework.assert_stage_success(result)
 
     # Check output file
-    chunks_file = stage_test_framework.get_file_by_extension(result.output_files, ".chunks.json")
+    chunks_file = stage_test_framework.get_file_by_extension(
+        result.output_files, ".chunks.json"
+    )
 
     # Validate JSON structure
     stage_test_framework.assert_json_structure(
-        chunks_file,
-        ["chunks", "summary", "chunk_count", "document_metadata"]
+        chunks_file, ["chunks", "summary", "chunk_count", "document_metadata"]
     )
 
     # Load and validate content
-    with open(chunks_file, 'r', encoding='utf-8') as f:
+    with open(chunks_file, "r", encoding="utf-8") as f:
         chunks_data = json.load(f)
 
-    assert len(chunks_data['chunks']) > 0
-    assert chunks_data['chunk_count'] == len(chunks_data['chunks'])
-    assert len(chunks_data['summary']) > 0
+    assert len(chunks_data["chunks"]) > 0
+    assert chunks_data["chunk_count"] == len(chunks_data["chunks"])
+    assert len(chunks_data["summary"]) > 0
 
     # Check chunk structure
-    chunk = chunks_data['chunks'][0]
-    assert 'content' in chunk
-    assert 'index' in chunk
-    assert 'token_count' in chunk
-    assert len(chunk['content']) > 0
+    chunk = chunks_data["chunks"][0]
+    assert "content" in chunk
+    assert "index" in chunk
+    assert "token_count" in chunk
+    assert len(chunk["content"]) > 0
 
 
 @pytest.mark.asyncio
@@ -58,41 +59,43 @@ async def test_chunker_with_semantic_strategy(stage_test_framework: StageTestFra
 
     # Execute with semantic chunking config
     config = {
-        'chunker': {
-            'chunk_strategy': 'semantic',
-            'chunk_size': 1000,
-            'generate_summary': True,
-            'include_embeddings': True
+        "chunker": {
+            "chunk_strategy": "semantic",
+            "chunk_size": 1000,
+            "generate_summary": True,
+            "include_embeddings": True,
         }
     }
 
     result = await stage_test_framework.execute_stage_test(
-        StageType.CHUNKER,
-        [test_file],
-        config=config
+        StageType.CHUNKER, [test_file], config=config
     )
 
     # Assert success
     stage_test_framework.assert_stage_success(result)
 
     # Check chunks file
-    chunks_file = stage_test_framework.get_file_by_extension(result.output_files, ".chunks.json")
+    chunks_file = stage_test_framework.get_file_by_extension(
+        result.output_files, ".chunks.json"
+    )
 
-    with open(chunks_file, 'r', encoding='utf-8') as f:
+    with open(chunks_file, "r", encoding="utf-8") as f:
         chunks_data = json.load(f)
 
     # Check semantic chunking results
-    assert len(chunks_data['chunks']) > 0
+    assert len(chunks_data["chunks"]) > 0
 
     # Check if embeddings are included
-    chunk = chunks_data['chunks'][0]
-    if 'embedding' in chunk:
-        assert isinstance(chunk['embedding'], list)
-        assert len(chunk['embedding']) > 0
+    chunk = chunks_data["chunks"][0]
+    if "embedding" in chunk:
+        assert isinstance(chunk["embedding"], list)
+        assert len(chunk["embedding"]) > 0
 
 
 @pytest.mark.asyncio
-async def test_chunker_with_page_level_strategy(stage_test_framework: StageTestFramework):
+async def test_chunker_with_page_level_strategy(
+    stage_test_framework: StageTestFramework,
+):
     """Test chunker stage with page-level chunking strategy."""
 
     # Create test markdown file with page markers
@@ -123,40 +126,42 @@ This is the final page with concluding remarks.
 
     # Execute with page-level chunking config
     config = {
-        'chunker': {
-            'chunk_strategy': 'page-level',
-            'preserve_page_boundaries': True,
-            'generate_summary': True
+        "chunker": {
+            "chunk_strategy": "page-level",
+            "preserve_page_boundaries": True,
+            "generate_summary": True,
         }
     }
 
     result = await stage_test_framework.execute_stage_test(
-        StageType.CHUNKER,
-        [test_file],
-        config=config
+        StageType.CHUNKER, [test_file], config=config
     )
 
     # Assert success
     stage_test_framework.assert_stage_success(result)
 
     # Check chunks file
-    chunks_file = stage_test_framework.get_file_by_extension(result.output_files, ".chunks.json")
+    chunks_file = stage_test_framework.get_file_by_extension(
+        result.output_files, ".chunks.json"
+    )
 
-    with open(chunks_file, 'r', encoding='utf-8') as f:
+    with open(chunks_file, "r", encoding="utf-8") as f:
         chunks_data = json.load(f)
 
     # Should have chunks corresponding to pages
-    assert len(chunks_data['chunks']) >= 3
+    assert len(chunks_data["chunks"]) >= 3
 
     # Check page metadata
-    for chunk in chunks_data['chunks']:
-        if 'source_metadata' in chunk:
+    for chunk in chunks_data["chunks"]:
+        if "source_metadata" in chunk:
             # May contain page information
             pass
 
 
 @pytest.mark.asyncio
-async def test_chunker_with_topic_based_strategy(stage_test_framework: StageTestFramework):
+async def test_chunker_with_topic_based_strategy(
+    stage_test_framework: StageTestFramework,
+):
     """Test chunker stage with topic-based chunking strategy."""
 
     # Create test markdown file with timestamps (simulating audio/video)
@@ -185,41 +190,41 @@ duration: 300
 
     # Execute with topic-based chunking config
     config = {
-        'chunker': {
-            'chunk_strategy': 'topic-based',
-            'preserve_timestamps': True,
-            'generate_summary': True,
-            'chunk_size': 2000
+        "chunker": {
+            "chunk_strategy": "topic-based",
+            "preserve_timestamps": True,
+            "generate_summary": True,
+            "chunk_size": 2000,
         }
     }
 
     result = await stage_test_framework.execute_stage_test(
-        StageType.CHUNKER,
-        [test_file],
-        config=config
+        StageType.CHUNKER, [test_file], config=config
     )
 
     # Assert success
     stage_test_framework.assert_stage_success(result)
 
     # Check chunks file
-    chunks_file = stage_test_framework.get_file_by_extension(result.output_files, ".chunks.json")
+    chunks_file = stage_test_framework.get_file_by_extension(
+        result.output_files, ".chunks.json"
+    )
 
-    with open(chunks_file, 'r', encoding='utf-8') as f:
+    with open(chunks_file, "r", encoding="utf-8") as f:
         chunks_data = json.load(f)
 
     # Should have topic-based chunks
-    assert len(chunks_data['chunks']) > 0
+    assert len(chunks_data["chunks"]) > 0
 
     # Check for timestamp preservation
     found_timestamp = False
-    for chunk in chunks_data['chunks']:
-        if '[' in chunk['content'] and ']' in chunk['content']:
+    for chunk in chunks_data["chunks"]:
+        if "[" in chunk["content"] and "]" in chunk["content"]:
             found_timestamp = True
             break
 
     # Should preserve timestamps if configured
-    if config['chunker']['preserve_timestamps']:
+    if config["chunker"]["preserve_timestamps"]:
         assert found_timestamp
 
 
@@ -228,47 +233,50 @@ async def test_chunker_custom_chunk_size(stage_test_framework: StageTestFramewor
     """Test chunker stage with custom chunk size."""
 
     # Create large test markdown file
-    large_content = """---
+    large_content = (
+        """---
 title: Large Document
 ---
 
 # Large Document
 
-""" + "This is a sentence with content. " * 200  # Create large content
+"""
+        + "This is a sentence with content. " * 200
+    )  # Create large content
 
     test_file = stage_test_framework.create_test_file("large.md", large_content)
 
     # Execute with small chunk size
     config = {
-        'chunker': {
-            'chunk_size': 500,  # Small chunks
-            'chunk_overlap': 50,
-            'generate_summary': True
+        "chunker": {
+            "chunk_size": 500,  # Small chunks
+            "chunk_overlap": 50,
+            "generate_summary": True,
         }
     }
 
     result = await stage_test_framework.execute_stage_test(
-        StageType.CHUNKER,
-        [test_file],
-        config=config
+        StageType.CHUNKER, [test_file], config=config
     )
 
     # Assert success
     stage_test_framework.assert_stage_success(result)
 
     # Check chunks file
-    chunks_file = stage_test_framework.get_file_by_extension(result.output_files, ".chunks.json")
+    chunks_file = stage_test_framework.get_file_by_extension(
+        result.output_files, ".chunks.json"
+    )
 
-    with open(chunks_file, 'r', encoding='utf-8') as f:
+    with open(chunks_file, "r", encoding="utf-8") as f:
         chunks_data = json.load(f)
 
     # Should have multiple chunks due to small chunk size
-    assert len(chunks_data['chunks']) > 1
+    assert len(chunks_data["chunks"]) > 1
 
     # Check chunk sizes are reasonable
-    for chunk in chunks_data['chunks']:
+    for chunk in chunks_data["chunks"]:
         # Chunks should be roughly within the specified size
-        assert len(chunk['content']) <= 1000  # Allow some flexibility
+        assert len(chunk["content"]) <= 1000  # Allow some flexibility
 
 
 @pytest.mark.asyncio
@@ -280,15 +288,13 @@ async def test_chunker_skip_existing(stage_test_framework: StageTestFramework):
 
     # Execute first time
     result1 = await stage_test_framework.execute_stage_test(
-        StageType.CHUNKER,
-        [test_file]
+        StageType.CHUNKER, [test_file]
     )
     stage_test_framework.assert_stage_success(result1)
 
     # Execute second time - should skip
     result2 = await stage_test_framework.execute_stage_test(
-        StageType.CHUNKER,
-        [test_file]
+        StageType.CHUNKER, [test_file]
     )
     stage_test_framework.assert_stage_skipped(result2)
 
@@ -301,30 +307,25 @@ async def test_chunker_without_summary(stage_test_framework: StageTestFramework)
     test_file = stage_test_framework.create_test_markdown("input.md")
 
     # Execute without summary
-    config = {
-        'chunker': {
-            'generate_summary': False,
-            'chunk_size': 1000
-        }
-    }
+    config = {"chunker": {"generate_summary": False, "chunk_size": 1000}}
 
     result = await stage_test_framework.execute_stage_test(
-        StageType.CHUNKER,
-        [test_file],
-        config=config
+        StageType.CHUNKER, [test_file], config=config
     )
 
     # Assert success
     stage_test_framework.assert_stage_success(result)
 
     # Check chunks file
-    chunks_file = stage_test_framework.get_file_by_extension(result.output_files, ".chunks.json")
+    chunks_file = stage_test_framework.get_file_by_extension(
+        result.output_files, ".chunks.json"
+    )
 
-    with open(chunks_file, 'r', encoding='utf-8') as f:
+    with open(chunks_file, "r", encoding="utf-8") as f:
         chunks_data = json.load(f)
 
     # Summary should be empty or minimal
-    assert 'summary' in chunks_data
+    assert "summary" in chunks_data
     # Summary might be empty or a default value
 
 
@@ -333,17 +334,20 @@ async def test_chunker_output_naming(stage_test_framework: StageTestFramework):
     """Test chunker stage output file naming conventions."""
 
     # Create test file with specific name
-    test_file = stage_test_framework.create_test_file("my_document.md", "# Test\n\nContent here.")
+    test_file = stage_test_framework.create_test_file(
+        "my_document.md", "# Test\n\nContent here."
+    )
 
     result = await stage_test_framework.execute_stage_test(
-        StageType.CHUNKER,
-        [test_file]
+        StageType.CHUNKER, [test_file]
     )
 
     stage_test_framework.assert_stage_success(result)
 
     # Check output file naming
-    chunks_file = stage_test_framework.get_file_by_extension(result.output_files, ".chunks.json")
+    chunks_file = stage_test_framework.get_file_by_extension(
+        result.output_files, ".chunks.json"
+    )
 
     # Should be based on input filename
     assert "my_document" in chunks_file.name
@@ -372,22 +376,23 @@ This is test content for metadata preservation testing.
     test_file = stage_test_framework.create_test_file("metadata_test.md", content)
 
     result = await stage_test_framework.execute_stage_test(
-        StageType.CHUNKER,
-        [test_file]
+        StageType.CHUNKER, [test_file]
     )
 
     stage_test_framework.assert_stage_success(result)
 
     # Check chunks file
-    chunks_file = stage_test_framework.get_file_by_extension(result.output_files, ".chunks.json")
+    chunks_file = stage_test_framework.get_file_by_extension(
+        result.output_files, ".chunks.json"
+    )
 
-    with open(chunks_file, 'r', encoding='utf-8') as f:
+    with open(chunks_file, "r", encoding="utf-8") as f:
         chunks_data = json.load(f)
 
     # Check document metadata preservation
-    assert 'document_metadata' in chunks_data
-    metadata = chunks_data['document_metadata']
+    assert "document_metadata" in chunks_data
+    metadata = chunks_data["document_metadata"]
 
     # Should preserve key metadata
-    assert 'title' in metadata
-    assert metadata['title'] == 'Test Document'
+    assert "title" in metadata
+    assert metadata["title"] == "Test Document"

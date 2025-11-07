@@ -1,7 +1,8 @@
 """Entity categorization service for adding semantic categories to entities."""
 
 import asyncio
-from typing import List, Dict, Optional, Any
+from typing import Any, Dict, List, Optional
+
 import structlog
 
 from ..models import Entity
@@ -22,21 +23,97 @@ class EntityCategorizationService:
 
         # Predefined semantic categories for fallback
         self.semantic_categories = {
-            'MEDICAL': ['disease', 'condition', 'symptom', 'disorder', 'syndrome', 'illness', 'diagnosis'],
-            'CHEMICAL': ['vitamin', 'mineral', 'supplement', 'compound', 'element', 'molecule', 'substance'],
-            'BIOLOGICAL': ['hormone', 'enzyme', 'protein', 'neurotransmitter', 'receptor', 'gene', 'cell'],
-            'TECHNICAL': ['software', 'hardware', 'system', 'technology', 'device', 'tool', 'platform'],
-            'PHARMACEUTICAL': ['drug', 'medication', 'medicine', 'treatment', 'therapy', 'prescription'],
-            'ANATOMICAL': ['brain', 'organ', 'tissue', 'muscle', 'nerve', 'gland', 'system'],
-            'NUTRITIONAL': ['food', 'nutrient', 'diet', 'nutrition', 'meal', 'ingredient'],
-            'PSYCHOLOGICAL': ['behavior', 'emotion', 'cognition', 'memory', 'attention', 'mood'],
-            'ORGANIZATIONAL': ['company', 'institution', 'organization', 'agency', 'corporation'],
-            'GEOGRAPHICAL': ['country', 'city', 'region', 'location', 'place', 'area'],
-            'TEMPORAL': ['time', 'period', 'duration', 'age', 'year', 'month', 'day'],
-            'QUANTITATIVE': ['amount', 'dose', 'level', 'concentration', 'percentage', 'ratio']
+            "MEDICAL": [
+                "disease",
+                "condition",
+                "symptom",
+                "disorder",
+                "syndrome",
+                "illness",
+                "diagnosis",
+            ],
+            "CHEMICAL": [
+                "vitamin",
+                "mineral",
+                "supplement",
+                "compound",
+                "element",
+                "molecule",
+                "substance",
+            ],
+            "BIOLOGICAL": [
+                "hormone",
+                "enzyme",
+                "protein",
+                "neurotransmitter",
+                "receptor",
+                "gene",
+                "cell",
+            ],
+            "TECHNICAL": [
+                "software",
+                "hardware",
+                "system",
+                "technology",
+                "device",
+                "tool",
+                "platform",
+            ],
+            "PHARMACEUTICAL": [
+                "drug",
+                "medication",
+                "medicine",
+                "treatment",
+                "therapy",
+                "prescription",
+            ],
+            "ANATOMICAL": [
+                "brain",
+                "organ",
+                "tissue",
+                "muscle",
+                "nerve",
+                "gland",
+                "system",
+            ],
+            "NUTRITIONAL": [
+                "food",
+                "nutrient",
+                "diet",
+                "nutrition",
+                "meal",
+                "ingredient",
+            ],
+            "PSYCHOLOGICAL": [
+                "behavior",
+                "emotion",
+                "cognition",
+                "memory",
+                "attention",
+                "mood",
+            ],
+            "ORGANIZATIONAL": [
+                "company",
+                "institution",
+                "organization",
+                "agency",
+                "corporation",
+            ],
+            "GEOGRAPHICAL": ["country", "city", "region", "location", "place", "area"],
+            "TEMPORAL": ["time", "period", "duration", "age", "year", "month", "day"],
+            "QUANTITATIVE": [
+                "amount",
+                "dose",
+                "level",
+                "concentration",
+                "percentage",
+                "ratio",
+            ],
         }
 
-    async def categorize_entities(self, entities: List[Entity], domain: Optional[str] = None) -> List[Entity]:
+    async def categorize_entities(
+        self, entities: List[Entity], domain: Optional[str] = None
+    ) -> List[Entity]:
         """Add semantic categories to entities.
 
         Args:
@@ -54,13 +131,15 @@ class EntityCategorizationService:
         # Process entities in batches for efficiency
         batch_size = 10
         for i in range(0, len(entities), batch_size):
-            batch = entities[i:i + batch_size]
+            batch = entities[i : i + batch_size]
             batch_results = await self._categorize_entity_batch(batch, domain)
             categorized_entities.extend(batch_results)
 
         return categorized_entities
 
-    async def _categorize_entity_batch(self, entities: List[Entity], domain: Optional[str] = None) -> List[Entity]:
+    async def _categorize_entity_batch(
+        self, entities: List[Entity], domain: Optional[str] = None
+    ) -> List[Entity]:
         """Categorize a batch of entities.
 
         Args:
@@ -79,7 +158,9 @@ class EntityCategorizationService:
         # Fallback to rule-based categorization
         return [self._rule_based_categorize(entity, domain) for entity in entities]
 
-    async def _llm_categorize_batch(self, entities: List[Entity], domain: Optional[str] = None) -> List[Entity]:
+    async def _llm_categorize_batch(
+        self, entities: List[Entity], domain: Optional[str] = None
+    ) -> List[Entity]:
         """Use LLM to categorize entities in batch.
 
         Args:
@@ -126,18 +207,21 @@ Only return the JSON array, no explanation."""
 
             # Parse JSON response
             import json
+
             categories_data = json.loads(response.strip())
 
             # Apply categories to entities
             categorized_entities = []
             for i, entity in enumerate(entities):
                 if i < len(categories_data):
-                    category = categories_data[i].get('category', 'GENERAL')
+                    category = categories_data[i].get("category", "GENERAL")
                     categorized_entity = self._add_category_to_entity(entity, category)
                     categorized_entities.append(categorized_entity)
                 else:
                     # Fallback for missing entries
-                    categorized_entities.append(self._rule_based_categorize(entity, domain))
+                    categorized_entities.append(
+                        self._rule_based_categorize(entity, domain)
+                    )
 
             return categorized_entities
 
@@ -146,7 +230,9 @@ Only return the JSON array, no explanation."""
             # Fallback to rule-based categorization
             return [self._rule_based_categorize(entity, domain) for entity in entities]
 
-    def _rule_based_categorize(self, entity: Entity, domain: Optional[str] = None) -> Entity:
+    def _rule_based_categorize(
+        self, entity: Entity, domain: Optional[str] = None
+    ) -> Entity:
         """Apply rule-based categorization to an entity.
 
         Args:
@@ -166,15 +252,15 @@ Only return the JSON array, no explanation."""
         # Domain-specific fallback
         if domain:
             domain_lower = domain.lower()
-            if domain_lower in ['medical', 'health']:
-                return self._add_category_to_entity(entity, 'MEDICAL')
-            elif domain_lower in ['technical', 'technology']:
-                return self._add_category_to_entity(entity, 'TECHNICAL')
-            elif domain_lower in ['business', 'corporate']:
-                return self._add_category_to_entity(entity, 'ORGANIZATIONAL')
+            if domain_lower in ["medical", "health"]:
+                return self._add_category_to_entity(entity, "MEDICAL")
+            elif domain_lower in ["technical", "technology"]:
+                return self._add_category_to_entity(entity, "TECHNICAL")
+            elif domain_lower in ["business", "corporate"]:
+                return self._add_category_to_entity(entity, "ORGANIZATIONAL")
 
         # Default category
-        return self._add_category_to_entity(entity, 'GENERAL')
+        return self._add_category_to_entity(entity, "GENERAL")
 
     def _add_category_to_entity(self, entity: Entity, category: str) -> Entity:
         """Add semantic category to entity attributes.
@@ -190,16 +276,20 @@ Only return the JSON array, no explanation."""
         entity_dict = entity.model_dump()
 
         # Add category to attributes
-        if 'attributes' not in entity_dict:
-            entity_dict['attributes'] = {}
+        if "attributes" not in entity_dict:
+            entity_dict["attributes"] = {}
 
-        entity_dict['attributes']['semantic_category'] = category
-        entity_dict['attributes']['categorization_method'] = 'llm' if self.llm_service else 'rule_based'
+        entity_dict["attributes"]["semantic_category"] = category
+        entity_dict["attributes"]["categorization_method"] = (
+            "llm" if self.llm_service else "rule_based"
+        )
 
         # Create new entity with category
         return Entity(**entity_dict)
 
-    def get_entities_by_category(self, entities: List[Entity], category: str) -> List[Entity]:
+    def get_entities_by_category(
+        self, entities: List[Entity], category: str
+    ) -> List[Entity]:
         """Filter entities by semantic category.
 
         Args:
@@ -210,8 +300,10 @@ Only return the JSON array, no explanation."""
             List of entities matching the category
         """
         return [
-            entity for entity in entities
-            if entity.attributes and entity.attributes.get('semantic_category') == category
+            entity
+            for entity in entities
+            if entity.attributes
+            and entity.attributes.get("semantic_category") == category
         ]
 
     def get_category_distribution(self, entities: List[Entity]) -> Dict[str, int]:
@@ -225,10 +317,10 @@ Only return the JSON array, no explanation."""
         """
         distribution = {}
         for entity in entities:
-            if entity.attributes and 'semantic_category' in entity.attributes:
-                category = entity.attributes['semantic_category']
+            if entity.attributes and "semantic_category" in entity.attributes:
+                category = entity.attributes["semantic_category"]
                 distribution[category] = distribution.get(category, 0) + 1
             else:
-                distribution['UNCATEGORIZED'] = distribution.get('UNCATEGORIZED', 0) + 1
+                distribution["UNCATEGORIZED"] = distribution.get("UNCATEGORIZED", 0) + 1
 
         return distribution

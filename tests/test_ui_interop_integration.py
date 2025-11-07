@@ -1,13 +1,13 @@
 """Integration tests for UI interoperability endpoints."""
 
-import pytest
-import tempfile
 import json
+import tempfile
 import time
 from pathlib import Path
-from fastapi.testclient import TestClient
-from unittest.mock import patch, Mock, AsyncMock
+from unittest.mock import AsyncMock, Mock, patch
 
+import pytest
+from fastapi.testclient import TestClient
 from morag.server import create_app
 
 
@@ -21,8 +21,10 @@ def client():
 @pytest.fixture
 def sample_text_file():
     """Create a sample text file for testing."""
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
-        f.write("# Integration Test Document\n\nThis is a comprehensive test document for UI interoperability.")
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+        f.write(
+            "# Integration Test Document\n\nThis is a comprehensive test document for UI interoperability."
+        )
         temp_path = Path(f.name)
 
     yield temp_path
@@ -35,9 +37,9 @@ def sample_text_file():
 @pytest.fixture
 def sample_pdf_file():
     """Create a sample PDF file for testing."""
-    with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as f:
+    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as f:
         # Write minimal PDF content
-        f.write(b'%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n')
+        f.write(b"%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n")
         temp_path = Path(f.name)
 
     yield temp_path
@@ -50,8 +52,10 @@ def sample_pdf_file():
 class TestUIInteropIntegration:
     """Integration tests for complete UI interoperability workflow."""
 
-    @patch('morag.api_models.endpoints.conversion.get_deduplication_service')
-    def test_markdown_conversion_workflow(self, mock_dedup_service, client, sample_text_file):
+    @patch("morag.api_models.endpoints.conversion.get_deduplication_service")
+    def test_markdown_conversion_workflow(
+        self, mock_dedup_service, client, sample_text_file
+    ):
         """Test complete markdown conversion workflow."""
         # Mock deduplication service
         mock_service = AsyncMock()
@@ -61,15 +65,15 @@ class TestUIInteropIntegration:
         mock_dedup_service.return_value = mock_service
 
         # Test markdown conversion
-        with open(sample_text_file, 'rb') as f:
+        with open(sample_text_file, "rb") as f:
             response = client.post(
                 "/api/convert/markdown",
                 files={"file": ("test.txt", f, "text/plain")},
                 data={
                     "document_id": "test-doc-integration",
                     "include_metadata": "true",
-                    "language": "en"
-                }
+                    "language": "en",
+                },
             )
 
         assert response.status_code == 200
@@ -83,9 +87,11 @@ class TestUIInteropIntegration:
         assert data["metadata"]["language"] == "en"
         assert data["processing_time_ms"] > 0
 
-    @patch('morag.tasks.enhanced_processing_task.enhanced_process_ingest_task.delay')
-    @patch('morag.api_models.endpoints.conversion.get_deduplication_service')
-    def test_processing_with_webhooks_workflow(self, mock_dedup_service, mock_task, client, sample_text_file):
+    @patch("morag.tasks.enhanced_processing_task.enhanced_process_ingest_task.delay")
+    @patch("morag.api_models.endpoints.conversion.get_deduplication_service")
+    def test_processing_with_webhooks_workflow(
+        self, mock_dedup_service, mock_task, client, sample_text_file
+    ):
         """Test complete processing with webhooks workflow."""
         # Mock deduplication service
         mock_service = AsyncMock()
@@ -97,7 +103,7 @@ class TestUIInteropIntegration:
         mock_task.return_value = Mock(id="integration-task-123")
 
         # Test processing with webhooks
-        with open(sample_text_file, 'rb') as f:
+        with open(sample_text_file, "rb") as f:
             response = client.post(
                 "/api/convert/process-ingest",
                 files={"file": ("test.txt", f, "text/plain")},
@@ -110,8 +116,10 @@ class TestUIInteropIntegration:
                     "chunking_strategy": "semantic",
                     "chunk_size": "2000",
                     "chunk_overlap": "100",
-                    "metadata": json.dumps({"test": "integration", "category": "ui-interop"})
-                }
+                    "metadata": json.dumps(
+                        {"test": "integration", "category": "ui-interop"}
+                    ),
+                },
             )
 
         assert response.status_code == 200
@@ -140,8 +148,10 @@ class TestUIInteropIntegration:
         assert options["chunk_overlap"] == 100
         assert options["metadata"]["test"] == "integration"
 
-    @patch('morag.api_models.endpoints.conversion.get_deduplication_service')
-    def test_duplicate_document_handling(self, mock_dedup_service, client, sample_text_file):
+    @patch("morag.api_models.endpoints.conversion.get_deduplication_service")
+    def test_duplicate_document_handling(
+        self, mock_dedup_service, client, sample_text_file
+    ):
         """Test duplicate document handling workflow."""
         # Mock deduplication service to return existing document
         mock_service = AsyncMock()
@@ -152,28 +162,28 @@ class TestUIInteropIntegration:
             "status": "completed",
             "facts_count": 10,
             "keywords_count": 5,
-            "chunks_count": 3
+            "chunks_count": 3,
         }
         mock_service.create_duplicate_error_response.return_value = {
             "error": "duplicate_document",
             "message": "Document with ID 'duplicate-doc' already exists",
             "existing_document": {
                 "document_id": "duplicate-doc",
-                "status": "completed"
+                "status": "completed",
             },
             "options": {
                 "update_url": "/api/process/update/duplicate-doc",
-                "delete_url": "/api/process/delete/duplicate-doc"
-            }
+                "delete_url": "/api/process/delete/duplicate-doc",
+            },
         }
         mock_dedup_service.return_value = mock_service
 
         # Test markdown conversion with existing document
-        with open(sample_text_file, 'rb') as f:
+        with open(sample_text_file, "rb") as f:
             response = client.post(
                 "/api/convert/markdown",
                 files={"file": ("test.txt", f, "text/plain")},
-                data={"document_id": "duplicate-doc"}
+                data={"document_id": "duplicate-doc"},
             )
 
         # Should return existing document info
@@ -184,14 +194,14 @@ class TestUIInteropIntegration:
         assert data["metadata"]["document_id"] == "duplicate-doc"
 
         # Test processing with existing document (should return 409)
-        with open(sample_text_file, 'rb') as f:
+        with open(sample_text_file, "rb") as f:
             response = client.post(
                 "/api/convert/process-ingest",
                 files={"file": ("test.txt", f, "text/plain")},
                 data={
                     "webhook_url": "https://api.example.com/webhooks/test",
-                    "document_id": "duplicate-doc"
-                }
+                    "document_id": "duplicate-doc",
+                },
             )
 
         assert response.status_code == 409
@@ -199,7 +209,7 @@ class TestUIInteropIntegration:
         assert error_data["error"] == "duplicate_document"
         assert "duplicate-doc" in error_data["message"]
 
-    @patch('morag.api_models.endpoints.temp_files.get_temp_file_service')
+    @patch("morag.api_models.endpoints.temp_files.get_temp_file_service")
     def test_temporary_file_management_workflow(self, mock_get_service, client):
         """Test complete temporary file management workflow."""
         # Mock temporary file service
@@ -213,23 +223,23 @@ class TestUIInteropIntegration:
                     "filename": "original.txt",
                     "size_bytes": 1024,
                     "content_type": "text/plain",
-                    "created_at": "2024-01-15T10:30:00Z"
+                    "created_at": "2024-01-15T10:30:00Z",
                 },
                 {
                     "filename": "markdown.md",
                     "size_bytes": 2048,
                     "content_type": "text/markdown",
-                    "created_at": "2024-01-15T10:31:00Z"
+                    "created_at": "2024-01-15T10:31:00Z",
                 },
                 {
                     "filename": "metadata.json",
                     "size_bytes": 512,
                     "content_type": "application/json",
-                    "created_at": "2024-01-15T10:31:30Z"
-                }
+                    "created_at": "2024-01-15T10:31:30Z",
+                },
             ],
             "total_size_bytes": 3584,
-            "expires_at": "2024-01-16T10:30:00Z"
+            "expires_at": "2024-01-16T10:30:00Z",
         }
 
         # Mock file info retrieval
@@ -239,8 +249,8 @@ class TestUIInteropIntegration:
                 "filename": "metadata.json",
                 "size_bytes": 512,
                 "content_type": "application/json",
-                "created_at": "2024-01-15T10:31:30Z"
-            }
+                "created_at": "2024-01-15T10:31:30Z",
+            },
         )
 
         # Mock session deletion
@@ -268,7 +278,9 @@ class TestUIInteropIntegration:
         assert "metadata.json" in filenames
 
         # Test getting file info
-        response = client.get("/api/files/temp/integration-session-123/metadata.json/info")
+        response = client.get(
+            "/api/files/temp/integration-session-123/metadata.json/info"
+        )
         assert response.status_code == 200
         info_data = response.json()
 
@@ -343,7 +355,7 @@ class TestUIInteropIntegration:
         response = client.post(
             "/api/convert/process-ingest",
             files={"file": ("test.txt", b"content", "text/plain")},
-            data={"webhook_url": "invalid-url"}
+            data={"webhook_url": "invalid-url"},
         )
         # Should return validation error or 500 with proper error message
         assert response.status_code in [422, 500]

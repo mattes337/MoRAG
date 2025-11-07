@@ -1,16 +1,18 @@
 """Configuration validation for MoRAG agents."""
 
-from typing import Dict, List, Any, Optional, Set
-from pydantic import BaseModel, Field, validator
-import structlog
+from typing import Any, Dict, List, Optional, Set
 
-from ..base.config import AgentConfig, PromptConfig, ModelConfig, RetryConfig
+import structlog
+from pydantic import BaseModel, Field, validator
+
+from ..base.config import AgentConfig, ModelConfig, PromptConfig, RetryConfig
 
 logger = structlog.get_logger(__name__)
 
 
 class ConfigValidationError(Exception):
     """Raised when configuration validation fails."""
+
     pass
 
 
@@ -20,7 +22,9 @@ class ConfigValidationResult(BaseModel):
     is_valid: bool = Field(..., description="Whether configuration is valid")
     errors: List[str] = Field(default_factory=list, description="Validation errors")
     warnings: List[str] = Field(default_factory=list, description="Validation warnings")
-    suggestions: List[str] = Field(default_factory=list, description="Improvement suggestions")
+    suggestions: List[str] = Field(
+        default_factory=list, description="Improvement suggestions"
+    )
 
 
 class ConfigValidator:
@@ -29,16 +33,37 @@ class ConfigValidator:
     def __init__(self):
         """Initialize the configuration validator."""
         self.required_agent_names = {
-            "fact_extraction", "entity_extraction", "relation_extraction",
-            "keyword_extraction", "query_analysis", "content_analysis",
-            "sentiment_analysis", "topic_analysis", "summarization",
-            "path_selection", "reasoning", "response_generation",
-            "decision_making", "context_analysis", "explanation",
-            "synthesis", "chunking", "classification", "validation", "filtering"
+            "fact_extraction",
+            "entity_extraction",
+            "relation_extraction",
+            "keyword_extraction",
+            "query_analysis",
+            "content_analysis",
+            "sentiment_analysis",
+            "topic_analysis",
+            "summarization",
+            "path_selection",
+            "reasoning",
+            "response_generation",
+            "decision_making",
+            "context_analysis",
+            "explanation",
+            "synthesis",
+            "chunking",
+            "classification",
+            "validation",
+            "filtering",
         }
 
         self.valid_output_formats = {"json", "text", "structured"}
-        self.valid_domains = {"general", "medical", "legal", "technical", "business", "academic"}
+        self.valid_domains = {
+            "general",
+            "medical",
+            "legal",
+            "technical",
+            "business",
+            "academic",
+        }
         self.valid_providers = {"gemini", "openai", "anthropic"}
 
     def validate_config(self, config: AgentConfig) -> ConfigValidationResult:
@@ -80,7 +105,7 @@ class ConfigValidator:
             is_valid=len(errors) == 0,
             errors=errors,
             warnings=warnings,
-            suggestions=suggestions
+            suggestions=suggestions,
         )
 
     def _validate_basic_config(self, config: AgentConfig) -> List[str]:
@@ -107,7 +132,9 @@ class ConfigValidator:
 
         return errors
 
-    def _validate_prompt_config(self, prompt: PromptConfig) -> tuple[List[str], List[str]]:
+    def _validate_prompt_config(
+        self, prompt: PromptConfig
+    ) -> tuple[List[str], List[str]]:
         """Validate prompt configuration."""
         errors = []
         warnings = []
@@ -170,7 +197,9 @@ class ConfigValidator:
 
         return errors
 
-    def _validate_agent_config(self, config: AgentConfig) -> tuple[List[str], List[str]]:
+    def _validate_agent_config(
+        self, config: AgentConfig
+    ) -> tuple[List[str], List[str]]:
         """Validate agent-specific configuration."""
         warnings = []
         suggestions = []
@@ -196,8 +225,14 @@ class ConfigValidator:
 
         # Check for unused or deprecated configuration keys
         common_keys = {
-            "entity_types", "max_chunk_size", "min_chunk_size", "overlap",
-            "max_facts", "include_offsets", "normalize_entities", "min_entity_length"
+            "entity_types",
+            "max_chunk_size",
+            "min_chunk_size",
+            "overlap",
+            "max_facts",
+            "include_offsets",
+            "normalize_entities",
+            "min_entity_length",
         }
 
         for key in agent_config.keys():
@@ -206,7 +241,9 @@ class ConfigValidator:
 
         return warnings, suggestions
 
-    def validate_all_configs(self, configs: Dict[str, AgentConfig]) -> Dict[str, ConfigValidationResult]:
+    def validate_all_configs(
+        self, configs: Dict[str, AgentConfig]
+    ) -> Dict[str, ConfigValidationResult]:
         """Validate multiple agent configurations.
 
         Args:
@@ -222,7 +259,9 @@ class ConfigValidator:
 
         return results
 
-    def get_validation_summary(self, results: Dict[str, ConfigValidationResult]) -> Dict[str, Any]:
+    def get_validation_summary(
+        self, results: Dict[str, ConfigValidationResult]
+    ) -> Dict[str, Any]:
         """Get summary of validation results.
 
         Args:
@@ -244,7 +283,9 @@ class ConfigValidator:
             "total_errors": total_errors,
             "total_warnings": total_warnings,
             "total_suggestions": total_suggestions,
-            "validation_rate": valid_configs / total_configs if total_configs > 0 else 0
+            "validation_rate": valid_configs / total_configs
+            if total_configs > 0
+            else 0,
         }
 
 
@@ -276,7 +317,9 @@ def validate_config(config: AgentConfig) -> ConfigValidationResult:
     return get_config_validator().validate_config(config)
 
 
-def validate_all_configs(configs: Dict[str, AgentConfig]) -> Dict[str, ConfigValidationResult]:
+def validate_all_configs(
+    configs: Dict[str, AgentConfig]
+) -> Dict[str, ConfigValidationResult]:
     """Validate multiple agent configurations.
 
     Args:

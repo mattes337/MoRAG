@@ -1,10 +1,11 @@
 """Unit tests for YouTube tasks."""
 
-import pytest
-from pathlib import Path
-
 # Import the task functions directly to avoid Celery decorator issues
 import sys
+from pathlib import Path
+
+import pytest
+
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from morag_youtube import YouTubeConfig, YouTubeDownloadResult
@@ -20,7 +21,7 @@ class TestYouTubeVideoTask:
         mock_youtube_metadata,
         mock_gemini_service,
         mock_qdrant_service,
-        tmp_path
+        tmp_path,
     ):
         """Test successful YouTube video processing."""
 
@@ -33,7 +34,7 @@ class TestYouTubeVideoTask:
             metadata=mock_youtube_metadata,
             download_time=5.0,
             file_size=1024000,
-            temp_files=[]
+            temp_files=[],
         )
 
         # Simulate the task logic directly
@@ -63,17 +64,21 @@ class TestYouTubeVideoTask:
                     "channel_id": mock_result.metadata.channel_id,
                     "playlist_id": mock_result.metadata.playlist_id,
                     "playlist_title": mock_result.metadata.playlist_title,
-                    "playlist_index": mock_result.metadata.playlist_index
+                    "playlist_index": mock_result.metadata.playlist_index,
                 },
                 "files": {
-                    "video_path": str(mock_result.video_path) if mock_result.video_path else None,
-                    "audio_path": str(mock_result.audio_path) if mock_result.audio_path else None,
+                    "video_path": str(mock_result.video_path)
+                    if mock_result.video_path
+                    else None,
+                    "audio_path": str(mock_result.audio_path)
+                    if mock_result.audio_path
+                    else None,
                     "subtitle_paths": [str(p) for p in mock_result.subtitle_paths],
-                    "thumbnail_paths": [str(p) for p in mock_result.thumbnail_paths]
+                    "thumbnail_paths": [str(p) for p in mock_result.thumbnail_paths],
                 },
                 "download_time": mock_result.download_time,
                 "file_size": mock_result.file_size,
-                "embeddings_stored": 0
+                "embeddings_stored": 0,
             }
 
             # Simulate embedding storage
@@ -81,7 +86,9 @@ class TestYouTubeVideoTask:
             if store_embeddings:
                 combined_text = f"Title: {mock_result.metadata.title}\n"
                 if mock_result.metadata.description:
-                    combined_text += f"Description: {mock_result.metadata.description}\n"
+                    combined_text += (
+                        f"Description: {mock_result.metadata.description}\n"
+                    )
                 if mock_result.metadata.tags:
                     combined_text += f"Tags: {', '.join(mock_result.metadata.tags)}\n"
 
@@ -99,7 +106,7 @@ class TestYouTubeVideoTask:
                         "title": mock_result.metadata.title,
                         "uploader": mock_result.metadata.uploader,
                     },
-                    collection_name="youtube"
+                    collection_name="youtube",
                 )
 
                 result["embeddings_stored"] = 1
@@ -120,10 +127,7 @@ class TestYouTubeVideoTask:
 
     @pytest.mark.asyncio
     async def test_process_youtube_video_no_embeddings(
-        self,
-        mock_celery_task,
-        mock_youtube_metadata,
-        tmp_path
+        self, mock_celery_task, mock_youtube_metadata, tmp_path
     ):
         """Test YouTube video processing without storing embeddings."""
 
@@ -135,19 +139,16 @@ class TestYouTubeVideoTask:
             metadata=mock_youtube_metadata,
             download_time=3.0,
             file_size=512000,
-            temp_files=[]
+            temp_files=[],
         )
 
         # Simulate task without embeddings
         result = {
             "metadata": {"id": mock_result.metadata.id},
-            "files": {
-                "video_path": str(mock_result.video_path),
-                "audio_path": None
-            },
+            "files": {"video_path": str(mock_result.video_path), "audio_path": None},
             "embeddings_stored": 0,
             "download_time": 3.0,
-            "file_size": 512000
+            "file_size": 512000,
         }
 
         assert result["embeddings_stored"] == 0
@@ -172,7 +173,7 @@ class TestYouTubePlaylistTask:
         mock_youtube_metadata,
         mock_gemini_service,
         mock_qdrant_service,
-        tmp_path
+        tmp_path,
     ):
         """Test successful YouTube playlist processing."""
 
@@ -186,7 +187,7 @@ class TestYouTubePlaylistTask:
                 metadata=mock_youtube_metadata,
                 download_time=2.0,
                 file_size=500000,
-                temp_files=[]
+                temp_files=[],
             )
             for i in range(3)
         ]
@@ -203,10 +204,10 @@ class TestYouTubePlaylistTask:
                     "metadata": {"id": f"test_video_{i}"},
                     "files": {"video_path": str(tmp_path / f"video_{i}.mp4")},
                     "download_time": 2.0,
-                    "file_size": 500000
+                    "file_size": 500000,
                 }
                 for i in range(3)
-            ]
+            ],
         }
 
         # Verify results
@@ -231,9 +232,7 @@ class TestYouTubeMetadataTask:
 
     @pytest.mark.asyncio
     async def test_extract_youtube_metadata_success(
-        self,
-        mock_celery_task,
-        mock_youtube_metadata
+        self, mock_celery_task, mock_youtube_metadata
     ):
         """Test successful YouTube metadata extraction."""
 
@@ -246,9 +245,9 @@ class TestYouTubeMetadataTask:
                 "duration": mock_youtube_metadata.duration,
                 "description": mock_youtube_metadata.description,
                 "view_count": mock_youtube_metadata.view_count,
-                "tags": mock_youtube_metadata.tags
+                "tags": mock_youtube_metadata.tags,
             },
-            "extraction_time": 1.0
+            "extraction_time": 1.0,
         }
 
         # Verify metadata extraction
@@ -264,10 +263,7 @@ class TestYouTubeAudioTask:
 
     @pytest.mark.asyncio
     async def test_download_youtube_audio_success(
-        self,
-        mock_celery_task,
-        mock_youtube_metadata,
-        tmp_path
+        self, mock_celery_task, mock_youtube_metadata, tmp_path
     ):
         """Test successful YouTube audio download."""
 
@@ -276,11 +272,11 @@ class TestYouTubeAudioTask:
         result = {
             "metadata": {
                 "id": mock_youtube_metadata.id,
-                "title": mock_youtube_metadata.title
+                "title": mock_youtube_metadata.title,
             },
             "audio_path": str(audio_path),
             "download_time": 3.0,
-            "file_size": 2048000
+            "file_size": 2048000,
         }
 
         # Verify audio download

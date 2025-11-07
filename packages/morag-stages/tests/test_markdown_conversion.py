@@ -1,14 +1,17 @@
 """Tests for markdown-conversion stage."""
 
-import pytest
 from pathlib import Path
 
-from morag_stages import StageType, StageStatus
+import pytest
+from morag_stages import StageStatus, StageType
+
 from .test_framework import StageTestFramework
 
 
 @pytest.mark.asyncio
-async def test_markdown_conversion_with_markdown_input(stage_test_framework: StageTestFramework):
+async def test_markdown_conversion_with_markdown_input(
+    stage_test_framework: StageTestFramework,
+):
     """Test markdown-conversion stage with markdown input."""
 
     # Create test markdown file
@@ -16,8 +19,7 @@ async def test_markdown_conversion_with_markdown_input(stage_test_framework: Sta
 
     # Execute markdown-conversion stage
     result = await stage_test_framework.execute_stage_test(
-        StageType.MARKDOWN_CONVERSION,
-        [test_file]
+        StageType.MARKDOWN_CONVERSION, [test_file]
     )
 
     # Assert success
@@ -30,7 +32,9 @@ async def test_markdown_conversion_with_markdown_input(stage_test_framework: Sta
 
 
 @pytest.mark.asyncio
-async def test_markdown_conversion_with_text_input(stage_test_framework: StageTestFramework):
+async def test_markdown_conversion_with_text_input(
+    stage_test_framework: StageTestFramework,
+):
     """Test markdown-conversion stage with plain text input."""
 
     # Create test text file
@@ -44,8 +48,7 @@ The document discusses technology, science, and other subjects.
 
     # Execute markdown-conversion stage
     result = await stage_test_framework.execute_stage_test(
-        StageType.MARKDOWN_CONVERSION,
-        [test_file]
+        StageType.MARKDOWN_CONVERSION, [test_file]
     )
 
     # Assert success
@@ -57,7 +60,9 @@ The document discusses technology, science, and other subjects.
 
 
 @pytest.mark.asyncio
-async def test_markdown_conversion_with_config(stage_test_framework: StageTestFramework):
+async def test_markdown_conversion_with_config(
+    stage_test_framework: StageTestFramework,
+):
     """Test markdown-conversion stage with custom configuration."""
 
     # Create test file
@@ -65,17 +70,15 @@ async def test_markdown_conversion_with_config(stage_test_framework: StageTestFr
 
     # Execute with custom config
     config = {
-        'markdown-conversion': {
-            'preserve_formatting': True,
-            'include_metadata': True,
-            'add_source_attribution': True
+        "markdown-conversion": {
+            "preserve_formatting": True,
+            "include_metadata": True,
+            "add_source_attribution": True,
         }
     }
 
     result = await stage_test_framework.execute_stage_test(
-        StageType.MARKDOWN_CONVERSION,
-        [test_file],
-        config=config
+        StageType.MARKDOWN_CONVERSION, [test_file], config=config
     )
 
     # Assert success
@@ -83,7 +86,7 @@ async def test_markdown_conversion_with_config(stage_test_framework: StageTestFr
 
     # Check output file has metadata in new H1+H2 format
     output_file = stage_test_framework.get_file_by_extension(result.output_files, ".md")
-    content = output_file.read_text(encoding='utf-8')
+    content = output_file.read_text(encoding="utf-8")
 
     # Should use new H1+H2 format instead of YAML frontmatter
     assert content.startswith("# ")
@@ -92,7 +95,9 @@ async def test_markdown_conversion_with_config(stage_test_framework: StageTestFr
 
 
 @pytest.mark.asyncio
-async def test_markdown_conversion_skip_existing(stage_test_framework: StageTestFramework):
+async def test_markdown_conversion_skip_existing(
+    stage_test_framework: StageTestFramework,
+):
     """Test markdown-conversion stage skips when output already exists."""
 
     # Create test file
@@ -100,21 +105,21 @@ async def test_markdown_conversion_skip_existing(stage_test_framework: StageTest
 
     # Execute first time
     result1 = await stage_test_framework.execute_stage_test(
-        StageType.MARKDOWN_CONVERSION,
-        [test_file]
+        StageType.MARKDOWN_CONVERSION, [test_file]
     )
     stage_test_framework.assert_stage_success(result1)
 
     # Execute second time - should skip
     result2 = await stage_test_framework.execute_stage_test(
-        StageType.MARKDOWN_CONVERSION,
-        [test_file]
+        StageType.MARKDOWN_CONVERSION, [test_file]
     )
     stage_test_framework.assert_stage_skipped(result2)
 
 
 @pytest.mark.asyncio
-async def test_markdown_conversion_audio_simulation(stage_test_framework: StageTestFramework):
+async def test_markdown_conversion_audio_simulation(
+    stage_test_framework: StageTestFramework,
+):
     """Test markdown-conversion stage with audio file simulation."""
 
     # Create a file that simulates audio processing output
@@ -146,17 +151,15 @@ async def test_markdown_conversion_audio_simulation(stage_test_framework: StageT
 
     # Execute with audio-specific config
     config = {
-        'markdown-conversion': {
-            'include_timestamps': True,
-            'speaker_diarization': True,
-            'content_type': 'audio'
+        "markdown-conversion": {
+            "include_timestamps": True,
+            "speaker_diarization": True,
+            "content_type": "audio",
         }
     }
 
     result = await stage_test_framework.execute_stage_test(
-        StageType.MARKDOWN_CONVERSION,
-        [test_file],
-        config=config
+        StageType.MARKDOWN_CONVERSION, [test_file], config=config
     )
 
     # Assert success
@@ -164,7 +167,7 @@ async def test_markdown_conversion_audio_simulation(stage_test_framework: StageT
 
     # Check output contains timestamps and speakers
     output_file = stage_test_framework.get_file_by_extension(result.output_files, ".md")
-    content = output_file.read_text(encoding='utf-8')
+    content = output_file.read_text(encoding="utf-8")
 
     assert "[00:00 - 00:15]" in content
     assert "Speaker 1:" in content
@@ -172,7 +175,9 @@ async def test_markdown_conversion_audio_simulation(stage_test_framework: StageT
 
 
 @pytest.mark.asyncio
-async def test_markdown_conversion_video_simulation(stage_test_framework: StageTestFramework):
+async def test_markdown_conversion_video_simulation(
+    stage_test_framework: StageTestFramework,
+):
     """Test markdown-conversion stage with video file simulation."""
 
     # Create a file that simulates video processing output
@@ -207,17 +212,15 @@ async def test_markdown_conversion_video_simulation(stage_test_framework: StageT
 
     # Execute with video-specific config
     config = {
-        'markdown-conversion': {
-            'include_timestamps': True,
-            'topic_segmentation': True,
-            'content_type': 'video'
+        "markdown-conversion": {
+            "include_timestamps": True,
+            "topic_segmentation": True,
+            "content_type": "video",
         }
     }
 
     result = await stage_test_framework.execute_stage_test(
-        StageType.MARKDOWN_CONVERSION,
-        [test_file],
-        config=config
+        StageType.MARKDOWN_CONVERSION, [test_file], config=config
     )
 
     # Assert success
@@ -225,7 +228,7 @@ async def test_markdown_conversion_video_simulation(stage_test_framework: StageT
 
     # Check output contains video-specific elements
     output_file = stage_test_framework.get_file_by_extension(result.output_files, ".md")
-    content = output_file.read_text(encoding='utf-8')
+    content = output_file.read_text(encoding="utf-8")
 
     assert "Video Transcript" in content
     assert "[00:00 - 00:20]" in content
@@ -234,7 +237,9 @@ async def test_markdown_conversion_video_simulation(stage_test_framework: StageT
 
 
 @pytest.mark.asyncio
-async def test_markdown_conversion_error_handling(stage_test_framework: StageTestFramework):
+async def test_markdown_conversion_error_handling(
+    stage_test_framework: StageTestFramework,
+):
     """Test markdown-conversion stage error handling."""
 
     # Create an empty file to trigger potential errors
@@ -242,8 +247,7 @@ async def test_markdown_conversion_error_handling(stage_test_framework: StageTes
 
     # Execute stage - should handle gracefully
     result = await stage_test_framework.execute_stage_test(
-        StageType.MARKDOWN_CONVERSION,
-        [empty_file]
+        StageType.MARKDOWN_CONVERSION, [empty_file]
     )
 
     # Should either succeed with minimal output or fail gracefully
@@ -256,17 +260,20 @@ async def test_markdown_conversion_error_handling(stage_test_framework: StageTes
 
 
 @pytest.mark.asyncio
-async def test_markdown_conversion_multiple_files(stage_test_framework: StageTestFramework):
+async def test_markdown_conversion_multiple_files(
+    stage_test_framework: StageTestFramework,
+):
     """Test markdown-conversion stage with multiple input files."""
 
     # Create multiple test files
     file1 = stage_test_framework.create_test_file("doc1.txt", "First document content.")
-    file2 = stage_test_framework.create_test_file("doc2.txt", "Second document content.")
+    file2 = stage_test_framework.create_test_file(
+        "doc2.txt", "Second document content."
+    )
 
     # Execute with multiple files
     result = await stage_test_framework.execute_stage_test(
-        StageType.MARKDOWN_CONVERSION,
-        [file1, file2]
+        StageType.MARKDOWN_CONVERSION, [file1, file2]
     )
 
     # Should process the first file (or handle multiple files appropriately)
@@ -278,15 +285,16 @@ async def test_markdown_conversion_multiple_files(stage_test_framework: StageTes
 
 
 @pytest.mark.asyncio
-async def test_markdown_conversion_output_naming(stage_test_framework: StageTestFramework):
+async def test_markdown_conversion_output_naming(
+    stage_test_framework: StageTestFramework,
+):
     """Test markdown-conversion stage output file naming conventions."""
 
     # Create test file with specific name
     test_file = stage_test_framework.create_test_file("my_document.txt", "Test content")
 
     result = await stage_test_framework.execute_stage_test(
-        StageType.MARKDOWN_CONVERSION,
-        [test_file]
+        StageType.MARKDOWN_CONVERSION, [test_file]
     )
 
     stage_test_framework.assert_stage_success(result)

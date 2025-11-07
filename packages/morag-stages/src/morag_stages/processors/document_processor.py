@@ -2,10 +2,11 @@
 
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any, Dict
+
 import structlog
 
-from .interface import StageProcessor, ProcessorResult
+from .interface import ProcessorResult, StageProcessor
 
 logger = structlog.get_logger(__name__)
 
@@ -13,6 +14,7 @@ logger = structlog.get_logger(__name__)
 try:
     from morag_core.exceptions import ProcessingError
 except ImportError:
+
     class ProcessingError(Exception):  # type: ignore
         pass
 
@@ -29,12 +31,13 @@ class DocumentStageProcessor(StageProcessor):
         """Get or create document processor instance."""
         if self._document_processor is None:
             try:
-                from morag_document import DocumentProcessor, DocumentConfig
+                from morag_document import DocumentConfig, DocumentProcessor
+
                 config = DocumentConfig(
                     extract_text=True,
                     extract_tables=True,
                     extract_images=True,
-                    ocr_enabled=True
+                    ocr_enabled=True,
                 )
                 self._document_processor = DocumentProcessor(config)
             except ImportError as e:
@@ -46,6 +49,7 @@ class DocumentStageProcessor(StageProcessor):
         if self._services is None:
             try:
                 from morag_services import MoRAGServices
+
                 self._services = MoRAGServices()
             except ImportError as e:
                 raise ProcessingError(f"MoRAG services not available: {e}")
@@ -56,10 +60,7 @@ class DocumentStageProcessor(StageProcessor):
         return content_type.upper() == "DOCUMENT"
 
     async def process(
-        self,
-        input_file: Path,
-        output_file: Path,
-        config: Dict[str, Any]
+        self, input_file: Path, output_file: Path, config: Dict[str, Any]
     ) -> ProcessorResult:
         """Process document file to markdown."""
         logger.info("Processing document file", input_file=str(input_file))
@@ -71,12 +72,13 @@ class DocumentStageProcessor(StageProcessor):
 
                 # Convert config to DocumentConfig
                 from morag_document import DocumentConfig
+
                 doc_config = DocumentConfig(
-                    extract_text=config.get('extract_text', True),
-                    extract_tables=config.get('extract_tables', True),
-                    extract_images=config.get('extract_images', True),
-                    ocr_enabled=config.get('ocr_enabled', True),
-                    preserve_formatting=config.get('preserve_formatting', True)
+                    extract_text=config.get("extract_text", True),
+                    extract_tables=config.get("extract_tables", True),
+                    extract_images=config.get("extract_images", True),
+                    ocr_enabled=config.get("ocr_enabled", True),
+                    preserve_formatting=config.get("preserve_formatting", True),
                 )
 
                 result = await processor.process_document(input_file, doc_config)
@@ -91,7 +93,7 @@ class DocumentStageProcessor(StageProcessor):
                     "author": result.metadata.author,
                     "created_date": result.metadata.created_date,
                     "modified_date": result.metadata.modified_date,
-                    "created_at": datetime.now().isoformat()
+                    "created_at": datetime.now().isoformat(),
                 }
 
                 content = f"\n# Document Analysis\n\n"
@@ -124,7 +126,7 @@ class DocumentStageProcessor(StageProcessor):
                     content += f"- **Language**: {result.metadata.language}\n"
 
                 markdown_content = self.create_markdown_with_metadata(content, metadata)
-                output_file.write_text(markdown_content, encoding='utf-8')
+                output_file.write_text(markdown_content, encoding="utf-8")
 
                 return ProcessorResult(
                     content=content,
@@ -132,36 +134,43 @@ class DocumentStageProcessor(StageProcessor):
                     metrics={
                         "pages": result.metadata.pages,
                         "content_length": len(result.text_content or ""),
-                        "has_tables": len(result.tables) > 0 if result.tables else False,
-                        "has_images": len(result.images) > 0 if result.images else False
+                        "has_tables": len(result.tables) > 0
+                        if result.tables
+                        else False,
+                        "has_images": len(result.images) > 0
+                        if result.images
+                        else False,
                     },
-                    final_output_file=output_file
+                    final_output_file=output_file,
                 )
 
             except Exception as doc_error:
-                logger.warning("morag_document processor failed, trying MoRAG services", error=str(doc_error))
+                logger.warning(
+                    "morag_document processor failed, trying MoRAG services",
+                    error=str(doc_error),
+                )
 
                 # Fallback to MoRAG services
                 services = self._get_services()
 
                 # Prepare options for document service
                 options = {
-                    'extract_tables': config.get('extract_tables', True),
-                    'extract_images': config.get('extract_images', True),
-                    'ocr_enabled': config.get('ocr_enabled', True),
-                    'preserve_formatting': config.get('preserve_formatting', True)
+                    "extract_tables": config.get("extract_tables", True),
+                    "extract_images": config.get("extract_images", True),
+                    "ocr_enabled": config.get("ocr_enabled", True),
+                    "preserve_formatting": config.get("preserve_formatting", True),
                 }
 
                 # Use document service
                 result = await services.process_document(str(input_file), options)
 
                 metadata = {
-                    "title": result.metadata.get('title') or input_file.stem,
+                    "title": result.metadata.get("title") or input_file.stem,
                     "source": str(input_file),
                     "type": "document",
                     "format": input_file.suffix.lower(),
                     "created_at": datetime.now().isoformat(),
-                    **result.metadata
+                    **result.metadata,
                 }
 
                 content = f"\n# Document Analysis\n\n"
@@ -169,18 +178,20 @@ class DocumentStageProcessor(StageProcessor):
                     content += f"## Content\n\n{result.text_content}\n\n"
 
                 markdown_content = self.create_markdown_with_metadata(content, metadata)
-                output_file.write_text(markdown_content, encoding='utf-8')
+                output_file.write_text(markdown_content, encoding="utf-8")
 
                 return ProcessorResult(
                     content=content,
                     metadata=metadata,
                     metrics={
                         "content_length": len(result.text_content or ""),
-                        "has_tables": config.get('extract_tables', True)
+                        "has_tables": config.get("extract_tables", True),
                     },
-                    final_output_file=output_file
+                    final_output_file=output_file,
                 )
 
         except Exception as e:
-            logger.error("Document processing failed", input_file=str(input_file), error=str(e))
+            logger.error(
+                "Document processing failed", input_file=str(input_file), error=str(e)
+            )
             raise ProcessingError(f"Document processing failed for {input_file}: {e}")

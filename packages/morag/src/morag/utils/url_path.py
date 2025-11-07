@@ -2,9 +2,10 @@
 URL path utilities to handle URLs without corrupting them through pathlib.
 """
 
+import os
 from pathlib import Path
 from typing import Union
-import os
+
 import structlog
 
 logger = structlog.get_logger(__name__)
@@ -38,19 +39,19 @@ class URLPath:
     def name(self) -> str:
         """Return a filename-like name from the URL."""
         # Extract the last part of the URL path, or use a default
-        parts = self.url_str.rstrip('/').split('/')
+        parts = self.url_str.rstrip("/").split("/")
         if len(parts) > 2:  # More than just protocol://domain
             name = parts[-1]
-            if name and not name.startswith('?'):
+            if name and not name.startswith("?"):
                 return name
 
         # Fallback to domain name or generic name
-        if 'youtube.com' in self.url_str or 'youtu.be' in self.url_str:
-            return 'youtube_video'
-        elif any(domain in self.url_str for domain in ['.com', '.org', '.net', '.edu']):
-            return 'web_content'
+        if "youtube.com" in self.url_str or "youtu.be" in self.url_str:
+            return "youtube_video"
+        elif any(domain in self.url_str for domain in [".com", ".org", ".net", ".edu"]):
+            return "web_content"
         else:
-            return 'url_content'
+            return "url_content"
 
     def exists(self) -> bool:
         """URLs are assumed to exist for processing purposes."""
@@ -59,7 +60,7 @@ class URLPath:
     @property
     def suffix(self) -> str:
         """Return empty suffix for URLs."""
-        return ''
+        return ""
 
     @property
     def stem(self) -> str:
@@ -107,7 +108,7 @@ def create_path_from_string(path_str: str) -> Union[Path, URLPath]:
         Path object for local files, URLPath for URLs
     """
     logger.debug("Creating path from string", path_str=path_str)
-    if path_str.startswith(('http://', 'https://')):
+    if path_str.startswith(("http://", "https://")):
         logger.info("Creating URLPath for URL", url=path_str)
         return URLPath(path_str)
     else:
@@ -129,7 +130,7 @@ def is_url(path_like) -> bool:
         return True
 
     path_str = str(path_like)
-    return path_str.startswith(('http://', 'https://'))
+    return path_str.startswith(("http://", "https://"))
 
 
 def get_url_string(path_like) -> str:
@@ -149,7 +150,7 @@ def get_url_string(path_like) -> str:
         return path_like.url_str
 
     path_str = str(path_like)
-    if path_str.startswith(('http://', 'https://')):
+    if path_str.startswith(("http://", "https://")):
         return path_str
 
     raise ValueError(f"Not a URL: {path_like}")

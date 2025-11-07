@@ -1,28 +1,28 @@
 """Core fact graph operations including LLM interactions."""
 
+import asyncio
 import json
 import re
-import asyncio
-from typing import List, Dict, Any, Optional
-import structlog
+from typing import Any, Dict, List, Optional
 
+import structlog
 from morag_reasoning.llm import LLMClient
+
 from ..models.fact import Fact, FactRelation, FactRelationType
 
 
 class FactGraphOperations:
     """Handle core fact graph operations and LLM interactions."""
 
-    def __init__(self, llm_client: LLMClient, logger: Optional[structlog.BoundLogger] = None):
+    def __init__(
+        self, llm_client: LLMClient, logger: Optional[structlog.BoundLogger] = None
+    ):
         """Initialize operations handler."""
         self.llm_client = llm_client
         self.logger = logger or structlog.get_logger(__name__)
 
     async def create_fact_relationships(
-        self,
-        facts: List[Fact],
-        min_confidence: float,
-        max_relations_per_fact: int
+        self, facts: List[Fact], min_confidence: float, max_relations_per_fact: int
     ) -> List[FactRelation]:
         """Create semantic relationships between facts.
 
@@ -46,10 +46,12 @@ class FactGraphOperations:
         total_batches = (len(facts) + batch_size - 1) // batch_size
 
         for i in range(0, len(facts), batch_size):
-            batch = facts[i:i + batch_size]
+            batch = facts[i : i + batch_size]
             batch_num = i // batch_size + 1
 
-            self.logger.debug(f"Processing relationship batch {batch_num}/{total_batches}")
+            self.logger.debug(
+                f"Processing relationship batch {batch_num}/{total_batches}"
+            )
 
             batch_relationships = await self._extract_relationships_for_batch(
                 batch, min_confidence, max_relations_per_fact
@@ -66,7 +68,7 @@ class FactGraphOperations:
                     self.logger.error(
                         f"Too many failed batches ({failed_batches}), stopping relationship extraction",
                         processed_batches=batch_num,
-                        total_batches=total_batches
+                        total_batches=total_batches,
                     )
                     break
             else:
@@ -78,16 +80,13 @@ class FactGraphOperations:
         self.logger.info(
             f"Relationship extraction completed",
             total_relationships=len(relationships),
-            failed_batches=failed_batches
+            failed_batches=failed_batches,
         )
 
         return relationships
 
     async def _extract_relationships_for_batch(
-        self,
-        facts: List[Fact],
-        min_confidence: float,
-        max_relations_per_fact: int
+        self, facts: List[Fact], min_confidence: float, max_relations_per_fact: int
     ) -> List[FactRelation]:
         """Extract relationships from a batch of facts using LLM."""
         try:
@@ -105,7 +104,9 @@ class FactGraphOperations:
             response = await self.llm_client.complete(prompt)
 
             if not response or not response.strip():
-                self.logger.warning("Empty response from LLM for relationship extraction")
+                self.logger.warning(
+                    "Empty response from LLM for relationship extraction"
+                )
                 return []
 
             # Parse the response
@@ -116,7 +117,9 @@ class FactGraphOperations:
                 parsed_relationships, facts, min_confidence
             )
 
-            self.logger.debug(f"Extracted {len(fact_relations)} relationships from batch of {len(facts)} facts")
+            self.logger.debug(
+                f"Extracted {len(fact_relations)} relationships from batch of {len(facts)} facts"
+            )
 
             return fact_relations
 
@@ -125,7 +128,7 @@ class FactGraphOperations:
                 f"Error extracting relationships for batch",
                 error=str(e),
                 error_type=type(e).__name__,
-                batch_size=len(facts)
+                batch_size=len(facts),
             )
             return []
 
@@ -137,10 +140,12 @@ class FactGraphOperations:
             "approach": fact.approach,
             "solution": fact.solution,
             "confidence": fact.confidence,
-            "context": fact.context
+            "context": fact.context,
         }
 
-    def _create_relationship_prompt(self, facts: List[Dict[str, Any]], max_relations: int) -> str:
+    def _create_relationship_prompt(
+        self, facts: List[Dict[str, Any]], max_relations: int
+    ) -> str:
         """Create prompt for relationship extraction."""
         facts_text = json.dumps(facts, indent=2)
 
@@ -197,18 +202,18 @@ RESPONSE (JSON only, no other text):"""
     def _fix_common_json_issues(self, response: str) -> str:
         """Fix common JSON formatting issues in LLM responses."""
         # Remove markdown code blocks
-        response = re.sub(r'```(?:json)?\s*', '', response)
-        response = re.sub(r'\s*```', '', response)
+        response = re.sub(r"```(?:json)?\s*", "", response)
+        response = re.sub(r"\s*```", "", response)
 
         # Remove any leading/trailing non-JSON content
         response = response.strip()
 
         # Find the first '[' and last ']' to extract JSON array
-        start = response.find('[')
-        end = response.rfind(']')
+        start = response.find("[")
+        end = response.rfind("]")
 
         if start >= 0 and end > start:
-            response = response[start:end+1]
+            response = response[start : end + 1]
 
         # Fix common JSON issues
         response = self._preprocess_malformed_keys(response)
@@ -218,18 +223,20 @@ RESPONSE (JSON only, no other text):"""
     def _preprocess_malformed_keys(self, response: str) -> str:
         """Fix malformed JSON keys."""
         # Fix unquoted keys (basic cases)
-        response = re.sub(r'(\w+):', r'"\1":', response)
+        response = re.sub(r"(\w+):", r'"\1":', response)
 
         # Fix single quotes to double quotes
         response = response.replace("'", '"')
 
         # Remove trailing commas
-        response = re.sub(r',\s*}', '}', response)
-        response = re.sub(r',\s*]', ']', response)
+        response = re.sub(r",\s*}", "}", response)
+        response = re.sub(r",\s*]", "]", response)
 
         return response
 
-    def _validate_relationships(self, relationships: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _validate_relationships(
+        self, relationships: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
         """Validate and clean relationship objects."""
         validated = []
 
@@ -247,7 +254,12 @@ RESPONSE (JSON only, no other text):"""
 
     def _is_valid_relationship_object(self, obj: Dict[str, Any]) -> bool:
         """Check if relationship object has required fields."""
-        required_fields = ["source_fact_id", "target_fact_id", "relation_type", "confidence"]
+        required_fields = [
+            "source_fact_id",
+            "target_fact_id",
+            "relation_type",
+            "confidence",
+        ]
         return all(field in obj for field in required_fields)
 
     def _normalize_relationship_object(self, obj: Dict[str, Any]) -> Dict[str, Any]:
@@ -257,10 +269,10 @@ RESPONSE (JSON only, no other text):"""
             "target_fact_id": int(obj["target_fact_id"]),
             "relation_type": str(obj["relation_type"]).lower(),
             "confidence": float(obj["confidence"]),
-            "explanation": self._safe_get_key(obj, "explanation", "")
+            "explanation": self._safe_get_key(obj, "explanation", ""),
         }
 
-    def _safe_get_key(self, data: Dict[str, Any], key: str, default: str = '') -> str:
+    def _safe_get_key(self, data: Dict[str, Any], key: str, default: str = "") -> str:
         """Safely get a key from dictionary with fallback."""
         value = data.get(key, default)
         if value is None:
@@ -271,7 +283,7 @@ RESPONSE (JSON only, no other text):"""
         self,
         relationships: List[Dict[str, Any]],
         facts: List[Fact],
-        min_confidence: float
+        min_confidence: float,
     ) -> List[FactRelation]:
         """Create FactRelation objects from parsed relationship data."""
         fact_relations = []
@@ -288,7 +300,9 @@ RESPONSE (JSON only, no other text):"""
 
                 # Validate fact IDs
                 if source_id >= len(facts) or target_id >= len(facts):
-                    self.logger.warning(f"Invalid fact IDs: source={source_id}, target={target_id}, max={len(facts)-1}")
+                    self.logger.warning(
+                        f"Invalid fact IDs: source={source_id}, target={target_id}, max={len(facts)-1}"
+                    )
                     continue
 
                 if source_id == target_id:
@@ -309,13 +323,15 @@ RESPONSE (JSON only, no other text):"""
                     relation_type=relation_type,
                     confidence=confidence,
                     explanation=rel_data.get("explanation", ""),
-                    context={}
+                    context={},
                 )
 
                 fact_relations.append(fact_relation)
 
             except (KeyError, ValueError, TypeError) as e:
-                self.logger.warning(f"Error creating fact relation: {e}, data: {rel_data}")
+                self.logger.warning(
+                    f"Error creating fact relation: {e}, data: {rel_data}"
+                )
                 continue
 
         return fact_relations
@@ -329,7 +345,7 @@ RESPONSE (JSON only, no other text):"""
             "similar_to": FactRelationType.SIMILARITY,
             "contradicts": FactRelationType.CONTRADICTION,
             "temporal_before": FactRelationType.TEMPORAL,
-            "part_of": FactRelationType.HIERARCHICAL
+            "part_of": FactRelationType.HIERARCHICAL,
         }
 
         return type_mapping.get(relation_type_str.lower())

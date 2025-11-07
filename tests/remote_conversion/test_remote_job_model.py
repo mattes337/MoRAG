@@ -1,7 +1,8 @@
 """Tests for remote job model."""
 
-import pytest
 from datetime import datetime, timedelta
+
+import pytest
 from morag_core.models.remote_job import RemoteJob
 
 
@@ -14,7 +15,7 @@ class TestRemoteJob:
             ingestion_task_id="test-task-123",
             source_file_path="/tmp/test.mp3",
             content_type="audio",
-            task_options={"webhook_url": "http://example.com/webhook"}
+            task_options={"webhook_url": "http://example.com/webhook"},
         )
 
         assert job.id is not None
@@ -34,7 +35,7 @@ class TestRemoteJob:
             ingestion_task_id="test-task-123",
             source_file_path="/tmp/test.mp3",
             content_type="audio",
-            task_options={"webhook_url": "http://example.com/webhook"}
+            task_options={"webhook_url": "http://example.com/webhook"},
         )
 
         # Convert to dict
@@ -65,7 +66,7 @@ class TestRemoteJob:
             ingestion_task_id="test-task-123",
             source_file_path="/tmp/test.mp3",
             content_type="audio",
-            task_options={}
+            task_options={},
         )
 
         # Initially can't retry (not failed)
@@ -90,7 +91,7 @@ class TestRemoteJob:
             ingestion_task_id="test-task-123",
             source_file_path="/tmp/test.mp3",
             content_type="audio",
-            task_options={}
+            task_options={},
         )
 
         # No timeout set
@@ -110,7 +111,7 @@ class TestRemoteJob:
             ingestion_task_id="test-task-123",
             source_file_path="/tmp/test.mp3",
             content_type="audio",
-            task_options={}
+            task_options={},
         )
 
         # No start time

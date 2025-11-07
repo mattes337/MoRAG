@@ -30,6 +30,7 @@ async def test_audio_dual_format():
 
         # Test that audio service supports both formats
         from morag_audio.service import AudioService
+
         audio_service = AudioService()
 
         print("✅ Audio service supports markdown format")
@@ -37,14 +38,15 @@ async def test_audio_dual_format():
 
         # Test that audio converter has both methods
         from morag_audio.converters.audio_converter import AudioConverter
+
         converter = AudioConverter()
 
-        if hasattr(converter, 'convert_to_markdown'):
+        if hasattr(converter, "convert_to_markdown"):
             print("✅ Audio converter has convert_to_markdown method")
         else:
             print("❌ Audio converter missing convert_to_markdown method")
 
-        if hasattr(converter, 'convert_to_json'):
+        if hasattr(converter, "convert_to_json"):
             print("✅ Audio converter has convert_to_json method")
         else:
             print("❌ Audio converter missing convert_to_json method")
@@ -67,7 +69,7 @@ async def test_video_dual_format():
         print("✅ Video service supports markdown format")
         print("✅ Video service supports JSON format")
 
-        if hasattr(video_service, '_convert_to_json'):
+        if hasattr(video_service, "_convert_to_json"):
             print("✅ Video service has _convert_to_json method")
         else:
             print("❌ Video service missing _convert_to_json method")
@@ -87,12 +89,12 @@ async def test_document_dual_format():
         # Test that document service supports both formats
         service = DocumentService()
 
-        if hasattr(service, 'process_document'):
+        if hasattr(service, "process_document"):
             print("✅ Document service has process_document method (markdown)")
         else:
             print("❌ Document service missing process_document method")
 
-        if hasattr(service, 'process_document_to_json'):
+        if hasattr(service, "process_document_to_json"):
             print("✅ Document service has process_document_to_json method")
         else:
             print("❌ Document service missing process_document_to_json method")
@@ -160,12 +162,12 @@ async def test_server_normalization():
                             {
                                 "timestamp": 0,
                                 "speaker": 1,
-                                "text": "This is JSON content for API."
+                                "text": "This is JSON content for API.",
                             }
-                        ]
+                        ],
                     }
-                ]
-            }
+                ],
+            },
         )
 
         # Test normalization
@@ -209,7 +211,9 @@ async def main():
         print("✅ Video processing: Dual format support implemented")
         print("✅ Document processing: Dual format support implemented")
         print("✅ Services layer: Processes both formats correctly")
-        print("✅ Server normalization: Uses JSON for API, preserves markdown for Qdrant")
+        print(
+            "✅ Server normalization: Uses JSON for API, preserves markdown for Qdrant"
+        )
 
         print("\n🎯 Result:")
         print("• Qdrant storage: Uses markdown from text_content field")
@@ -220,6 +224,7 @@ async def main():
     except Exception as e:
         print(f"\n❌ Dual format test suite failed: {e}")
         import traceback
+
         traceback.print_exc()
 
 

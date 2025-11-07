@@ -1,9 +1,9 @@
 """Graph-level operations for Neo4j storage."""
 
 import logging
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
 
-from ...models import Graph, Entity, Relation
+from ...models import Entity, Graph, Relation
 from ...models.types import EntityId
 from .base_operations import BaseOperations
 
@@ -71,14 +71,17 @@ class GraphOperations(BaseOperations):
 
         properties = entity.metadata.copy() if entity.metadata else {}
 
-        result = await self._execute_query(query, {
-            "id": entity.id,
-            "name": entity.name,
-            "normalized_name": normalized_name,
-            "type": entity.type,
-            "confidence": entity.confidence,
-            "metadata": properties
-        })
+        result = await self._execute_query(
+            query,
+            {
+                "id": entity.id,
+                "name": entity.name,
+                "normalized_name": normalized_name,
+                "type": entity.type,
+                "confidence": entity.confidence,
+                "metadata": properties,
+            },
+        )
 
         return result[0]["id"] if result else entity.id
 
@@ -104,21 +107,21 @@ class GraphOperations(BaseOperations):
 
         properties = relation.metadata.copy() if relation.metadata else {}
 
-        result = await self._execute_query(query, {
-            "source_id": relation.source_entity_id,
-            "target_id": relation.target_entity_id,
-            "relation_id": relation.id,
-            "relation_type": relation.type,
-            "confidence": relation.confidence,
-            "metadata": properties
-        })
+        result = await self._execute_query(
+            query,
+            {
+                "source_id": relation.source_entity_id,
+                "target_id": relation.target_entity_id,
+                "relation_id": relation.id,
+                "relation_type": relation.type,
+                "confidence": relation.confidence,
+                "metadata": properties,
+            },
+        )
 
         return result[0]["id"] if result else relation.id
 
-    async def get_graph(
-        self,
-        entity_ids: Optional[List[EntityId]] = None
-    ) -> Graph:
+    async def get_graph(self, entity_ids: Optional[List[EntityId]] = None) -> Graph:
         """Get a graph or subgraph.
 
         Args:
@@ -136,7 +139,9 @@ class GraphOperations(BaseOperations):
             WHERE e.id IN $entity_ids
             RETURN e
             """
-            entity_result = await self._execute_query(entity_query, {"entity_ids": entity_ids})
+            entity_result = await self._execute_query(
+                entity_query, {"entity_ids": entity_ids}
+            )
         else:
             entity_query = "MATCH (e:Entity) RETURN e"
             entity_result = await self._execute_query(entity_query)
@@ -157,7 +162,9 @@ class GraphOperations(BaseOperations):
             WHERE source.id IN $entity_ids AND target.id IN $entity_ids
             RETURN r, source.id as source_id, target.id as target_id
             """
-            relation_result = await self._execute_query(relation_query, {"entity_ids": entity_id_list})
+            relation_result = await self._execute_query(
+                relation_query, {"entity_ids": entity_id_list}
+            )
 
             # Parse relations
             for record in relation_result:
@@ -169,7 +176,7 @@ class GraphOperations(BaseOperations):
                         source_entity_id=record["source_id"],
                         target_entity_id=record["target_id"],
                         confidence=rel_data.get("confidence", 1.0),
-                        metadata=rel_data.get("metadata", {})
+                        metadata=rel_data.get("metadata", {}),
                     )
                     graph.relations[relation.id] = relation
                 except Exception as e:
@@ -219,7 +226,7 @@ class GraphOperations(BaseOperations):
                 ORDER BY connections DESC
                 LIMIT 10
                 RETURN e.id as entity_id, e.name as name, connections
-            """
+            """,
         }
 
         # Execute each query and collect results
@@ -227,19 +234,31 @@ class GraphOperations(BaseOperations):
             try:
                 result = await self._execute_query(query)
 
-                if stat_name in ["entity_count", "relation_count", "document_count", "chunk_count"]:
+                if stat_name in [
+                    "entity_count",
+                    "relation_count",
+                    "document_count",
+                    "chunk_count",
+                ]:
                     stats[stat_name] = result[0]["count"] if result else 0
                 elif stat_name == "avg_entity_connections":
-                    stats[stat_name] = float(result[0]["avg_connections"]) if result and result[0]["avg_connections"] else 0.0
+                    stats[stat_name] = (
+                        float(result[0]["avg_connections"])
+                        if result and result[0]["avg_connections"]
+                        else 0.0
+                    )
                 elif stat_name in ["entity_types", "relation_types"]:
-                    stats[stat_name] = [{"type": r["type"], "count": r["count"]} for r in result]
+                    stats[stat_name] = [
+                        {"type": r["type"], "count": r["count"]} for r in result
+                    ]
                 elif stat_name == "most_connected_entities":
                     stats[stat_name] = [
                         {
                             "entity_id": r["entity_id"],
                             "name": r["name"],
-                            "connections": r["connections"]
-                        } for r in result
+                            "connections": r["connections"],
+                        }
+                        for r in result
                     ]
 
             except Exception as e:
@@ -291,7 +310,11 @@ class GraphOperations(BaseOperations):
             """
 
             clustering_result = await self._execute_query(clustering_query)
-            metrics["avg_clustering_coefficient"] = float(clustering_result[0]["avg_clustering"]) if clustering_result and clustering_result[0]["avg_clustering"] else 0.0
+            metrics["avg_clustering_coefficient"] = (
+                float(clustering_result[0]["avg_clustering"])
+                if clustering_result and clustering_result[0]["avg_clustering"]
+                else 0.0
+            )
 
             # Connected components count (simplified)
             components_query = """
@@ -301,14 +324,16 @@ class GraphOperations(BaseOperations):
             """
 
             components_result = await self._execute_query(components_query)
-            metrics["isolated_entities"] = components_result[0]["isolated_entities"] if components_result else 0
+            metrics["isolated_entities"] = (
+                components_result[0]["isolated_entities"] if components_result else 0
+            )
 
         except Exception as e:
             logger.warning(f"Failed to calculate graph metrics: {e}")
             metrics = {
                 "graph_density": 0.0,
                 "avg_clustering_coefficient": 0.0,
-                "isolated_entities": 0
+                "isolated_entities": 0,
             }
 
         return metrics
@@ -325,28 +350,28 @@ class GraphOperations(BaseOperations):
         optimizations = [
             {
                 "name": "entity_id_index",
-                "query": "CREATE INDEX entity_id_index IF NOT EXISTS FOR (e:Entity) ON (e.id)"
+                "query": "CREATE INDEX entity_id_index IF NOT EXISTS FOR (e:Entity) ON (e.id)",
             },
             {
                 "name": "entity_name_index",
-                "query": "CREATE INDEX entity_name_index IF NOT EXISTS FOR (e:Entity) ON (e.name)"
+                "query": "CREATE INDEX entity_name_index IF NOT EXISTS FOR (e:Entity) ON (e.name)",
             },
             {
                 "name": "relation_id_index",
-                "query": "CREATE INDEX relation_id_index IF NOT EXISTS FOR ()-[r:RELATION]-() ON (r.id)"
+                "query": "CREATE INDEX relation_id_index IF NOT EXISTS FOR ()-[r:RELATION]-() ON (r.id)",
             },
             {
                 "name": "document_id_index",
-                "query": "CREATE INDEX document_id_index IF NOT EXISTS FOR (d:Document) ON (d.id)"
+                "query": "CREATE INDEX document_id_index IF NOT EXISTS FOR (d:Document) ON (d.id)",
             },
             {
                 "name": "chunk_id_index",
-                "query": "CREATE INDEX chunk_id_index IF NOT EXISTS FOR (c:DocumentChunk) ON (c.id)"
+                "query": "CREATE INDEX chunk_id_index IF NOT EXISTS FOR (c:DocumentChunk) ON (c.id)",
             },
             {
                 "name": "chunk_document_id_index",
-                "query": "CREATE INDEX chunk_document_id_index IF NOT EXISTS FOR (c:DocumentChunk) ON (c.document_id)"
-            }
+                "query": "CREATE INDEX chunk_document_id_index IF NOT EXISTS FOR (c:DocumentChunk) ON (c.document_id)",
+            },
         ]
 
         for optimization in optimizations:

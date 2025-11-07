@@ -1,26 +1,30 @@
 """Entity identification service for intelligent retrieval."""
 
-import structlog
-from typing import List, Optional, Any
-from pydantic_ai import Agent
-from pydantic import BaseModel, Field
+from typing import Any, List, Optional
 
-from morag_reasoning.llm import LLMClient
+import structlog
 from morag_graph.storage.neo4j_storage import Neo4jStorage
+from morag_reasoning.llm import LLMClient
 from morag_services.embedding import GeminiEmbeddingService
+from pydantic import BaseModel, Field
+from pydantic_ai import Agent
 
 
 class IdentifiedEntity(BaseModel):
     """An entity identified from a user query."""
+
     name: str = Field(..., description="Entity name")
     entity_type: str = Field(..., description="Entity type")
     confidence: float = Field(ge=0.0, le=1.0, description="Confidence score")
     context: str = Field(..., description="Context in which entity appears")
-    graph_entity_id: Optional[str] = Field(None, description="Linked graph entity ID if found")
+    graph_entity_id: Optional[str] = Field(
+        None, description="Linked graph entity ID if found"
+    )
 
 
 class EntityIdentificationResult(BaseModel):
     """Result of entity identification from query."""
+
     entities: List[IdentifiedEntity] = Field(..., description="Identified entities")
 
 
@@ -34,7 +38,7 @@ class EntityIdentificationService:
         embedding_service: Optional[GeminiEmbeddingService] = None,
         min_confidence: float = 0.3,
         max_entities: int = 50,
-        language: Optional[str] = None
+        language: Optional[str] = None,
     ):
         """Initialize the entity identification service.
 
@@ -58,7 +62,7 @@ class EntityIdentificationService:
         self.agent = Agent(
             model=llm_client.get_model(),
             result_type=EntityIdentificationResult,
-            system_prompt=self._get_system_prompt()
+            system_prompt=self._get_system_prompt(),
         )
 
     def _get_system_prompt(self) -> str:
@@ -99,24 +103,26 @@ Return only the most relevant entities that would help retrieve information to a
         if not query or not query.strip():
             return []
 
-        self.logger.info("Starting entity identification", query=query, language=self.language)
+        self.logger.info(
+            "Starting entity identification", query=query, language=self.language
+        )
 
         try:
             # Build language-specific instruction
             language_instruction = ""
             if self.language:
                 language_names = {
-                    'en': 'English',
-                    'de': 'German',
-                    'fr': 'French',
-                    'es': 'Spanish',
-                    'it': 'Italian',
-                    'pt': 'Portuguese',
-                    'nl': 'Dutch',
-                    'ru': 'Russian',
-                    'zh': 'Chinese',
-                    'ja': 'Japanese',
-                    'ko': 'Korean'
+                    "en": "English",
+                    "de": "German",
+                    "fr": "French",
+                    "es": "Spanish",
+                    "it": "Italian",
+                    "pt": "Portuguese",
+                    "nl": "Dutch",
+                    "ru": "Russian",
+                    "zh": "Chinese",
+                    "ja": "Japanese",
+                    "ko": "Korean",
                 }
                 language_name = language_names.get(self.language, self.language)
                 language_instruction = f"\n\nIMPORTANT: Extract entity names in {language_name} ({self.language}) to match how they appear in the knowledge graph. Entity names must be in {language_name} for accurate graph matching."
@@ -133,13 +139,14 @@ Focus on entities that are likely to exist in a knowledge graph and are essentia
 
             # Filter by confidence and limit count
             filtered_entities = [
-                entity for entity in entities
+                entity
+                for entity in entities
                 if entity.confidence >= self.min_confidence
             ]
 
             # Sort by confidence and limit
             filtered_entities.sort(key=lambda x: x.confidence, reverse=True)
-            filtered_entities = filtered_entities[:self.max_entities]
+            filtered_entities = filtered_entities[: self.max_entities]
 
             # Link to graph entities if graph storage is available
             if self.graph_storage:
@@ -148,7 +155,7 @@ Focus on entities that are likely to exist in a knowledge graph and are essentia
             self.logger.info(
                 "Entity identification completed",
                 total_entities=len(filtered_entities),
-                query=query
+                query=query,
             )
 
             return filtered_entities
@@ -158,7 +165,7 @@ Focus on entities that are likely to exist in a knowledge graph and are essentia
                 "Entity identification failed",
                 error=str(e),
                 error_type=type(e).__name__,
-                query=query
+                query=query,
             )
             raise
 
@@ -177,12 +184,14 @@ Focus on entities that are likely to exist in a knowledge graph and are essentia
                 candidates = await self.graph_storage.search_entities(
                     entity.name,
                     entity_type=None,  # Don't filter by type to allow cross-type matching
-                    limit=10  # Get more candidates for better matching
+                    limit=10,  # Get more candidates for better matching
                 )
 
                 # If embedding service is available and we have few candidates, try vector search
                 if self.embedding_service and len(candidates) < 3:
-                    vector_candidates = await self._find_similar_entities_by_vector(entity)
+                    vector_candidates = await self._find_similar_entities_by_vector(
+                        entity
+                    )
                     # Merge vector candidates with exact search candidates
                     candidates.extend(vector_candidates)
                     # Remove duplicates by entity ID
@@ -199,7 +208,7 @@ Focus on entities that are likely to exist in a knowledge graph and are essentia
                     self.logger.debug(
                         "Entity linking candidates found",
                         entity_name=entity.name,
-                        candidates=[f"{c.name} ({c.type})" for c in candidates]
+                        candidates=[f"{c.name} ({c.type})" for c in candidates],
                     )
 
                     # Find best match based on name similarity
@@ -209,8 +218,7 @@ Focus on entities that are likely to exist in a knowledge graph and are essentia
                     for candidate in candidates:
                         # Simple similarity scoring
                         similarity = self._calculate_name_similarity(
-                            entity.name.lower(),
-                            candidate.name.lower()
+                            entity.name.lower(), candidate.name.lower()
                         )
 
                         # Debug logging for entity linking
@@ -219,10 +227,12 @@ Focus on entities that are likely to exist in a knowledge graph and are essentia
                             entity_name=entity.name,
                             candidate_name=candidate.name,
                             similarity=similarity,
-                            threshold=0.7
+                            threshold=0.7,
                         )
 
-                        if similarity > best_score and similarity >= 0.7:  # Lower threshold for cross-language matching
+                        if (
+                            similarity > best_score and similarity >= 0.7
+                        ):  # Lower threshold for cross-language matching
                             best_score = similarity
                             best_match = candidate
 
@@ -232,14 +242,14 @@ Focus on entities that are likely to exist in a knowledge graph and are essentia
                             "Linked entity to graph",
                             entity_name=entity.name,
                             graph_entity_id=best_match.id,
-                            similarity=best_score
+                            similarity=best_score,
                         )
 
             except Exception as e:
                 self.logger.warning(
                     "Failed to link entity to graph",
                     entity_name=entity.name,
-                    error=str(e)
+                    error=str(e),
                 )
 
     def _calculate_name_similarity(self, name1: str, name2: str) -> float:
@@ -272,7 +282,9 @@ Focus on entities that are likely to exist in a knowledge graph and are essentia
 
         return len(intersection) / len(union) if union else 0.0
 
-    async def _find_similar_entities_by_vector(self, entity: IdentifiedEntity) -> List[Any]:
+    async def _find_similar_entities_by_vector(
+        self, entity: IdentifiedEntity
+    ) -> List[Any]:
         """Find similar entities using vector similarity search.
 
         Args:
@@ -302,7 +314,9 @@ Focus on entities that are likely to exist in a knowledge graph and are essentia
 
             # Search for similar entities in Neo4j using vector similarity
             # This requires the EntityEmbeddingService functionality
-            from morag_graph.services.entity_embedding_service import EntityEmbeddingService
+            from morag_graph.services.entity_embedding_service import (
+                EntityEmbeddingService,
+            )
 
             entity_embedding_service = EntityEmbeddingService(
                 self.graph_storage, self.embedding_service
@@ -316,27 +330,31 @@ Focus on entities that are likely to exist in a knowledge graph and are essentia
             candidates = []
             for similar in similar_entities:
                 # Create a simple candidate object with both 'type' and 'entity_type' attributes
-                candidate = type('Candidate', (), {
-                    'id': similar['id'],
-                    'name': similar['name'],
-                    'type': similar.get('type', 'Unknown'),  # Add 'type' attribute
-                    'entity_type': similar.get('type', 'Unknown'),  # Keep 'entity_type' for compatibility
-                    'similarity_score': similar['similarity']
-                })()
+                candidate = type(
+                    "Candidate",
+                    (),
+                    {
+                        "id": similar["id"],
+                        "name": similar["name"],
+                        "type": similar.get("type", "Unknown"),  # Add 'type' attribute
+                        "entity_type": similar.get(
+                            "type", "Unknown"
+                        ),  # Keep 'entity_type' for compatibility
+                        "similarity_score": similar["similarity"],
+                    },
+                )()
                 candidates.append(candidate)
 
             self.logger.debug(
                 "Vector similarity search found candidates",
                 entity_name=entity.name,
-                candidates_count=len(candidates)
+                candidates_count=len(candidates),
             )
 
             return candidates
 
         except Exception as e:
             self.logger.warning(
-                "Vector similarity search failed",
-                entity_name=entity.name,
-                error=str(e)
+                "Vector similarity search failed", entity_name=entity.name, error=str(e)
             )
             return []

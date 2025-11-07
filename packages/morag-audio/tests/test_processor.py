@@ -1,13 +1,18 @@
 """Tests for the AudioProcessor class."""
 
 import os
-import pytest
 from pathlib import Path
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
-from morag_audio.processor import AudioProcessor, AudioConfig, AudioProcessingError, AudioSegment
-from morag_audio.processor import AudioProcessingResult
+import pytest
 from morag_audio import AudioTranscriptSegment
+from morag_audio.processor import (
+    AudioConfig,
+    AudioProcessingError,
+    AudioProcessingResult,
+    AudioProcessor,
+    AudioSegment,
+)
 
 
 @pytest.fixture
@@ -18,7 +23,7 @@ def audio_config():
         enable_diarization=False,
         enable_topic_segmentation=False,
         device="cpu",
-        vad_filter=True
+        vad_filter=True,
     )
 
 
@@ -30,7 +35,7 @@ def rest_audio_config():
         use_rest_api=True,
         openai_api_key="test-api-key",
         api_base_url="https://api.openai.com/v1",
-        timeout=30
+        timeout=30,
     )
 
 
@@ -102,10 +107,11 @@ async def test_extract_metadata():
         mock_audio.sample_width = 2
         mock_audio.__len__.return_value = 60000  # 60 seconds in ms
 
-        with patch("pathlib.Path.exists", return_value=True), \
-             patch("morag_audio.processor.PydubSegment.from_file", return_value=mock_audio), \
-             patch("morag_audio.processor.mutagen.File", return_value={"title": "Test Title"}):
-
+        with patch("pathlib.Path.exists", return_value=True), patch(
+            "morag_audio.processor.PydubSegment.from_file", return_value=mock_audio
+        ), patch(
+            "morag_audio.processor.mutagen.File", return_value={"title": "Test Title"}
+        ):
             metadata = await processor._extract_metadata(mock_file)
 
             assert metadata["filename"] == "test.mp3"
@@ -139,7 +145,9 @@ async def test_transcribe_audio(mock_transcriber):
 @pytest.mark.asyncio
 async def test_transcribe_audio_rest_api(rest_audio_config):
     """Test audio transcription with REST API."""
-    with patch("morag_audio.processor.RestTranscriptionService") as mock_rest_service_class:
+    with patch(
+        "morag_audio.processor.RestTranscriptionService"
+    ) as mock_rest_service_class:
         # Mock the service instance
         mock_service = AsyncMock()
         mock_rest_service_class.return_value = mock_service
@@ -147,14 +155,16 @@ async def test_transcribe_audio_rest_api(rest_audio_config):
         # Mock transcription response
         mock_segments = [
             AudioTranscriptSegment("Hello world", 0.0, 2.0, 0.95, "en"),
-            AudioTranscriptSegment("from REST API", 2.0, 4.0, 0.90, "en")
+            AudioTranscriptSegment("from REST API", 2.0, 4.0, 0.90, "en"),
         ]
         mock_service.transcribe_audio.return_value = (
             "Hello world from REST API",
             mock_segments,
-            "en"
+            "en",
         )
-        mock_service.convert_to_markdown.return_value = "# Transcript\n\nHello world from REST API"
+        mock_service.convert_to_markdown.return_value = (
+            "# Transcript\n\nHello world from REST API"
+        )
 
         processor = AudioProcessor(rest_audio_config)
         mock_file = MagicMock()
@@ -174,7 +184,9 @@ async def test_transcribe_audio_rest_api(rest_audio_config):
 @pytest.mark.asyncio
 async def test_transcribe_audio_rest_api_error(rest_audio_config):
     """Test audio transcription with REST API error."""
-    with patch("morag_audio.processor.RestTranscriptionService") as mock_rest_service_class:
+    with patch(
+        "morag_audio.processor.RestTranscriptionService"
+    ) as mock_rest_service_class:
         # Mock the service instance to raise an error
         mock_service = AsyncMock()
         mock_rest_service_class.return_value = mock_service
@@ -191,20 +203,24 @@ async def test_transcribe_audio_rest_api_error(rest_audio_config):
 @pytest.mark.asyncio
 async def test_process_success():
     """Test successful audio processing."""
-    with patch("morag_audio.processor.WhisperModel", return_value=MagicMock()), \
-         patch("pathlib.Path.exists", return_value=True), \
-         patch.object(AudioProcessor, "_extract_metadata", new_callable=AsyncMock) as mock_extract, \
-         patch.object(AudioProcessor, "_transcribe_audio", new_callable=AsyncMock) as mock_transcribe:
-
+    with patch("morag_audio.processor.WhisperModel", return_value=MagicMock()), patch(
+        "pathlib.Path.exists", return_value=True
+    ), patch.object(
+        AudioProcessor, "_extract_metadata", new_callable=AsyncMock
+    ) as mock_extract, patch.object(
+        AudioProcessor, "_transcribe_audio", new_callable=AsyncMock
+    ) as mock_transcribe:
         # Set up mocks
         mock_extract.return_value = {"duration": 60.0, "channels": 2}
 
         segments = [
             AudioSegment(start=0.0, end=5.0, text="This is test segment 1."),
             AudioSegment(start=5.0, end=10.0, text="This is test segment 2."),
-            AudioSegment(start=10.0, end=15.0, text="This is test segment 3.")
+            AudioSegment(start=10.0, end=15.0, text="This is test segment 3."),
         ]
-        transcript = "This is test segment 1. This is test segment 2. This is test segment 3."
+        transcript = (
+            "This is test segment 1. This is test segment 2. This is test segment 3."
+        )
         mock_transcribe.return_value = (segments, transcript)
 
         # Create processor and process file
@@ -223,10 +239,13 @@ async def test_process_success():
 @pytest.mark.asyncio
 async def test_process_success_rest_api(rest_audio_config):
     """Test successful audio processing with REST API."""
-    with patch("morag_audio.processor.RestTranscriptionService") as mock_rest_service_class, \
-         patch("pathlib.Path.exists", return_value=True), \
-         patch.object(AudioProcessor, "_extract_metadata", new_callable=AsyncMock) as mock_extract:
-
+    with patch(
+        "morag_audio.processor.RestTranscriptionService"
+    ) as mock_rest_service_class, patch(
+        "pathlib.Path.exists", return_value=True
+    ), patch.object(
+        AudioProcessor, "_extract_metadata", new_callable=AsyncMock
+    ) as mock_extract:
         # Mock the service instance
         mock_service = AsyncMock()
         mock_rest_service_class.return_value = mock_service
@@ -242,16 +261,18 @@ async def test_process_success_rest_api(rest_audio_config):
             duration=60.0,
             segments=[
                 AudioTranscriptSegment("Hello world", 0.0, 2.0, 0.95, "en"),
-                AudioTranscriptSegment("from REST API", 2.0, 4.0, 0.90, "en")
+                AudioTranscriptSegment("from REST API", 2.0, 4.0, 0.90, "en"),
             ],
             metadata={"duration": 60.0, "channels": 2},
             processing_time=2.0,
             model_used="whisper-1",
-            markdown_transcript="# Transcript\n\nHello world from REST API"
+            markdown_transcript="# Transcript\n\nHello world from REST API",
         )
 
         # Mock _transcribe_audio to return the result directly
-        with patch.object(AudioProcessor, "_transcribe_audio", new_callable=AsyncMock) as mock_transcribe:
+        with patch.object(
+            AudioProcessor, "_transcribe_audio", new_callable=AsyncMock
+        ) as mock_transcribe:
             mock_transcribe.return_value = mock_result
 
             # Create processor and process file
@@ -263,7 +284,10 @@ async def test_process_success_rest_api(rest_audio_config):
             assert result.transcript == "Hello world from REST API"
             assert result.language == "en"
             assert len(result.segments) == 2
-            assert result.markdown_transcript == "# Transcript\n\nHello world from REST API"
+            assert (
+                result.markdown_transcript
+                == "# Transcript\n\nHello world from REST API"
+            )
 
 
 @pytest.mark.asyncio
@@ -271,29 +295,42 @@ async def test_process_with_diarization():
     """Test audio processing with speaker diarization."""
     config = AudioConfig(enable_diarization=True)
 
-    with patch("morag_audio.processor.WhisperModel", return_value=MagicMock()), \
-         patch("morag_audio.processor.Pipeline", return_value=MagicMock()), \
-         patch("pathlib.Path.exists", return_value=True), \
-         patch.object(AudioProcessor, "_extract_metadata", new_callable=AsyncMock) as mock_extract, \
-         patch.object(AudioProcessor, "_transcribe_audio", new_callable=AsyncMock) as mock_transcribe, \
-         patch.object(AudioProcessor, "_apply_diarization", new_callable=AsyncMock) as mock_diarize:
-
+    with patch("morag_audio.processor.WhisperModel", return_value=MagicMock()), patch(
+        "morag_audio.processor.Pipeline", return_value=MagicMock()
+    ), patch("pathlib.Path.exists", return_value=True), patch.object(
+        AudioProcessor, "_extract_metadata", new_callable=AsyncMock
+    ) as mock_extract, patch.object(
+        AudioProcessor, "_transcribe_audio", new_callable=AsyncMock
+    ) as mock_transcribe, patch.object(
+        AudioProcessor, "_apply_diarization", new_callable=AsyncMock
+    ) as mock_diarize:
         # Set up mocks
         mock_extract.return_value = {"duration": 60.0}
 
         segments = [
             AudioSegment(start=0.0, end=5.0, text="This is test segment 1."),
             AudioSegment(start=5.0, end=10.0, text="This is test segment 2."),
-            AudioSegment(start=10.0, end=15.0, text="This is test segment 3.")
+            AudioSegment(start=10.0, end=15.0, text="This is test segment 3."),
         ]
-        transcript = "This is test segment 1. This is test segment 2. This is test segment 3."
+        transcript = (
+            "This is test segment 1. This is test segment 2. This is test segment 3."
+        )
         mock_transcribe.return_value = (segments, transcript)
 
         # Mock diarization to add speaker info
         diarized_segments = [
-            AudioSegment(start=0.0, end=5.0, text="This is test segment 1.", speaker="Speaker A"),
-            AudioSegment(start=5.0, end=10.0, text="This is test segment 2.", speaker="Speaker B"),
-            AudioSegment(start=10.0, end=15.0, text="This is test segment 3.", speaker="Speaker A")
+            AudioSegment(
+                start=0.0, end=5.0, text="This is test segment 1.", speaker="Speaker A"
+            ),
+            AudioSegment(
+                start=5.0, end=10.0, text="This is test segment 2.", speaker="Speaker B"
+            ),
+            AudioSegment(
+                start=10.0,
+                end=15.0,
+                text="This is test segment 3.",
+                speaker="Speaker A",
+            ),
         ]
         mock_diarize.return_value = diarized_segments
 

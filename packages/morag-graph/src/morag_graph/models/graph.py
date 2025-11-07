@@ -1,7 +1,7 @@
 """Graph model for graph-augmented RAG."""
 
-from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -119,7 +119,8 @@ class Graph(BaseModel):
 
         # Remove all relations involving this entity
         relation_ids_to_remove = [
-            r_id for r_id, r in self.relations.items()
+            r_id
+            for r_id, r in self.relations.items()
             if r.source_entity_id == entity_id or r.target_entity_id == entity_id
         ]
 
@@ -156,7 +157,8 @@ class Graph(BaseModel):
             List of relations involving the entity
         """
         return [
-            r for r in self.relations.values()
+            r
+            for r in self.relations.values()
             if r.source_entity_id == entity_id or r.target_entity_id == entity_id
         ]
 
@@ -169,10 +171,7 @@ class Graph(BaseModel):
         Returns:
             List of outgoing relations from the entity
         """
-        return [
-            r for r in self.relations.values()
-            if r.source_entity_id == entity_id
-        ]
+        return [r for r in self.relations.values() if r.source_entity_id == entity_id]
 
     def get_incoming_relations(self, entity_id: EntityId) -> List[Relation]:
         """Get all incoming relations to an entity.
@@ -183,10 +182,7 @@ class Graph(BaseModel):
         Returns:
             List of incoming relations to the entity
         """
-        return [
-            r for r in self.relations.values()
-            if r.target_entity_id == entity_id
-        ]
+        return [r for r in self.relations.values() if r.target_entity_id == entity_id]
 
     def get_neighbors(self, entity_id: EntityId) -> List[Entity]:
         """Get all neighboring entities of an entity.
@@ -216,10 +212,7 @@ class Graph(BaseModel):
         Returns:
             List of entities of the specified type
         """
-        return [
-            e for e in self.entities.values()
-            if str(e.type) == entity_type
-        ]
+        return [e for e in self.entities.values() if str(e.type) == entity_type]
 
     def get_relations_by_type(self, relation_type: str) -> List[Relation]:
         """Get all relations of a specific type.
@@ -230,12 +223,9 @@ class Graph(BaseModel):
         Returns:
             List of relations of the specified type
         """
-        return [
-            r for r in self.relations.values()
-            if str(r.type) == relation_type
-        ]
+        return [r for r in self.relations.values() if str(r.type) == relation_type]
 
-    def merge(self, other: 'Graph') -> None:
+    def merge(self, other: "Graph") -> None:
         """Merge another graph into this graph.
 
         Args:
@@ -250,8 +240,10 @@ class Graph(BaseModel):
         for relation_id, relation in other.relations.items():
             if relation_id not in self.relations:
                 # Only add relation if both entities exist in this graph
-                if (relation.source_entity_id in self.entities and
-                    relation.target_entity_id in self.entities):
+                if (
+                    relation.source_entity_id in self.entities
+                    and relation.target_entity_id in self.entities
+                ):
                     self.relations[relation_id] = relation
 
     def to_dict(self) -> Dict[str, Any]:
@@ -264,7 +256,7 @@ class Graph(BaseModel):
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'Graph':
+    def from_dict(cls, data: Dict[str, Any]) -> "Graph":
         """Create graph from dictionary.
 
         Args:

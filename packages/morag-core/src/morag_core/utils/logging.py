@@ -35,11 +35,9 @@ def configure_logging(log_level: Optional[str] = None) -> None:
         # Add timestamps and log level
         structlog.processors.TimeStamper(fmt="iso"),
         structlog.stdlib.add_log_level,
-
         # Add extra context from threadlocal storage
         structlog.processors.StackInfoRenderer(),
         structlog.processors.format_exc_info,
-
         # Format the output
         structlog.processors.UnicodeDecoder(),
     ]
@@ -50,7 +48,9 @@ def configure_logging(log_level: Optional[str] = None) -> None:
     else:
         # Pretty printing for development
         processors.append(
-            structlog.dev.ConsoleRenderer(colors=True, exception_formatter=structlog.dev.plain_traceback)
+            structlog.dev.ConsoleRenderer(
+                colors=True, exception_formatter=structlog.dev.plain_traceback
+            )
         )
 
     structlog.configure(
@@ -74,7 +74,9 @@ def get_logger(name: str) -> structlog.BoundLogger:
     return structlog.get_logger(name)
 
 
-def add_request_context(logger: structlog.BoundLogger, request_id: str, **kwargs) -> structlog.BoundLogger:
+def add_request_context(
+    logger: structlog.BoundLogger, request_id: str, **kwargs
+) -> structlog.BoundLogger:
     """Add request context to logger.
 
     Args:
@@ -94,7 +96,7 @@ def log_exception(
     exc: Exception,
     message: str = "An error occurred",
     level: str = "error",
-    **kwargs
+    **kwargs,
 ) -> None:
     """Log exception with context.
 

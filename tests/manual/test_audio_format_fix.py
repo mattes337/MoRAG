@@ -29,65 +29,69 @@ async def test_enhanced_format():
 
     # Create mock enhanced result
     enhanced_result = Mock()
-    enhanced_result.transcript = "Hello there. How are you today? I'm doing well, thank you."
+    enhanced_result.transcript = (
+        "Hello there. How are you today? I'm doing well, thank you."
+    )
     enhanced_result.summary = "A brief conversation between two people."
     enhanced_result.metadata = {
-        'filename': 'test_audio.wav',
-        'duration': 180,
-        'language': 'en',
-        'model_used': 'whisper-large-v3',
-        'num_speakers': 2,
-        'num_topics': 2,
-        'diarization_used': True,
-        'topic_segmentation_used': True
+        "filename": "test_audio.wav",
+        "duration": 180,
+        "language": "en",
+        "model_used": "whisper-large-v3",
+        "num_speakers": 2,
+        "num_topics": 2,
+        "diarization_used": True,
+        "topic_segmentation_used": True,
     }
 
     # Mock speakers
     enhanced_result.speakers = [
-        {'id': 'SPEAKER_00', 'total_speaking_time': 90, 'segments_count': 3},
-        {'id': 'SPEAKER_01', 'total_speaking_time': 90, 'segments_count': 2}
+        {"id": "SPEAKER_00", "total_speaking_time": 90, "segments_count": 3},
+        {"id": "SPEAKER_01", "total_speaking_time": 90, "segments_count": 2},
     ]
 
     # Mock segments with timing
     enhanced_result.segments = [
         Mock(text="Hello there.", start_time=0.0, end_time=2.0),
         Mock(text="How are you today?", start_time=2.5, end_time=5.0),
-        Mock(text="I'm doing well, thank you.", start_time=5.5, end_time=8.0)
+        Mock(text="I'm doing well, thank you.", start_time=5.5, end_time=8.0),
     ]
 
     # Mock speaker segments
     enhanced_result.speaker_segments = [
-        {'speaker': 'SPEAKER_00', 'start_time': 0.0, 'end_time': 2.0},
-        {'speaker': 'SPEAKER_01', 'start_time': 2.5, 'end_time': 5.0},
-        {'speaker': 'SPEAKER_00', 'start_time': 5.5, 'end_time': 8.0}
+        {"speaker": "SPEAKER_00", "start_time": 0.0, "end_time": 2.0},
+        {"speaker": "SPEAKER_01", "start_time": 2.5, "end_time": 5.0},
+        {"speaker": "SPEAKER_00", "start_time": 5.5, "end_time": 8.0},
     ]
 
     # Mock topics
     enhanced_result.topics = [
         {
-            'topic': 'Greeting',
-            'sentences': ['Hello there.', 'How are you today?'],
-            'start_sentence': 0
+            "topic": "Greeting",
+            "sentences": ["Hello there.", "How are you today?"],
+            "start_sentence": 0,
         },
         {
-            'topic': 'Response',
-            'sentences': ["I'm doing well, thank you."],
-            'start_sentence': 2
-        }
+            "topic": "Response",
+            "sentences": ["I'm doing well, thank you."],
+            "start_sentence": 2,
+        },
     ]
 
     # Create conversion options
     options = ConversionOptions(
         include_metadata=True,
         format_options={
-            'include_speaker_info': True,
-            'include_topic_info': True,
-            'include_timestamps': True
-        }
+            "include_speaker_info": True,
+            "include_topic_info": True,
+            "include_timestamps": True,
+        },
     )
 
     # Generate markdown
-    markdown = await converter._create_enhanced_structured_markdown(enhanced_result, options)
+    markdown = await converter._create_enhanced_structured_markdown(
+        enhanced_result, options
+    )
 
     print("📝 Generated markdown:")
     print("-" * 60)
@@ -156,21 +160,24 @@ async def test_basic_format():
     audio_result.transcript = "This is a simple transcript without speaker diarization."
     audio_result.summary = None
     audio_result.metadata = {
-        'filename': 'simple_audio.wav',
-        'duration': 60,
-        'language': 'en',
-        'model_used': 'whisper-base'
+        "filename": "simple_audio.wav",
+        "duration": 60,
+        "language": "en",
+        "model_used": "whisper-base",
     }
 
     # Mock segments
     audio_result.segments = [
-        Mock(text="This is a simple transcript without speaker diarization.", start_time=0.0, end_time=5.0)
+        Mock(
+            text="This is a simple transcript without speaker diarization.",
+            start_time=0.0,
+            end_time=5.0,
+        )
     ]
 
     # Create conversion options
     options = ConversionOptions(
-        include_metadata=True,
-        format_options={'include_timestamps': True}
+        include_metadata=True, format_options={"include_timestamps": True}
     )
 
     # Generate markdown
@@ -240,6 +247,7 @@ async def main():
     except Exception as e:
         print(f"\n💥 Test failed with error: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 

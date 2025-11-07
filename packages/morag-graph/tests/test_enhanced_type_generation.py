@@ -1,10 +1,10 @@
 """Test enhanced entity and relationship type generation."""
 
-import pytest
 import asyncio
-from unittest.mock import Mock, AsyncMock, patch
 from typing import List
+from unittest.mock import AsyncMock, Mock, patch
 
+import pytest
 from morag_graph.extraction.entity_extractor import EntityExtractor
 from morag_graph.extraction.relation_extractor import RelationExtractor
 from morag_graph.models import Entity, Relation
@@ -16,6 +16,7 @@ try:
 except ImportError:
     # Fallback LLMConfig for compatibility
     from pydantic import BaseModel
+
     class LLMConfig(BaseModel):
         provider: str = "gemini"
         model: str = "gemini-1.5-flash"
@@ -46,7 +47,7 @@ class TestEnhancedTypeGeneration:
         # Check that it discourages generic types
         assert "Never generic" in prompt
         assert '"ENTITY"' in prompt  # Should be mentioned as something to avoid
-        assert '"THING"' in prompt   # Should be mentioned as something to avoid
+        assert '"THING"' in prompt  # Should be mentioned as something to avoid
 
     def test_relation_prompt_encourages_specific_types(self):
         """Test that relation extraction prompt encourages specific types."""
@@ -66,7 +67,7 @@ class TestEnhancedTypeGeneration:
 
         # Check that it discourages generic types
         assert "Never generic" in prompt
-        assert '"RELATES"' in prompt   # Should be mentioned as something to avoid
+        assert '"RELATES"' in prompt  # Should be mentioned as something to avoid
         assert '"CONNECTS"' in prompt  # Should be mentioned as something to avoid
 
     def test_domain_specific_prompts(self):
@@ -108,14 +109,13 @@ class TestEnhancedTypeGeneration:
 
         for entity_type, expected_label in test_cases:
             entity = Entity(
-                name="Test Entity",
-                type=entity_type,
-                confidence=0.9,
-                attributes={}
+                name="Test Entity", type=entity_type, confidence=0.9, attributes={}
             )
 
             neo4j_label = entity.get_neo4j_label()
-            assert neo4j_label == expected_label, f"Expected {expected_label}, got {neo4j_label}"
+            assert (
+                neo4j_label == expected_label
+            ), f"Expected {expected_label}, got {neo4j_label}"
 
     def test_relation_neo4j_type_generation(self):
         """Test that relations generate proper Neo4j relationship types."""
@@ -135,11 +135,13 @@ class TestEnhancedTypeGeneration:
                 target_entity_id="entity_2",
                 type=relation_type,
                 confidence=0.9,
-                attributes={}
+                attributes={},
             )
 
             neo4j_type = relation.get_neo4j_type()
-            assert neo4j_type == expected_type, f"Expected {expected_type}, got {neo4j_type}"
+            assert (
+                neo4j_type == expected_type
+            ), f"Expected {expected_type}, got {neo4j_type}"
 
     @pytest.mark.asyncio
     async def test_storage_uses_dynamic_labels(self):
@@ -154,7 +156,7 @@ class TestEnhancedTypeGeneration:
             name="Dr. Smith",
             type="MEDICAL_RESEARCHER",
             confidence=0.9,
-            attributes={"specialty": "cardiology"}
+            attributes={"specialty": "cardiology"},
         )
 
         # Create test relation with specific type
@@ -163,7 +165,7 @@ class TestEnhancedTypeGeneration:
             target_entity_id="entity_2",
             type="CONDUCTS_RESEARCH_ON",
             confidence=0.9,
-            attributes={}
+            attributes={},
         )
 
         # Verify that the entity has the correct Neo4j label
@@ -176,8 +178,18 @@ class TestEnhancedTypeGeneration:
         """Test that the system avoids generic types."""
         # These should be transformed to more specific types by the LLM
         generic_types = [
-            "ENTITY", "THING", "ITEM", "OBJECT", "PERSON", "ORGANIZATION",
-            "CONCEPT", "LOCATION", "RELATES", "CONNECTS", "LINKS", "MENTIONS"
+            "ENTITY",
+            "THING",
+            "ITEM",
+            "OBJECT",
+            "PERSON",
+            "ORGANIZATION",
+            "CONCEPT",
+            "LOCATION",
+            "RELATES",
+            "CONNECTS",
+            "LINKS",
+            "MENTIONS",
         ]
 
         config = LLMConfig(provider="mock", model="test")
@@ -189,10 +201,14 @@ class TestEnhancedTypeGeneration:
 
         # Check that prompts discourage these generic types
         for generic_type in ["ENTITY", "THING", "ITEM", "OBJECT"]:
-            assert f'"{generic_type}"' in entity_prompt  # Should be mentioned as something to avoid
+            assert (
+                f'"{generic_type}"' in entity_prompt
+            )  # Should be mentioned as something to avoid
 
         for generic_type in ["RELATES", "CONNECTS", "LINKS", "MENTIONS"]:
-            assert f'"{generic_type}"' in relation_prompt  # Should be mentioned as something to avoid
+            assert (
+                f'"{generic_type}"' in relation_prompt
+            )  # Should be mentioned as something to avoid
 
     def test_uppercase_underscore_format(self):
         """Test that types are formatted in uppercase with underscores."""

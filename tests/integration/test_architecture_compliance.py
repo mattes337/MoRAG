@@ -4,11 +4,12 @@ This module tests that the codebase follows the modular architecture
 patterns and doesn't use deprecated monolithic import patterns.
 """
 
-import pytest
 import ast
 import re
 from pathlib import Path
-from typing import List, Dict, Set, Tuple
+from typing import Dict, List, Set, Tuple
+
+import pytest
 import yaml
 
 
@@ -17,49 +18,49 @@ class TestArchitectureCompliance:
 
     # Forbidden import patterns (old monolithic structure)
     FORBIDDEN_PATTERNS = [
-        r'from morag\.core\.',
-        r'from morag\.services\.',
-        r'from morag\.processors\.',
-        r'from morag\.converters\.',
-        r'from morag\.tasks\.',
-        r'from morag\.models\.',
-        r'from morag\.utils\.',
-        r'import morag\.core\.',
-        r'import morag\.services\.',
-        r'import morag\.processors\.',
-        r'import morag\.converters\.',
+        r"from morag\.core\.",
+        r"from morag\.services\.",
+        r"from morag\.processors\.",
+        r"from morag\.converters\.",
+        r"from morag\.tasks\.",
+        r"from morag\.models\.",
+        r"from morag\.utils\.",
+        r"import morag\.core\.",
+        r"import morag\.services\.",
+        r"import morag\.processors\.",
+        r"import morag\.converters\.",
     ]
 
     # Allowed import patterns (new modular structure)
     ALLOWED_PATTERNS = [
-        r'from morag_core',
-        r'from morag_services',
-        r'from morag_web',
-        r'from morag_youtube',
-        r'from morag_audio',
-        r'from morag_video',
-        r'from morag_document',
-        r'from morag_image',
-        r'import morag_core',
-        r'import morag_services',
-        r'import morag_web',
-        r'import morag_youtube',
-        r'import morag_audio',
-        r'import morag_video',
-        r'import morag_document',
-        r'import morag_image',
+        r"from morag_core",
+        r"from morag_services",
+        r"from morag_web",
+        r"from morag_youtube",
+        r"from morag_audio",
+        r"from morag_video",
+        r"from morag_document",
+        r"from morag_image",
+        r"import morag_core",
+        r"import morag_services",
+        r"import morag_web",
+        r"import morag_youtube",
+        r"import morag_audio",
+        r"import morag_video",
+        r"import morag_document",
+        r"import morag_image",
     ]
 
     # Package dependency rules
     DEPENDENCY_RULES = {
-        'morag_core': [],
-        'morag_services': ['morag_core'],
-        'morag_web': ['morag_core', 'morag_services'],
-        'morag_youtube': ['morag_core', 'morag_services', 'morag_audio', 'morag_video'],
-        'morag_audio': ['morag_core', 'morag_services'],
-        'morag_video': ['morag_core', 'morag_services', 'morag_audio'],
-        'morag_document': ['morag_core', 'morag_services'],
-        'morag_image': ['morag_core', 'morag_services'],
+        "morag_core": [],
+        "morag_services": ["morag_core"],
+        "morag_web": ["morag_core", "morag_services"],
+        "morag_youtube": ["morag_core", "morag_services", "morag_audio", "morag_video"],
+        "morag_audio": ["morag_core", "morag_services"],
+        "morag_video": ["morag_core", "morag_services", "morag_audio"],
+        "morag_document": ["morag_core", "morag_services"],
+        "morag_image": ["morag_core", "morag_services"],
     }
 
     def test_no_forbidden_imports(self):
@@ -71,10 +72,9 @@ class TestArchitectureCompliance:
             violations.extend(file_violations)
 
         if violations:
-            violation_msg = "\n".join([
-                f"{file}:{line}: {pattern}"
-                for file, line, pattern in violations
-            ])
+            violation_msg = "\n".join(
+                [f"{file}:{line}: {pattern}" for file, line, pattern in violations]
+            )
             pytest.fail(f"Found forbidden import patterns:\n{violation_msg}")
 
     def test_dependency_compliance(self):
@@ -82,14 +82,18 @@ class TestArchitectureCompliance:
         violations = []
 
         for package_name, allowed_deps in self.DEPENDENCY_RULES.items():
-            package_violations = self._check_package_dependencies(package_name, allowed_deps)
+            package_violations = self._check_package_dependencies(
+                package_name, allowed_deps
+            )
             violations.extend(package_violations)
 
         if violations:
-            violation_msg = "\n".join([
-                f"{package}: imports {imported} (not in allowed: {allowed})"
-                for package, imported, allowed in violations
-            ])
+            violation_msg = "\n".join(
+                [
+                    f"{package}: imports {imported} (not in allowed: {allowed})"
+                    for package, imported, allowed in violations
+                ]
+            )
             pytest.fail(f"Found dependency violations:\n{violation_msg}")
 
     def test_import_consistency(self):
@@ -101,10 +105,9 @@ class TestArchitectureCompliance:
             inconsistencies.extend(file_inconsistencies)
 
         if inconsistencies:
-            inconsistency_msg = "\n".join([
-                f"{file}:{line}: {issue}"
-                for file, line, issue in inconsistencies
-            ])
+            inconsistency_msg = "\n".join(
+                [f"{file}:{line}: {issue}" for file, line, issue in inconsistencies]
+            )
             pytest.fail(f"Found import inconsistencies:\n{inconsistency_msg}")
 
     def test_no_circular_imports(self):
@@ -113,10 +116,7 @@ class TestArchitectureCompliance:
         cycles = self._find_cycles(import_graph)
 
         if cycles:
-            cycle_msg = "\n".join([
-                " -> ".join(cycle + [cycle[0]])
-                for cycle in cycles
-            ])
+            cycle_msg = "\n".join([" -> ".join(cycle + [cycle[0]]) for cycle in cycles])
             pytest.fail(f"Found circular imports:\n{cycle_msg}")
 
     def test_package_isolation(self):
@@ -129,10 +129,9 @@ class TestArchitectureCompliance:
             violations.extend(file_violations)
 
         if violations:
-            violation_msg = "\n".join([
-                f"{file}:{line}: {violation}"
-                for file, line, violation in violations
-            ])
+            violation_msg = "\n".join(
+                [f"{file}:{line}: {violation}" for file, line, violation in violations]
+            )
             pytest.fail(f"Found package isolation violations:\n{violation_msg}")
 
     def _find_python_files(self) -> List[Path]:
@@ -157,15 +156,17 @@ class TestArchitectureCompliance:
 
         return python_files
 
-    def _check_file_for_forbidden_imports(self, file_path: Path) -> List[Tuple[str, int, str]]:
+    def _check_file_for_forbidden_imports(
+        self, file_path: Path
+    ) -> List[Tuple[str, int, str]]:
         """Check a file for forbidden import patterns."""
         violations = []
 
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, "r", encoding="utf-8") as f:
                 content = f.read()
 
-            lines = content.split('\n')
+            lines = content.split("\n")
             for line_num, line in enumerate(lines, 1):
                 for pattern in self.FORBIDDEN_PATTERNS:
                     if re.search(pattern, line):
@@ -177,12 +178,14 @@ class TestArchitectureCompliance:
 
         return violations
 
-    def _check_package_dependencies(self, package_name: str, allowed_deps: List[str]) -> List[Tuple[str, str, List[str]]]:
+    def _check_package_dependencies(
+        self, package_name: str, allowed_deps: List[str]
+    ) -> List[Tuple[str, str, List[str]]]:
         """Check that a package only imports allowed dependencies."""
         violations = []
 
         # Find package directory
-        package_dir = Path("packages") / package_name.replace('_', '-')
+        package_dir = Path("packages") / package_name.replace("_", "-")
         if not package_dir.exists():
             return violations
 
@@ -192,7 +195,7 @@ class TestArchitectureCompliance:
                 continue
 
             try:
-                with open(py_file, 'r', encoding='utf-8') as f:
+                with open(py_file, "r", encoding="utf-8") as f:
                     content = f.read()
 
                 # Parse imports
@@ -201,16 +204,30 @@ class TestArchitectureCompliance:
                     if isinstance(node, ast.Import):
                         for alias in node.names:
                             imported_package = self._extract_package_name(alias.name)
-                            if imported_package and imported_package.startswith('morag_'):
-                                if imported_package not in allowed_deps and imported_package != package_name:
-                                    violations.append((package_name, imported_package, allowed_deps))
+                            if imported_package and imported_package.startswith(
+                                "morag_"
+                            ):
+                                if (
+                                    imported_package not in allowed_deps
+                                    and imported_package != package_name
+                                ):
+                                    violations.append(
+                                        (package_name, imported_package, allowed_deps)
+                                    )
 
                     elif isinstance(node, ast.ImportFrom):
                         if node.module:
                             imported_package = self._extract_package_name(node.module)
-                            if imported_package and imported_package.startswith('morag_'):
-                                if imported_package not in allowed_deps and imported_package != package_name:
-                                    violations.append((package_name, imported_package, allowed_deps))
+                            if imported_package and imported_package.startswith(
+                                "morag_"
+                            ):
+                                if (
+                                    imported_package not in allowed_deps
+                                    and imported_package != package_name
+                                ):
+                                    violations.append(
+                                        (package_name, imported_package, allowed_deps)
+                                    )
 
             except Exception:
                 # Skip files that can't be parsed
@@ -220,8 +237,8 @@ class TestArchitectureCompliance:
 
     def _extract_package_name(self, module_name: str) -> str:
         """Extract the top-level package name from a module path."""
-        parts = module_name.split('.')
-        if parts and parts[0].startswith('morag_'):
+        parts = module_name.split(".")
+        if parts and parts[0].startswith("morag_"):
             return parts[0]
         return ""
 
@@ -230,18 +247,18 @@ class TestArchitectureCompliance:
         inconsistencies = []
 
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, "r", encoding="utf-8") as f:
                 content = f.read()
 
-            lines = content.split('\n')
+            lines = content.split("\n")
             for line_num, line in enumerate(lines, 1):
                 # Check for mixed import styles
-                if 'from morag.' in line and any(pattern in line for pattern in ['morag_core', 'morag_services']):
-                    inconsistencies.append((
-                        str(file_path),
-                        line_num,
-                        "Mixed import styles in same file"
-                    ))
+                if "from morag." in line and any(
+                    pattern in line for pattern in ["morag_core", "morag_services"]
+                ):
+                    inconsistencies.append(
+                        (str(file_path), line_num, "Mixed import styles in same file")
+                    )
 
         except Exception:
             pass
@@ -255,7 +272,7 @@ class TestArchitectureCompliance:
         for package_name in self.DEPENDENCY_RULES.keys():
             import_graph[package_name] = set()
 
-            package_dir = Path("packages") / package_name.replace('_', '-')
+            package_dir = Path("packages") / package_name.replace("_", "-")
             if not package_dir.exists():
                 continue
 
@@ -264,7 +281,7 @@ class TestArchitectureCompliance:
                     continue
 
                 try:
-                    with open(py_file, 'r', encoding='utf-8') as f:
+                    with open(py_file, "r", encoding="utf-8") as f:
                         content = f.read()
 
                     tree = ast.parse(content)
@@ -272,13 +289,23 @@ class TestArchitectureCompliance:
                         if isinstance(node, (ast.Import, ast.ImportFrom)):
                             if isinstance(node, ast.Import):
                                 for alias in node.names:
-                                    imported_package = self._extract_package_name(alias.name)
-                                    if imported_package and imported_package != package_name:
+                                    imported_package = self._extract_package_name(
+                                        alias.name
+                                    )
+                                    if (
+                                        imported_package
+                                        and imported_package != package_name
+                                    ):
                                         import_graph[package_name].add(imported_package)
 
                             elif isinstance(node, ast.ImportFrom) and node.module:
-                                imported_package = self._extract_package_name(node.module)
-                                if imported_package and imported_package != package_name:
+                                imported_package = self._extract_package_name(
+                                    node.module
+                                )
+                                if (
+                                    imported_package
+                                    and imported_package != package_name
+                                ):
                                     import_graph[package_name].add(imported_package)
 
                 except Exception:
@@ -323,20 +350,22 @@ class TestArchitectureCompliance:
         violations = []
 
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, "r", encoding="utf-8") as f:
                 content = f.read()
 
-            lines = content.split('\n')
+            lines = content.split("\n")
             for line_num, line in enumerate(lines, 1):
                 # Check for imports that access internal modules
                 # e.g., from morag_audio.internal.something import ...
-                if re.search(r'from morag_\w+\.\w+\.\w+', line):
+                if re.search(r"from morag_\w+\.\w+\.\w+", line):
                     # This might be accessing internal modules
-                    violations.append((
-                        str(file_path),
-                        line_num,
-                        f"Possible internal module access: {line.strip()}"
-                    ))
+                    violations.append(
+                        (
+                            str(file_path),
+                            line_num,
+                            f"Possible internal module access: {line.strip()}",
+                        )
+                    )
 
         except Exception:
             pass

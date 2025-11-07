@@ -1,9 +1,11 @@
-import pytest
 import os
-import yaml
-from pathlib import Path
-from unittest.mock import patch, MagicMock
 import subprocess
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+
+import pytest
+import yaml
+
 
 class TestDockerConfiguration:
     """Test Docker configuration files."""
@@ -38,20 +40,30 @@ class TestDockerConfiguration:
             compose_config = yaml.safe_load(f)
 
         # Check required services
-        services = compose_config.get('services', {})
-        required_services = ['redis', 'qdrant', 'api', 'worker-documents', 'worker-media', 'worker-web', 'nginx', 'flower']
+        services = compose_config.get("services", {})
+        required_services = [
+            "redis",
+            "qdrant",
+            "api",
+            "worker-documents",
+            "worker-media",
+            "worker-web",
+            "nginx",
+            "flower",
+        ]
 
         for service in required_services:
             assert service in services, f"Service {service} not found in docker-compose"
 
         # Check volumes
-        volumes = compose_config.get('volumes', {})
-        assert 'redis_data' in volumes
-        assert 'qdrant_data' in volumes
+        volumes = compose_config.get("volumes", {})
+        assert "redis_data" in volumes
+        assert "qdrant_data" in volumes
 
         # Check networks
-        networks = compose_config.get('networks', {})
-        assert 'morag-network' in networks
+        networks = compose_config.get("networks", {})
+        assert "morag-network" in networks
+
 
 class TestNginxConfiguration:
     """Test Nginx configuration."""
@@ -66,6 +78,7 @@ class TestNginxConfiguration:
         assert "limit_req_zone" in content
         assert "proxy_pass" in content
         assert "gzip on" in content
+
 
 class TestEnvironmentConfiguration:
     """Test environment configuration."""
@@ -93,11 +106,12 @@ class TestEnvironmentConfiguration:
             "QDRANT_PORT",
             "LOG_LEVEL",
             "METRICS_ENABLED",
-            "ENVIRONMENT"
+            "ENVIRONMENT",
         ]
 
         for var in required_vars:
             assert var in content, f"Required environment variable {var} not found"
+
 
 class TestDeploymentScripts:
     """Test deployment scripts."""
@@ -107,7 +121,7 @@ class TestDeploymentScripts:
         script_path = Path("scripts/deploy.sh")
         assert script_path.exists(), "scripts/deploy.sh not found"
 
-        content = script_path.read_text(encoding='utf-8')
+        content = script_path.read_text(encoding="utf-8")
         assert "#!/bin/bash" in content
         assert "docker-compose" in content
         assert ".env.prod" in content
@@ -117,7 +131,7 @@ class TestDeploymentScripts:
         script_path = Path("scripts/backup.sh")
         assert script_path.exists(), "scripts/backup.sh not found"
 
-        content = script_path.read_text(encoding='utf-8')
+        content = script_path.read_text(encoding="utf-8")
         assert "#!/bin/bash" in content
         assert "BACKUP_DIR" in content
         assert "tar" in content
@@ -127,7 +141,7 @@ class TestDeploymentScripts:
         script_path = Path("scripts/monitor.sh")
         assert script_path.exists(), "scripts/monitor.sh not found"
 
-        content = script_path.read_text(encoding='utf-8')
+        content = script_path.read_text(encoding="utf-8")
         assert "#!/bin/bash" in content
         assert "docker stats" in content
         assert "curl" in content
@@ -142,6 +156,7 @@ class TestDeploymentScripts:
         assert "qdrant_service" in content
         assert "asyncio" in content
 
+
 class TestKubernetesConfiguration:
     """Test Kubernetes configuration."""
 
@@ -154,11 +169,12 @@ class TestKubernetesConfiguration:
             k8s_configs = list(yaml.safe_load_all(f))
 
         # Check for required Kubernetes resources
-        resource_kinds = [config.get('kind') for config in k8s_configs if config]
-        assert 'Deployment' in resource_kinds
-        assert 'Service' in resource_kinds
-        assert 'PersistentVolumeClaim' in resource_kinds
-        assert 'Secret' in resource_kinds
+        resource_kinds = [config.get("kind") for config in k8s_configs if config]
+        assert "Deployment" in resource_kinds
+        assert "Service" in resource_kinds
+        assert "PersistentVolumeClaim" in resource_kinds
+        assert "Secret" in resource_kinds
+
 
 class TestProductionReadiness:
     """Test production readiness aspects."""
@@ -169,13 +185,15 @@ class TestProductionReadiness:
         with open(compose_path) as f:
             compose_config = yaml.safe_load(f)
 
-        services = compose_config.get('services', {})
+        services = compose_config.get("services", {})
 
         # Check that critical services have health checks
-        critical_services = ['redis', 'qdrant', 'api']
+        critical_services = ["redis", "qdrant", "api"]
         for service in critical_services:
             service_config = services.get(service, {})
-            assert 'healthcheck' in service_config, f"Service {service} missing health check"
+            assert (
+                "healthcheck" in service_config
+            ), f"Service {service} missing health check"
 
     def test_security_configuration(self):
         """Test security configurations."""
@@ -198,12 +216,12 @@ class TestProductionReadiness:
             k8s_configs = list(yaml.safe_load_all(f))
 
         for config in k8s_configs:
-            if config and config.get('kind') == 'Deployment':
-                containers = config['spec']['template']['spec']['containers']
+            if config and config.get("kind") == "Deployment":
+                containers = config["spec"]["template"]["spec"]["containers"]
                 for container in containers:
-                    resources = container.get('resources', {})
-                    assert 'requests' in resources, "Resource requests not configured"
-                    assert 'limits' in resources, "Resource limits not configured"
+                    resources = container.get("resources", {})
+                    assert "requests" in resources, "Resource requests not configured"
+                    assert "limits" in resources, "Resource limits not configured"
 
     def test_persistent_storage(self):
         """Test that persistent storage is configured."""
@@ -213,11 +231,12 @@ class TestProductionReadiness:
 
         pvc_found = False
         for config in k8s_configs:
-            if config and config.get('kind') == 'PersistentVolumeClaim':
+            if config and config.get("kind") == "PersistentVolumeClaim":
                 pvc_found = True
                 break
 
         assert pvc_found, "No PersistentVolumeClaim found"
+
 
 class TestDeploymentIntegration:
     """Integration tests for deployment (requires Docker)."""
@@ -227,14 +246,12 @@ class TestDeploymentIntegration:
         """Test that Docker images can be built."""
         try:
             import docker
+
             client = docker.from_env()
 
             # Test main Dockerfile
             image, logs = client.images.build(
-                path=".",
-                dockerfile="Dockerfile",
-                tag="morag-test:latest",
-                rm=True
+                path=".", dockerfile="Dockerfile", tag="morag-test:latest", rm=True
             )
             assert image is not None
 
@@ -243,7 +260,7 @@ class TestDeploymentIntegration:
                 path=".",
                 dockerfile="Dockerfile.worker",
                 tag="morag-worker-test:latest",
-                rm=True
+                rm=True,
             )
             assert worker_image is not None
 
@@ -258,12 +275,13 @@ class TestDeploymentIntegration:
                 ["docker-compose", "-f", "docker-compose.prod.yml", "config"],
                 capture_output=True,
                 text=True,
-                check=True
+                check=True,
             )
             assert result.returncode == 0
 
         except (subprocess.CalledProcessError, FileNotFoundError) as e:
             pytest.skip(f"Docker Compose not available: {e}")
+
 
 class TestDocumentation:
     """Test deployment documentation."""
@@ -273,7 +291,7 @@ class TestDocumentation:
         task_path = Path("tasks/22-deployment-config.md")
         assert task_path.exists(), "Deployment task documentation not found"
 
-        content = task_path.read_text(encoding='utf-8')
+        content = task_path.read_text(encoding="utf-8")
         assert "Docker" in content
         assert "production" in content
         assert "nginx" in content
@@ -286,5 +304,7 @@ class TestDocumentation:
             content = readme_path.read_text()
             # Check for deployment-related content
             deployment_keywords = ["docker", "deployment", "production"]
-            has_deployment_info = any(keyword in content.lower() for keyword in deployment_keywords)
+            has_deployment_info = any(
+                keyword in content.lower() for keyword in deployment_keywords
+            )
             assert has_deployment_info, "README missing deployment information"

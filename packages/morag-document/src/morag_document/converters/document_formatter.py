@@ -2,7 +2,8 @@
 
 import re
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
+
 import structlog
 
 logger = structlog.get_logger(__name__)
@@ -12,10 +13,7 @@ class DocumentFormatter:
     """Formats document content according to LLM documentation specifications."""
 
     def format_document_content(
-        self,
-        raw_content: str,
-        file_path: Path,
-        metadata: Dict[str, Any]
+        self, raw_content: str, file_path: Path, metadata: Dict[str, Any]
     ) -> str:
         """Format document content according to LLM documentation format.
 
@@ -40,11 +38,11 @@ class DocumentFormatter:
         formatted_parts.append("## Document Information")
 
         # Extract metadata for information section
-        page_count = metadata.get('page_count', 'Unknown')
-        word_count = metadata.get('word_count', 'Unknown')
-        doc_type = metadata.get('document_type', file_path.suffix.lstrip('.').upper())
-        language = metadata.get('language', 'Unknown')
-        file_size = metadata.get('file_size', 'Unknown')
+        page_count = metadata.get("page_count", "Unknown")
+        word_count = metadata.get("word_count", "Unknown")
+        doc_type = metadata.get("document_type", file_path.suffix.lstrip(".").upper())
+        language = metadata.get("language", "Unknown")
+        file_size = metadata.get("file_size", "Unknown")
 
         # Format file size if it's a number
         if isinstance(file_size, (int, float)):
@@ -57,14 +55,16 @@ class DocumentFormatter:
         else:
             file_size_str = str(file_size)
 
-        formatted_parts.extend([
-            f"- **Page Count**: {page_count}",
-            f"- **Word Count**: {word_count}",
-            f"- **Document Type**: {doc_type}",
-            f"- **Language**: {language}",
-            f"- **File Size**: {file_size_str}",
-            ""
-        ])
+        formatted_parts.extend(
+            [
+                f"- **Page Count**: {page_count}",
+                f"- **Word Count**: {word_count}",
+                f"- **Document Type**: {doc_type}",
+                f"- **Language**: {language}",
+                f"- **File Size**: {file_size_str}",
+                "",
+            ]
+        )
 
         # Content Structure: Preserve original document structure
         content_section = self._format_content_structure(raw_content)
@@ -85,11 +85,11 @@ class DocumentFormatter:
             return "## Content\n\nNo content available."
 
         # Clean up the raw content
-        lines = raw_content.split('\n')
+        lines = raw_content.split("\n")
         formatted_lines = []
 
         # Track if we need to add a content header
-        has_headers = any(line.strip().startswith('#') for line in lines)
+        has_headers = any(line.strip().startswith("#") for line in lines)
 
         if not has_headers:
             # No headers found, add a general content header
@@ -105,10 +105,10 @@ class DocumentFormatter:
                 continue
 
             # Ensure proper heading hierarchy
-            if stripped_line.startswith('#'):
+            if stripped_line.startswith("#"):
                 # Adjust heading levels to start from ## (since # is used for document title)
-                heading_level = len(stripped_line) - len(stripped_line.lstrip('#'))
-                heading_text = stripped_line.lstrip('#').strip()
+                heading_level = len(stripped_line) - len(stripped_line.lstrip("#"))
+                heading_text = stripped_line.lstrip("#").strip()
 
                 # Increment all heading levels by 1 (# becomes ##, ## becomes ###, etc.)
                 adjusted_level = heading_level + 1
@@ -134,7 +134,7 @@ class DocumentFormatter:
         while cleaned_lines and not cleaned_lines[-1].strip():
             cleaned_lines.pop()
 
-        return '\n'.join(cleaned_lines)
+        return "\n".join(cleaned_lines)
 
     def extract_metadata_from_content(self, content: str) -> Dict[str, Any]:
         """Extract metadata from document content.
@@ -148,26 +148,27 @@ class DocumentFormatter:
         metadata = {}
 
         # Count words (approximate)
-        word_count = len(re.findall(r'\b\w+\b', content))
-        metadata['word_count'] = word_count
+        word_count = len(re.findall(r"\b\w+\b", content))
+        metadata["word_count"] = word_count
 
         # Count pages (estimate based on content length)
         # Rough estimate: 250 words per page
         estimated_pages = max(1, word_count // 250)
-        metadata['page_count'] = estimated_pages
+        metadata["page_count"] = estimated_pages
 
         # Detect language (basic detection)
         try:
             from langdetect import detect
+
             detected_lang = detect(content[:1000])  # Use first 1000 chars for detection
-            metadata['language'] = detected_lang.upper()
+            metadata["language"] = detected_lang.upper()
         except:
-            metadata['language'] = 'Unknown'
+            metadata["language"] = "Unknown"
 
         # Extract chapter/section information
-        headers = re.findall(r'^#+\s+(.+)$', content, re.MULTILINE)
-        metadata['sections'] = headers
-        metadata['section_count'] = len(headers)
+        headers = re.findall(r"^#+\s+(.+)$", content, re.MULTILINE)
+        metadata["sections"] = headers
+        metadata["section_count"] = len(headers)
 
         return metadata
 
@@ -181,10 +182,10 @@ class DocumentFormatter:
             True if structure should be preserved, False otherwise
         """
         # Check for structured content indicators
-        has_headers = bool(re.search(r'^#+\s+', content, re.MULTILINE))
-        has_lists = bool(re.search(r'^\s*[-*+]\s+', content, re.MULTILINE))
-        has_numbered_lists = bool(re.search(r'^\s*\d+\.\s+', content, re.MULTILINE))
-        has_tables = bool(re.search(r'\|.*\|', content))
+        has_headers = bool(re.search(r"^#+\s+", content, re.MULTILINE))
+        has_lists = bool(re.search(r"^\s*[-*+]\s+", content, re.MULTILINE))
+        has_numbered_lists = bool(re.search(r"^\s*\d+\.\s+", content, re.MULTILINE))
+        has_tables = bool(re.search(r"\|.*\|", content))
 
         # If content has structural elements, preserve them
         return has_headers or has_lists or has_numbered_lists or has_tables
@@ -199,16 +200,18 @@ class DocumentFormatter:
             Cleaned content
         """
         # Remove excessive whitespace
-        content = re.sub(r'\n{3,}', '\n\n', content)
+        content = re.sub(r"\n{3,}", "\n\n", content)
 
         # Fix common formatting issues
-        content = re.sub(r'^\s*\n', '', content)  # Remove leading empty lines
-        content = re.sub(r'\n\s*$', '', content)  # Remove trailing whitespace
+        content = re.sub(r"^\s*\n", "", content)  # Remove leading empty lines
+        content = re.sub(r"\n\s*$", "", content)  # Remove trailing whitespace
 
         # Fix header spacing
-        content = re.sub(r'^(#+\s*.+)\n([^\n#])', r'\1\n\n\2', content, flags=re.MULTILINE)
+        content = re.sub(
+            r"^(#+\s*.+)\n([^\n#])", r"\1\n\n\2", content, flags=re.MULTILINE
+        )
 
         # Ensure proper list formatting
-        content = re.sub(r'^(\s*[-*+]\s+)', r'\1', content, flags=re.MULTILINE)
+        content = re.sub(r"^(\s*[-*+]\s+)", r"\1", content, flags=re.MULTILINE)
 
         return content.strip()

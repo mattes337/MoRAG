@@ -3,12 +3,12 @@
 import json
 import logging
 from datetime import datetime
-from typing import Dict, List, Optional, Any, ClassVar
+from typing import Any, ClassVar, Dict, List, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
-from .types import EntityId, EntityAttributes
-from ..utils.id_generation import UnifiedIDGenerator, IDValidator
+from ..utils.id_generation import IDValidator, UnifiedIDGenerator
+from .types import EntityAttributes, EntityId
 
 logger = logging.getLogger(__name__)
 
@@ -36,27 +36,35 @@ class Entity(BaseModel):
     attributes: EntityAttributes = Field(default_factory=dict)
     source_doc_id: Optional[str] = None
     confidence: float = 1.0
-    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
-    embedding: Optional[List[float]] = Field(default=None, description="Vector embedding")
-    created_at: Optional[datetime] = Field(default_factory=datetime.now, description="Creation timestamp")
-    updated_at: Optional[datetime] = Field(default_factory=datetime.now, description="Last update timestamp")
-
-
+    metadata: Dict[str, Any] = Field(
+        default_factory=dict, description="Additional metadata"
+    )
+    embedding: Optional[List[float]] = Field(
+        default=None, description="Vector embedding"
+    )
+    created_at: Optional[datetime] = Field(
+        default_factory=datetime.now, description="Creation timestamp"
+    )
+    updated_at: Optional[datetime] = Field(
+        default_factory=datetime.now, description="Last update timestamp"
+    )
 
     # Class variables for Neo4J integration
     _neo4j_label: ClassVar[str] = "Entity"
 
     def __init__(self, **data):
         """Initialize entity with unified deterministic ID based on name, type, and source document."""
-        if 'id' not in data or not data['id']:
+        if "id" not in data or not data["id"]:
             # Generate unified deterministic ID based on name, type, and source document
-            name = data.get('name', '')
-            entity_type = str(data.get('type', "CUSTOM"))
-            source_doc_id = data.get('source_doc_id', '')
-            data['id'] = UnifiedIDGenerator.generate_entity_id(name, entity_type, source_doc_id)
+            name = data.get("name", "")
+            entity_type = str(data.get("type", "CUSTOM"))
+            source_doc_id = data.get("source_doc_id", "")
+            data["id"] = UnifiedIDGenerator.generate_entity_id(
+                name, entity_type, source_doc_id
+            )
         super().__init__(**data)
 
-    @field_validator('id')
+    @field_validator("id")
     @classmethod
     def validate_id_format(cls, v):
         """Validate entity ID format."""
@@ -66,12 +74,21 @@ class Entity(BaseModel):
 
     def __setattr__(self, name, value):
         """Override setattr to regenerate ID when source_doc_id changes."""
-        if name == 'source_doc_id' and hasattr(self, 'source_doc_id') and self.source_doc_id != value:
+        if (
+            name == "source_doc_id"
+            and hasattr(self, "source_doc_id")
+            and self.source_doc_id != value
+        ):
             # Set the new value first
             super().__setattr__(name, value)
             # Regenerate ID with new source_doc_id using unified generator
             entity_type = str(self.type)
-            super().__setattr__('id', UnifiedIDGenerator.generate_entity_id(self.name, entity_type, value or ''))
+            super().__setattr__(
+                "id",
+                UnifiedIDGenerator.generate_entity_id(
+                    self.name, entity_type, value or ""
+                ),
+            )
         else:
             super().__setattr__(name, value)
 
@@ -105,16 +122,16 @@ class Entity(BaseModel):
         normalized = type_value.upper().strip()
 
         # Sanitize for valid Neo4j label (no dots, spaces, special chars)
-        normalized = normalized.replace('.', '_').replace(' ', '_').replace('-', '_')
-        normalized = normalized.replace('(', '').replace(')', '').replace('/', '_')
-        normalized = normalized.replace('&', '_AND_').replace('+', '_PLUS_')
+        normalized = normalized.replace(".", "_").replace(" ", "_").replace("-", "_")
+        normalized = normalized.replace("(", "").replace(")", "").replace("/", "_")
+        normalized = normalized.replace("&", "_AND_").replace("+", "_PLUS_")
 
         # Remove any double underscores
-        while '__' in normalized:
-            normalized = normalized.replace('__', '_')
+        while "__" in normalized:
+            normalized = normalized.replace("__", "_")
 
         # Remove leading/trailing underscores
-        normalized = normalized.strip('_')
+        normalized = normalized.strip("_")
 
         # Ensure the label is valid (starts with letter, contains only alphanumeric and underscore)
         if not normalized or not normalized[0].isalpha():
@@ -133,7 +150,7 @@ class Entity(BaseModel):
         """
         return "Entity"
 
-    @field_validator('confidence')
+    @field_validator("confidence")
     @classmethod
     def validate_confidence(cls, v: float) -> float:
         """Validate that confidence is between 0.0 and 1.0."""
@@ -141,7 +158,7 @@ class Entity(BaseModel):
             raise ValueError(f"Confidence must be between 0.0 and 1.0, got {v}")
         return v
 
-    @field_validator('type')
+    @field_validator("type")
     @classmethod
     def validate_type(cls, v: str) -> str:
         """Validate entity type is a non-empty string."""
@@ -164,7 +181,7 @@ class Entity(BaseModel):
         data = self.model_dump()
 
         # Ensure type is string for JSON serialization
-        data['type'] = str(data['type'])
+        data["type"] = str(data["type"])
 
         return data
 
@@ -184,59 +201,65 @@ class Entity(BaseModel):
         properties = self.model_dump()
 
         # Ensure type is clean string value
-        properties['type'] = type_value
+        properties["type"] = type_value
 
         # Remove unnecessary fields to simplify graph structure
-        properties.pop('attributes', None)  # Used for auto creation, not needed in graph
-        properties.pop('source_doc_id', None)  # Document reference, entities connect via chunks
-        properties.pop('description', None)  # Redundant with entity type and name
+        properties.pop(
+            "attributes", None
+        )  # Used for auto creation, not needed in graph
+        properties.pop(
+            "source_doc_id", None
+        )  # Document reference, entities connect via chunks
+        properties.pop("description", None)  # Redundant with entity type and name
 
         # Add label for Neo4J - use only the LLM-determined type as label
         # Normalize to uppercase singular canonical form
         type_label = self._normalize_label(type_value)
 
-        properties['_labels'] = [type_label]
+        properties["_labels"] = [type_label]
 
         return properties
 
     @classmethod
-    def from_neo4j_node(cls, node: Dict[str, Any]) -> 'Entity':
+    def from_neo4j_node(cls, node: Dict[str, Any]) -> "Entity":
         """Create entity from Neo4J node properties."""
         # Make a copy to avoid modifying the original
         node = node.copy()
 
         # Validate required fields
-        if 'name' not in node or not node['name']:
+        if "name" not in node or not node["name"]:
             raise ValueError(f"Entity node missing required 'name' field: {node}")
 
         # Ensure required fields have defaults
-        node.setdefault('type', 'CUSTOM')
-        node.setdefault('confidence', 1.0)
-        node.setdefault('attributes', {})
+        node.setdefault("type", "CUSTOM")
+        node.setdefault("confidence", 1.0)
+        node.setdefault("attributes", {})
 
         # Deserialize attributes from JSON string
-        if 'attributes' in node and isinstance(node['attributes'], str):
+        if "attributes" in node and isinstance(node["attributes"], str):
             try:
-                node['attributes'] = json.loads(node['attributes'])
+                node["attributes"] = json.loads(node["attributes"])
             except (json.JSONDecodeError, TypeError):
-                node['attributes'] = {}
+                node["attributes"] = {}
 
         # Remove Neo4J specific properties
-        if '_labels' in node:
-            node.pop('_labels')
+        if "_labels" in node:
+            node.pop("_labels")
 
         # Check if the entity ID is invalid and regenerate if needed
-        entity_id = node.get('id', '')
+        entity_id = node.get("id", "")
         if entity_id:
             try:
                 IDValidator.validate_entity_id(entity_id)
             except:
                 # Regenerate ID using the unified generator if validation fails
-                name = node.get('name', '')
-                entity_type = str(node.get('type', 'CUSTOM'))
-                source_doc_id = node.get('source_doc_id', '')
-                new_id = UnifiedIDGenerator.generate_entity_id(name, entity_type, source_doc_id)
+                name = node.get("name", "")
+                entity_type = str(node.get("type", "CUSTOM"))
+                source_doc_id = node.get("source_doc_id", "")
+                new_id = UnifiedIDGenerator.generate_entity_id(
+                    name, entity_type, source_doc_id
+                )
                 logger.debug(f"Regenerated invalid entity ID: {entity_id} -> {new_id}")
-                node['id'] = new_id
+                node["id"] = new_id
 
         return cls(**node)

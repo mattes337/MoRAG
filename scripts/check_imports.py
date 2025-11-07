@@ -8,14 +8,14 @@ This script analyzes Python files to find:
 4. Import order issues
 """
 
+import argparse
 import ast
 import os
-import sys
 import re
-from pathlib import Path
-from typing import Set, Dict, List, Tuple, Optional
+import sys
 from collections import defaultdict
-import argparse
+from pathlib import Path
+from typing import Dict, List, Optional, Set, Tuple
 
 
 class ImportChecker(ast.NodeVisitor):
@@ -39,9 +39,9 @@ class ImportChecker(ast.NodeVisitor):
 
     def visit_ImportFrom(self, node):
         """Handle 'from module import name' statements."""
-        module = node.module or ''
+        module = node.module or ""
         for alias in node.names:
-            if alias.name == '*':
+            if alias.name == "*":
                 # Star imports are problematic but we can't track them easily
                 self.warnings.append(f"Star import from {module} at line {node.lineno}")
             else:
@@ -119,28 +119,104 @@ class ImportChecker(ast.NodeVisitor):
         """Check for missing imports."""
         # Built-in names that don't need imports
         builtins = {
-            'abs', 'all', 'any', 'ascii', 'bin', 'bool', 'bytearray', 'bytes',
-            'callable', 'chr', 'classmethod', 'compile', 'complex', 'delattr',
-            'dict', 'dir', 'divmod', 'enumerate', 'eval', 'exec', 'filter',
-            'float', 'format', 'frozenset', 'getattr', 'globals', 'hasattr',
-            'hash', 'help', 'hex', 'id', 'input', 'int', 'isinstance',
-            'issubclass', 'iter', 'len', 'list', 'locals', 'map', 'max',
-            'memoryview', 'min', 'next', 'object', 'oct', 'open', 'ord',
-            'pow', 'print', 'property', 'range', 'repr', 'reversed', 'round',
-            'set', 'setattr', 'slice', 'sorted', 'staticmethod', 'str', 'sum',
-            'super', 'tuple', 'type', 'vars', 'zip', '__import__',
-            'Exception', 'BaseException', 'ValueError', 'TypeError', 'KeyError',
-            'IndexError', 'AttributeError', 'ImportError', 'ModuleNotFoundError',
-            'True', 'False', 'None', '__name__', '__file__', '__doc__', '__package__',
-            '__spec__', '__loader__', '__cached__', '__builtins__', 'self', 'cls'
+            "abs",
+            "all",
+            "any",
+            "ascii",
+            "bin",
+            "bool",
+            "bytearray",
+            "bytes",
+            "callable",
+            "chr",
+            "classmethod",
+            "compile",
+            "complex",
+            "delattr",
+            "dict",
+            "dir",
+            "divmod",
+            "enumerate",
+            "eval",
+            "exec",
+            "filter",
+            "float",
+            "format",
+            "frozenset",
+            "getattr",
+            "globals",
+            "hasattr",
+            "hash",
+            "help",
+            "hex",
+            "id",
+            "input",
+            "int",
+            "isinstance",
+            "issubclass",
+            "iter",
+            "len",
+            "list",
+            "locals",
+            "map",
+            "max",
+            "memoryview",
+            "min",
+            "next",
+            "object",
+            "oct",
+            "open",
+            "ord",
+            "pow",
+            "print",
+            "property",
+            "range",
+            "repr",
+            "reversed",
+            "round",
+            "set",
+            "setattr",
+            "slice",
+            "sorted",
+            "staticmethod",
+            "str",
+            "sum",
+            "super",
+            "tuple",
+            "type",
+            "vars",
+            "zip",
+            "__import__",
+            "Exception",
+            "BaseException",
+            "ValueError",
+            "TypeError",
+            "KeyError",
+            "IndexError",
+            "AttributeError",
+            "ImportError",
+            "ModuleNotFoundError",
+            "True",
+            "False",
+            "None",
+            "__name__",
+            "__file__",
+            "__doc__",
+            "__package__",
+            "__spec__",
+            "__loader__",
+            "__cached__",
+            "__builtins__",
+            "self",
+            "cls",
         }
 
         # Names that are imported or defined locally
         available_names = (
-            set(self.imports.keys()) |
-            set(self.from_imports.keys()) |
-            self.defined_names |
-            builtins
+            set(self.imports.keys())
+            | set(self.from_imports.keys())
+            | self.defined_names
+            | builtins
         )
 
         # Find missing imports
@@ -161,7 +237,7 @@ class ImportChecker(ast.NodeVisitor):
 def check_file(filepath: Path) -> Tuple[List[str], List[str]]:
     """Check a single Python file for import issues."""
     try:
-        with open(filepath, 'r', encoding='utf-8') as f:
+        with open(filepath, "r", encoding="utf-8") as f:
             content = f.read()
 
         tree = ast.parse(content, filename=str(filepath))
@@ -178,28 +254,32 @@ def check_file(filepath: Path) -> Tuple[List[str], List[str]]:
         return [f"Error checking {filepath}: {e}"], []
 
 
-def find_python_files(directory: Path, exclude_patterns: List[str] = None) -> List[Path]:
+def find_python_files(
+    directory: Path, exclude_patterns: List[str] = None
+) -> List[Path]:
     """Find all Python files in a directory."""
     if exclude_patterns is None:
         exclude_patterns = [
-            '__pycache__',
-            '.git',
-            '.venv',
-            'venv',
-            'env',
-            '.pytest_cache',
-            'node_modules',
-            '.mypy_cache'
+            "__pycache__",
+            ".git",
+            ".venv",
+            "venv",
+            "env",
+            ".pytest_cache",
+            "node_modules",
+            ".mypy_cache",
         ]
 
     python_files = []
 
     for root, dirs, files in os.walk(directory):
         # Remove excluded directories
-        dirs[:] = [d for d in dirs if not any(pattern in d for pattern in exclude_patterns)]
+        dirs[:] = [
+            d for d in dirs if not any(pattern in d for pattern in exclude_patterns)
+        ]
 
         for file in files:
-            if file.endswith('.py'):
+            if file.endswith(".py"):
                 filepath = Path(root) / file
                 python_files.append(filepath)
 
@@ -208,15 +288,24 @@ def find_python_files(directory: Path, exclude_patterns: List[str] = None) -> Li
 
 def main():
     """Main function."""
-    parser = argparse.ArgumentParser(description='Check Python files for import issues')
-    parser.add_argument('paths', nargs='*', default=['.'],
-                       help='Paths to check (files or directories)')
-    parser.add_argument('--exclude', action='append', default=[],
-                       help='Patterns to exclude from checking')
-    parser.add_argument('--errors-only', action='store_true',
-                       help='Only show errors, not warnings')
-    parser.add_argument('--exit-on-error', action='store_true',
-                       help='Exit with non-zero code if errors found')
+    parser = argparse.ArgumentParser(description="Check Python files for import issues")
+    parser.add_argument(
+        "paths", nargs="*", default=["."], help="Paths to check (files or directories)"
+    )
+    parser.add_argument(
+        "--exclude",
+        action="append",
+        default=[],
+        help="Patterns to exclude from checking",
+    )
+    parser.add_argument(
+        "--errors-only", action="store_true", help="Only show errors, not warnings"
+    )
+    parser.add_argument(
+        "--exit-on-error",
+        action="store_true",
+        help="Exit with non-zero code if errors found",
+    )
 
     args = parser.parse_args()
 
@@ -226,7 +315,7 @@ def main():
     for path_str in args.paths:
         path = Path(path_str)
 
-        if path.is_file() and path.suffix == '.py':
+        if path.is_file() and path.suffix == ".py":
             files_to_check = [path]
         elif path.is_dir():
             files_to_check = find_python_files(path, args.exclude)
@@ -261,5 +350,5 @@ def main():
     return len(all_errors)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

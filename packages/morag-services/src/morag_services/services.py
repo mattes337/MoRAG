@@ -10,14 +10,20 @@ This facade is deprecated - use MoRAGServiceCoordinator directly.
 """
 
 import warnings
-from typing import Dict, List, Any, Optional, Union
-
-# Import single-purpose components
-from .service_coordinator import MoRAGServiceCoordinator, ServiceConfig, ContentType, ProcessingResult
-from .content_processors import ContentProcessors
-from .service_utilities import ServiceUtilities
+from typing import Any, Dict, List, Optional, Union
 
 from morag_core.utils.logging import get_logger
+
+from .content_processors import ContentProcessors
+
+# Import single-purpose components
+from .service_coordinator import (
+    ContentType,
+    MoRAGServiceCoordinator,
+    ProcessingResult,
+    ServiceConfig,
+)
+from .service_utilities import ServiceUtilities
 
 logger = get_logger(__name__)
 
@@ -25,7 +31,7 @@ logger = get_logger(__name__)
 warnings.warn(
     "MoRAGServices is deprecated. Use MoRAGServiceCoordinator directly for new code.",
     DeprecationWarning,
-    stacklevel=2
+    stacklevel=2,
 )
 
 
@@ -49,10 +55,14 @@ class MoRAGServices:
 
     def __init__(self, config=None, graph_config=None, data_output_dir=None):
         """Initialize MoRAG services facade."""
-        logger.warning("MoRAGServices is deprecated. Use MoRAGServiceCoordinator directly.")
+        logger.warning(
+            "MoRAGServices is deprecated. Use MoRAGServiceCoordinator directly."
+        )
 
         # Delegate to single-purpose components - no inheritance
-        self._coordinator = MoRAGServiceCoordinator(config, graph_config, data_output_dir)
+        self._coordinator = MoRAGServiceCoordinator(
+            config, graph_config, data_output_dir
+        )
         self._processors = ContentProcessors(self._coordinator)
         self._detector = ContentTypeDetector()
         self._utilities = ServiceUtilities()
@@ -89,31 +99,50 @@ class MoRAGServices:
 
     # Pure delegation - no logic here
 
-    async def process_content(self, path_or_url: str, content_type: Optional[str] = None, options: Optional[Dict[str, Any]] = None) -> ProcessingResult:
+    async def process_content(
+        self,
+        path_or_url: str,
+        content_type: Optional[str] = None,
+        options: Optional[Dict[str, Any]] = None,
+    ) -> ProcessingResult:
         """Process content based on detected or specified type."""
-        return await self._processors.process_content(path_or_url, content_type, options)
+        return await self._processors.process_content(
+            path_or_url, content_type, options
+        )
 
-    async def process_document(self, document_path: str, options: Optional[Dict[str, Any]] = None) -> ProcessingResult:
+    async def process_document(
+        self, document_path: str, options: Optional[Dict[str, Any]] = None
+    ) -> ProcessingResult:
         """Process document content."""
         return await self._processors.process_document(document_path, options)
 
-    async def process_audio(self, audio_path: str, options: Optional[Dict[str, Any]] = None) -> ProcessingResult:
+    async def process_audio(
+        self, audio_path: str, options: Optional[Dict[str, Any]] = None
+    ) -> ProcessingResult:
         """Process audio content."""
         return await self._processors.process_audio(audio_path, options)
 
-    async def process_video(self, video_path: str, options: Optional[Dict[str, Any]] = None) -> ProcessingResult:
+    async def process_video(
+        self, video_path: str, options: Optional[Dict[str, Any]] = None
+    ) -> ProcessingResult:
         """Process video content."""
         return await self._processors.process_video(video_path, options)
 
-    async def process_image(self, image_path: str, options: Optional[Dict[str, Any]] = None) -> ProcessingResult:
+    async def process_image(
+        self, image_path: str, options: Optional[Dict[str, Any]] = None
+    ) -> ProcessingResult:
         """Process image content."""
         return await self._processors.process_image(image_path, options)
 
-    async def process_url(self, url: str, options: Optional[Dict[str, Any]] = None) -> ProcessingResult:
+    async def process_url(
+        self, url: str, options: Optional[Dict[str, Any]] = None
+    ) -> ProcessingResult:
         """Process web URL content."""
         return await self._processors.process_url(url, options)
 
-    async def process_youtube(self, url: str, options: Optional[Dict[str, Any]] = None) -> ProcessingResult:
+    async def process_youtube(
+        self, url: str, options: Optional[Dict[str, Any]] = None
+    ) -> ProcessingResult:
         """Process YouTube content."""
         return await self._processors.process_youtube(url, options)
 
@@ -134,12 +163,12 @@ class MoRAGServices:
 
 # Backward compatibility exports
 __all__ = [
-    "MoRAGServices",              # Deprecated facade - use MoRAGServiceCoordinator instead
-    "MoRAGServiceCoordinator",     # Recommended for new code
-    "ContentProcessors",           # Single-purpose content processing
-    "ContentTypeDetector",        # Single-purpose content type detection
-    "ServiceUtilities",           # Single-purpose utilities
+    "MoRAGServices",  # Deprecated facade - use MoRAGServiceCoordinator instead
+    "MoRAGServiceCoordinator",  # Recommended for new code
+    "ContentProcessors",  # Single-purpose content processing
+    "ContentTypeDetector",  # Single-purpose content type detection
+    "ServiceUtilities",  # Single-purpose utilities
     "ServiceConfig",
     "ContentType",
-    "ProcessingResult"
+    "ProcessingResult",
 ]

@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """Test script to verify circular dependency fix."""
 
-import sys
 import os
+import sys
 
 # Add package paths
-sys.path.insert(0, 'packages/morag-core/src')
-sys.path.insert(0, 'packages/morag-stages/src')
-sys.path.insert(0, 'packages/morag-services/src')
+sys.path.insert(0, "packages/morag-core/src")
+sys.path.insert(0, "packages/morag-stages/src")
+sys.path.insert(0, "packages/morag-services/src")
+
 
 def test_dependency_inversion():
     """Test that dependency inversion is properly implemented."""
@@ -16,11 +17,13 @@ def test_dependency_inversion():
 
     try:
         # Test 1: Import interfaces without importing concrete implementations
-        from morag_core.interfaces import IServiceCoordinator, IContentProcessor
+        from morag_core.interfaces import IContentProcessor, IServiceCoordinator
+
         print("✅ 1. Interfaces imported successfully")
 
         # Test 2: Import stages without importing concrete services
         from morag_stages.stages.fact_generation_stage import FactGeneratorStage
+
         print("✅ 2. FactGeneratorStage imported without circular dependencies")
 
         # Test 3: Create stage with None coordinator (backward compatibility)
@@ -30,6 +33,7 @@ def test_dependency_inversion():
         # Test 4: Verify stage accepts IServiceCoordinator interface
         class MockCoordinator:
             """Mock service coordinator for testing."""
+
             async def get_service(self, service_type: str):
                 return None
 
@@ -45,13 +49,14 @@ def test_dependency_inversion():
 
         # Test 5: Verify that morag-services can be imported separately
         from morag_services.service_coordinator import MoRAGServiceCoordinator
+
         print("✅ 5. MoRAGServiceCoordinator imported successfully")
 
         # Test 6: Verify that service coordinator implements interface
         coordinator = MoRAGServiceCoordinator()
-        assert hasattr(coordinator, 'get_service')
-        assert hasattr(coordinator, 'initialize_services')
-        assert hasattr(coordinator, 'cleanup_services')
+        assert hasattr(coordinator, "get_service")
+        assert hasattr(coordinator, "initialize_services")
+        assert hasattr(coordinator, "cleanup_services")
         print("✅ 6. MoRAGServiceCoordinator implements IServiceCoordinator interface")
 
         print("\n🎉 All dependency inversion tests passed!")
@@ -70,6 +75,7 @@ def test_dependency_inversion():
     except Exception as e:
         print(f"❌ Unexpected error: {e}")
         return False
+
 
 if __name__ == "__main__":
     success = test_dependency_inversion()

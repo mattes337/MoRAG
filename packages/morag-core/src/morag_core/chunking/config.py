@@ -1,12 +1,14 @@
 """Universal chunking configuration for MoRAG."""
 
 from enum import Enum
-from typing import Optional, Dict, Any, Union
+from typing import Any, Dict, Optional, Union
+
 from pydantic import BaseModel, Field
 
 
 class ChunkingStrategy(str, Enum):
     """Available chunking strategies."""
+
     SEMANTIC = "semantic"
     SIZE_BASED = "size_based"
     HYBRID = "hybrid"
@@ -20,26 +22,16 @@ class ChunkingConfig(BaseModel):
 
     # Core chunking parameters
     strategy: ChunkingStrategy = Field(
-        default=ChunkingStrategy.SEMANTIC,
-        description="Chunking strategy to use"
+        default=ChunkingStrategy.SEMANTIC, description="Chunking strategy to use"
     )
     max_chunk_size: int = Field(
-        default=4000,
-        ge=100,
-        le=32000,
-        description="Maximum characters per chunk"
+        default=4000, ge=100, le=32000, description="Maximum characters per chunk"
     )
     min_chunk_size: int = Field(
-        default=500,
-        ge=50,
-        le=8000,
-        description="Minimum characters per chunk"
+        default=500, ge=50, le=8000, description="Minimum characters per chunk"
     )
     overlap_size: int = Field(
-        default=200,
-        ge=0,
-        le=2000,
-        description="Character overlap between chunks"
+        default=200, ge=0, le=2000, description="Character overlap between chunks"
     )
 
     # Semantic chunking parameters
@@ -47,63 +39,46 @@ class ChunkingConfig(BaseModel):
         default=0.6,
         ge=0.0,
         le=1.0,
-        description="Minimum confidence for semantic boundaries"
+        description="Minimum confidence for semantic boundaries",
     )
     use_ai_analysis: bool = Field(
-        default=True,
-        description="Whether to use AI for semantic analysis"
+        default=True, description="Whether to use AI for semantic analysis"
     )
 
     # Content-specific parameters
     respect_sentence_boundaries: bool = Field(
-        default=True,
-        description="Avoid splitting sentences when possible"
+        default=True, description="Avoid splitting sentences when possible"
     )
     respect_paragraph_boundaries: bool = Field(
-        default=True,
-        description="Prefer paragraph boundaries for splits"
+        default=True, description="Prefer paragraph boundaries for splits"
     )
     preserve_code_blocks: bool = Field(
-        default=True,
-        description="Keep code blocks intact when possible"
+        default=True, description="Keep code blocks intact when possible"
     )
     preserve_tables: bool = Field(
-        default=True,
-        description="Keep tables intact when possible"
+        default=True, description="Keep tables intact when possible"
     )
 
     # Language and encoding
     language: Optional[str] = Field(
-        default=None,
-        description="Content language for language-specific processing"
+        default=None, description="Content language for language-specific processing"
     )
-    encoding: str = Field(
-        default="utf-8",
-        description="Text encoding"
-    )
+    encoding: str = Field(default="utf-8", description="Text encoding")
 
     # Performance parameters
     max_concurrent_chunks: int = Field(
-        default=5,
-        ge=1,
-        le=20,
-        description="Maximum concurrent chunk processing"
+        default=5, ge=1, le=20, description="Maximum concurrent chunk processing"
     )
     timeout_seconds: int = Field(
-        default=30,
-        ge=5,
-        le=300,
-        description="Timeout for chunk processing"
+        default=30, ge=5, le=300, description="Timeout for chunk processing"
     )
 
     # Content type specific settings
     content_type: Optional[str] = Field(
-        default=None,
-        description="Content type hint (document, audio, video, web)"
+        default=None, description="Content type hint (document, audio, video, web)"
     )
     metadata: Dict[str, Any] = Field(
-        default_factory=dict,
-        description="Additional metadata for chunking"
+        default_factory=dict, description="Additional metadata for chunking"
     )
 
     @classmethod

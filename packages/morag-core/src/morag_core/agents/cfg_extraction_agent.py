@@ -1,10 +1,11 @@
 """Context-Free Grammar extraction agent for complex structured outputs."""
 
-from typing import Type, List, Optional, Dict, Any, Union
+from typing import Any, Dict, List, Optional, Type, Union
+
 import structlog
 from pydantic import BaseModel, Field
 
-from ..ai.base_agent import MoRAGBaseAgent, AgentConfig
+from ..ai.base_agent import AgentConfig, MoRAGBaseAgent
 from ..ai.models import ConfidenceLevel
 
 logger = structlog.get_logger(__name__)
@@ -26,7 +27,9 @@ class CFGExtractionResult(BaseModel):
     total_triples: int = Field(description="Total number of triples")
     confidence: ConfidenceLevel = Field(description="Overall confidence level")
     grammar_used: str = Field(description="Grammar type used for extraction")
-    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
+    metadata: Dict[str, Any] = Field(
+        default_factory=dict, description="Additional metadata"
+    )
 
 
 class CFGExtractionAgent(MoRAGBaseAgent[CFGExtractionResult]):
@@ -42,7 +45,7 @@ class CFGExtractionAgent(MoRAGBaseAgent[CFGExtractionResult]):
             config = AgentConfig(
                 model="google-gla:gemini-1.5-flash",
                 temperature=0.1,
-                outlines_provider="gemini"
+                outlines_provider="gemini",
             )
 
         super().__init__(config)
@@ -161,7 +164,7 @@ IMPORTANT:
         text: str,
         domain: str = "general",
         grammar_type: str = "knowledge_triples",
-        min_confidence: Optional[float] = None
+        min_confidence: Optional[float] = None,
     ) -> CFGExtractionResult:
         """Extract knowledge using context-free grammar constraints.
 
@@ -180,7 +183,7 @@ IMPORTANT:
                 total_triples=0,
                 confidence=ConfidenceLevel.HIGH,
                 grammar_used=grammar_type,
-                metadata={"error": "Empty text", "domain": domain}
+                metadata={"error": "Empty text", "domain": domain},
             )
 
         # Update configuration for this extraction
@@ -192,7 +195,7 @@ IMPORTANT:
             text_length=len(text),
             domain=domain,
             grammar_type=grammar_type,
-            structured_generation=self.is_outlines_available()
+            structured_generation=self.is_outlines_available(),
         )
 
         # Prepare the extraction prompt
@@ -211,7 +214,7 @@ IMPORTANT:
                 triples_extracted=result.total_triples,
                 confidence=result.confidence,
                 grammar_used=result.grammar_used,
-                used_outlines=self.is_outlines_available()
+                used_outlines=self.is_outlines_available(),
             )
 
             return result
@@ -224,11 +227,7 @@ IMPORTANT:
                 total_triples=0,
                 confidence=ConfidenceLevel.LOW,
                 grammar_used=grammar_type,
-                metadata={
-                    "error": str(e),
-                    "domain": domain,
-                    "fallback": True
-                }
+                metadata={"error": str(e), "domain": domain, "fallback": True},
             )
 
     def get_cfg_generator(self, grammar_type: str = "knowledge_triples"):
@@ -266,10 +265,7 @@ IMPORTANT:
             raise
 
     def _create_extraction_prompt(
-        self,
-        text: str,
-        domain: str,
-        grammar_type: str
+        self, text: str, domain: str, grammar_type: str
     ) -> str:
         """Create the extraction prompt for CFG-based extraction.
 
@@ -299,7 +295,7 @@ Extract structured knowledge triples that follow the grammar constraints and rep
         result: CFGExtractionResult,
         original_text: str,
         domain: str,
-        grammar_type: str
+        grammar_type: str,
     ) -> CFGExtractionResult:
         """Post-process and validate the CFG extraction result.
 
@@ -314,7 +310,8 @@ Extract structured knowledge triples that follow the grammar constraints and rep
         """
         # Filter triples by confidence threshold
         filtered_triples = [
-            triple for triple in result.triples
+            triple
+            for triple in result.triples
             if triple.confidence >= self.min_confidence
         ]
 
@@ -322,24 +319,26 @@ Extract structured knowledge triples that follow the grammar constraints and rep
         if len(filtered_triples) > self.max_triples:
             # Sort by confidence and take top triples
             filtered_triples = sorted(
-                filtered_triples,
-                key=lambda t: t.confidence,
-                reverse=True
-            )[:self.max_triples]
+                filtered_triples, key=lambda t: t.confidence, reverse=True
+            )[: self.max_triples]
 
         # Update metadata
         metadata = result.metadata or {}
-        metadata.update({
-            "domain": domain,
-            "grammar_type": grammar_type,
-            "original_triple_count": len(result.triples),
-            "filtered_triple_count": len(filtered_triples),
-            "text_length": len(original_text),
-            "min_confidence_threshold": self.min_confidence,
-            "max_triples_limit": self.max_triples,
-            "extraction_method": "outlines_cfg" if self.is_outlines_available() else "fallback",
-            "grammar_constraints": "applied"
-        })
+        metadata.update(
+            {
+                "domain": domain,
+                "grammar_type": grammar_type,
+                "original_triple_count": len(result.triples),
+                "filtered_triple_count": len(filtered_triples),
+                "text_length": len(original_text),
+                "min_confidence_threshold": self.min_confidence,
+                "max_triples_limit": self.max_triples,
+                "extraction_method": "outlines_cfg"
+                if self.is_outlines_available()
+                else "fallback",
+                "grammar_constraints": "applied",
+            }
+        )
 
         # Create updated result
         return CFGExtractionResult(
@@ -347,5 +346,5 @@ Extract structured knowledge triples that follow the grammar constraints and rep
             total_triples=len(filtered_triples),
             confidence=result.confidence,
             grammar_used=grammar_type,
-            metadata=metadata
+            metadata=metadata,
         )

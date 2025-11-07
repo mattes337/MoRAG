@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """CLI tool for testing the remote conversion system."""
 
-import sys
-import os
 import argparse
-import tempfile
 import json
+import os
+import sys
+import tempfile
 from pathlib import Path
 
 # Add project paths
@@ -14,15 +14,18 @@ sys.path.insert(0, str(project_root))
 
 # Load environment variables from the project root
 from dotenv import load_dotenv
-env_path = project_root / '.env'
+
+env_path = project_root / ".env"
 load_dotenv(env_path)
 
 # Load environment variables from the project root
 from dotenv import load_dotenv
-env_path = project_root / '.env'
+
+env_path = project_root / ".env"
 load_dotenv(env_path)
 sys.path.insert(0, str(project_root / "packages" / "morag-core" / "src"))
 sys.path.insert(0, str(project_root / "packages" / "morag" / "src"))
+
 
 def test_remote_job_lifecycle():
     """Test the complete remote job lifecycle."""
@@ -30,9 +33,12 @@ def test_remote_job_lifecycle():
     print("=" * 40)
 
     try:
+        from morag.models.remote_job_api import (
+            CreateRemoteJobRequest,
+            SubmitResultRequest,
+        )
         from morag.repositories.remote_job_repository import RemoteJobRepository
         from morag.services.remote_job_service import RemoteJobService
-        from morag.models.remote_job_api import CreateRemoteJobRequest, SubmitResultRequest
 
         # Create temporary directory for testing
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -49,9 +55,9 @@ def test_remote_job_lifecycle():
                 content_type="audio",
                 task_options={
                     "webhook_url": "http://example.com/webhook",
-                    "metadata": {"source": "test"}
+                    "metadata": {"source": "test"},
                 },
-                ingestion_task_id="test-ingestion-123"
+                ingestion_task_id="test-ingestion-123",
             )
 
             job = service.create_job(request)
@@ -62,9 +68,7 @@ def test_remote_job_lifecycle():
             # Step 2: Poll for jobs (simulate worker)
             print("\n2️⃣ Polling for jobs (worker simulation)...")
             available_jobs = service.poll_available_jobs(
-                worker_id="test-worker-1",
-                content_types=["audio", "video"],
-                max_jobs=1
+                worker_id="test-worker-1", content_types=["audio", "video"], max_jobs=1
             )
 
             if len(available_jobs) != 1:
@@ -85,10 +89,10 @@ def test_remote_job_lifecycle():
                     "speakers": ["Speaker_00", "Speaker_01"],
                     "topics": [
                         {"timestamp": 0, "topic": "Introduction"},
-                        {"timestamp": 60, "topic": "Main Discussion"}
-                    ]
+                        {"timestamp": 60, "topic": "Main Discussion"},
+                    ],
                 },
-                processing_time=45.3
+                processing_time=45.3,
             )
 
             completed_job = service.submit_result(job.id, result_request)
@@ -105,8 +109,10 @@ def test_remote_job_lifecycle():
     except Exception as e:
         print(f"\n[FAIL] Test failed with error: {e}")
         import traceback
+
         traceback.print_exc()
         return False
+
 
 def test_api_endpoints():
     """Test the API endpoints using httpx."""
@@ -127,7 +133,9 @@ def test_api_endpoints():
             else:
                 print(f"[WARN] Server responded with status {response.status_code}")
         except httpx.RequestError:
-            print("[FAIL] Server is not running. Start the server with: python -m morag.server")
+            print(
+                "[FAIL] Server is not running. Start the server with: python -m morag.server"
+            )
             return False
 
         # Test creating a remote job
@@ -136,7 +144,7 @@ def test_api_endpoints():
             "source_file_path": "/tmp/test_audio.mp3",
             "content_type": "audio",
             "task_options": {"webhook_url": "http://example.com/webhook"},
-            "ingestion_task_id": "test-api-123"
+            "ingestion_task_id": "test-api-123",
         }
 
         response = httpx.post(f"{base_url}/api/v1/remote-jobs/", json=job_data)
@@ -147,7 +155,9 @@ def test_api_endpoints():
 
             # Test job status
             print("\n3️⃣ Testing job status...")
-            status_response = httpx.get(f"{base_url}/api/v1/remote-jobs/{job_id}/status")
+            status_response = httpx.get(
+                f"{base_url}/api/v1/remote-jobs/{job_id}/status"
+            )
             if status_response.status_code == 200:
                 status_data = status_response.json()
                 print(f"[OK] Job status: {status_data['status']}")
@@ -163,11 +173,14 @@ def test_api_endpoints():
         return True
 
     except ImportError:
-        print("[FAIL] requests library not available. Install with: pip install requests")
+        print(
+            "[FAIL] requests library not available. Install with: pip install requests"
+        )
         return False
     except Exception as e:
         print(f"[FAIL] API test failed: {e}")
         return False
+
 
 def main():
     """Main CLI function."""
@@ -176,7 +189,7 @@ def main():
         "--test",
         choices=["lifecycle", "api", "all"],
         default="all",
-        help="Which test to run"
+        help="Which test to run",
     )
 
     args = parser.parse_args()
@@ -199,6 +212,7 @@ def main():
     else:
         print("[ERROR] Some tests failed!")
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

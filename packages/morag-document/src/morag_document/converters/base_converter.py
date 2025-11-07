@@ -7,19 +7,18 @@ from typing import Any, Dict, List, Optional, Set, Union
 
 import structlog
 from langdetect import detect
-
+from morag_core.config import get_settings
 from morag_core.interfaces.converter import (
     BaseConverter,
     ChunkingStrategy,
+    ConversionError,
     ConversionOptions,
     ConversionResult,
     QualityScore,
-    ConversionError,
     UnsupportedFormatError,
 )
 from morag_core.models.document import Document, DocumentMetadata, DocumentType
-from morag_core.utils.file_handling import get_file_info, detect_format, get_file_hash
-from morag_core.config import get_settings
+from morag_core.utils.file_handling import detect_format, get_file_hash, get_file_info
 
 from ..services.markitdown_service import MarkitdownService
 from .document_formatter import DocumentFormatter

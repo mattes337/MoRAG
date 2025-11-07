@@ -8,11 +8,11 @@ import hashlib
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Any, Set
+from typing import Any, Dict, List, Optional, Set
 
 from pydantic import BaseModel
 
-from ..models import Entity, Relation, Document, DocumentChunk
+from ..models import Document, DocumentChunk, Entity, Relation
 from ..storage.base import BaseStorage
 
 logger = logging.getLogger(__name__)
@@ -31,9 +31,7 @@ class FileMetadata(BaseModel):
     source_doc_id: str  # Unique identifier for this file
 
     class Config:
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
+        json_encoders = {datetime: lambda v: v.isoformat()}
 
 
 class FileIngestion:
@@ -99,7 +97,7 @@ class FileIngestion:
                 mime_type=self._get_mime_type(file_path),
                 ingestion_timestamp=datetime.now(),
                 last_modified=datetime.fromtimestamp(stat.st_mtime),
-                source_doc_id=source_doc_id
+                source_doc_id=source_doc_id,
             )
         except Exception as e:
             logger.error(f"Failed to extract metadata from {file_path}: {e}")
@@ -115,15 +113,15 @@ class FileIngestion:
             MIME type string or None
         """
         extension_to_mime = {
-            '.txt': 'text/plain',
-            '.pdf': 'application/pdf',
-            '.doc': 'application/msword',
-            '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            '.json': 'application/json',
-            '.xml': 'application/xml',
-            '.html': 'text/html',
-            '.md': 'text/markdown',
-            '.csv': 'text/csv'
+            ".txt": "text/plain",
+            ".pdf": "application/pdf",
+            ".doc": "application/msword",
+            ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            ".json": "application/json",
+            ".xml": "application/xml",
+            ".html": "text/html",
+            ".md": "text/markdown",
+            ".csv": "text/csv",
         }
 
         return extension_to_mime.get(file_path.suffix.lower())
@@ -145,15 +143,16 @@ class FileIngestion:
         # Check in storage by looking for entities with this source_doc_id
         try:
             entities = await self.storage.search_entities(
-                query=file_metadata.source_doc_id,
-                limit=1
+                query=file_metadata.source_doc_id, limit=1
             )
 
             if entities:
                 # File already ingested, update cache
                 self._checksum_to_file[file_metadata.checksum] = file_metadata.file_path
                 self._ingested_files[file_metadata.file_path] = file_metadata
-                logger.info(f"File {file_metadata.file_name} already ingested (found in storage)")
+                logger.info(
+                    f"File {file_metadata.file_name} already ingested (found in storage)"
+                )
                 return True
 
             return False
@@ -162,7 +161,9 @@ class FileIngestion:
             logger.warning(f"Error checking if file already ingested: {e}")
             return False
 
-    def _group_entities_into_chunks(self, entities: List[Entity]) -> List[tuple[str, List[Entity]]]:
+    def _group_entities_into_chunks(
+        self, entities: List[Entity]
+    ) -> List[tuple[str, List[Entity]]]:
         """Group entities by their chunk index to create document chunks.
 
         Args:
@@ -196,10 +197,16 @@ class FileIngestion:
             chunk_entities = chunks_map[chunk_index]
             # Use source_text from first entity's attributes if available, otherwise create descriptive text
             chunk_text = ""
-            if chunk_entities and chunk_entities[0].attributes and 'source_text' in chunk_entities[0].attributes:
-                chunk_text = chunk_entities[0].attributes['source_text']
+            if (
+                chunk_entities
+                and chunk_entities[0].attributes
+                and "source_text" in chunk_entities[0].attributes
+            ):
+                chunk_text = chunk_entities[0].attributes["source_text"]
             else:
-                chunk_text = f"Document chunk {chunk_index} with {len(chunk_entities)} entities"
+                chunk_text = (
+                    f"Document chunk {chunk_index} with {len(chunk_entities)} entities"
+                )
 
             result.append((chunk_text, chunk_entities))
 
@@ -220,7 +227,7 @@ class FileIngestion:
         file_path: Path,
         entities: List[Entity],
         relations: List[Relation],
-        force_reingest: bool = False
+        force_reingest: bool = False,
     ) -> Dict[str, Any]:
         """Ingest entities and relations from a file using the new document structure.
 
@@ -240,13 +247,15 @@ class FileIngestion:
             file_metadata = self.get_file_metadata(file_path)
 
             # Check for duplicates unless forced
-            if not force_reingest and await self.is_file_already_ingested(file_metadata):
+            if not force_reingest and await self.is_file_already_ingested(
+                file_metadata
+            ):
                 return {
-                    'status': 'skipped',
-                    'reason': 'duplicate_file',
-                    'file_metadata': file_metadata,
-                    'entities_stored': 0,
-                    'relations_stored': 0
+                    "status": "skipped",
+                    "reason": "duplicate_file",
+                    "file_metadata": file_metadata,
+                    "entities_stored": 0,
+                    "relations_stored": 0,
                 }
 
             # Create Document node
@@ -261,10 +270,10 @@ class FileIngestion:
                 ingestion_timestamp=file_metadata.ingestion_timestamp,
                 last_modified=file_metadata.last_modified,
                 metadata={
-                    'file_name': file_metadata.file_name,
-                    'file_checksum': file_metadata.checksum,
-                    'ingestion_timestamp': file_metadata.ingestion_timestamp.isoformat()
-                }
+                    "file_name": file_metadata.file_name,
+                    "file_checksum": file_metadata.checksum,
+                    "ingestion_timestamp": file_metadata.ingestion_timestamp.isoformat(),
+                },
             )
 
             # Store Document
@@ -286,16 +295,18 @@ class FileIngestion:
                     end_position=len(chunk_text),
                     chunk_type="text",
                     metadata={
-                        'entity_count': len(chunk_entities),
-                        'extraction_method': 'llm_based'
-                    }
+                        "entity_count": len(chunk_entities),
+                        "extraction_method": "llm_based",
+                    },
                 )
 
                 chunk_id = await self.storage.store_document_chunk(chunk)
                 chunk_ids.append(chunk_id)
 
                 # Create Document -> CONTAINS -> DocumentChunk relationship
-                await self.storage.create_document_contains_chunk_relation(document_id, chunk_id)
+                await self.storage.create_document_contains_chunk_relation(
+                    document_id, chunk_id
+                )
 
                 # Store entities (they are already clean in the new model)
                 entity_ids = await self.storage.store_entities(chunk_entities)
@@ -303,9 +314,7 @@ class FileIngestion:
                 # Create DocumentChunk -> MENTIONS -> Entity relationships
                 for entity in chunk_entities:
                     await self.storage.create_chunk_mentions_entity_relation(
-                        chunk_id,
-                        entity.id,
-                        chunk_text  # Use chunk text as context
+                        chunk_id, entity.id, chunk_text  # Use chunk text as context
                     )
 
             # Store entity-to-entity relations (they are already clean in the new model)
@@ -315,26 +324,26 @@ class FileIngestion:
             self._ingested_files[file_metadata.file_path] = file_metadata
             self._checksum_to_file[file_metadata.checksum] = file_metadata.file_path
 
-            logger.info(f"Successfully ingested file {file_metadata.file_name} with new document structure")
-            logger.info(f"Created 1 document, {len(chunk_ids)} chunks, {len(entities)} entities, {len(relations)} relations")
+            logger.info(
+                f"Successfully ingested file {file_metadata.file_name} with new document structure"
+            )
+            logger.info(
+                f"Created 1 document, {len(chunk_ids)} chunks, {len(entities)} entities, {len(relations)} relations"
+            )
 
             return {
-                'status': 'success',
-                'file_metadata': file_metadata,
-                'document_id': document_id,
-                'chunks_created': len(chunk_ids),
-                'entities_stored': len(entities),
-                'relations_stored': len(relations),
-                'chunk_ids': chunk_ids
+                "status": "success",
+                "file_metadata": file_metadata,
+                "document_id": document_id,
+                "chunks_created": len(chunk_ids),
+                "entities_stored": len(entities),
+                "relations_stored": len(relations),
+                "chunk_ids": chunk_ids,
             }
 
         except Exception as e:
             logger.error(f"Failed to ingest file {file_path}: {e}")
-            return {
-                'status': 'error',
-                'error': str(e),
-                'file_path': str(file_path)
-            }
+            return {"status": "error", "error": str(e), "file_path": str(file_path)}
 
     async def get_ingested_files(self) -> List[FileMetadata]:
         """Get list of all ingested files.
@@ -358,8 +367,7 @@ class FileIngestion:
 
             # Find all entities from this file
             entities = await self.storage.search_entities(
-                query=file_metadata.source_doc_id,
-                limit=1000  # Adjust as needed
+                query=file_metadata.source_doc_id, limit=1000  # Adjust as needed
             )
 
             # Delete entities (this should cascade to relations)
@@ -374,21 +382,19 @@ class FileIngestion:
             if file_metadata.checksum in self._checksum_to_file:
                 del self._checksum_to_file[file_metadata.checksum]
 
-            logger.info(f"Removed {deleted_entities} entities from file {file_metadata.file_name}")
+            logger.info(
+                f"Removed {deleted_entities} entities from file {file_metadata.file_name}"
+            )
 
             return {
-                'status': 'success',
-                'entities_deleted': deleted_entities,
-                'file_metadata': file_metadata
+                "status": "success",
+                "entities_deleted": deleted_entities,
+                "file_metadata": file_metadata,
             }
 
         except Exception as e:
             logger.error(f"Failed to remove file {file_path} from graph: {e}")
-            return {
-                'status': 'error',
-                'error': str(e),
-                'file_path': str(file_path)
-            }
+            return {"status": "error", "error": str(e), "file_path": str(file_path)}
 
     def get_ingestion_stats(self) -> Dict[str, Any]:
         """Get ingestion statistics.
@@ -397,9 +403,9 @@ class FileIngestion:
             Dictionary with ingestion statistics
         """
         return {
-            'total_files_ingested': len(self._ingested_files),
-            'unique_checksums': len(self._checksum_to_file),
-            'files_by_type': self._get_files_by_type()
+            "total_files_ingested": len(self._ingested_files),
+            "unique_checksums": len(self._checksum_to_file),
+            "files_by_type": self._get_files_by_type(),
         }
 
     def _get_files_by_type(self) -> Dict[str, int]:
@@ -410,6 +416,6 @@ class FileIngestion:
         """
         type_counts = {}
         for file_metadata in self._ingested_files.values():
-            mime_type = file_metadata.mime_type or 'unknown'
+            mime_type = file_metadata.mime_type or "unknown"
             type_counts[mime_type] = type_counts.get(mime_type, 0) + 1
         return type_counts

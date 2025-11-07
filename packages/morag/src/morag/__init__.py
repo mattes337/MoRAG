@@ -224,6 +224,7 @@ from pathlib import Path
 
 try:
     from dotenv import load_dotenv
+
     # Look for .env file in current directory and parent directories
     env_path = Path.cwd() / ".env"
     if not env_path.exists():
@@ -235,27 +236,28 @@ try:
     if env_path.exists():
         load_dotenv(env_path)
         # Only print in debug mode to avoid spam
-        if os.getenv('MORAG_DEBUG', '').lower() in ('true', '1', 'yes'):
+        if os.getenv("MORAG_DEBUG", "").lower() in ("true", "1", "yes"):
             print(f"[DEBUG] Loaded environment variables from: {env_path}")
 except ImportError:
     # python-dotenv not available, continue without .env loading
     pass
 
-from .api import MoRAGAPI
 from morag.cli import main as cli_main
-from morag.server import create_app, main as server_main
-from morag.worker import main as worker_main
 from morag.orchestrator import MoRAGOrchestrator
-
-# Pipeline orchestration components
-from .agents import MoRAGPipelineAgent, IngestionOptions, ResolutionOptions
-from .pipeline import IntermediateFileManager, PipelineStateManager
+from morag.server import create_app
+from morag.server import main as server_main
+from morag.worker import main as worker_main
 
 # Re-export key components from sub-packages
 from morag_core.models import Document, DocumentChunk, ProcessingResult
-from morag_services import MoRAGServices, ServiceConfig, ContentType
-from morag_web import WebProcessor, WebConverter
+from morag_services import ContentType, MoRAGServices, ServiceConfig
+from morag_web import WebConverter, WebProcessor
 from morag_youtube import YouTubeProcessor
+
+# Pipeline orchestration components
+from .agents import IngestionOptions, MoRAGPipelineAgent, ResolutionOptions
+from .api import MoRAGAPI
+from .pipeline import IntermediateFileManager, PipelineStateManager
 
 __version__ = "0.1.0"
 

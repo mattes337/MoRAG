@@ -2,12 +2,12 @@
 
 import json
 import logging
-from typing import Dict, List, Optional, Any, Set
 from datetime import datetime
+from typing import Any, Dict, List, Optional, Set
 
 from ...models import Entity
 from ...models.types import EntityId
-from ...utils.id_generation import UnifiedIDGenerator, IDValidator
+from ...utils.id_generation import IDValidator, UnifiedIDGenerator
 from .base_operations import BaseOperations
 
 logger = logging.getLogger(__name__)
@@ -41,18 +41,18 @@ class EntityOperations(BaseOperations):
         name_lower = name.lower().strip()
 
         # Check for exact generic names
-        if name_lower in ['entity', 'unknown', 'placeholder']:
+        if name_lower in ["entity", "unknown", "placeholder"]:
             return True
 
         # Generic patterns to avoid
         generic_patterns = [
-            'entity_',
-            'entity ',
-            'unknown',
-            'placeholder',
-            'temp_',
-            'auto_',
-            'generated_'
+            "entity_",
+            "entity ",
+            "unknown",
+            "placeholder",
+            "temp_",
+            "auto_",
+            "generated_",
         ]
 
         for pattern in generic_patterns:
@@ -60,7 +60,7 @@ class EntityOperations(BaseOperations):
                 return True
 
         # Check if it's just "Entity" followed by an ID or hash
-        if name_lower.startswith('entity') and ('_' in name or name.isdigit()):
+        if name_lower.startswith("entity") and ("_" in name or name.isdigit()):
             return True
 
         return False
@@ -88,7 +88,9 @@ class EntityOperations(BaseOperations):
         except Exception:
             logger.warning(f"Invalid entity ID format: {entity.id}")
             # Generate a new valid ID
-            entity.id = UnifiedIDGenerator.generate_entity_id(entity.name, str(entity.type), entity.source_doc_id or "")
+            entity.id = UnifiedIDGenerator.generate_entity_id(
+                entity.name, str(entity.type), entity.source_doc_id or ""
+            )
             logger.info(f"Generated new entity ID: {entity.id}")
 
         # Get the normalized Neo4j label from the entity type
@@ -128,25 +130,32 @@ class EntityOperations(BaseOperations):
 
         properties = entity.attributes.copy() if entity.attributes else {}
 
-        result = await self._execute_query(query, {
-            "id": entity.id,
-            "name": entity.name,
-            "normalized_name": normalized_name,
-            "type": entity.type,
-            "confidence": entity.confidence,
-            "metadata": json.dumps(properties) if properties else "{}"
-        })
+        result = await self._execute_query(
+            query,
+            {
+                "id": entity.id,
+                "name": entity.name,
+                "normalized_name": normalized_name,
+                "type": entity.type,
+                "confidence": entity.confidence,
+                "metadata": json.dumps(properties) if properties else "{}",
+            },
+        )
 
         if result:
-            final_name = result[0].get('final_name', entity.name)
-            final_type = result[0].get('final_type', entity.type)
+            final_name = result[0].get("final_name", entity.name)
+            final_type = result[0].get("final_type", entity.type)
             if final_name != entity.name or final_type != entity.type:
-                logger.debug(f"Entity merged: '{entity.name}' -> '{final_name}' (type: {entity.type} -> {final_type}) "
-                        f"due to case-insensitive deduplication. Entity ID: {result[0].get('id')}")
+                logger.debug(
+                    f"Entity merged: '{entity.name}' -> '{final_name}' (type: {entity.type} -> {final_type}) "
+                    f"due to case-insensitive deduplication. Entity ID: {result[0].get('id')}"
+                )
             return result[0]["id"]
         return entity.id
 
-    async def _create_missing_entity(self, entity_id: str, entity_name: str) -> Optional[str]:
+    async def _create_missing_entity(
+        self, entity_id: str, entity_name: str
+    ) -> Optional[str]:
         """Create a missing entity with minimal information.
 
         Args:
@@ -158,7 +167,9 @@ class EntityOperations(BaseOperations):
         """
         # Don't create entities with generic names
         if self._is_generic_entity_name(entity_name):
-            logger.warning(f"Refusing to create entity with generic name: '{entity_name}'")
+            logger.warning(
+                f"Refusing to create entity with generic name: '{entity_name}'"
+            )
             return None
         # Check if the provided entity_id is in valid format
         try:
@@ -167,11 +178,13 @@ class EntityOperations(BaseOperations):
             valid_entity_id = entity_id
         except:
             # If invalid, generate a proper unified ID
-            logger.warning(f"Invalid entity ID format: {entity_id}, generating new unified ID")
+            logger.warning(
+                f"Invalid entity ID format: {entity_id}, generating new unified ID"
+            )
             valid_entity_id = UnifiedIDGenerator.generate_entity_id(
                 name=entity_name,
                 entity_type="CUSTOM",  # Default type for auto-created entities
-                source_doc_id=""  # No specific source document
+                source_doc_id="",  # No specific source document
             )
             logger.info(f"Generated new unified entity ID: {valid_entity_id}")
 
@@ -187,7 +200,7 @@ class EntityOperations(BaseOperations):
             name=entity_name,
             type=entity_type,
             confidence=0.1,  # Low confidence for auto-created entities
-            attributes={"auto_created": True, "created_at": datetime.now().isoformat()}
+            attributes={"auto_created": True, "created_at": datetime.now().isoformat()},
         )
 
         # Store the entity
@@ -214,7 +227,9 @@ class EntityOperations(BaseOperations):
         # This is more reliable than batch operations for deduplication
         return [await self.store_entity(entity) for entity in entities]
 
-    async def store_entity_with_chunk_references(self, entity: Entity, chunk_ids: List[str]) -> EntityId:
+    async def store_entity_with_chunk_references(
+        self, entity: Entity, chunk_ids: List[str]
+    ) -> EntityId:
         """Store entity with references to chunks where it's mentioned.
 
         Args:
@@ -233,7 +248,9 @@ class EntityOperations(BaseOperations):
 
         return entity_id
 
-    async def _create_entity_chunk_relationship(self, entity_id: EntityId, chunk_id: str) -> None:
+    async def _create_entity_chunk_relationship(
+        self, entity_id: EntityId, chunk_id: str
+    ) -> None:
         """Create MENTIONS relationship between chunk and entity (chunk -> entity).
 
         Args:
@@ -246,15 +263,18 @@ class EntityOperations(BaseOperations):
         RETURN e.id as entity_id, c.id as chunk_id
         """
 
-        result = await self._execute_query(query, {
-            "entity_id": entity_id,
-            "chunk_id": chunk_id
-        })
+        result = await self._execute_query(
+            query, {"entity_id": entity_id, "chunk_id": chunk_id}
+        )
 
         if not result:
-            logger.warning(f"Failed to create chunk-entity relationship: entity {entity_id} or chunk {chunk_id} not found")
+            logger.warning(
+                f"Failed to create chunk-entity relationship: entity {entity_id} or chunk {chunk_id} not found"
+            )
         else:
-            logger.debug(f"Created MENTIONS relationship: chunk {chunk_id} -> entity {entity_id}")
+            logger.debug(
+                f"Created MENTIONS relationship: chunk {chunk_id} -> entity {entity_id}"
+            )
 
     async def fix_unconnected_entities(self) -> int:
         """DEPRECATED: Find and fix entities that are not connected to any chunks.
@@ -265,7 +285,9 @@ class EntityOperations(BaseOperations):
         Returns:
             Number of entities that were fixed (always 0 now)
         """
-        logger.info("fix_unconnected_entities called but is deprecated with chunk-based extraction")
+        logger.info(
+            "fix_unconnected_entities called but is deprecated with chunk-based extraction"
+        )
         return 0
 
     async def get_entities_by_chunk_id(self, chunk_id: str) -> List[Entity]:
@@ -286,7 +308,7 @@ class EntityOperations(BaseOperations):
 
         entities = []
         for record in result:
-            entity_data = dict(record['e'])
+            entity_data = dict(record["e"])
             entities.append(Entity.from_neo4j_node(entity_data))
 
         return entities
@@ -307,9 +329,11 @@ class EntityOperations(BaseOperations):
 
         result = await self._execute_query(query, {"entity_id": entity_id})
 
-        return [record['chunk_id'] for record in result]
+        return [record["chunk_id"] for record in result]
 
-    async def get_document_chunks_by_entity_names(self, entity_names: List[str]) -> List[Dict[str, Any]]:
+    async def get_document_chunks_by_entity_names(
+        self, entity_names: List[str]
+    ) -> List[Dict[str, Any]]:
         """Get all DocumentChunk nodes related to specific entity names with full metadata.
 
         Uses both direct entity-chunk relationships and vector similarity search
@@ -337,7 +361,9 @@ class EntityOperations(BaseOperations):
                 LIMIT 5
                 """
 
-                entity_results = await self._execute_query(entity_query, {"entity_name": entity_name})
+                entity_results = await self._execute_query(
+                    entity_query, {"entity_name": entity_name}
+                )
 
                 for entity_result in entity_results:
                     entity_id = entity_result["entity_id"]
@@ -358,22 +384,31 @@ class EntityOperations(BaseOperations):
                            related_entity_names
                     """
 
-                    chunk_results = await self._execute_query(chunk_query, {"entity_id": entity_id})
+                    chunk_results = await self._execute_query(
+                        chunk_query, {"entity_id": entity_id}
+                    )
 
                     # Process chunk results to include related entity names
                     for chunk_result in chunk_results:
                         # Safely get related entity names and filter out null values
-                        related_entities = [name for name in (chunk_result.get("related_entity_names") or []) if name]
+                        related_entities = [
+                            name
+                            for name in (chunk_result.get("related_entity_names") or [])
+                            if name
+                        ]
 
                         chunk_data = {
                             "chunk_id": chunk_result["chunk_id"],
                             "document_id": chunk_result["document_id"],
                             "chunk_index": chunk_result["chunk_index"],
                             "text": chunk_result["content"],
-                            "content": chunk_result["content"],  # Alias for compatibility
+                            "content": chunk_result[
+                                "content"
+                            ],  # Alias for compatibility
                             "chunk_metadata": chunk_result["metadata"] or {},
-                            "document_name": chunk_result.get("document_name") or "Unknown Document",
-                            "related_entity_names": related_entities
+                            "document_name": chunk_result.get("document_name")
+                            or "Unknown Document",
+                            "related_entity_names": related_entities,
                         }
                         chunks.append(chunk_data)
 
@@ -383,9 +418,12 @@ class EntityOperations(BaseOperations):
         # Method 2: Text pattern matching as fallback
         if not chunks:
             # Create a case-insensitive regex pattern for each entity name
-            word_boundary = r'\b'
-            whitespace_pattern = r'\s+'
-            patterns = [f"(?i){word_boundary}{name.replace(' ', whitespace_pattern)}{word_boundary}" for name in entity_names]
+            word_boundary = r"\b"
+            whitespace_pattern = r"\s+"
+            patterns = [
+                f"(?i){word_boundary}{name.replace(' ', whitespace_pattern)}{word_boundary}"
+                for name in entity_names
+            ]
 
             query = """
             MATCH (c:DocumentChunk)
@@ -407,7 +445,9 @@ class EntityOperations(BaseOperations):
 
             for record in result:
                 # Safely get related entity names and filter out null values
-                related_entities = [name for name in (record.get("related_entity_names") or []) if name]
+                related_entities = [
+                    name for name in (record.get("related_entity_names") or []) if name
+                ]
 
                 chunk_data = {
                     "chunk_id": record["chunk_id"],
@@ -417,7 +457,7 @@ class EntityOperations(BaseOperations):
                     "content": record["content"],  # Alias for compatibility
                     "chunk_metadata": record["metadata"] or {},
                     "document_name": record.get("document_name") or "Unknown Document",
-                    "related_entity_names": related_entities
+                    "related_entity_names": related_entities,
                 }
                 chunks.append(chunk_data)
 
@@ -429,10 +469,14 @@ class EntityOperations(BaseOperations):
                 unique_chunks.append(chunk)
                 seen_chunk_ids.add(chunk["chunk_id"])
 
-        self.logger.debug(f"Found {len(unique_chunks)} unique chunks for entities: {entity_names}")
+        self.logger.debug(
+            f"Found {len(unique_chunks)} unique chunks for entities: {entity_names}"
+        )
         return unique_chunks
 
-    async def update_entity_chunk_references(self, entity_id: EntityId, chunk_ids: List[str]) -> None:
+    async def update_entity_chunk_references(
+        self, entity_id: EntityId, chunk_ids: List[str]
+    ) -> None:
         """Update entity's chunk references by replacing all existing relationships.
 
         Args:
@@ -521,10 +565,7 @@ class EntityOperations(BaseOperations):
         return entities
 
     async def search_entities(
-        self,
-        query: str,
-        entity_type: Optional[str] = None,
-        limit: int = 10
+        self, query: str, entity_type: Optional[str] = None, limit: int = 10
     ) -> List[Entity]:
         """Search for entities by name or content.
 
@@ -570,8 +611,8 @@ class EntityOperations(BaseOperations):
                         "query": query,
                         "entity_type": entity_type,
                         "record": record,
-                        "error": str(e)
-                    }
+                        "error": str(e),
+                    },
                 )
 
         return entities
@@ -597,13 +638,16 @@ class EntityOperations(BaseOperations):
         RETURN e
         """
 
-        result = await self._execute_query(query, {
-            "entity_id": entity.id,
-            "name": entity.name,
-            "type": entity.type,
-            "confidence": entity.confidence,
-            "metadata": json.dumps(properties) if properties else "{}"
-        })
+        result = await self._execute_query(
+            query,
+            {
+                "entity_id": entity.id,
+                "name": entity.name,
+                "type": entity.type,
+                "confidence": entity.confidence,
+                "metadata": json.dumps(properties) if properties else "{}",
+            },
+        )
 
         return len(result) > 0
 
@@ -651,7 +695,9 @@ class EntityOperations(BaseOperations):
 
         return entities
 
-    async def create_chunk_mentions_entity_relation(self, chunk_id: str, entity_id: str, context: str) -> None:
+    async def create_chunk_mentions_entity_relation(
+        self, chunk_id: str, entity_id: str, context: str
+    ) -> None:
         """Create a MENTIONS relationship between a chunk and an entity.
 
         Args:
@@ -665,8 +711,6 @@ class EntityOperations(BaseOperations):
         SET r.context = $context,
             r.created_at = datetime()
         """
-        await self._execute_query(query, {
-            "chunk_id": chunk_id,
-            "entity_id": entity_id,
-            "context": context
-        })
+        await self._execute_query(
+            query, {"chunk_id": chunk_id, "entity_id": entity_id, "context": context}
+        )

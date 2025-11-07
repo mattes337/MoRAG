@@ -2,26 +2,39 @@
 
 import re
 from datetime import datetime
-from typing import List, Dict, Any, Optional
 from pathlib import Path
-import structlog
+from typing import Any, Dict, List, Optional
 
+import structlog
 from morag_core.config.unified import MarkdownOptimizerConfig
-from ..models import Stage, StageType, StageStatus, StageResult, StageContext, StageMetadata
-from ..exceptions import StageExecutionError, StageValidationError
+
 from ..error_handling import stage_error_handler, validation_error_handler
+from ..exceptions import StageExecutionError, StageValidationError
+from ..models import (
+    Stage,
+    StageContext,
+    StageMetadata,
+    StageResult,
+    StageStatus,
+    StageType,
+)
 
 # Import LLM services with graceful fallback
 try:
-    from morag_reasoning.llm import LLMClient, LLMConfig as ReasoningLLMConfig
+    from morag_reasoning.llm import LLMClient
+    from morag_reasoning.llm import LLMConfig as ReasoningLLMConfig
+
     LLM_AVAILABLE = True
 except ImportError:
     LLM_AVAILABLE = False
+
     # Create placeholder classes for runtime
     class LLMClient:  # type: ignore
         pass
+
     class ReasoningLLMConfig:  # type: ignore
         pass
+
 
 logger = structlog.get_logger(__name__)
 
@@ -39,10 +52,12 @@ class MarkdownOptimizerStage(Stage):
         self.agent = None
 
     @stage_error_handler("markdown_optimizer_execute")
-    async def execute(self,
-                     input_files: List[Path],
-                     context: StageContext,
-                     output_dir: Optional[Path] = None) -> StageResult:
+    async def execute(
+        self,
+        input_files: List[Path],
+        context: StageContext,
+        output_dir: Optional[Path] = None,
+    ) -> StageResult:
         """Execute markdown optimization on input files.
 
         Args:
@@ -57,7 +72,7 @@ class MarkdownOptimizerStage(Stage):
             raise StageValidationError(
                 "Markdown optimizer stage requires exactly one input file",
                 stage_type=self.stage_type.value,
-                invalid_files=[str(f) for f in input_files]
+                invalid_files=[str(f) for f in input_files],
             )
 
         input_file = input_files[0]
@@ -66,9 +81,9 @@ class MarkdownOptimizerStage(Stage):
         context_config = context.get_stage_config(self.stage_type)
         config = MarkdownOptimizerConfig.from_env_and_overrides(context_config)
 
-        logger.info("Starting markdown optimization",
-                   input_file=str(input_file),
-                   config=config)
+        logger.info(
+            "Starting markdown optimization", input_file=str(input_file), config=config
+        )
 
         try:
             # Get output directory from parameter or context
@@ -79,7 +94,7 @@ class MarkdownOptimizerStage(Stage):
             effective_output_dir.mkdir(parents=True, exist_ok=True)
 
             # Read input markdown
-            markdown_content = input_file.read_text(encoding='utf-8')
+            markdown_content = input_file.read_text(encoding="utf-8")
 
             # Extract metadata and content
             metadata, content = self._extract_metadata_and_content(markdown_content)
@@ -88,10 +103,14 @@ class MarkdownOptimizerStage(Stage):
             api_key_available = self._check_api_key_available()
             if LLM_AVAILABLE and config.enabled and api_key_available:
                 try:
-                    optimized_content = await self._optimize_with_llm(content, metadata, config, context)
+                    optimized_content = await self._optimize_with_llm(
+                        content, metadata, config, context
+                    )
                     optimization_applied = True
                 except Exception as e:
-                    logger.warning("LLM optimization failed, using basic cleanup", error=str(e))
+                    logger.warning(
+                        "LLM optimization failed, using basic cleanup", error=str(e)
+                    )
                     optimized_content = self._basic_text_cleanup(content)
                     optimization_applied = False
             else:
@@ -103,7 +122,7 @@ class MarkdownOptimizerStage(Stage):
             final_markdown = self._reconstruct_markdown(metadata, optimized_content)
 
             # Write to file
-            output_file.write_text(final_markdown, encoding='utf-8')
+            output_file.write_text(final_markdown, encoding="utf-8")
 
             # Create metadata
             stage_metadata = StageMetadata(
@@ -111,14 +130,16 @@ class MarkdownOptimizerStage(Stage):
                 start_time=datetime.now(),
                 input_files=[str(input_file)],
                 output_files=[str(output_file)],
-                config_used=config.model_dump() if hasattr(config, 'model_dump') else config.__dict__,
+                config_used=config.model_dump()
+                if hasattr(config, "model_dump")
+                else config.__dict__,
                 metrics={
                     "optimization_applied": optimization_applied,
                     "input_length": len(content),
                     "output_length": len(optimized_content),
                     "length_change": len(optimized_content) - len(content),
-                    "has_metadata": bool(metadata)
-                }
+                    "has_metadata": bool(metadata),
+                },
             )
 
             return StageResult(
@@ -129,18 +150,18 @@ class MarkdownOptimizerStage(Stage):
                 data={
                     "optimization_applied": optimization_applied,
                     "original_length": len(content),
-                    "optimized_length": len(optimized_content)
-                }
+                    "optimized_length": len(optimized_content),
+                },
             )
 
         except Exception as e:
-            logger.error("Markdown optimization failed",
-                        input_file=str(input_file),
-                        error=str(e))
+            logger.error(
+                "Markdown optimization failed", input_file=str(input_file), error=str(e)
+            )
             raise StageExecutionError(
                 f"Markdown optimization failed: {e}",
                 stage_type=self.stage_type.value,
-                original_error=e
+                original_error=e,
             )
 
     @validation_error_handler("markdown_optimizer_validate_inputs")
@@ -153,33 +174,43 @@ class MarkdownOptimizerStage(Stage):
         Returns:
             True if inputs are valid
         """
-        logger.debug("Validating markdown optimizer inputs",
-                    input_count=len(input_files),
-                    input_files=[str(f) for f in input_files])
+        logger.debug(
+            "Validating markdown optimizer inputs",
+            input_count=len(input_files),
+            input_files=[str(f) for f in input_files],
+        )
 
         if len(input_files) != 1:
-            logger.error("Invalid input count for markdown optimizer",
-                        expected=1,
-                        actual=len(input_files),
-                        files=[str(f) for f in input_files])
+            logger.error(
+                "Invalid input count for markdown optimizer",
+                expected=1,
+                actual=len(input_files),
+                files=[str(f) for f in input_files],
+            )
             return False
 
         input_file = input_files[0]
 
         # Check if file exists and is markdown
         if not input_file.exists():
-            logger.error("Input file does not exist for markdown optimizer",
-                        file_path=str(input_file))
+            logger.error(
+                "Input file does not exist for markdown optimizer",
+                file_path=str(input_file),
+            )
             return False
 
-        if input_file.suffix.lower() not in ['.md', '.markdown']:
-            logger.error("Input file is not markdown for markdown optimizer",
-                        file_path=str(input_file),
-                        suffix=input_file.suffix)
+        if input_file.suffix.lower() not in [".md", ".markdown"]:
+            logger.error(
+                "Input file is not markdown for markdown optimizer",
+                file_path=str(input_file),
+                suffix=input_file.suffix,
+            )
             return False
 
-        logger.debug("Input validation successful for markdown optimizer",
-                    file_path=str(input_file))
+        logger.debug(
+            "Input validation successful for markdown optimizer",
+            file_path=str(input_file),
+        )
         return True
 
     def get_dependencies(self) -> List[StageType]:
@@ -190,7 +221,9 @@ class MarkdownOptimizerStage(Stage):
         """
         return [StageType.MARKDOWN_CONVERSION]
 
-    def get_expected_outputs(self, input_files: List[Path], context: StageContext) -> List[Path]:
+    def get_expected_outputs(
+        self, input_files: List[Path], context: StageContext
+    ) -> List[Path]:
         """Get expected output file paths.
 
         Args:
@@ -205,6 +238,7 @@ class MarkdownOptimizerStage(Stage):
 
         input_file = input_files[0]
         from ..file_manager import sanitize_filename
+
         sanitized_name = sanitize_filename(input_file.stem)
         output_file = context.output_dir / f"{sanitized_name}.opt.md"
         return [output_file]
@@ -224,9 +258,14 @@ class MarkdownOptimizerStage(Stage):
             True if API key is available
         """
         import os
-        return bool(os.environ.get('GEMINI_API_KEY') or os.environ.get('GOOGLE_API_KEY'))
 
-    def _extract_metadata_and_content(self, markdown: str) -> tuple[Dict[str, Any], str]:
+        return bool(
+            os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+        )
+
+    def _extract_metadata_and_content(
+        self, markdown: str
+    ) -> tuple[Dict[str, Any], str]:
         """Extract metadata and content from markdown (supports both YAML frontmatter and H1+H2 format).
 
         Args:
@@ -236,34 +275,34 @@ class MarkdownOptimizerStage(Stage):
             Tuple of (metadata dict, content string)
         """
         # Check for YAML frontmatter (legacy format)
-        if markdown.startswith('---\n'):
-            parts = markdown.split('---\n', 2)
+        if markdown.startswith("---\n"):
+            parts = markdown.split("---\n", 2)
             if len(parts) >= 3:
                 yaml_content = parts[1]
                 content = parts[2]
 
                 # Parse YAML metadata (simple parsing)
                 metadata = {}
-                for line in yaml_content.strip().split('\n'):
-                    if ':' in line:
-                        key, value = line.split(':', 1)
+                for line in yaml_content.strip().split("\n"):
+                    if ":" in line:
+                        key, value = line.split(":", 1)
                         key = key.strip()
-                        value = value.strip().strip('"\'')
+                        value = value.strip().strip("\"'")
                         metadata[key] = value
 
                 return metadata, content
 
         # Check for new H1+H2 format
-        lines = markdown.split('\n')
-        if lines and lines[0].startswith('# '):
+        lines = markdown.split("\n")
+        if lines and lines[0].startswith("# "):
             # Extract title from H1
             title_line = lines[0][2:].strip()
-            metadata = {'title': title_line}
+            metadata = {"title": title_line}
 
             # Look for information section
             info_section_start = -1
             for i, line in enumerate(lines):
-                if line.startswith('## ') and 'Information' in line:
+                if line.startswith("## ") and "Information" in line:
                     info_section_start = i
                     break
 
@@ -271,14 +310,14 @@ class MarkdownOptimizerStage(Stage):
                 # Extract metadata from information section
                 for i in range(info_section_start + 1, len(lines)):
                     line = lines[i].strip()
-                    if line.startswith('- **') and '**:' in line:
+                    if line.startswith("- **") and "**:" in line:
                         # Parse metadata line: - **Key**: Value
-                        key_end = line.find('**:', 4)
+                        key_end = line.find("**:", 4)
                         if key_end > 4:
                             key = line[4:key_end].strip()
-                            value = line[key_end + 3:].strip()
-                            metadata[key.lower().replace(' ', '_')] = value
-                    elif line.startswith('## ') or (line and not line.startswith('- ')):
+                            value = line[key_end + 3 :].strip()
+                            metadata[key.lower().replace(" ", "_")] = value
+                    elif line.startswith("## ") or (line and not line.startswith("- ")):
                         # End of information section
                         break
 
@@ -300,17 +339,21 @@ class MarkdownOptimizerStage(Stage):
         content = content.strip()
 
         # Remove markdown code block wrapping if present
-        if content.startswith('```markdown\n') and content.endswith('\n```'):
+        if content.startswith("```markdown\n") and content.endswith("\n```"):
             content = content[12:-4].strip()
-        elif content.startswith('```\n') and content.endswith('\n```'):
+        elif content.startswith("```\n") and content.endswith("\n```"):
             content = content[4:-4].strip()
 
         # Return the cleaned content directly
         return content
 
-
-
-    async def _optimize_with_llm(self, content: str, metadata: Dict[str, Any], config: MarkdownOptimizerConfig, context: StageContext = None) -> str:
+    async def _optimize_with_llm(
+        self,
+        content: str,
+        metadata: Dict[str, Any],
+        config: MarkdownOptimizerConfig,
+        context: StageContext = None,
+    ) -> str:
         """Optimize content using LLM with text splitting for large files.
 
         Args:
@@ -328,17 +371,21 @@ class MarkdownOptimizerStage(Stage):
 
             # Check for agent-specific model overrides from context
             model_override = None
-            if context and hasattr(context, 'config') and context.config:
-                model_config = context.config.get('model_config', {})
+            if context and hasattr(context, "config") and context.config:
+                model_config = context.config.get("model_config", {})
                 if model_config:
                     # Check for markdown optimizer specific model
-                    markdown_optimizer_model = model_config.get('agent_models', {}).get('markdown_optimizer')
+                    markdown_optimizer_model = model_config.get("agent_models", {}).get(
+                        "markdown_optimizer"
+                    )
                     if markdown_optimizer_model:
                         model_override = markdown_optimizer_model
-                        logger.info(f"Using markdown optimizer agent model override: {model_override}")
+                        logger.info(
+                            f"Using markdown optimizer agent model override: {model_override}"
+                        )
                     # Check for default model override
-                    elif model_config.get('default_model'):
-                        model_override = model_config['default_model']
+                    elif model_config.get("default_model"):
+                        model_override = model_config["default_model"]
                         logger.info(f"Using default model override: {model_override}")
 
             # Convert to reasoning LLMConfig format
@@ -355,13 +402,23 @@ class MarkdownOptimizerStage(Stage):
             # Determine if content needs splitting
             if len(content) <= config.max_chunk_size:
                 # Content is small enough to process in one request
-                logger.info("Processing content in single LLM request", content_length=len(content))
-                return await self._optimize_single_chunk(llm_client, content, metadata, config)
+                logger.info(
+                    "Processing content in single LLM request",
+                    content_length=len(content),
+                )
+                return await self._optimize_single_chunk(
+                    llm_client, content, metadata, config
+                )
             else:
                 # Content is too large, split and process in chunks
-                logger.info("Content too large, splitting for multiple LLM requests",
-                           content_length=len(content), max_chunk_size=config.max_chunk_size)
-                return await self._optimize_with_splitting(llm_client, content, metadata, config)
+                logger.info(
+                    "Content too large, splitting for multiple LLM requests",
+                    content_length=len(content),
+                    max_chunk_size=config.max_chunk_size,
+                )
+                return await self._optimize_with_splitting(
+                    llm_client, content, metadata, config
+                )
 
         except ImportError:
             logger.warning("LLM reasoning module not available, using basic cleanup")
@@ -380,16 +437,16 @@ class MarkdownOptimizerStage(Stage):
             Cleaned up content
         """
         # Remove excessive whitespace
-        content = re.sub(r'\n\s*\n\s*\n', '\n\n', content)
+        content = re.sub(r"\n\s*\n\s*\n", "\n\n", content)
 
         # Fix common formatting issues
-        content = re.sub(r'([.!?])\s*\n\s*([A-Z])', r'\1 \2', content)
+        content = re.sub(r"([.!?])\s*\n\s*([A-Z])", r"\1 \2", content)
 
         # Normalize line endings
-        content = content.replace('\r\n', '\n').replace('\r', '\n')
+        content = content.replace("\r\n", "\n").replace("\r", "\n")
 
         # Preserve formatting by only stripping leading/trailing whitespace, not internal formatting
-        return content.strip(' \t')
+        return content.strip(" \t")
 
     def _get_api_key(self) -> Optional[str]:
         """Get API key for LLM operations.
@@ -398,9 +455,16 @@ class MarkdownOptimizerStage(Stage):
             API key string or None if not available
         """
         import os
-        return os.environ.get('GEMINI_API_KEY') or os.environ.get('GOOGLE_API_KEY')
 
-    async def _optimize_single_chunk(self, llm_client, content: str, metadata: Dict[str, Any], config: MarkdownOptimizerConfig) -> str:
+        return os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+
+    async def _optimize_single_chunk(
+        self,
+        llm_client,
+        content: str,
+        metadata: Dict[str, Any],
+        config: MarkdownOptimizerConfig,
+    ) -> str:
         """Optimize content in a single LLM request.
 
         Args:
@@ -422,23 +486,26 @@ class MarkdownOptimizerStage(Stage):
         # Generate optimized content
         messages = [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
+            {"role": "user", "content": user_prompt},
         ]
 
         response = await llm_client.generate_from_messages(
-            messages,
-            max_tokens=config.max_tokens,
-            temperature=config.temperature
+            messages, max_tokens=config.max_tokens, temperature=config.temperature
         )
 
         # Preserve formatting by only stripping leading/trailing whitespace, not internal formatting
         if isinstance(response, str):
-            return response.strip(' \t')
+            return response.strip(" \t")
         else:
-            return str(response).strip(' \t')
+            return str(response).strip(" \t")
 
-    async def _optimize_with_splitting(self, llm_client, content: str, metadata: Dict[str, Any],
-                                     config: MarkdownOptimizerConfig) -> str:
+    async def _optimize_with_splitting(
+        self,
+        llm_client,
+        content: str,
+        metadata: Dict[str, Any],
+        config: MarkdownOptimizerConfig,
+    ) -> str:
         """Optimize content by splitting into chunks and processing separately.
 
         Args:
@@ -453,9 +520,11 @@ class MarkdownOptimizerStage(Stage):
         # Split content into manageable chunks
         chunks = self._split_content_intelligently(content, config.max_chunk_size)
 
-        logger.info("Split content into chunks for optimization",
-                   num_chunks=len(chunks),
-                   avg_chunk_size=sum(len(c) for c in chunks) // len(chunks) if chunks else 0)
+        logger.info(
+            "Split content into chunks for optimization",
+            num_chunks=len(chunks),
+            avg_chunk_size=sum(len(c) for c in chunks) // len(chunks) if chunks else 0,
+        )
 
         # Process each chunk
         optimized_chunks = []
@@ -466,25 +535,31 @@ class MarkdownOptimizerStage(Stage):
 
             try:
                 # Create context-aware prompts for chunk processing
-                system_prompt = self._get_chunk_system_prompt(content_type, config, i, len(chunks))
-                user_prompt = self._get_chunk_user_prompt(chunk, metadata, config, i, len(chunks))
+                system_prompt = self._get_chunk_system_prompt(
+                    content_type, config, i, len(chunks)
+                )
+                user_prompt = self._get_chunk_user_prompt(
+                    chunk, metadata, config, i, len(chunks)
+                )
 
                 messages = [
                     {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
+                    {"role": "user", "content": user_prompt},
                 ]
 
                 optimized_chunk = await llm_client.generate_from_messages(
                     messages,
                     max_tokens=config.max_tokens,
-                    temperature=config.temperature
+                    temperature=config.temperature,
                 )
 
                 # Preserve formatting by only stripping leading/trailing whitespace, not internal formatting
-                optimized_chunks.append(optimized_chunk.strip(' \t'))
+                optimized_chunks.append(optimized_chunk.strip(" \t"))
 
             except Exception as e:
-                logger.warning(f"Failed to optimize chunk {i}, using original", error=str(e))
+                logger.warning(
+                    f"Failed to optimize chunk {i}, using original", error=str(e)
+                )
                 optimized_chunks.append(chunk)
 
         # Reassemble optimized content
@@ -502,31 +577,42 @@ class MarkdownOptimizerStage(Stage):
         """
         # Check metadata for content type hints
         if metadata:
-            source_type = metadata.get('source_type', '').lower()
-            if 'video' in source_type or 'mp4' in source_type:
-                return 'video'
-            elif 'audio' in source_type or any(ext in source_type for ext in ['mp3', 'wav', 'flac']):
-                return 'audio'
-            elif 'pdf' in source_type or 'document' in source_type:
-                return 'document'
-            elif 'web' in source_type or 'html' in source_type:
-                return 'web_content'
+            source_type = metadata.get("source_type", "").lower()
+            if "video" in source_type or "mp4" in source_type:
+                return "video"
+            elif "audio" in source_type or any(
+                ext in source_type for ext in ["mp3", "wav", "flac"]
+            ):
+                return "audio"
+            elif "pdf" in source_type or "document" in source_type:
+                return "document"
+            elif "web" in source_type or "html" in source_type:
+                return "web_content"
 
         # Analyze content for type indicators
-        if '[' in content and ']' in content and any(time_pattern in content for time_pattern in [':', 'min', 'sec']):
+        if (
+            "[" in content
+            and "]" in content
+            and any(time_pattern in content for time_pattern in [":", "min", "sec"])
+        ):
             # Likely contains timestamps
-            if 'speaker' in content.lower() or any(speaker in content.lower() for speaker in ['person', 'interviewer', 'host']):
-                return 'video'  # Video with speakers
+            if "speaker" in content.lower() or any(
+                speaker in content.lower()
+                for speaker in ["person", "interviewer", "host"]
+            ):
+                return "video"  # Video with speakers
             else:
-                return 'audio'  # Audio transcript
-        elif content.count('#') > 3:  # Multiple headings suggest document structure
-            return 'document'
-        elif 'http' in content or 'www.' in content:
-            return 'web_content'
+                return "audio"  # Audio transcript
+        elif content.count("#") > 3:  # Multiple headings suggest document structure
+            return "document"
+        elif "http" in content or "www." in content:
+            return "web_content"
         else:
-            return 'general'
+            return "general"
 
-    def _get_system_prompt(self, content_type: str, config: MarkdownOptimizerConfig) -> str:
+    def _get_system_prompt(
+        self, content_type: str, config: MarkdownOptimizerConfig
+    ) -> str:
         """Get system prompt for optimization.
 
         Args:
@@ -578,23 +664,27 @@ PRESERVE EXACTLY:
         if config.improve_structure:
             base_prompt += " Improve the document structure and formatting."
 
-        if config.preserve_timestamps and content_type in ['video', 'audio']:
-            base_prompt += " IMPORTANT: Preserve all timestamp information exactly as provided."
+        if config.preserve_timestamps and content_type in ["video", "audio"]:
+            base_prompt += (
+                " IMPORTANT: Preserve all timestamp information exactly as provided."
+            )
 
         if config.preserve_metadata:
             base_prompt += " Preserve all metadata and structural elements that contain substantive information."
 
         # Add content-type specific instructions
-        if content_type == 'video':
+        if content_type == "video":
             base_prompt += " This is a video transcript. Maintain speaker labels and timestamps while removing any video-specific clutter like chapter markers or promotional segments."
-        elif content_type == 'audio':
+        elif content_type == "audio":
             base_prompt += " This is an audio transcript. Maintain speaker labels and timestamps while removing any audio-specific clutter like intro/outro music references or promotional segments."
-        elif content_type == 'document':
+        elif content_type == "document":
             base_prompt += " This is a document. Maintain proper heading structure and formatting while removing document-specific clutter like page headers, footers, and navigation elements."
 
         return base_prompt
 
-    def _get_user_prompt(self, content: str, metadata: Dict[str, Any], config: MarkdownOptimizerConfig) -> str:
+    def _get_user_prompt(
+        self, content: str, metadata: Dict[str, Any], config: MarkdownOptimizerConfig
+    ) -> str:
         """Get user prompt for optimization.
 
         Args:
@@ -609,29 +699,38 @@ PRESERVE EXACTLY:
         language_instruction = "\n\nCRITICAL LANGUAGE REQUIREMENT: You MUST preserve the EXACT ORIGINAL LANGUAGE of the content. DO NOT translate or switch to any other language, especially English. Analyze the content language and keep ALL content in that same language."
 
         if metadata:
-            detected_language = metadata.get('language', '').lower()
+            detected_language = metadata.get("language", "").lower()
             if detected_language:
                 language_names = {
-                    'en': 'English',
-                    'de': 'German',
-                    'fr': 'French',
-                    'es': 'Spanish',
-                    'it': 'Italian',
-                    'pt': 'Portuguese',
-                    'nl': 'Dutch',
-                    'ru': 'Russian',
-                    'zh': 'Chinese',
-                    'ja': 'Japanese',
-                    'ko': 'Korean'
+                    "en": "English",
+                    "de": "German",
+                    "fr": "French",
+                    "es": "Spanish",
+                    "it": "Italian",
+                    "pt": "Portuguese",
+                    "nl": "Dutch",
+                    "ru": "Russian",
+                    "zh": "Chinese",
+                    "ja": "Japanese",
+                    "ko": "Korean",
                 }
-                language_name = language_names.get(detected_language, detected_language.title())
+                language_name = language_names.get(
+                    detected_language, detected_language.title()
+                )
                 language_instruction = f"\n\nCRITICAL LANGUAGE REQUIREMENT: You MUST preserve the original language ({language_name}) AT ALL COSTS. DO NOT translate or switch to any other language, especially English. Keep ALL content in {language_name}."
 
         # Check for existing document type prefixes in title to avoid duplication
         title_prefix_instruction = ""
-        if content.strip().startswith('# '):
-            first_line = content.split('\n')[0]
-            if any(prefix in first_line for prefix in ['# Video Analysis', '# Document Analysis', '# Audio Analysis']):
+        if content.strip().startswith("# "):
+            first_line = content.split("\n")[0]
+            if any(
+                prefix in first_line
+                for prefix in [
+                    "# Video Analysis",
+                    "# Document Analysis",
+                    "# Audio Analysis",
+                ]
+            ):
                 title_prefix_instruction = "\n\nIMPORTANT: The document already has a proper analysis prefix in the title. DO NOT add additional prefixes like 'Document Analysis:' to the existing title."
 
         # Add strong anti-hallucination instructions
@@ -644,7 +743,9 @@ PRESERVE EXACTLY:
 
         return prompt
 
-    def _split_content_intelligently(self, content: str, max_chunk_size: int) -> List[str]:
+    def _split_content_intelligently(
+        self, content: str, max_chunk_size: int
+    ) -> List[str]:
         """Split content into chunks while preserving structure.
 
         Args:
@@ -660,7 +761,7 @@ PRESERVE EXACTLY:
         chunks = []
 
         # Try to split at major section boundaries first (## headers)
-        major_sections = re.split(r'\n(?=##\s)', content)
+        major_sections = re.split(r"\n(?=##\s)", content)
 
         current_chunk = ""
 
@@ -673,7 +774,9 @@ PRESERVE EXACTLY:
             if current_chunk and len(current_chunk) + len(section) + 2 > max_chunk_size:
                 # Try to split the current chunk at minor boundaries
                 if current_chunk:
-                    chunks.extend(self._split_section_at_boundaries(current_chunk, max_chunk_size))
+                    chunks.extend(
+                        self._split_section_at_boundaries(current_chunk, max_chunk_size)
+                    )
                 current_chunk = section
             else:
                 # Add section to current chunk
@@ -684,11 +787,15 @@ PRESERVE EXACTLY:
 
         # Handle remaining content
         if current_chunk:
-            chunks.extend(self._split_section_at_boundaries(current_chunk, max_chunk_size))
+            chunks.extend(
+                self._split_section_at_boundaries(current_chunk, max_chunk_size)
+            )
 
         return [chunk.strip() for chunk in chunks if chunk.strip()]
 
-    def _split_section_at_boundaries(self, section: str, max_chunk_size: int) -> List[str]:
+    def _split_section_at_boundaries(
+        self, section: str, max_chunk_size: int
+    ) -> List[str]:
         """Split a section at natural boundaries.
 
         Args:
@@ -704,7 +811,7 @@ PRESERVE EXACTLY:
         chunks = []
 
         # Try splitting at paragraph boundaries first
-        paragraphs = section.split('\n\n')
+        paragraphs = section.split("\n\n")
         current_chunk = ""
 
         for paragraph in paragraphs:
@@ -713,13 +820,18 @@ PRESERVE EXACTLY:
                 continue
 
             # If adding this paragraph would exceed chunk size
-            if current_chunk and len(current_chunk) + len(paragraph) + 2 > max_chunk_size:
+            if (
+                current_chunk
+                and len(current_chunk) + len(paragraph) + 2 > max_chunk_size
+            ):
                 if current_chunk:
                     chunks.append(current_chunk.strip())
 
                 # If single paragraph is too large, split it further
                 if len(paragraph) > max_chunk_size:
-                    chunks.extend(self._split_paragraph_at_sentences(paragraph, max_chunk_size))
+                    chunks.extend(
+                        self._split_paragraph_at_sentences(paragraph, max_chunk_size)
+                    )
                 else:
                     current_chunk = paragraph
             else:
@@ -735,7 +847,9 @@ PRESERVE EXACTLY:
 
         return chunks
 
-    def _split_paragraph_at_sentences(self, paragraph: str, max_chunk_size: int) -> List[str]:
+    def _split_paragraph_at_sentences(
+        self, paragraph: str, max_chunk_size: int
+    ) -> List[str]:
         """Split a large paragraph at sentence boundaries.
 
         Args:
@@ -749,7 +863,7 @@ PRESERVE EXACTLY:
             return [paragraph]
 
         # Split at sentence boundaries (simple approach)
-        sentences = re.split(r'(?<=[.!?])\s+', paragraph)
+        sentences = re.split(r"(?<=[.!?])\s+", paragraph)
 
         chunks = []
         current_chunk = ""
@@ -760,13 +874,18 @@ PRESERVE EXACTLY:
                 continue
 
             # If adding this sentence would exceed chunk size
-            if current_chunk and len(current_chunk) + len(sentence) + 1 > max_chunk_size:
+            if (
+                current_chunk
+                and len(current_chunk) + len(sentence) + 1 > max_chunk_size
+            ):
                 if current_chunk:
                     chunks.append(current_chunk.strip())
 
                 # If single sentence is too large, split at word boundaries
                 if len(sentence) > max_chunk_size:
-                    chunks.extend(self._split_at_word_boundaries(sentence, max_chunk_size))
+                    chunks.extend(
+                        self._split_at_word_boundaries(sentence, max_chunk_size)
+                    )
                 else:
                     current_chunk = sentence
             else:
@@ -818,9 +937,13 @@ PRESERVE EXACTLY:
 
         return chunks
 
-
-    def _get_chunk_system_prompt(self, content_type: str, config: MarkdownOptimizerConfig,
-                                chunk_num: int, total_chunks: int) -> str:
+    def _get_chunk_system_prompt(
+        self,
+        content_type: str,
+        config: MarkdownOptimizerConfig,
+        chunk_num: int,
+        total_chunks: int,
+    ) -> str:
         """Get system prompt for chunk processing.
 
         Args:
@@ -873,26 +996,32 @@ PRESERVE ESSENTIAL CONTENT: Keep all substantive information, facts, data, and m
         if config.improve_structure:
             base_prompt += " Improve the formatting and structure within this chunk."
 
-        if config.preserve_timestamps and content_type in ['video', 'audio']:
+        if config.preserve_timestamps and content_type in ["video", "audio"]:
             base_prompt += " CRITICAL: Preserve all timestamp information exactly as provided - do not modify timestamps."
 
         if config.preserve_metadata:
             base_prompt += " Preserve all metadata and structural elements that contain substantive information."
 
         # Add content-type specific instructions
-        if content_type == 'video':
+        if content_type == "video":
             base_prompt += " This is part of a video transcript. Maintain speaker labels and timestamps exactly while removing any video-specific clutter like chapter markers or promotional segments."
-        elif content_type == 'audio':
+        elif content_type == "audio":
             base_prompt += " This is part of an audio transcript. Maintain speaker labels and timestamps exactly while removing any audio-specific clutter like intro/outro music references or promotional segments."
-        elif content_type == 'document':
+        elif content_type == "document":
             base_prompt += " This is part of a document. Maintain proper heading structure and formatting while removing document-specific clutter like page headers, footers, and navigation elements."
 
         base_prompt += " Return only the optimized content without any explanatory text or metadata."
 
         return base_prompt
 
-    def _get_chunk_user_prompt(self, chunk: str, metadata: Dict[str, Any], config: MarkdownOptimizerConfig,
-                              chunk_num: int, total_chunks: int) -> str:
+    def _get_chunk_user_prompt(
+        self,
+        chunk: str,
+        metadata: Dict[str, Any],
+        config: MarkdownOptimizerConfig,
+        chunk_num: int,
+        total_chunks: int,
+    ) -> str:
         """Get user prompt for chunk processing.
 
         Args:
@@ -909,22 +1038,24 @@ PRESERVE ESSENTIAL CONTENT: Keep all substantive information, facts, data, and m
         language_instruction = "\n\nCRITICAL LANGUAGE REQUIREMENT: You MUST preserve the EXACT ORIGINAL LANGUAGE of the content. DO NOT translate or switch to any other language, especially English. Analyze the content language and keep ALL content in that same language."
 
         if metadata:
-            detected_language = metadata.get('language', '').lower()
+            detected_language = metadata.get("language", "").lower()
             if detected_language:
                 language_names = {
-                    'en': 'English',
-                    'de': 'German',
-                    'fr': 'French',
-                    'es': 'Spanish',
-                    'it': 'Italian',
-                    'pt': 'Portuguese',
-                    'nl': 'Dutch',
-                    'ru': 'Russian',
-                    'zh': 'Chinese',
-                    'ja': 'Japanese',
-                    'ko': 'Korean'
+                    "en": "English",
+                    "de": "German",
+                    "fr": "French",
+                    "es": "Spanish",
+                    "it": "Italian",
+                    "pt": "Portuguese",
+                    "nl": "Dutch",
+                    "ru": "Russian",
+                    "zh": "Chinese",
+                    "ja": "Japanese",
+                    "ko": "Korean",
                 }
-                language_name = language_names.get(detected_language, detected_language.title())
+                language_name = language_names.get(
+                    detected_language, detected_language.title()
+                )
                 language_instruction = f"\n\nCRITICAL LANGUAGE REQUIREMENT: You MUST preserve the original language ({language_name}) AT ALL COSTS. DO NOT translate or switch to any other language, especially English. Keep ALL content in {language_name}."
 
         # Add strong anti-hallucination instructions for chunks
@@ -951,9 +1082,13 @@ PRESERVE ESSENTIAL CONTENT: Keep all substantive information, facts, data, and m
             return ""
 
         # For most content types, simply join with double newlines
-        if content_type in ['video', 'audio']:
+        if content_type in ["video", "audio"]:
             # For transcripts, preserve internal formatting but clean edges
-            return '\n\n'.join(chunk.strip(' \t') for chunk in optimized_chunks if chunk.strip(' \t'))
+            return "\n\n".join(
+                chunk.strip(" \t") for chunk in optimized_chunks if chunk.strip(" \t")
+            )
         else:
             # For documents and other content, preserve internal formatting but clean edges
-            return '\n\n'.join(chunk.strip(' \t') for chunk in optimized_chunks if chunk.strip(' \t'))
+            return "\n\n".join(
+                chunk.strip(" \t") for chunk in optimized_chunks if chunk.strip(" \t")
+            )

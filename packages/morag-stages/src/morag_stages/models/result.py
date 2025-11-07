@@ -1,11 +1,12 @@
 """Stage result models."""
 
-from typing import Any, Dict, List, Optional
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
 from pydantic import BaseModel, Field
 
-from .stage import StageType, StageStatus
+from .stage import StageStatus, StageType
 
 
 class StageMetadata(BaseModel):
@@ -16,15 +17,16 @@ class StageMetadata(BaseModel):
     end_time: Optional[datetime] = Field(default=None, description="Stage end time")
     input_files: List[str] = Field(description="Input file paths")
     output_files: List[str] = Field(description="Output file paths")
-    config_used: Dict[str, Any] = Field(default_factory=dict, description="Configuration used")
-    metrics: Dict[str, Any] = Field(default_factory=dict, description="Stage-specific metrics")
+    config_used: Dict[str, Any] = Field(
+        default_factory=dict, description="Configuration used"
+    )
+    metrics: Dict[str, Any] = Field(
+        default_factory=dict, description="Stage-specific metrics"
+    )
     warnings: List[str] = Field(default_factory=list, description="Non-fatal warnings")
 
     class Config:
-        json_encoders = {
-            datetime: lambda v: v.isoformat(),
-            Path: lambda v: str(v)
-        }
+        json_encoders = {datetime: lambda v: v.isoformat(), Path: lambda v: str(v)}
 
 
 class StageResult(BaseModel):
@@ -34,16 +36,20 @@ class StageResult(BaseModel):
     status: StageStatus = Field(description="Execution status")
     output_files: List[Path] = Field(description="Generated output files")
     metadata: StageMetadata = Field(description="Execution metadata")
-    error_message: Optional[str] = Field(default=None, description="Error message if failed")
+    error_message: Optional[str] = Field(
+        default=None, description="Error message if failed"
+    )
 
     # Additional data that stages can include
-    data: Dict[str, Any] = Field(default_factory=dict, description="Stage-specific output data")
+    data: Dict[str, Any] = Field(
+        default_factory=dict, description="Stage-specific output data"
+    )
 
     class Config:
         json_encoders = {
             Path: lambda v: str(v),
             StageType: lambda v: v.value,
-            StageStatus: lambda v: v.value
+            StageStatus: lambda v: v.value,
         }
 
     @property
@@ -85,6 +91,7 @@ class StageResult(BaseModel):
             List of matching file paths
         """
         return [
-            file_path for file_path in self.output_files
+            file_path
+            for file_path in self.output_files
             if file_path.suffix.lower() == extension.lower()
         ]

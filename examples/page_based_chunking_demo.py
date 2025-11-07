@@ -14,9 +14,9 @@ from pathlib import Path
 # Add the src directory to the path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from morag_document import DocumentProcessor
-from morag_core.models.document import DocumentChunk
 from morag_core.chunking import SemanticChunker
+from morag_core.models.document import DocumentChunk
+from morag_document import DocumentProcessor
 
 
 async def create_sample_document_chunks():
@@ -27,56 +27,56 @@ async def create_sample_document_chunks():
             chunk_type="title",
             page_number=1,
             element_id="title_1",
-            metadata={"element_type": "Title"}
+            metadata={"element_type": "Title"},
         ),
         DocumentChunk(
             text="Machine learning is a subset of artificial intelligence that enables computers to learn and improve from experience without being explicitly programmed.",
             chunk_type="text",
             page_number=1,
             element_id="para_1",
-            metadata={"element_type": "Text"}
+            metadata={"element_type": "Text"},
         ),
         DocumentChunk(
             text="It focuses on developing algorithms that can access data and use it to learn for themselves.",
             chunk_type="text",
             page_number=1,
             element_id="para_2",
-            metadata={"element_type": "Text"}
+            metadata={"element_type": "Text"},
         ),
         DocumentChunk(
             text="Types of Machine Learning",
             chunk_type="title",
             page_number=2,
             element_id="title_2",
-            metadata={"element_type": "Title"}
+            metadata={"element_type": "Title"},
         ),
         DocumentChunk(
             text="There are three main types of machine learning: supervised learning, unsupervised learning, and reinforcement learning.",
             chunk_type="text",
             page_number=2,
             element_id="para_3",
-            metadata={"element_type": "Text"}
+            metadata={"element_type": "Text"},
         ),
         DocumentChunk(
             text="Supervised learning uses labeled training data to learn a mapping function from input variables to output variables.",
             chunk_type="text",
             page_number=2,
             element_id="para_4",
-            metadata={"element_type": "Text"}
+            metadata={"element_type": "Text"},
         ),
         DocumentChunk(
             text="Applications and Future",
             chunk_type="title",
             page_number=3,
             element_id="title_3",
-            metadata={"element_type": "Title"}
+            metadata={"element_type": "Title"},
         ),
         DocumentChunk(
             text="Machine learning has numerous applications in various fields including healthcare, finance, transportation, and entertainment.",
             chunk_type="text",
             page_number=3,
             element_id="para_5",
-            metadata={"element_type": "Text"}
+            metadata={"element_type": "Text"},
         ),
     ]
 
@@ -94,19 +94,21 @@ async def demonstrate_page_based_chunking():
         metadata={
             "parser": "demo",
             "file_name": "ml_guide.pdf",
-            "total_chunks": len(sample_chunks)
+            "total_chunks": len(sample_chunks),
         },
         images=[],
         total_pages=3,
-        word_count=150
+        word_count=150,
     )
 
     print("Original chunks (sentence/element level):")
     print(f"Total chunks: {len(parse_result.chunks)}")
     for i, chunk in enumerate(parse_result.chunks):
-        print(f"  {i+1}. Page {chunk.page_number} ({chunk.chunk_type}): {chunk.text[:60]}...")
+        print(
+            f"  {i+1}. Page {chunk.page_number} ({chunk.chunk_type}): {chunk.text[:60]}..."
+        )
 
-    print("\n" + "="*60 + "\n")
+    print("\n" + "=" * 60 + "\n")
 
     # Apply page-based chunking
     processor = DocumentProcessor()
@@ -118,16 +120,22 @@ async def demonstrate_page_based_chunking():
         print(f"\n  {i+1}. Page {chunk.page_number} chunk:")
         print(f"     Length: {len(chunk.text)} characters")
         print(f"     Type: {chunk.chunk_type}")
-        print(f"     Original chunks combined: {chunk.metadata.get('original_chunks_count', 'N/A')}")
+        print(
+            f"     Original chunks combined: {chunk.metadata.get('original_chunks_count', 'N/A')}"
+        )
         print(f"     Content preview: {chunk.text[:100]}...")
 
-    print("\n" + "="*60 + "\n")
+    print("\n" + "=" * 60 + "\n")
 
     # Show the difference in vector points
     print("Vector Database Impact:")
     print(f"  Before: {len(parse_result.chunks)} vector points")
     print(f"  After:  {len(page_based_result.chunks)} vector points")
-    reduction = (len(parse_result.chunks) - len(page_based_result.chunks)) / len(parse_result.chunks) * 100
+    reduction = (
+        (len(parse_result.chunks) - len(page_based_result.chunks))
+        / len(parse_result.chunks)
+        * 100
+    )
     print(f"  Reduction: {reduction:.1f}%")
 
     return page_based_result
@@ -157,7 +165,9 @@ async def demonstrate_chunking_strategies():
     for strategy in strategies:
         print(f"\n{strategy.upper()} Chunking:")
         try:
-            chunks = await chunker.chunk_text(sample_text, chunk_size=200, strategy=strategy)
+            chunks = await chunker.chunk_text(
+                sample_text, chunk_size=200, strategy=strategy
+            )
             print(f"  Number of chunks: {len(chunks)}")
             for i, chunk in enumerate(chunks):
                 print(f"    {i+1}. ({chunk.word_count} words): {chunk.text[:50]}...")
@@ -176,7 +186,7 @@ async def main():
     # Demonstrate different chunking strategies
     await demonstrate_chunking_strategies()
 
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("Demo completed!")
     print("\nKey Benefits of Page-Based Chunking:")
     print("  ✓ Preserves document structure and page context")

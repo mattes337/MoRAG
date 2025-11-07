@@ -1,9 +1,9 @@
 """Integration tests for web scraping functionality."""
 
-import pytest
 from unittest.mock import AsyncMock, Mock, patch
-import httpx
 
+import httpx
+import pytest
 from src.morag.processors.web import WebProcessor, WebScrapingConfig
 
 
@@ -110,14 +110,14 @@ class TestWebIntegration:
             rate_limit_delay=0.1,
             extract_links=True,
             convert_to_markdown=True,
-            clean_content=True
+            clean_content=True,
         )
 
         # Mock HTTP response
         mock_response = Mock()
         mock_response.text = sample_html_page
-        mock_response.headers = {'content-type': 'text/html; charset=utf-8'}
-        mock_response.content = sample_html_page.encode('utf-8')
+        mock_response.headers = {"content-type": "text/html; charset=utf-8"}
+        mock_response.content = sample_html_page.encode("utf-8")
         mock_response.raise_for_status = Mock()
 
         # Mock chunking service to return simple chunks
@@ -130,7 +130,7 @@ class TestWebIntegration:
                 word_count=6,
                 entities=[],
                 topics=["web scraping"],
-                chunk_type="title"
+                chunk_type="title",
             ),
             Mock(
                 text="Web scraping is a powerful technique for extracting data from websites.",
@@ -140,17 +140,23 @@ class TestWebIntegration:
                 word_count=11,
                 entities=[],
                 topics=["web scraping", "data extraction"],
-                chunk_type="text"
-            )
+                chunk_type="text",
+            ),
         ]
-        web_processor.chunking_service.chunk_text = AsyncMock(return_value=mock_chunk_infos)
+        web_processor.chunking_service.chunk_text = AsyncMock(
+            return_value=mock_chunk_infos
+        )
 
         # Mock HTTP client
-        with patch('httpx.AsyncClient') as mock_client:
-            mock_client.return_value.__aenter__.return_value.get = AsyncMock(return_value=mock_response)
+        with patch("httpx.AsyncClient") as mock_client:
+            mock_client.return_value.__aenter__.return_value.get = AsyncMock(
+                return_value=mock_response
+            )
 
             # Process the URL
-            result = await web_processor.process_url("https://techblog.com/web-scraping-guide", config)
+            result = await web_processor.process_url(
+                "https://techblog.com/web-scraping-guide", config
+            )
 
             # Verify the result
             assert result.success is True
@@ -166,13 +172,16 @@ class TestWebIntegration:
 
             # Check metadata extraction
             metadata = content.metadata
-            assert metadata['title'] == "Sample Article - Tech Blog"
-            assert metadata['description'] == "A comprehensive guide to web scraping with Python"
-            assert metadata['keywords'] == "web scraping, python, automation"
-            assert metadata['author'] == "John Doe"
-            assert metadata['og_title'] == "Sample Article - Tech Blog"
-            assert metadata['twitter_card'] == "summary_large_image"
-            assert metadata['domain'] == "techblog.com"
+            assert metadata["title"] == "Sample Article - Tech Blog"
+            assert (
+                metadata["description"]
+                == "A comprehensive guide to web scraping with Python"
+            )
+            assert metadata["keywords"] == "web scraping, python, automation"
+            assert metadata["author"] == "John Doe"
+            assert metadata["og_title"] == "Sample Article - Tech Blog"
+            assert metadata["twitter_card"] == "summary_large_image"
+            assert metadata["domain"] == "techblog.com"
 
             # Check images extraction (navigation links are removed during cleaning)
             assert len(content.images) > 0
@@ -199,10 +208,13 @@ class TestWebIntegration:
             assert call_args[0][0] == "https://techblog.com/web-scraping-guide"
 
             # Check headers were set correctly
-            headers = call_args[1]['headers']
-            assert 'User-Agent' in headers
-            assert 'MoRAG' in headers['User-Agent']
-            assert headers['Accept'] == 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+            headers = call_args[1]["headers"]
+            assert "User-Agent" in headers
+            assert "MoRAG" in headers["User-Agent"]
+            assert (
+                headers["Accept"]
+                == "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+            )
 
     @pytest.mark.asyncio
     async def test_error_handling_workflow(self):
@@ -211,7 +223,7 @@ class TestWebIntegration:
         config = WebScrapingConfig(max_retries=1)
 
         # Mock HTTP error
-        with patch('httpx.AsyncClient') as mock_client:
+        with patch("httpx.AsyncClient") as mock_client:
             mock_client.return_value.__aenter__.return_value.get = AsyncMock(
                 side_effect=httpx.RequestError("Connection failed")
             )
@@ -232,16 +244,12 @@ class TestWebIntegration:
         web_processor = WebProcessor()
         config = WebScrapingConfig(rate_limit_delay=0.1)
 
-        urls = [
-            "https://example1.com",
-            "https://example2.com",
-            "https://example3.com"
-        ]
+        urls = ["https://example1.com", "https://example2.com", "https://example3.com"]
 
         # Mock HTTP response
         mock_response = Mock()
         mock_response.text = sample_html_page
-        mock_response.headers = {'content-type': 'text/html'}
+        mock_response.headers = {"content-type": "text/html"}
         mock_response.content = sample_html_page.encode()
         mock_response.raise_for_status = Mock()
 
@@ -254,13 +262,17 @@ class TestWebIntegration:
             word_count=2,
             entities=[],
             topics=[],
-            chunk_type="text"
+            chunk_type="text",
         )
-        web_processor.chunking_service.chunk_text = AsyncMock(return_value=[mock_chunk_info])
+        web_processor.chunking_service.chunk_text = AsyncMock(
+            return_value=[mock_chunk_info]
+        )
 
         # Mock HTTP client
-        with patch('httpx.AsyncClient') as mock_client:
-            mock_client.return_value.__aenter__.return_value.get = AsyncMock(return_value=mock_response)
+        with patch("httpx.AsyncClient") as mock_client:
+            mock_client.return_value.__aenter__.return_value.get = AsyncMock(
+                return_value=mock_response
+            )
 
             # Process URLs in batch
             results = await web_processor.process_urls(urls, config)

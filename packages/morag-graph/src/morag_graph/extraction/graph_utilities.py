@@ -1,6 +1,7 @@
 """Graph construction utilities and helper functions."""
 
-from typing import List, Dict, Any
+from typing import Any, Dict, List
+
 import structlog
 
 from ..models.fact import Fact, FactRelation
@@ -14,7 +15,9 @@ class GraphUtilities:
         """Initialize graph utilities."""
         self.logger = structlog.get_logger(__name__)
 
-    def build_graph_structure(self, facts: List[Fact], relationships: List[FactRelation]) -> Graph:
+    def build_graph_structure(
+        self, facts: List[Fact], relationships: List[FactRelation]
+    ) -> Graph:
         """Build graph structure from facts and relationships.
 
         Args:
@@ -38,8 +41,8 @@ class GraphUtilities:
                         "solution": fact.solution,
                         "confidence": fact.confidence,
                         "context": fact.context,
-                        "citations": getattr(fact, 'citations', [])
-                    }
+                        "citations": getattr(fact, "citations", []),
+                    },
                 }
                 nodes.append(node)
 
@@ -51,20 +54,24 @@ class GraphUtilities:
                 target_idx = self._find_fact_index(relationship.target_fact, facts)
 
                 if source_idx is None or target_idx is None:
-                    self.logger.warning("Could not find fact indices for relationship",
-                                      relationship_id=i)
+                    self.logger.warning(
+                        "Could not find fact indices for relationship",
+                        relationship_id=i,
+                    )
                     continue
 
                 edge = {
                     "id": f"rel_{i}",
                     "source": f"fact_{source_idx}",
                     "target": f"fact_{target_idx}",
-                    "type": relationship.relation_type.value if hasattr(relationship.relation_type, 'value') else str(relationship.relation_type),
+                    "type": relationship.relation_type.value
+                    if hasattr(relationship.relation_type, "value")
+                    else str(relationship.relation_type),
                     "data": {
                         "confidence": relationship.confidence,
                         "explanation": relationship.explanation,
-                        "context": relationship.context
-                    }
+                        "context": relationship.context,
+                    },
                 }
                 edges.append(edge)
 
@@ -74,7 +81,7 @@ class GraphUtilities:
             self.logger.info(
                 "Graph structure built successfully",
                 num_nodes=len(nodes),
-                num_edges=len(edges)
+                num_edges=len(edges),
             )
 
             return graph
@@ -83,7 +90,7 @@ class GraphUtilities:
             self.logger.error(
                 "Error building graph structure",
                 error=str(e),
-                error_type=type(e).__name__
+                error_type=type(e).__name__,
             )
             # Return empty graph on error
             return Graph(nodes=[], edges=[])
@@ -114,10 +121,10 @@ class GraphUtilities:
             True if facts are considered equal
         """
         return (
-            fact1.subject == fact2.subject and
-            fact1.object == fact2.object and
-            fact1.approach == fact2.approach and
-            fact1.solution == fact2.solution
+            fact1.subject == fact2.subject
+            and fact1.object == fact2.object
+            and fact1.approach == fact2.approach
+            and fact1.solution == fact2.solution
         )
 
     def validate_graph(self, graph: Graph) -> Dict[str, Any]:
@@ -134,7 +141,7 @@ class GraphUtilities:
                 "valid": True,
                 "node_count": len(graph.nodes),
                 "edge_count": len(graph.edges),
-                "issues": []
+                "issues": [],
             }
 
             # Check for duplicate node IDs
@@ -156,11 +163,15 @@ class GraphUtilities:
                 target = edge.get("target")
 
                 if source not in valid_node_ids:
-                    stats["issues"].append(f"Edge references invalid source node: {source}")
+                    stats["issues"].append(
+                        f"Edge references invalid source node: {source}"
+                    )
                     stats["valid"] = False
 
                 if target not in valid_node_ids:
-                    stats["issues"].append(f"Edge references invalid target node: {target}")
+                    stats["issues"].append(
+                        f"Edge references invalid target node: {target}"
+                    )
                     stats["valid"] = False
 
             return stats
@@ -171,7 +182,7 @@ class GraphUtilities:
                 "error": str(e),
                 "node_count": 0,
                 "edge_count": 0,
-                "issues": [f"Validation error: {e}"]
+                "issues": [f"Validation error: {e}"],
             }
 
     def get_graph_statistics(self, graph: Graph) -> Dict[str, Any]:
@@ -188,7 +199,7 @@ class GraphUtilities:
             "edge_count": len(graph.edges),
             "node_types": {},
             "edge_types": {},
-            "avg_confidence": 0.0
+            "avg_confidence": 0.0,
         }
 
         # Count node types

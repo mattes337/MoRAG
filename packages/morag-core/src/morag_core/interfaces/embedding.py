@@ -2,13 +2,14 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union
-from datetime import datetime
 
 
 class EmbeddingProvider(str, Enum):
     """Embedding provider enum."""
+
     OPENAI = "openai"
     GEMINI = "gemini"
     HUGGINGFACE = "huggingface"
@@ -20,6 +21,7 @@ class EmbeddingProvider(str, Enum):
 @dataclass
 class EmbeddingConfig:
     """Configuration for embedding generation."""
+
     provider: EmbeddingProvider
     model_name: str
     api_key: Optional[str] = None
@@ -35,6 +37,7 @@ class EmbeddingConfig:
 @dataclass
 class EmbeddingRequest:
     """Request for embedding generation."""
+
     texts: List[str]
     model: Optional[str] = None
     normalize: bool = True
@@ -44,6 +47,7 @@ class EmbeddingRequest:
 @dataclass
 class EmbeddingResult:
     """Result of embedding generation."""
+
     embeddings: List[List[float]]
     model: str
     usage: Dict[str, Any] = field(default_factory=dict)
@@ -87,10 +91,7 @@ class BaseEmbeddingService(ABC):
 
     @abstractmethod
     async def generate_embeddings(
-        self,
-        texts: List[str],
-        model: Optional[str] = None,
-        **kwargs
+        self, texts: List[str], model: Optional[str] = None, **kwargs
     ) -> EmbeddingResult:
         """Generate embeddings for texts.
 
@@ -106,10 +107,7 @@ class BaseEmbeddingService(ABC):
 
     @abstractmethod
     async def generate_embedding(
-        self,
-        text: str,
-        model: Optional[str] = None,
-        **kwargs
+        self, text: str, model: Optional[str] = None, **kwargs
     ) -> List[float]:
         """Generate embedding for a single text.
 
@@ -188,9 +186,7 @@ class BaseEmbeddingService(ABC):
         return True
 
     def chunk_texts(
-        self,
-        texts: List[str],
-        max_chunk_size: Optional[int] = None
+        self, texts: List[str], max_chunk_size: Optional[int] = None
     ) -> List[List[str]]:
         """Chunk texts into batches.
 
@@ -205,6 +201,6 @@ class BaseEmbeddingService(ABC):
         chunks = []
 
         for i in range(0, len(texts), chunk_size):
-            chunks.append(texts[i:i + chunk_size])
+            chunks.append(texts[i : i + chunk_size])
 
         return chunks

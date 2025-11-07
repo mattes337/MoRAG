@@ -1,17 +1,23 @@
 #!/usr/bin/env python3
 """CLI test script for temp directory validation fixes."""
 
-import sys
 import os
-import tempfile
 import shutil
-from pathlib import Path
-import httpx
+import sys
+import tempfile
 import time
+from pathlib import Path
+
+import httpx
 
 # Add the packages to the path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "packages" / "morag" / "src"))
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "packages" / "morag-core" / "src"))
+sys.path.insert(
+    0, str(Path(__file__).parent.parent.parent / "packages" / "morag" / "src")
+)
+sys.path.insert(
+    0, str(Path(__file__).parent.parent.parent / "packages" / "morag-core" / "src")
+)
+
 
 def test_api_startup_validation():
     """Test that API server validates temp directory on startup."""
@@ -27,7 +33,9 @@ def test_api_startup_validation():
             print(f"   Health status: {health_data}")
             return True
         else:
-            print(f"[FAIL] API server health check failed (status: {response.status_code})")
+            print(
+                f"[FAIL] API server health check failed (status: {response.status_code})"
+            )
             return False
 
     except httpx.ConnectError:
@@ -38,6 +46,7 @@ def test_api_startup_validation():
         print(f"[FAIL] API server test error: {e}")
         return False
 
+
 def test_file_upload_endpoint():
     """Test file upload endpoint to verify temp directory usage."""
     print("📤 Testing file upload endpoint...")
@@ -46,18 +55,16 @@ def test_file_upload_endpoint():
         # Create a test file
         test_content = "This is a test file for temp directory validation."
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
             f.write(test_content)
             test_file_path = f.name
 
         try:
             # Upload the file
-            with open(test_file_path, 'rb') as f:
-                files = {'file': ('test.txt', f, 'text/plain')}
+            with open(test_file_path, "rb") as f:
+                files = {"file": ("test.txt", f, "text/plain")}
                 response = httpx.post(
-                    "http://localhost:8000/process/file",
-                    files=files,
-                    timeout=30
+                    "http://localhost:8000/process/file", files=files, timeout=30
                 )
 
             if response.status_code == 200:
@@ -79,6 +86,7 @@ def test_file_upload_endpoint():
         print(f"[FAIL] File upload test error: {e}")
         return False
 
+
 def test_temp_directory_consistency():
     """Test that temp directory is consistently used across components."""
     print("[FILES] Testing temp directory consistency...")
@@ -93,12 +101,14 @@ def test_temp_directory_consistency():
         print(f"   Upload handler temp dir: {temp_dir}")
 
         # Check if it's using shared volume
-        if str(temp_dir).startswith('/app/temp'):
+        if str(temp_dir).startswith("/app/temp"):
             print("[OK] Using shared Docker volume (/app/temp)")
-        elif str(temp_dir).startswith('./temp'):
+        elif str(temp_dir).startswith("./temp"):
             print("[OK] Using local development directory (./temp)")
-        elif str(temp_dir).startswith('/tmp/'):
-            print("[WARN]  Using system temp directory (may cause issues in containers)")
+        elif str(temp_dir).startswith("/tmp/"):
+            print(
+                "[WARN]  Using system temp directory (may cause issues in containers)"
+            )
         else:
             print(f"❓ Using unknown temp directory: {temp_dir}")
 
@@ -114,6 +124,7 @@ def test_temp_directory_consistency():
         print(f"[FAIL] Temp directory consistency test error: {e}")
         return False
 
+
 def test_worker_file_access():
     """Test that workers can access files uploaded via API."""
     print("👷 Testing worker file access...")
@@ -122,42 +133,45 @@ def test_worker_file_access():
         # Create a test file for ingestion (background processing)
         test_content = "This is a test file for worker access validation."
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
             f.write(test_content)
             test_file_path = f.name
 
         try:
             # Submit file for ingestion (background processing)
-            with open(test_file_path, 'rb') as f:
-                files = {'file': ('worker_test.txt', f, 'text/plain')}
-                data = {'source_type': 'document'}
+            with open(test_file_path, "rb") as f:
+                files = {"file": ("worker_test.txt", f, "text/plain")}
+                data = {"source_type": "document"}
                 response = httpx.post(
                     "http://localhost:8000/api/v1/ingest/file",
                     files=files,
                     data=data,
-                    timeout=30
+                    timeout=30,
                 )
 
             if response.status_code == 200:
                 result = response.json()
-                task_id = result.get('task_id')
-                print(f"[OK] File submitted for background processing (task: {task_id})")
+                task_id = result.get("task_id")
+                print(
+                    f"[OK] File submitted for background processing (task: {task_id})"
+                )
 
                 # Check task status after a short delay
                 time.sleep(2)
                 status_response = httpx.get(
-                    f"http://localhost:8000/api/v1/status/{task_id}",
-                    timeout=10
+                    f"http://localhost:8000/api/v1/status/{task_id}", timeout=10
                 )
 
                 if status_response.status_code == 200:
                     status_data = status_response.json()
                     print(f"   Task status: {status_data.get('status', 'unknown')}")
 
-                    if status_data.get('status') == 'FAILURE':
-                        error = status_data.get('error', 'Unknown error')
-                        if 'File not found' in error:
-                            print("[FAIL] Worker cannot access uploaded file - volume mapping issue!")
+                    if status_data.get("status") == "FAILURE":
+                        error = status_data.get("error", "Unknown error")
+                        if "File not found" in error:
+                            print(
+                                "[FAIL] Worker cannot access uploaded file - volume mapping issue!"
+                            )
                             return False
                         else:
                             print(f"   Task failed with different error: {error}")
@@ -165,7 +179,9 @@ def test_worker_file_access():
                     print("[OK] Worker can access uploaded files")
                     return True
                 else:
-                    print(f"[FAIL] Cannot check task status (status: {status_response.status_code})")
+                    print(
+                        f"[FAIL] Cannot check task status (status: {status_response.status_code})"
+                    )
                     return False
             else:
                 print(f"[FAIL] File ingestion failed (status: {response.status_code})")
@@ -180,6 +196,7 @@ def test_worker_file_access():
     except Exception as e:
         print(f"[FAIL] Worker file access test error: {e}")
         return False
+
 
 def main():
     """Run all temp directory validation tests."""
@@ -216,6 +233,7 @@ def main():
     else:
         print("[FAIL] Some tests failed - check temp directory configuration")
         return False
+
 
 if __name__ == "__main__":
     success = main()

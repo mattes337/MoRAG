@@ -1,12 +1,14 @@
 """Enhanced entity extractor with multi-round gleaning and confidence scoring."""
 
-import structlog
 import time
-from typing import List, Optional, Set
 from dataclasses import dataclass
+from typing import List, Optional, Set
+
+import structlog
 
 try:
     import langextract as lx
+
     LANGEXTRACT_AVAILABLE = True
 except ImportError:
     LANGEXTRACT_AVAILABLE = False
@@ -21,6 +23,7 @@ logger = structlog.get_logger(__name__)
 @dataclass
 class ConfidenceEntity:
     """Entity with confidence scoring and extraction metadata."""
+
     entity: Entity
     confidence: float
     extraction_round: int
@@ -35,6 +38,7 @@ class ConfidenceEntity:
 @dataclass
 class GleaningResult:
     """Result of a gleaning round."""
+
     entities: List[ConfidenceEntity]
     missed_entities_detected: bool
     confidence_threshold_met: bool
@@ -53,7 +57,7 @@ class GleaningStrategy:
         text: str,
         existing_entities: List[ConfidenceEntity],
         extractor: EntityExtractor,
-        source_doc_id: Optional[str] = None
+        source_doc_id: Optional[str] = None,
     ) -> List[Entity]:
         """Extract entities using this strategy."""
         raise NotImplementedError
@@ -70,7 +74,7 @@ class BasicGleaningStrategy(GleaningStrategy):
         text: str,
         existing_entities: List[ConfidenceEntity],
         extractor: EntityExtractor,
-        source_doc_id: Optional[str] = None
+        source_doc_id: Optional[str] = None,
     ) -> List[Entity]:
         """Extract entities using basic strategy."""
         return await extractor.extract(text, source_doc_id)
@@ -87,7 +91,7 @@ class ContextualGleaningStrategy(GleaningStrategy):
         text: str,
         existing_entities: List[ConfidenceEntity],
         extractor: EntityExtractor,
-        source_doc_id: Optional[str] = None
+        source_doc_id: Optional[str] = None,
     ) -> List[Entity]:
         """Extract entities focusing on missing types."""
         # Analyze existing entity types
@@ -107,22 +111,28 @@ class ContextualGleaningStrategy(GleaningStrategy):
         """Identify potentially missing entity types from text."""
         # Common entity types that might be missed
         all_types = {
-            "person", "organization", "location", "concept",
-            "object", "event", "technology", "method", "process"
+            "person",
+            "organization",
+            "location",
+            "concept",
+            "object",
+            "event",
+            "technology",
+            "method",
+            "process",
         }
         return list(all_types - existing_types)
 
     def _create_focused_extractor(
-        self,
-        base_extractor: EntityExtractor,
-        focus_types: List[str]
+        self, base_extractor: EntityExtractor, focus_types: List[str]
     ) -> EntityExtractor:
         """Create extractor focused on specific entity types."""
         # Create new extractor with focused entity types
         focused_types = {t: f"Focus on {t} entities" for t in focus_types}
 
         return EntityExtractor(
-            min_confidence=base_extractor.min_confidence * 0.8,  # Lower threshold for focused search
+            min_confidence=base_extractor.min_confidence
+            * 0.8,  # Lower threshold for focused search
             chunk_size=base_extractor.chunk_size,
             dynamic_types=True,
             entity_types=focused_types,
@@ -131,7 +141,7 @@ class ContextualGleaningStrategy(GleaningStrategy):
             api_key=base_extractor.api_key,
             max_workers=base_extractor.max_workers,
             extraction_passes=2,  # Fewer passes for focused extraction
-            domain=base_extractor.domain
+            domain=base_extractor.domain,
         )
 
 
@@ -146,7 +156,7 @@ class SemanticGleaningStrategy(GleaningStrategy):
         text: str,
         existing_entities: List[ConfidenceEntity],
         extractor: EntityExtractor,
-        source_doc_id: Optional[str] = None
+        source_doc_id: Optional[str] = None,
     ) -> List[Entity]:
         """Extract entities using semantic relationships."""
         if not existing_entities:
@@ -170,7 +180,7 @@ class SemanticGleaningStrategy(GleaningStrategy):
         text: str,
         context: str,
         extractor: EntityExtractor,
-        source_doc_id: Optional[str] = None
+        source_doc_id: Optional[str] = None,
     ) -> List[Entity]:
         """Extract entities with additional context."""
         # Prepend context to text for extraction
@@ -178,7 +188,11 @@ class SemanticGleaningStrategy(GleaningStrategy):
         entities = await extractor.extract(contextual_text, source_doc_id)
 
         # Filter out entities that were in the context
-        context_names = {name.strip() for name in context.split(":")[1].split(",")} if ":" in context else set()
+        context_names = (
+            {name.strip() for name in context.split(":")[1].split(",")}
+            if ":" in context
+            else set()
+        )
         return [e for e in entities if e.name not in context_names]
 
 
@@ -189,10 +203,7 @@ class EntityConfidenceModel:
         self.logger = logger.bind(component="confidence_model")
 
     async def score_entity(
-        self,
-        entity: Entity,
-        text: str,
-        existing_entities: List[ConfidenceEntity]
+        self, entity: Entity, text: str, existing_entities: List[ConfidenceEntity]
     ) -> float:
         """Score entity confidence based on multiple factors."""
         base_confidence = entity.confidence
@@ -208,10 +219,10 @@ class EntityConfidenceModel:
 
         # Combine scores with weights
         final_confidence = (
-            base_confidence * 0.4 +
-            context_score * 0.3 +
-            uniqueness_score * 0.2 +
-            type_score * 0.1
+            base_confidence * 0.4
+            + context_score * 0.3
+            + uniqueness_score * 0.2
+            + type_score * 0.1
         )
 
         return min(1.0, max(0.0, final_confidence))
@@ -236,9 +247,7 @@ class EntityConfidenceModel:
         return 0.1  # Low score if no matches
 
     def _calculate_uniqueness_score(
-        self,
-        entity: Entity,
-        existing_entities: List[ConfidenceEntity]
+        self, entity: Entity, existing_entities: List[ConfidenceEntity]
     ) -> float:
         """Calculate uniqueness score (penalty for duplicates)."""
         entity_name_lower = entity.name.lower()
@@ -251,8 +260,10 @@ class EntityConfidenceModel:
                 return 0.1
 
             # Partial match penalty
-            if (entity_name_lower in existing_name_lower or
-                existing_name_lower in entity_name_lower):
+            if (
+                entity_name_lower in existing_name_lower
+                or existing_name_lower in entity_name_lower
+            ):
                 return 0.5
 
         return 1.0  # Full score for unique entities
@@ -275,7 +286,7 @@ class EnhancedEntityExtractor:
         max_rounds: int = 3,
         target_confidence: float = 0.85,
         confidence_threshold: float = 0.6,
-        enable_gleaning: bool = True
+        enable_gleaning: bool = True,
     ):
         """Initialize enhanced entity extractor.
 
@@ -296,15 +307,13 @@ class EnhancedEntityExtractor:
         self.gleaning_strategies = [
             BasicGleaningStrategy(),
             ContextualGleaningStrategy(),
-            SemanticGleaningStrategy()
+            SemanticGleaningStrategy(),
         ]
 
         self.logger = logger.bind(component="enhanced_entity_extractor")
 
     async def extract_with_gleaning(
-        self,
-        text: str,
-        source_doc_id: Optional[str] = None
+        self, text: str, source_doc_id: Optional[str] = None
     ) -> List[Entity]:
         """Extract entities with multi-round gleaning."""
         if not self.enable_gleaning:
@@ -316,7 +325,7 @@ class EnhancedEntityExtractor:
         self.logger.info(
             "Starting multi-round entity extraction",
             max_rounds=self.max_rounds,
-            target_confidence=self.target_confidence
+            target_confidence=self.target_confidence,
         )
 
         for round_num in range(self.max_rounds):
@@ -328,7 +337,7 @@ class EnhancedEntityExtractor:
             self.logger.info(
                 f"Round {round_num + 1}/{self.max_rounds}",
                 strategy=strategy.name,
-                existing_entities=len(all_entities)
+                existing_entities=len(all_entities),
             )
 
             # Extract entities for this round
@@ -344,12 +353,14 @@ class EnhancedEntityExtractor:
                 )
 
                 if confidence >= self.confidence_threshold:
-                    confident_entities.append(ConfidenceEntity(
-                        entity=entity,
-                        confidence=confidence,
-                        extraction_round=round_num + 1,
-                        gleaning_strategy=strategy.name
-                    ))
+                    confident_entities.append(
+                        ConfidenceEntity(
+                            entity=entity,
+                            confidence=confidence,
+                            extraction_round=round_num + 1,
+                            gleaning_strategy=strategy.name,
+                        )
+                    )
 
             # Add new entities
             new_entities = self._deduplicate_entities(all_entities + confident_entities)
@@ -362,7 +373,7 @@ class EnhancedEntityExtractor:
                 f"Round {round_num + 1} completed",
                 new_entities=new_count,
                 total_entities=len(all_entities),
-                processing_time=f"{round_time:.2f}s"
+                processing_time=f"{round_time:.2f}s",
             )
 
             # Check if we should stop early
@@ -370,7 +381,7 @@ class EnhancedEntityExtractor:
             if overall_confidence >= self.target_confidence:
                 self.logger.info(
                     "Target confidence reached, stopping early",
-                    confidence=overall_confidence
+                    confidence=overall_confidence,
                 )
                 break
 
@@ -386,15 +397,13 @@ class EnhancedEntityExtractor:
             "Multi-round extraction completed",
             total_entities=len(final_entities),
             total_time=f"{total_time:.2f}s",
-            final_confidence=self._calculate_overall_confidence(all_entities)
+            final_confidence=self._calculate_overall_confidence(all_entities),
         )
 
         return final_entities
 
     def _select_gleaning_strategy(
-        self,
-        round_num: int,
-        existing_entities: List[ConfidenceEntity]
+        self, round_num: int, existing_entities: List[ConfidenceEntity]
     ) -> GleaningStrategy:
         """Select appropriate gleaning strategy for the round."""
         if round_num == 0:
@@ -405,8 +414,7 @@ class EnhancedEntityExtractor:
             return self.gleaning_strategies[2]  # Semantic strategy
 
     def _deduplicate_entities(
-        self,
-        entities: List[ConfidenceEntity]
+        self, entities: List[ConfidenceEntity]
     ) -> List[ConfidenceEntity]:
         """Deduplicate entities by name and type."""
         seen = {}
@@ -430,24 +438,19 @@ class EnhancedEntityExtractor:
 
         return deduplicated
 
-    def _calculate_overall_confidence(
-        self,
-        entities: List[ConfidenceEntity]
-    ) -> float:
+    def _calculate_overall_confidence(self, entities: List[ConfidenceEntity]) -> float:
         """Calculate overall confidence score for all entities."""
         if not entities:
             return 0.0
 
         # Weighted average based on entity confidence
         total_weight = sum(e.confidence for e in entities)
-        weighted_sum = sum(e.confidence ** 2 for e in entities)  # Square for emphasis
+        weighted_sum = sum(e.confidence**2 for e in entities)  # Square for emphasis
 
         return weighted_sum / total_weight if total_weight > 0 else 0.0
 
     async def assess_missed_entities(
-        self,
-        text: str,
-        existing_entities: List[ConfidenceEntity]
+        self, text: str, existing_entities: List[ConfidenceEntity]
     ) -> bool:
         """Assess if there might be missed entities using LLM."""
         if not existing_entities:
@@ -486,7 +489,7 @@ class EnhancedEntityExtractor:
         self,
         text: str,
         source_doc_id: Optional[str] = None,
-        auto_infer_domain: bool = False
+        auto_infer_domain: bool = False,
     ) -> List[Entity]:
         """Extract entities (compatibility method)."""
         return await self.extract_with_gleaning(text, source_doc_id)

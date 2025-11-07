@@ -1,17 +1,20 @@
 """Tests for hybrid retrieval system."""
 
-import pytest
 import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
-from morag_graph.retrieval import (
-    HybridRetrievalCoordinator, ContextExpansionEngine,
-    RetrievalResult, HybridRetrievalConfig, ExpandedContext
-)
-from morag_graph.retrieval.models import VectorRetriever, DocumentResult
-from morag_graph.query import QueryEntityExtractor, QueryAnalysis, QueryEntity
+import pytest
 from morag_graph.models import Entity
 from morag_graph.operations.traversal import GraphPath
+from morag_graph.query import QueryAnalysis, QueryEntity, QueryEntityExtractor
+from morag_graph.retrieval import (
+    ContextExpansionEngine,
+    ExpandedContext,
+    HybridRetrievalConfig,
+    HybridRetrievalCoordinator,
+    RetrievalResult,
+)
+from morag_graph.retrieval.models import DocumentResult, VectorRetriever
 from morag_graph.storage.base import BaseStorage
 
 
@@ -21,15 +24,15 @@ def mock_vector_retriever():
     retriever = AsyncMock(spec=VectorRetriever)
     retriever.search.return_value = [
         {
-            'content': 'Vector search result 1',
-            'score': 0.9,
-            'metadata': {'source': 'doc1'}
+            "content": "Vector search result 1",
+            "score": 0.9,
+            "metadata": {"source": "doc1"},
         },
         {
-            'content': 'Vector search result 2',
-            'score': 0.8,
-            'metadata': {'source': 'doc2'}
-        }
+            "content": "Vector search result 2",
+            "score": 0.8,
+            "metadata": {"source": "doc2"},
+        },
     ]
     return retriever
 
@@ -41,10 +44,7 @@ def mock_context_expansion_engine():
 
     # Mock expanded context
     mock_entity = Entity(
-        id="ent_test_entity_person",
-        name="Test Entity",
-        type="PERSON",
-        confidence=0.9
+        id="ent_test_entity_person", name="Test Entity", type="PERSON", confidence=0.9
     )
     # Add source_doc_id attribute for document retrieval
     mock_entity.source_doc_id = "doc_123"
@@ -54,7 +54,7 @@ def mock_context_expansion_engine():
         expanded_entities=[mock_entity],
         expansion_paths=[GraphPath(entities=[mock_entity], relations=[])],
         context_score=0.8,
-        expansion_reasoning="Direct neighbors expansion"
+        expansion_reasoning="Direct neighbors expansion",
     )
 
     return engine
@@ -70,7 +70,7 @@ def mock_query_entity_extractor():
         text="Test Entity",
         entity_type="PERSON",
         confidence=0.9,
-        linked_entity_id="ent_test_entity_person"
+        linked_entity_id="ent_test_entity_person",
     )
 
     extractor.extract_and_link_entities.return_value = QueryAnalysis(
@@ -78,19 +78,21 @@ def mock_query_entity_extractor():
         entities=[query_entity],
         intent="factual",
         query_type="single_entity",
-        complexity_score=0.5
+        complexity_score=0.5,
     )
 
     return extractor
 
 
 @pytest.fixture
-def hybrid_coordinator(mock_vector_retriever, mock_context_expansion_engine, mock_query_entity_extractor):
+def hybrid_coordinator(
+    mock_vector_retriever, mock_context_expansion_engine, mock_query_entity_extractor
+):
     """Hybrid retrieval coordinator instance."""
     return HybridRetrievalCoordinator(
         vector_retriever=mock_vector_retriever,
         context_expansion_engine=mock_context_expansion_engine,
-        query_entity_extractor=mock_query_entity_extractor
+        query_entity_extractor=mock_query_entity_extractor,
     )
 
 
@@ -112,16 +114,20 @@ class TestHybridRetrievalCoordinator:
         assert scores == sorted(scores, reverse=True)
 
     @pytest.mark.asyncio
-    async def test_vector_only_fallback(self, mock_vector_retriever, mock_query_entity_extractor):
+    async def test_vector_only_fallback(
+        self, mock_vector_retriever, mock_query_entity_extractor
+    ):
         """Test fallback to vector-only retrieval when graph fails."""
         # Create coordinator with failing context expansion
         failing_expansion = AsyncMock(spec=ContextExpansionEngine)
-        failing_expansion.expand_context.side_effect = Exception("Graph expansion failed")
+        failing_expansion.expand_context.side_effect = Exception(
+            "Graph expansion failed"
+        )
 
         coordinator = HybridRetrievalCoordinator(
             vector_retriever=mock_vector_retriever,
             context_expansion_engine=failing_expansion,
-            query_entity_extractor=mock_query_entity_extractor
+            query_entity_extractor=mock_query_entity_extractor,
         )
 
         results = await coordinator.retrieve("test query")
@@ -134,9 +140,7 @@ class TestHybridRetrievalCoordinator:
     async def test_weighted_combination_fusion(self, hybrid_coordinator):
         """Test weighted combination fusion strategy."""
         config = HybridRetrievalConfig(
-            fusion_strategy="weighted_combination",
-            vector_weight=0.7,
-            graph_weight=0.3
+            fusion_strategy="weighted_combination", vector_weight=0.7, graph_weight=0.3
         )
 
         hybrid_coordinator.config = config
@@ -152,7 +156,7 @@ class TestHybridRetrievalCoordinator:
         """Test reciprocal rank fusion strategy."""
         config = HybridRetrievalConfig(
             fusion_strategy="rank_fusion",
-            min_confidence_threshold=0.0  # Lower threshold to ensure results pass
+            min_confidence_threshold=0.0,  # Lower threshold to ensure results pass
         )
         hybrid_coordinator.config = config
 
@@ -167,7 +171,7 @@ class TestHybridRetrievalCoordinator:
         """Test adaptive fusion strategy."""
         config = HybridRetrievalConfig(
             fusion_strategy="adaptive",
-            min_confidence_threshold=0.0  # Lower threshold to ensure results pass
+            min_confidence_threshold=0.0,  # Lower threshold to ensure results pass
         )
         hybrid_coordinator.config = config
 
@@ -177,7 +181,9 @@ class TestHybridRetrievalCoordinator:
         # Should adapt based on query complexity
 
     @pytest.mark.asyncio
-    async def test_empty_query_entities(self, mock_vector_retriever, mock_context_expansion_engine):
+    async def test_empty_query_entities(
+        self, mock_vector_retriever, mock_context_expansion_engine
+    ):
         """Test handling of queries with no entities."""
         # Mock extractor that returns no entities
         empty_extractor = AsyncMock(spec=QueryEntityExtractor)
@@ -186,13 +192,13 @@ class TestHybridRetrievalCoordinator:
             entities=[],
             intent="general",
             query_type="general",
-            complexity_score=0.2
+            complexity_score=0.2,
         )
 
         coordinator = HybridRetrievalCoordinator(
             vector_retriever=mock_vector_retriever,
             context_expansion_engine=mock_context_expansion_engine,
-            query_entity_extractor=empty_extractor
+            query_entity_extractor=empty_extractor,
         )
 
         results = await coordinator.retrieve("simple query")
@@ -225,7 +231,7 @@ class TestHybridRetrievalCoordinator:
             id="ent_test_entity_person",
             name="Test Entity",
             type="PERSON",
-            confidence=0.9
+            confidence=0.9,
         )
 
         context = ExpandedContext(
@@ -233,7 +239,7 @@ class TestHybridRetrievalCoordinator:
             expanded_entities=[entity],
             expansion_paths=[],
             context_score=0.8,
-            expansion_reasoning="test"
+            expansion_reasoning="test",
         )
 
         score = hybrid_coordinator._calculate_graph_relevance_score(entity, context)
@@ -263,7 +269,7 @@ class TestContextExpansionEngine:
             text="Test Entity",
             entity_type="PERSON",
             confidence=0.9,
-            linked_entity_id="ent_test_entity_person"
+            linked_entity_id="ent_test_entity_person",
         )
 
         query_analysis = QueryAnalysis(
@@ -271,14 +277,16 @@ class TestContextExpansionEngine:
             entities=[query_entity],
             intent="factual",
             query_type="single_entity",
-            complexity_score=0.5
+            complexity_score=0.5,
         )
 
         # Mock the graph traversal to return some neighbors
-        context_engine.graph_traversal.find_neighbors = AsyncMock(return_value=[
-            Entity(id="ent_neighbor_1", name="Neighbor 1", type="PERSON"),
-            Entity(id="ent_neighbor_2", name="Neighbor 2", type="CONCEPT")
-        ])
+        context_engine.graph_traversal.find_neighbors = AsyncMock(
+            return_value=[
+                Entity(id="ent_neighbor_1", name="Neighbor 1", type="PERSON"),
+                Entity(id="ent_neighbor_2", name="Neighbor 2", type="CONCEPT"),
+            ]
+        )
 
         context = await context_engine.expand_context(query_analysis)
 
@@ -295,7 +303,7 @@ class TestContextExpansionEngine:
             entities=[],
             intent="general",
             query_type="general",
-            complexity_score=0.2
+            complexity_score=0.2,
         )
 
         context = await context_engine.expand_context(query_analysis)
@@ -313,7 +321,7 @@ class TestContextExpansionEngine:
             entities=[QueryEntity("Einstein", "PERSON", 0.9)],
             intent="factual",
             query_type="single_entity",
-            complexity_score=0.3
+            complexity_score=0.3,
         )
 
         strategy1 = context_engine._select_expansion_strategy(analysis1)
@@ -324,11 +332,11 @@ class TestContextExpansionEngine:
             original_query="Einstein and physics",
             entities=[
                 QueryEntity("Einstein", "PERSON", 0.9),
-                QueryEntity("Physics", "CONCEPT", 0.8)
+                QueryEntity("Physics", "CONCEPT", 0.8),
             ],
             intent="factual",
             query_type="entity_relationship",
-            complexity_score=0.6
+            complexity_score=0.6,
         )
 
         strategy2 = context_engine._select_expansion_strategy(analysis2)
@@ -338,7 +346,7 @@ class TestContextExpansionEngine:
         """Test context score calculation."""
         entities = [
             Entity(id="ent_1", name="Entity 1", type="PERSON"),
-            Entity(id="ent_2", name="Entity 2", type="CONCEPT")
+            Entity(id="ent_2", name="Entity 2", type="CONCEPT"),
         ]
 
         paths = [GraphPath(entities=entities, relations=[])]
@@ -348,7 +356,7 @@ class TestContextExpansionEngine:
             entities=[],
             intent="factual",
             query_type="general",
-            complexity_score=0.5
+            complexity_score=0.5,
         )
 
         score = context_engine._calculate_context_score(query_analysis, entities, paths)

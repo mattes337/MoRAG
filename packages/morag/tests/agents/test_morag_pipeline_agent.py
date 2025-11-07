@@ -1,22 +1,22 @@
 """Tests for MoRAG Pipeline Agent."""
 
-import pytest
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
-from pathlib import Path
 import tempfile
+from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from morag.agents.morag_pipeline_agent import (
+    IngestionOptions,
+    IngestionResult,
     MoRAGPipelineAgent,
     PipelineMode,
     ProcessingStage,
-    IngestionOptions,
     ResolutionOptions,
-    IngestionResult,
-    ResolutionResult
+    ResolutionResult,
 )
-from morag_services import ContentType
 from morag_core.models import ProcessingResult
+from morag_services import ContentType
 
 
 class TestMoRAGPipelineAgent:
@@ -32,12 +32,14 @@ class TestMoRAGPipelineAgent:
     def mock_orchestrator(self):
         """Mock orchestrator for testing."""
         mock = MagicMock()
-        mock.process_content = AsyncMock(return_value=ProcessingResult(
-            content="Test content",
-            metadata={"title": "Test Document"},
-            processing_time=1.0,
-            success=True
-        ))
+        mock.process_content = AsyncMock(
+            return_value=ProcessingResult(
+                content="Test content",
+                metadata={"title": "Test Document"},
+                processing_time=1.0,
+                success=True,
+            )
+        )
         return mock
 
     @pytest.fixture
@@ -66,7 +68,7 @@ class TestMoRAGPipelineAgent:
             content_type=ContentType.DOCUMENT,
             enable_spacy_ner=True,
             enable_openie=True,
-            generate_intermediate_files=True
+            generate_intermediate_files=True,
         )
 
         # Run ingestion
@@ -87,7 +89,7 @@ class TestMoRAGPipelineAgent:
             max_depth=2,
             max_facts=10,
             enable_multi_hop=True,
-            generate_intermediate_files=True
+            generate_intermediate_files=True,
         )
 
         # Run resolution
@@ -105,19 +107,20 @@ class TestMoRAGPipelineAgent:
         """Test error handling in ingestion pipeline."""
         # Mock orchestrator to fail
         mock_orchestrator = MagicMock()
-        mock_orchestrator.process_content = AsyncMock(return_value=ProcessingResult(
-            content="",
-            metadata={},
-            processing_time=0.0,
-            success=False,
-            error_message="Processing failed"
-        ))
+        mock_orchestrator.process_content = AsyncMock(
+            return_value=ProcessingResult(
+                content="",
+                metadata={},
+                processing_time=0.0,
+                success=False,
+                error_message="Processing failed",
+            )
+        )
         pipeline_agent.orchestrator = mock_orchestrator
 
         # Create ingestion options
         options = IngestionOptions(
-            content_type=ContentType.DOCUMENT,
-            generate_intermediate_files=False
+            content_type=ContentType.DOCUMENT, generate_intermediate_files=False
         )
 
         # Run ingestion (should fail gracefully)
@@ -133,13 +136,14 @@ class TestMoRAGPipelineAgent:
     async def test_resolution_error_handling(self, pipeline_agent):
         """Test error handling in resolution pipeline."""
         # Create resolution options
-        options = ResolutionOptions(
-            max_depth=2,
-            generate_intermediate_files=False
-        )
+        options = ResolutionOptions(max_depth=2, generate_intermediate_files=False)
 
         # Mock an exception in the resolution process
-        with patch.object(pipeline_agent, '_process_basic_resolution', side_effect=Exception("Test error")):
+        with patch.object(
+            pipeline_agent,
+            "_process_basic_resolution",
+            side_effect=Exception("Test error"),
+        ):
             result = await pipeline_agent.process_resolution("Test query", options)
 
         # Verify error handling
@@ -149,15 +153,16 @@ class TestMoRAGPipelineAgent:
         assert result.processing_time > 0
 
     @pytest.mark.asyncio
-    async def test_intermediate_file_generation(self, pipeline_agent, mock_orchestrator, temp_dir):
+    async def test_intermediate_file_generation(
+        self, pipeline_agent, mock_orchestrator, temp_dir
+    ):
         """Test intermediate file generation."""
         # Mock the orchestrator
         pipeline_agent.orchestrator = mock_orchestrator
 
         # Create ingestion options with intermediate files enabled
         options = IngestionOptions(
-            content_type=ContentType.DOCUMENT,
-            generate_intermediate_files=True
+            content_type=ContentType.DOCUMENT, generate_intermediate_files=True
         )
 
         # Run ingestion
@@ -180,8 +185,7 @@ class TestMoRAGPipelineAgent:
 
         # Create ingestion options
         options = IngestionOptions(
-            content_type=ContentType.DOCUMENT,
-            generate_intermediate_files=False
+            content_type=ContentType.DOCUMENT, generate_intermediate_files=False
         )
 
         # Run ingestion
@@ -191,10 +195,10 @@ class TestMoRAGPipelineAgent:
         metrics = pipeline_agent.get_performance_metrics()
 
         # Verify metrics
-        assert 'total_processing_time' in metrics
-        assert 'stage_timings' in metrics
-        assert 'enhanced_components_available' in metrics
-        assert metrics['total_processing_time'] > 0
+        assert "total_processing_time" in metrics
+        assert "stage_timings" in metrics
+        assert "enhanced_components_available" in metrics
+        assert metrics["total_processing_time"] > 0
 
     @pytest.mark.asyncio
     async def test_different_content_types(self, pipeline_agent, mock_orchestrator):
@@ -206,16 +210,17 @@ class TestMoRAGPipelineAgent:
             ContentType.DOCUMENT,
             ContentType.WEB,
             ContentType.AUDIO,
-            ContentType.VIDEO
+            ContentType.VIDEO,
         ]
 
         for content_type in content_types:
             options = IngestionOptions(
-                content_type=content_type,
-                generate_intermediate_files=False
+                content_type=content_type, generate_intermediate_files=False
             )
 
-            result = await pipeline_agent.process_ingestion(f"test_{content_type.value}", options)
+            result = await pipeline_agent.process_ingestion(
+                f"test_{content_type.value}", options
+            )
 
             # Should succeed for all content types
             assert isinstance(result, IngestionResult)
@@ -228,24 +233,25 @@ class TestMoRAGPipelineAgent:
         test_data = {"test": "data", "number": 42}
 
         file_path = await pipeline_agent._save_stage_output(
-            ProcessingStage.CONTENT_CONVERSION,
-            test_data,
-            "test_source"
+            ProcessingStage.CONTENT_CONVERSION, test_data, "test_source"
         )
 
         # Verify file was created
         assert file_path.exists()
-        assert file_path.suffix == '.json'
+        assert file_path.suffix == ".json"
 
         # Verify content
         import json
-        with open(file_path, 'r') as f:
+
+        with open(file_path, "r") as f:
             loaded_data = json.load(f)
 
         assert loaded_data == test_data
 
     @pytest.mark.asyncio
-    async def test_enhanced_components_fallback(self, pipeline_agent, mock_orchestrator):
+    async def test_enhanced_components_fallback(
+        self, pipeline_agent, mock_orchestrator
+    ):
         """Test fallback when enhanced components are not available."""
         # Mock the orchestrator
         pipeline_agent.orchestrator = mock_orchestrator
@@ -256,20 +262,22 @@ class TestMoRAGPipelineAgent:
 
         # Test ingestion
         ingestion_options = IngestionOptions(
-            content_type=ContentType.DOCUMENT,
-            generate_intermediate_files=False
+            content_type=ContentType.DOCUMENT, generate_intermediate_files=False
         )
 
-        ingestion_result = await pipeline_agent.process_ingestion("test_doc", ingestion_options)
+        ingestion_result = await pipeline_agent.process_ingestion(
+            "test_doc", ingestion_options
+        )
         assert ingestion_result.success
-        assert ingestion_result.metadata.get('processing_mode') == 'basic'
+        assert ingestion_result.metadata.get("processing_mode") == "basic"
 
         # Test resolution
         resolution_options = ResolutionOptions(
-            max_depth=2,
-            generate_intermediate_files=False
+            max_depth=2, generate_intermediate_files=False
         )
 
-        resolution_result = await pipeline_agent.process_resolution("test query", resolution_options)
+        resolution_result = await pipeline_agent.process_resolution(
+            "test query", resolution_options
+        )
         assert resolution_result.success
-        assert resolution_result.metadata.get('processing_mode') == 'basic'
+        assert resolution_result.metadata.get("processing_mode") == "basic"

@@ -1,15 +1,16 @@
 """Tests for QdrantStorage checksum management functionality."""
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 from typing import List, Optional
+from unittest.mock import AsyncMock, MagicMock, patch
 
-from morag_graph.storage.qdrant_storage import QdrantStorage, QdrantConfig
+import pytest
 from morag_graph.models.entity import Entity
+from morag_graph.storage.qdrant_storage import QdrantConfig, QdrantStorage
 
 
 class MockFilter:
     """Mock Filter for testing."""
+
     def __init__(self, must=None, must_not=None):
         self.must = must or []
         self.must_not = must_not or []
@@ -17,6 +18,7 @@ class MockFilter:
 
 class MockFieldCondition:
     """Mock FieldCondition for testing."""
+
     def __init__(self, key, match, should_not=False):
         self.key = key
         self.match = match
@@ -25,6 +27,7 @@ class MockFieldCondition:
 
 class MockMatchValue:
     """Mock MatchValue for testing."""
+
     def __init__(self, value):
         self.value = value
 
@@ -51,7 +54,9 @@ class MockQdrantClient:
         for point in points:
             self.points[point.id] = point
 
-    async def retrieve(self, collection_name, ids, with_payload=False, with_vectors=False):
+    async def retrieve(
+        self, collection_name, ids, with_payload=False, with_vectors=False
+    ):
         """Mock retrieve."""
         result = []
         for point_id in ids:
@@ -65,7 +70,15 @@ class MockQdrantClient:
             if point_id in self.points:
                 del self.points[point_id]
 
-    async def scroll(self, collection_name, scroll_filter=None, limit=None, with_payload=True, with_vectors=True, offset=None):
+    async def scroll(
+        self,
+        collection_name,
+        scroll_filter=None,
+        limit=None,
+        with_payload=True,
+        with_vectors=True,
+        offset=None,
+    ):
         """Mock scroll method that filters points based on the provided filter."""
         # Mock scroll method
         filtered_points = []
@@ -79,22 +92,34 @@ class MockQdrantClient:
                 matches = True
 
                 # Check must conditions
-                if hasattr(scroll_filter, 'must') and scroll_filter.must:
+                if hasattr(scroll_filter, "must") and scroll_filter.must:
                     for condition in scroll_filter.must:
-                        if hasattr(condition, 'key') and hasattr(condition, 'match'):
+                        if hasattr(condition, "key") and hasattr(condition, "match"):
                             key = condition.key
-                            expected_value = condition.match.value if hasattr(condition.match, 'value') else condition.match
+                            expected_value = (
+                                condition.match.value
+                                if hasattr(condition.match, "value")
+                                else condition.match
+                            )
                             actual_value = point.payload.get(key)
                             if actual_value != expected_value:
                                 matches = False
                                 break
 
                 # Check must_not conditions
-                if matches and hasattr(scroll_filter, 'must_not') and scroll_filter.must_not:
+                if (
+                    matches
+                    and hasattr(scroll_filter, "must_not")
+                    and scroll_filter.must_not
+                ):
                     for condition in scroll_filter.must_not:
-                        if hasattr(condition, 'key') and hasattr(condition, 'match'):
+                        if hasattr(condition, "key") and hasattr(condition, "match"):
                             key = condition.key
-                            expected_value = condition.match.value if hasattr(condition.match, 'value') else condition.match
+                            expected_value = (
+                                condition.match.value
+                                if hasattr(condition.match, "value")
+                                else condition.match
+                            )
                             actual_value = point.payload.get(key)
                             if actual_value == expected_value:
                                 matches = False
@@ -133,17 +158,14 @@ def mock_qdrant_client():
 def qdrant_config():
     """Create QdrantConfig for testing."""
     return QdrantConfig(
-        host="localhost",
-        port=6333,
-        collection_name="test_collection",
-        vector_size=384
+        host="localhost", port=6333, collection_name="test_collection", vector_size=384
     )
 
 
 @pytest.fixture
 def qdrant_storage(qdrant_config):
     """Create QdrantStorage instance for testing."""
-    with patch('morag_graph.storage.qdrant_storage.QDRANT_AVAILABLE', True):
+    with patch("morag_graph.storage.qdrant_storage.QDRANT_AVAILABLE", True):
         storage = QdrantStorage(qdrant_config)
         return storage
 
@@ -152,20 +174,28 @@ class TestQdrantStorageChecksum:
     """Test cases for QdrantStorage checksum management."""
 
     @pytest.mark.asyncio
-    async def test_get_document_checksum_not_found(self, qdrant_storage, mock_qdrant_client):
+    async def test_get_document_checksum_not_found(
+        self, qdrant_storage, mock_qdrant_client
+    ):
         """Test getting checksum for non-existent document."""
-        with patch('morag_graph.storage.qdrant_storage.AsyncQdrantClient', return_value=mock_qdrant_client):
+        with patch(
+            "morag_graph.storage.qdrant_storage.AsyncQdrantClient",
+            return_value=mock_qdrant_client,
+        ):
             qdrant_storage.client = mock_qdrant_client
 
             result = await qdrant_storage.get_document_checksum("nonexistent_doc")
             assert result is None
 
     @pytest.mark.asyncio
-    async def test_store_and_get_document_checksum(self, qdrant_storage, mock_qdrant_client):
+    async def test_store_and_get_document_checksum(
+        self, qdrant_storage, mock_qdrant_client
+    ):
         """Test storing and retrieving document checksum."""
-        with patch('morag_graph.storage.qdrant_storage.AsyncQdrantClient', return_value=mock_qdrant_client), \
-             patch('morag_graph.storage.qdrant_storage.PointStruct', MockPointStruct):
-
+        with patch(
+            "morag_graph.storage.qdrant_storage.AsyncQdrantClient",
+            return_value=mock_qdrant_client,
+        ), patch("morag_graph.storage.qdrant_storage.PointStruct", MockPointStruct):
             qdrant_storage.client = mock_qdrant_client
 
             document_id = "test_doc"
@@ -190,9 +220,10 @@ class TestQdrantStorageChecksum:
     @pytest.mark.asyncio
     async def test_delete_document_checksum(self, qdrant_storage, mock_qdrant_client):
         """Test deleting document checksum."""
-        with patch('morag_graph.storage.qdrant_storage.AsyncQdrantClient', return_value=mock_qdrant_client), \
-             patch('morag_graph.storage.qdrant_storage.PointStruct', MockPointStruct):
-
+        with patch(
+            "morag_graph.storage.qdrant_storage.AsyncQdrantClient",
+            return_value=mock_qdrant_client,
+        ), patch("morag_graph.storage.qdrant_storage.PointStruct", MockPointStruct):
             qdrant_storage.client = mock_qdrant_client
 
             document_id = "test_doc"
@@ -218,12 +249,18 @@ class TestQdrantStorageChecksum:
     @pytest.mark.asyncio
     async def test_get_entities_by_document(self, qdrant_storage, mock_qdrant_client):
         """Test getting entities by document ID."""
-        with patch('morag_graph.storage.qdrant_storage.AsyncQdrantClient', return_value=mock_qdrant_client), \
-             patch('morag_graph.storage.qdrant_storage.PointStruct', MockPointStruct), \
-             patch('morag_graph.storage.qdrant_storage.Filter', MockFilter), \
-             patch('morag_graph.storage.qdrant_storage.FieldCondition', MockFieldCondition), \
-             patch('morag_graph.storage.qdrant_storage.MatchValue', MockMatchValue):
-
+        with patch(
+            "morag_graph.storage.qdrant_storage.AsyncQdrantClient",
+            return_value=mock_qdrant_client,
+        ), patch(
+            "morag_graph.storage.qdrant_storage.PointStruct", MockPointStruct
+        ), patch(
+            "morag_graph.storage.qdrant_storage.Filter", MockFilter
+        ), patch(
+            "morag_graph.storage.qdrant_storage.FieldCondition", MockFieldCondition
+        ), patch(
+            "morag_graph.storage.qdrant_storage.MatchValue", MockMatchValue
+        ):
             qdrant_storage.client = mock_qdrant_client
 
             document_id = "test_doc_123"
@@ -236,8 +273,8 @@ class TestQdrantStorageChecksum:
                     "name": "John Doe",
                     "type": "PERSON",
                     "source_doc_id": document_id,
-                    "confidence": 0.9
-                }
+                    "confidence": 0.9,
+                },
             )
 
             entity2 = MockPointStruct(
@@ -247,8 +284,8 @@ class TestQdrantStorageChecksum:
                     "name": "Acme Corp",
                     "type": "ORGANIZATION",
                     "source_doc_id": document_id,
-                    "confidence": 0.8
-                }
+                    "confidence": 0.8,
+                },
             )
 
             # Entity from different document (should not be returned)
@@ -259,8 +296,8 @@ class TestQdrantStorageChecksum:
                     "name": "Other Entity",
                     "type": "PERSON",
                     "source_doc_id": "other_doc",
-                    "confidence": 0.7
-                }
+                    "confidence": 0.7,
+                },
             )
 
             # Checksum entry (should be excluded)
@@ -270,13 +307,15 @@ class TestQdrantStorageChecksum:
                 payload={
                     "type": "document_checksum",
                     "document_id": document_id,
-                    "checksum": "abc123"
-                }
+                    "checksum": "abc123",
+                },
             )
 
             # Add to mock client
             mock_qdrant_client.points["ent_john_doe_person_test_doc_123"] = entity1
-            mock_qdrant_client.points["ent_acme_corp_organization_test_doc_123"] = entity2
+            mock_qdrant_client.points[
+                "ent_acme_corp_organization_test_doc_123"
+            ] = entity2
             mock_qdrant_client.points["ent_other_entity_person_other_doc"] = entity3
             mock_qdrant_client.points[f"checksum_{document_id}"] = checksum_point
 
@@ -299,9 +338,14 @@ class TestQdrantStorageChecksum:
             assert john_entity.confidence == 0.9
 
     @pytest.mark.asyncio
-    async def test_get_entities_by_document_empty(self, qdrant_storage, mock_qdrant_client):
+    async def test_get_entities_by_document_empty(
+        self, qdrant_storage, mock_qdrant_client
+    ):
         """Test getting entities for document with no entities."""
-        with patch('morag_graph.storage.qdrant_storage.AsyncQdrantClient', return_value=mock_qdrant_client):
+        with patch(
+            "morag_graph.storage.qdrant_storage.AsyncQdrantClient",
+            return_value=mock_qdrant_client,
+        ):
             qdrant_storage.client = mock_qdrant_client
 
             entities = await qdrant_storage.get_entities_by_document("nonexistent_doc")
@@ -326,49 +370,77 @@ class TestQdrantStorageChecksum:
             await qdrant_storage.get_entities_by_document("test_doc")
 
     @pytest.mark.asyncio
-    async def test_store_checksum_error_handling(self, qdrant_storage, mock_qdrant_client):
+    async def test_store_checksum_error_handling(
+        self, qdrant_storage, mock_qdrant_client
+    ):
         """Test error handling in store_document_checksum."""
-        with patch('morag_graph.storage.qdrant_storage.AsyncQdrantClient', return_value=mock_qdrant_client):
+        with patch(
+            "morag_graph.storage.qdrant_storage.AsyncQdrantClient",
+            return_value=mock_qdrant_client,
+        ):
             qdrant_storage.client = mock_qdrant_client
 
             # Mock upsert to raise an exception
-            mock_qdrant_client.upsert = AsyncMock(side_effect=Exception("Upsert failed"))
+            mock_qdrant_client.upsert = AsyncMock(
+                side_effect=Exception("Upsert failed")
+            )
 
             with pytest.raises(Exception, match="Upsert failed"):
                 await qdrant_storage.store_document_checksum("test_doc", "checksum")
 
     @pytest.mark.asyncio
-    async def test_get_checksum_error_handling(self, qdrant_storage, mock_qdrant_client):
+    async def test_get_checksum_error_handling(
+        self, qdrant_storage, mock_qdrant_client
+    ):
         """Test error handling in get_document_checksum."""
-        with patch('morag_graph.storage.qdrant_storage.AsyncQdrantClient', return_value=mock_qdrant_client):
+        with patch(
+            "morag_graph.storage.qdrant_storage.AsyncQdrantClient",
+            return_value=mock_qdrant_client,
+        ):
             qdrant_storage.client = mock_qdrant_client
 
             # Mock retrieve to raise an exception
-            mock_qdrant_client.retrieve = AsyncMock(side_effect=Exception("Retrieve failed"))
+            mock_qdrant_client.retrieve = AsyncMock(
+                side_effect=Exception("Retrieve failed")
+            )
 
             result = await qdrant_storage.get_document_checksum("test_doc")
             assert result is None  # Should return None on error
 
     @pytest.mark.asyncio
-    async def test_delete_checksum_error_handling(self, qdrant_storage, mock_qdrant_client):
+    async def test_delete_checksum_error_handling(
+        self, qdrant_storage, mock_qdrant_client
+    ):
         """Test error handling in delete_document_checksum."""
-        with patch('morag_graph.storage.qdrant_storage.AsyncQdrantClient', return_value=mock_qdrant_client):
+        with patch(
+            "morag_graph.storage.qdrant_storage.AsyncQdrantClient",
+            return_value=mock_qdrant_client,
+        ):
             qdrant_storage.client = mock_qdrant_client
 
             # Mock delete to raise an exception
-            mock_qdrant_client.delete = AsyncMock(side_effect=Exception("Delete failed"))
+            mock_qdrant_client.delete = AsyncMock(
+                side_effect=Exception("Delete failed")
+            )
 
             # Should not raise exception (error is logged but not raised)
             await qdrant_storage.delete_document_checksum("test_doc")
 
     @pytest.mark.asyncio
-    async def test_get_entities_error_handling(self, qdrant_storage, mock_qdrant_client):
+    async def test_get_entities_error_handling(
+        self, qdrant_storage, mock_qdrant_client
+    ):
         """Test error handling in get_entities_by_document."""
-        with patch('morag_graph.storage.qdrant_storage.AsyncQdrantClient', return_value=mock_qdrant_client):
+        with patch(
+            "morag_graph.storage.qdrant_storage.AsyncQdrantClient",
+            return_value=mock_qdrant_client,
+        ):
             qdrant_storage.client = mock_qdrant_client
 
             # Mock scroll to raise an exception
-            mock_qdrant_client.scroll = AsyncMock(side_effect=Exception("Scroll failed"))
+            mock_qdrant_client.scroll = AsyncMock(
+                side_effect=Exception("Scroll failed")
+            )
 
             result = await qdrant_storage.get_entities_by_document("test_doc")
             assert result == []  # Should return empty list on error

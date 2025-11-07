@@ -1,14 +1,15 @@
 """FastAPI server for MoRAG Stage-Based Processing System."""
 
 import asyncio
-from typing import Dict, Any, List, Optional
-from pathlib import Path
-import sys
 import os
+import sys
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 # Load environment variables from .env file early
 try:
     from dotenv import load_dotenv
+
     # Look for .env file in current directory and parent directories
     env_path = Path.cwd() / ".env"
     if not env_path.exists():
@@ -25,19 +26,22 @@ try:
 except ImportError:
     print("python-dotenv not available, skipping .env file loading")
 
+from contextlib import asynccontextmanager
+
+import structlog
 import uvicorn
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from fastapi.openapi.utils import get_openapi
-from contextlib import asynccontextmanager
-import structlog
+from fastapi.responses import JSONResponse
 
 # Add path for stage imports
-sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "morag-stages" / "src"))
+sys.path.insert(
+    0, str(Path(__file__).parent.parent.parent.parent / "morag-stages" / "src")
+)
 
-from morag.api_models.endpoints.stages import router as stages_router
 from morag.api_models.endpoints.files import router as files_router
+from morag.api_models.endpoints.stages import router as stages_router
 from morag.utils.file_upload import validate_temp_directory_access
 
 logger = structlog.get_logger(__name__)
@@ -110,13 +114,10 @@ def create_app() -> FastAPI:
         openapi_tags=[
             {
                 "name": "stages",
-                "description": "Stage execution endpoints using canonical stage names"
+                "description": "Stage execution endpoints using canonical stage names",
             },
-            {
-                "name": "files",
-                "description": "File management and download endpoints"
-            }
-        ]
+            {"name": "files", "description": "File management and download endpoints"},
+        ],
     )
 
     # Add CORS middleware
@@ -131,14 +132,16 @@ def create_app() -> FastAPI:
     # Add global exception handler
     @app.exception_handler(Exception)
     async def global_exception_handler(request, exc):
-        logger.error("Unhandled exception",
-                    path=request.url.path,
-                    method=request.method,
-                    error=str(exc),
-                    exc_info=True)
+        logger.error(
+            "Unhandled exception",
+            path=request.url.path,
+            method=request.method,
+            error=str(exc),
+            exc_info=True,
+        )
         return JSONResponse(
             status_code=500,
-            content={"detail": "Internal server error", "error": str(exc)}
+            content={"detail": "Internal server error", "error": str(exc)},
         )
 
     # Root endpoint
@@ -154,12 +157,12 @@ def create_app() -> FastAPI:
                 "markdown-optimizer",
                 "chunker",
                 "fact-generator",
-                "ingestor"
+                "ingestor",
             ],
             "docs_url": "/docs",
             "redoc_url": "/redoc",
             "health_url": "/api/v1/stages/health",
-            "migration_notice": "This API completely replaces all previous MoRAG endpoints. No backward compatibility is provided."
+            "migration_notice": "This API completely replaces all previous MoRAG endpoints. No backward compatibility is provided.",
         }
 
     # Legacy endpoint deprecation notice
@@ -185,10 +188,10 @@ def create_app() -> FastAPI:
                         "markdown-optimizer",
                         "chunker",
                         "fact-generator",
-                        "ingestor"
-                    ]
-                }
-            }
+                        "ingestor",
+                    ],
+                },
+            },
         )
 
     # Include stage-based routers ONLY
@@ -208,9 +211,7 @@ def create_app() -> FastAPI:
         )
 
         # Add custom info
-        openapi_schema["info"]["x-logo"] = {
-            "url": "https://example.com/logo.png"
-        }
+        openapi_schema["info"]["x-logo"] = {"url": "https://example.com/logo.png"}
 
         # Add migration notice
         openapi_schema["info"]["x-migration-notice"] = {
@@ -221,8 +222,8 @@ def create_app() -> FastAPI:
                 "markdown-optimizer",
                 "chunker",
                 "fact-generator",
-                "ingestor"
-            ]
+                "ingestor",
+            ],
         }
 
         app.openapi_schema = openapi_schema
@@ -241,19 +242,16 @@ def main():
     host = os.getenv("MORAG_HOST", "0.0.0.0")
     port = int(os.getenv("MORAG_PORT", "8000"))
     reload = os.getenv("MORAG_RELOAD", "false").lower() == "true"
-    log_level = os.getenv("MORAG_LOG_LEVEL", "info").lower()  # Ensure lowercase for uvicorn
+    log_level = os.getenv(
+        "MORAG_LOG_LEVEL", "info"
+    ).lower()  # Ensure lowercase for uvicorn
 
     # Create app
     app = create_app()
 
     # Run server
     uvicorn.run(
-        app,
-        host=host,
-        port=port,
-        reload=reload,
-        log_level=log_level,
-        access_log=True
+        app, host=host, port=port, reload=reload, log_level=log_level, access_log=True
     )
 
 

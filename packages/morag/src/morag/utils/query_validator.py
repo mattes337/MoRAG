@@ -1,10 +1,10 @@
 """Query validation utilities for enhanced API."""
 
 import re
-from typing import Optional, List
 from dataclasses import dataclass
-import structlog
+from typing import List, Optional
 
+import structlog
 from morag.models.enhanced_query import EnhancedQueryRequest, QueryType
 
 logger = structlog.get_logger(__name__)
@@ -13,6 +13,7 @@ logger = structlog.get_logger(__name__)
 @dataclass
 class ValidationResult:
     """Result of query validation."""
+
     is_valid: bool
     error_message: Optional[str] = None
     warnings: List[str] = None
@@ -32,16 +33,18 @@ class QueryValidator:
         self.min_query_length = 3
         self.max_query_length = 1000
         self.forbidden_patterns = [
-            r'<script.*?>.*?</script>',  # Script injection
-            r'javascript:',              # JavaScript URLs
-            r'data:.*base64',           # Base64 data URLs
+            r"<script.*?>.*?</script>",  # Script injection
+            r"javascript:",  # JavaScript URLs
+            r"data:.*base64",  # Base64 data URLs
         ]
 
         # Entity/relation type validation patterns
-        self.valid_entity_type_pattern = r'^[a-zA-Z][a-zA-Z0-9_]*$'
-        self.valid_relation_type_pattern = r'^[a-zA-Z][a-zA-Z0-9_]*$'
+        self.valid_entity_type_pattern = r"^[a-zA-Z][a-zA-Z0-9_]*$"
+        self.valid_relation_type_pattern = r"^[a-zA-Z][a-zA-Z0-9_]*$"
 
-    async def validate_query_request(self, request: EnhancedQueryRequest) -> ValidationResult:
+    async def validate_query_request(
+        self, request: EnhancedQueryRequest
+    ) -> ValidationResult:
         """Validate an enhanced query request.
 
         Args:
@@ -83,15 +86,10 @@ class QueryValidator:
 
         if errors:
             return ValidationResult(
-                is_valid=False,
-                error_message="; ".join(errors),
-                warnings=warnings
+                is_valid=False, error_message="; ".join(errors), warnings=warnings
             )
 
-        return ValidationResult(
-            is_valid=True,
-            warnings=warnings
-        )
+        return ValidationResult(is_valid=True, warnings=warnings)
 
     def _validate_query_text(self, query: str) -> ValidationResult:
         """Validate the query text itself."""
@@ -100,10 +98,14 @@ class QueryValidator:
 
         # Length validation
         if len(query) < self.min_query_length:
-            errors.append(f"Query too short (minimum {self.min_query_length} characters)")
+            errors.append(
+                f"Query too short (minimum {self.min_query_length} characters)"
+            )
 
         if len(query) > self.max_query_length:
-            errors.append(f"Query too long (maximum {self.max_query_length} characters)")
+            errors.append(
+                f"Query too long (maximum {self.max_query_length} characters)"
+            )
 
         # Security validation
         for pattern in self.forbidden_patterns:
@@ -124,7 +126,7 @@ class QueryValidator:
         return ValidationResult(
             is_valid=len(errors) == 0,
             error_message="; ".join(errors) if errors else None,
-            warnings=warnings
+            warnings=warnings,
         )
 
     def _validate_parameters(self, request: EnhancedQueryRequest) -> ValidationResult:
@@ -136,8 +138,13 @@ class QueryValidator:
         if request.expansion_strategy == "none" and request.expansion_depth > 1:
             warnings.append("Expansion depth ignored when strategy is 'none'")
 
-        if request.expansion_strategy == "direct_neighbors" and request.expansion_depth > 1:
-            warnings.append("Expansion depth > 1 not used with 'direct_neighbors' strategy")
+        if (
+            request.expansion_strategy == "direct_neighbors"
+            and request.expansion_depth > 1
+        ):
+            warnings.append(
+                "Expansion depth > 1 not used with 'direct_neighbors' strategy"
+            )
 
         # Fusion strategy compatibility
         if request.fusion_strategy == "vector_only" and request.include_graph_context:
@@ -159,18 +166,24 @@ class QueryValidator:
         return ValidationResult(
             is_valid=len(errors) == 0,
             error_message="; ".join(errors) if errors else None,
-            warnings=warnings
+            warnings=warnings,
         )
 
-    def _validate_query_type_compatibility(self, request: EnhancedQueryRequest) -> ValidationResult:
+    def _validate_query_type_compatibility(
+        self, request: EnhancedQueryRequest
+    ) -> ValidationResult:
         """Validate query type compatibility with other parameters."""
         warnings = []
 
         if request.query_type == QueryType.SIMPLE:
             if request.enable_multi_hop:
-                warnings.append("Multi-hop reasoning not typically used with simple queries")
+                warnings.append(
+                    "Multi-hop reasoning not typically used with simple queries"
+                )
             if request.include_reasoning_path:
-                warnings.append("Reasoning path not typically included for simple queries")
+                warnings.append(
+                    "Reasoning path not typically included for simple queries"
+                )
 
         elif request.query_type == QueryType.ENTITY_FOCUSED:
             if request.expansion_strategy == "none":
@@ -178,9 +191,13 @@ class QueryValidator:
 
         elif request.query_type == QueryType.MULTI_HOP:
             if not request.enable_multi_hop:
-                warnings.append("Multi-hop query type should have multi-hop reasoning enabled")
+                warnings.append(
+                    "Multi-hop query type should have multi-hop reasoning enabled"
+                )
             if request.expansion_depth < 2:
-                warnings.append("Multi-hop queries typically benefit from deeper expansion")
+                warnings.append(
+                    "Multi-hop queries typically benefit from deeper expansion"
+                )
 
         return ValidationResult(is_valid=True, warnings=warnings)
 
@@ -216,10 +233,12 @@ class QueryValidator:
         return ValidationResult(
             is_valid=len(errors) == 0,
             error_message="; ".join(errors) if errors else None,
-            warnings=warnings
+            warnings=warnings,
         )
 
-    def _validate_performance_parameters(self, request: EnhancedQueryRequest) -> ValidationResult:
+    def _validate_performance_parameters(
+        self, request: EnhancedQueryRequest
+    ) -> ValidationResult:
         """Validate parameters that affect performance."""
         warnings = []
 

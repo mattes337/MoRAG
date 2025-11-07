@@ -1,20 +1,23 @@
 """Extract structured facts from document chunks."""
 
 import re
-from typing import List, Dict, Any, Optional
 from concurrent.futures import ThreadPoolExecutor
+from typing import Any, Dict, List, Optional
+
 import structlog
 
 from ..models.fact import Fact, FactType
-from .fact_validator import FactValidator
-from .fact_filter import FactFilter, DomainFilterConfig
+from .fact_filter import DomainFilterConfig, FactFilter
 from .fact_filter_config import create_domain_configs_for_language
+from .fact_validator import FactValidator
 
 # Import agents framework - required
 try:
     from agents import get_agent
 except ImportError:
-    raise ImportError("Agents framework is required. Please install the agents package.")
+    raise ImportError(
+        "Agents framework is required. Please install the agents package."
+    )
 
 
 class FactExtractor:
@@ -32,7 +35,7 @@ class FactExtractor:
         allow_vague_language: bool = False,
         require_entities: bool = True,
         min_fact_length: int = 20,
-        strict_validation: bool = True
+        strict_validation: bool = True,
     ):
         """Initialize fact extractor with LLM and configuration.
 
@@ -63,7 +66,7 @@ class FactExtractor:
             allow_vague_language=allow_vague_language,
             require_entities=require_entities,
             min_fact_length=min_fact_length,
-            strict_validation=strict_validation
+            strict_validation=strict_validation,
         )
         # Initialize fact filter with domain-specific configurations
         domain_configs = self._create_domain_filter_configs()
@@ -74,15 +77,13 @@ class FactExtractor:
         self.fact_agent = get_agent("fact_extraction")
         # Configure agent for this domain and model
         self.fact_agent.update_config(
-            model={
-                "model": model_id  # Override the default model
-            },
+            model={"model": model_id},  # Override the default model
             agent_config={
                 "max_facts": max_facts_per_chunk,
                 "domain": domain,
                 "language": language,
-                "min_confidence": min_confidence
-            }
+                "min_confidence": min_confidence,
+            },
         )
 
     async def extract_facts(
@@ -90,7 +91,7 @@ class FactExtractor:
         chunk_text: str,
         chunk_id: str,
         document_id: str,
-        context: Optional[Dict[str, Any]] = None
+        context: Optional[Dict[str, Any]] = None,
     ) -> List[Fact]:
         """Extract structured facts from a document chunk.
 
@@ -107,20 +108,24 @@ class FactExtractor:
             return []
 
         # Update context from parameters
-        base_domain = context.get('domain', self.domain) if context else self.domain
+        base_domain = context.get("domain", self.domain) if context else self.domain
 
         # Infer domain from text if not explicitly provided or if it's 'general'
-        if base_domain == 'general':
+        if base_domain == "general":
             inferred_domain = self._infer_domain_from_text(chunk_text)
-            if inferred_domain != 'general':
+            if inferred_domain != "general":
                 base_domain = inferred_domain
-                self.logger.info(f"Inferred domain '{inferred_domain}' from text content")
+                self.logger.info(
+                    f"Inferred domain '{inferred_domain}' from text content"
+                )
 
         extraction_context = {
-            'domain': base_domain,
-            'language': context.get('language', self.language) if context else self.language,
-            'chunk_id': chunk_id,
-            'document_id': document_id
+            "domain": base_domain,
+            "language": context.get("language", self.language)
+            if context
+            else self.language,
+            "chunk_id": chunk_id,
+            "document_id": document_id,
         }
 
         self.logger.info(
@@ -128,7 +133,7 @@ class FactExtractor:
             chunk_id=chunk_id,
             document_id=document_id,
             text_length=len(chunk_text),
-            domain=extraction_context['domain']
+            domain=extraction_context["domain"],
         )
 
         try:
@@ -136,13 +141,15 @@ class FactExtractor:
             processed_text = self._preprocess_chunk(chunk_text)
 
             # Extract fact candidates using LLM
-            fact_candidates = await self._extract_fact_candidates(processed_text, extraction_context)
+            fact_candidates = await self._extract_fact_candidates(
+                processed_text, extraction_context
+            )
 
             if not fact_candidates:
                 self.logger.warning(
                     "No fact candidates extracted",
                     chunk_id=chunk_id,
-                    text_length=len(chunk_text)
+                    text_length=len(chunk_text),
                 )
                 return []
 
@@ -152,11 +159,15 @@ class FactExtractor:
                 chunk_id=chunk_id,
                 candidates_count=len(fact_candidates),
                 candidates_types=[type(c).__name__ for c in fact_candidates],
-                first_candidate_preview=str(fact_candidates[0])[:100] if fact_candidates else "None"
+                first_candidate_preview=str(fact_candidates[0])[:100]
+                if fact_candidates
+                else "None",
             )
 
             # Structure facts from candidates
-            facts = self._structure_facts(fact_candidates, chunk_id, document_id, extraction_context)
+            facts = self._structure_facts(
+                fact_candidates, chunk_id, document_id, extraction_context
+            )
 
             # Validate facts
             validated_facts = []
@@ -166,9 +177,7 @@ class FactExtractor:
                     validated_facts.append(fact)
                 else:
                     self.logger.debug(
-                        "Fact validation failed",
-                        fact_id=fact.id,
-                        issues=issues
+                        "Fact validation failed", fact_id=fact.id, issues=issues
                     )
 
             # Generate keywords for validated facts
@@ -177,17 +186,19 @@ class FactExtractor:
                     fact.keywords = self._generate_fact_keywords(fact)
 
             # Filter facts for domain relevance
-            domain_for_filtering = self._determine_filter_domain(extraction_context.get('domain', 'general'))
+            domain_for_filtering = self._determine_filter_domain(
+                extraction_context.get("domain", "general")
+            )
             document_context = {
-                'topics': extraction_context.get('topics', []),
-                'domain': extraction_context.get('domain'),
-                'source_file_name': extraction_context.get('source_file_name', '')
+                "topics": extraction_context.get("topics", []),
+                "domain": extraction_context.get("domain"),
+                "source_file_name": extraction_context.get("source_file_name", ""),
             }
 
             filtered_facts = self.fact_filter.filter_facts(
                 validated_facts,
                 domain=domain_for_filtering,
-                document_context=document_context
+                document_context=document_context,
             )
 
             self.logger.info(
@@ -196,7 +207,7 @@ class FactExtractor:
                 candidates_found=len(fact_candidates),
                 facts_structured=len(facts),
                 facts_validated=len(validated_facts),
-                facts_filtered=len(filtered_facts)
+                facts_filtered=len(filtered_facts),
             )
 
             return filtered_facts
@@ -206,14 +217,15 @@ class FactExtractor:
                 "Fact extraction failed",
                 chunk_id=chunk_id,
                 error=str(e),
-                error_type=type(e).__name__
+                error_type=type(e).__name__,
             )
             # Log the full stack trace for debugging
             import traceback
+
             self.logger.debug(
                 "Full fact extraction error traceback",
                 chunk_id=chunk_id,
-                traceback=traceback.format_exc()
+                traceback=traceback.format_exc(),
             )
             return []
 
@@ -227,17 +239,19 @@ class FactExtractor:
             Cleaned text ready for extraction
         """
         # Remove excessive whitespace
-        text = re.sub(r'\s+', ' ', text)
+        text = re.sub(r"\s+", " ", text)
 
         # Remove markdown artifacts that might confuse extraction
-        text = re.sub(r'#{1,6}\s*', '', text)  # Headers
-        text = re.sub(r'\*{1,2}([^*]+)\*{1,2}', r'\1', text)  # Bold/italic
-        text = re.sub(r'`([^`]+)`', r'\1', text)  # Inline code
+        text = re.sub(r"#{1,6}\s*", "", text)  # Headers
+        text = re.sub(r"\*{1,2}([^*]+)\*{1,2}", r"\1", text)  # Bold/italic
+        text = re.sub(r"`([^`]+)`", r"\1", text)  # Inline code
 
         # Clean up common artifacts - but preserve timestamps!
         # Only remove markdown links that have URLs (contain http or www or end with common extensions)
-        text = re.sub(r'\[([^\]]+)\]\((?:https?://|www\.|[^)]*\.[a-z]{2,4}[^)]*)\)', r'\1', text)  # Links with URLs
-        text = re.sub(r'!\[([^\]]*)\]\([^)]+\)', '', text)  # Images
+        text = re.sub(
+            r"\[([^\]]+)\]\((?:https?://|www\.|[^)]*\.[a-z]{2,4}[^)]*)\)", r"\1", text
+        )  # Links with URLs
+        text = re.sub(r"!\[([^\]]*)\]\([^)]+\)", "", text)  # Images
 
         # Preserve timestamp formats like [00:21 - 00:25] or [01:23] by not removing them
         # The original regex was too broad and removed timestamps
@@ -258,66 +272,182 @@ class FactExtractor:
         # Medical/health keywords (English and German)
         medical_keywords = [
             # English terms
-            'patient', 'doctor', 'medical', 'health', 'disease', 'treatment', 'medication',
-            'symptom', 'diagnosis', 'therapy', 'clinical', 'hospital', 'medicine',
-            'toxin', 'detox', 'vitamin', 'mineral', 'supplement', 'enzyme', 'hormone',
-            'thyroid', 'mercury', 'aluminum', 'heavy metal', 'herb', 'herbal',
-            'adhd', 'attention', 'hyperactivity', 'concentration', 'focus',
-            'ginkgo', 'biloba', 'ginseng', 'rhodiola', 'chlorella', 'extract',
-            'dosage', 'standardized', 'bioavailability', 'cognitive', 'neurotransmitter',
-
+            "patient",
+            "doctor",
+            "medical",
+            "health",
+            "disease",
+            "treatment",
+            "medication",
+            "symptom",
+            "diagnosis",
+            "therapy",
+            "clinical",
+            "hospital",
+            "medicine",
+            "toxin",
+            "detox",
+            "vitamin",
+            "mineral",
+            "supplement",
+            "enzyme",
+            "hormone",
+            "thyroid",
+            "mercury",
+            "aluminum",
+            "heavy metal",
+            "herb",
+            "herbal",
+            "adhd",
+            "attention",
+            "hyperactivity",
+            "concentration",
+            "focus",
+            "ginkgo",
+            "biloba",
+            "ginseng",
+            "rhodiola",
+            "chlorella",
+            "extract",
+            "dosage",
+            "standardized",
+            "bioavailability",
+            "cognitive",
+            "neurotransmitter",
             # German terms
-            'patient', 'arzt', 'medizinisch', 'gesundheit', 'krankheit', 'behandlung', 'medikament',
-            'symptom', 'diagnose', 'therapie', 'klinisch', 'krankenhaus', 'medizin',
-            'toxin', 'entgiftung', 'vitamin', 'mineral', 'nahrungsergänzung', 'enzym', 'hormon',
-            'schilddrüse', 'quecksilber', 'aluminium', 'schwermetall', 'kraut', 'kräuter', 'pflanzlich',
-            'adhs', 'aufmerksamkeit', 'hyperaktivität', 'konzentration', 'fokus',
-            'ginkgo', 'biloba', 'ginseng', 'rhodiola', 'chlorella', 'extrakt',
-            'dosierung', 'standardisiert', 'bioverfügbarkeit', 'kognitiv', 'neurotransmitter',
-            'aufmerksamkeitsdefizit', 'hyperaktivitätsstörung', 'durchblutung', 'gehirn',
-            'flavonglykoside', 'terpenlactone', 'ginsenoside', 'adaptogen', 'beruhigend',
-            'nebenwirkungen', 'wechselwirkungen', 'kontraindikation', 'sicherheit'
+            "patient",
+            "arzt",
+            "medizinisch",
+            "gesundheit",
+            "krankheit",
+            "behandlung",
+            "medikament",
+            "symptom",
+            "diagnose",
+            "therapie",
+            "klinisch",
+            "krankenhaus",
+            "medizin",
+            "toxin",
+            "entgiftung",
+            "vitamin",
+            "mineral",
+            "nahrungsergänzung",
+            "enzym",
+            "hormon",
+            "schilddrüse",
+            "quecksilber",
+            "aluminium",
+            "schwermetall",
+            "kraut",
+            "kräuter",
+            "pflanzlich",
+            "adhs",
+            "aufmerksamkeit",
+            "hyperaktivität",
+            "konzentration",
+            "fokus",
+            "ginkgo",
+            "biloba",
+            "ginseng",
+            "rhodiola",
+            "chlorella",
+            "extrakt",
+            "dosierung",
+            "standardisiert",
+            "bioverfügbarkeit",
+            "kognitiv",
+            "neurotransmitter",
+            "aufmerksamkeitsdefizit",
+            "hyperaktivitätsstörung",
+            "durchblutung",
+            "gehirn",
+            "flavonglykoside",
+            "terpenlactone",
+            "ginsenoside",
+            "adaptogen",
+            "beruhigend",
+            "nebenwirkungen",
+            "wechselwirkungen",
+            "kontraindikation",
+            "sicherheit",
         ]
 
         # Technical keywords
         technical_keywords = [
-            'system', 'software', 'database', 'server', 'network', 'algorithm',
-            'programming', 'code', 'api', 'framework', 'technology', 'computer'
+            "system",
+            "software",
+            "database",
+            "server",
+            "network",
+            "algorithm",
+            "programming",
+            "code",
+            "api",
+            "framework",
+            "technology",
+            "computer",
         ]
 
         # Legal keywords
         legal_keywords = [
-            'law', 'legal', 'court', 'judge', 'lawyer', 'attorney', 'contract',
-            'agreement', 'regulation', 'compliance', 'statute', 'jurisdiction'
+            "law",
+            "legal",
+            "court",
+            "judge",
+            "lawyer",
+            "attorney",
+            "contract",
+            "agreement",
+            "regulation",
+            "compliance",
+            "statute",
+            "jurisdiction",
         ]
 
         # Business keywords
         business_keywords = [
-            'business', 'company', 'corporation', 'market', 'sales', 'revenue',
-            'profit', 'customer', 'client', 'strategy', 'management', 'finance'
+            "business",
+            "company",
+            "corporation",
+            "market",
+            "sales",
+            "revenue",
+            "profit",
+            "customer",
+            "client",
+            "strategy",
+            "management",
+            "finance",
         ]
 
         # Count keyword matches
         medical_score = sum(1 for keyword in medical_keywords if keyword in text_lower)
-        technical_score = sum(1 for keyword in technical_keywords if keyword in text_lower)
+        technical_score = sum(
+            1 for keyword in technical_keywords if keyword in text_lower
+        )
         legal_score = sum(1 for keyword in legal_keywords if keyword in text_lower)
-        business_score = sum(1 for keyword in business_keywords if keyword in text_lower)
+        business_score = sum(
+            1 for keyword in business_keywords if keyword in text_lower
+        )
 
         # Determine domain based on highest score
         scores = {
-            'medical': medical_score,
-            'technical': technical_score,
-            'legal': legal_score,
-            'business': business_score
+            "medical": medical_score,
+            "technical": technical_score,
+            "legal": legal_score,
+            "business": business_score,
         }
 
         max_score = max(scores.values())
         if max_score >= 3:  # Minimum threshold for domain inference
             return max(scores, key=scores.get)
 
-        return 'general'  # Default to general if no clear domain
+        return "general"  # Default to general if no clear domain
 
-    async def _extract_fact_candidates(self, text: str, context: Dict[str, Any]) -> List[Dict[str, Any]]:
+    async def _extract_fact_candidates(
+        self, text: str, context: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
         """Use LLM to extract fact candidates from text.
 
         Args:
@@ -327,11 +457,11 @@ class FactExtractor:
         Returns:
             List of fact candidate dictionaries
         """
-        domain = context.get('domain', 'general')
-        language = context.get('language', 'en')
+        domain = context.get("domain", "general")
+        language = context.get("language", "en")
 
         # Extract query context for agent
-        query_context = context.get('query_context')
+        query_context = context.get("query_context")
 
         try:
             # Use the agents framework - ALWAYS
@@ -341,35 +471,35 @@ class FactExtractor:
                 domain=domain,
                 language=self.language,  # Critical: Include language in execution parameters
                 query_context=query_context,
-                max_facts=self.max_facts_per_chunk
+                max_facts=self.max_facts_per_chunk,
             )
 
             # Convert agent result to simplified format
             fact_candidates = []
             for fact in result.facts:
-                fact_candidates.append({
-                    'fact_text': fact.fact_text,
-                    'fact_type': fact.fact_type,
-                    'confidence': fact.confidence,
-                    'structured_metadata': fact.structured_metadata,
-                    'keywords': fact.keywords,
-                    'source_text': fact.source_text
-                })
+                fact_candidates.append(
+                    {
+                        "fact_text": fact.fact_text,
+                        "fact_type": fact.fact_type,
+                        "confidence": fact.confidence,
+                        "structured_metadata": fact.structured_metadata,
+                        "keywords": fact.keywords,
+                        "source_text": fact.source_text,
+                    }
+                )
 
             self.logger.debug(
                 "Agent fact extraction completed",
                 candidates_found=len(fact_candidates),
                 domain=domain,
-                total_facts_from_agent=result.total_facts
+                total_facts_from_agent=result.total_facts,
             )
 
             return fact_candidates
 
         except Exception as e:
             self.logger.error(
-                "Agent fact extraction failed",
-                error=str(e),
-                domain=domain
+                "Agent fact extraction failed", error=str(e), domain=domain
             )
             return []
 
@@ -393,7 +523,7 @@ class FactExtractor:
         self.logger.debug(
             "Parsing LLM response",
             response_length=len(response),
-            response_preview=response[:300]
+            response_preview=response[:300],
         )
 
         try:
@@ -403,7 +533,7 @@ class FactExtractor:
             parsed_data = LLMResponseParser.parse_json_response(
                 response=response,
                 fallback_value={"facts": []},
-                context="legacy_fact_extraction"
+                context="legacy_fact_extraction",
             )
 
             # Handle both old format (direct array) and new format (object with facts array)
@@ -414,7 +544,9 @@ class FactExtractor:
                     if isinstance(candidate, dict):
                         valid_candidates.append(candidate)
                     else:
-                        self.logger.warning(f"Candidate {i} is not a dictionary: {type(candidate)}")
+                        self.logger.warning(
+                            f"Candidate {i} is not a dictionary: {type(candidate)}"
+                        )
                 return valid_candidates
             elif isinstance(parsed_data, dict):
                 # New format: object with facts array
@@ -424,13 +556,17 @@ class FactExtractor:
                         if isinstance(candidate, dict):
                             valid_candidates.append(candidate)
                         else:
-                            self.logger.warning(f"Fact {i} is not a dictionary: {type(candidate)}")
+                            self.logger.warning(
+                                f"Fact {i} is not a dictionary: {type(candidate)}"
+                            )
                     return valid_candidates
                 else:
                     # Single fact object
                     return [parsed_data]
 
-            self.logger.warning("Unexpected response format", parsed_data_type=type(parsed_data))
+            self.logger.warning(
+                "Unexpected response format", parsed_data_type=type(parsed_data)
+            )
             return []
 
         except Exception as e:
@@ -439,7 +575,7 @@ class FactExtractor:
                 error=str(e),
                 error_type=type(e).__name__,
                 response_preview=response[:500],
-                response_length=len(response)
+                response_length=len(response),
             )
             return []
 
@@ -448,7 +584,7 @@ class FactExtractor:
         candidates: List[Dict[str, Any]],
         chunk_id: str,
         document_id: str,
-        context: Dict[str, Any]
+        context: Dict[str, Any],
     ) -> List[Fact]:
         """Convert LLM output to structured Fact objects using hybrid approach.
 
@@ -472,12 +608,12 @@ class FactExtractor:
                     self.logger.warning(
                         f"Candidate {i} is not a dictionary",
                         candidate_type=type(candidate).__name__,
-                        candidate_value=str(candidate)[:100]
+                        candidate_value=str(candidate)[:100],
                     )
                     continue
 
                 # Extract or generate fact_text field
-                fact_text = candidate.get('fact_text', '')
+                fact_text = candidate.get("fact_text", "")
 
                 # If fact_text is missing, generate it from structured fields
                 if not fact_text or not fact_text.strip():
@@ -486,12 +622,12 @@ class FactExtractor:
                 if not fact_text or not fact_text.strip():
                     self.logger.debug(
                         f"Candidate {i} missing fact_text and could not generate from fields",
-                        candidate=candidate
+                        candidate=candidate,
                     )
                     continue
 
                 # Extract structured metadata
-                structured_metadata_data = candidate.get('structured_metadata', {})
+                structured_metadata_data = candidate.get("structured_metadata", {})
                 if not isinstance(structured_metadata_data, dict):
                     structured_metadata_data = {}
 
@@ -510,36 +646,36 @@ class FactExtractor:
 
                 # Create fact with hybrid approach
                 fact_data = {
-                    'fact_text': fact_text.strip(),
-                    'structured_metadata': structured_metadata,
-                    'source_chunk_id': chunk_id,
-                    'source_document_id': document_id,
-                    'extraction_confidence': float(candidate.get('confidence', 0.8)),
-                    'fact_type': candidate.get('fact_type', FactType.DEFINITION),
-                    'domain': context.get('domain'),
-                    'language': context.get('language', 'en'),
-                    'keywords': candidate.get('keywords', []),
+                    "fact_text": fact_text.strip(),
+                    "structured_metadata": structured_metadata,
+                    "source_chunk_id": chunk_id,
+                    "source_document_id": document_id,
+                    "extraction_confidence": float(candidate.get("confidence", 0.8)),
+                    "fact_type": candidate.get("fact_type", FactType.DEFINITION),
+                    "domain": context.get("domain"),
+                    "language": context.get("language", "en"),
+                    "keywords": candidate.get("keywords", []),
                     # Enhanced extraction metadata
-                    'query_relevance': candidate.get('query_relevance'),
-                    'evidence_strength': candidate.get('evidence_strength'),
-                    'source_span': candidate.get('source_span'),
+                    "query_relevance": candidate.get("query_relevance"),
+                    "evidence_strength": candidate.get("evidence_strength"),
+                    "source_span": candidate.get("source_span"),
                     # Detailed source metadata from context
-                    'source_file_path': context.get('source_file_path'),
-                    'source_file_name': context.get('source_file_name'),
-                    'page_number': context.get('page_number'),
-                    'chapter_title': context.get('chapter_title'),
-                    'chapter_index': context.get('chapter_index'),
-                    'paragraph_index': context.get('paragraph_index'),
-                    'timestamp_start': context.get('timestamp_start'),
-                    'timestamp_end': context.get('timestamp_end'),
-                    'topic_header': context.get('topic_header'),
-                    'speaker_label': context.get('speaker_label'),
-                    'source_text_excerpt': context.get('source_text_excerpt')
+                    "source_file_path": context.get("source_file_path"),
+                    "source_file_name": context.get("source_file_name"),
+                    "page_number": context.get("page_number"),
+                    "chapter_title": context.get("chapter_title"),
+                    "chapter_index": context.get("chapter_index"),
+                    "paragraph_index": context.get("paragraph_index"),
+                    "timestamp_start": context.get("timestamp_start"),
+                    "timestamp_end": context.get("timestamp_end"),
+                    "topic_header": context.get("topic_header"),
+                    "speaker_label": context.get("speaker_label"),
+                    "source_text_excerpt": context.get("source_text_excerpt"),
                 }
 
                 # Validate fact type
-                if fact_data['fact_type'] not in FactType.all_types():
-                    fact_data['fact_type'] = FactType.DEFINITION
+                if fact_data["fact_type"] not in FactType.all_types():
+                    fact_data["fact_type"] = FactType.DEFINITION
 
                 fact = Fact(**fact_data)
                 facts.append(fact)
@@ -548,7 +684,7 @@ class FactExtractor:
                 self.logger.warning(
                     "Failed to structure fact candidate",
                     candidate=candidate,
-                    error=str(e)
+                    error=str(e),
                 )
                 continue
 
@@ -564,19 +700,19 @@ class FactExtractor:
             Generated fact text string
         """
         # Priority 1: Use fact_text from simplified structure
-        if candidate.get('fact_text'):
-            return candidate['fact_text'].strip()
+        if candidate.get("fact_text"):
+            return candidate["fact_text"].strip()
 
         # Priority 2: Try to use source_text if available
-        if candidate.get('source_text'):
-            return candidate['source_text'].strip()
+        if candidate.get("source_text"):
+            return candidate["source_text"].strip()
 
         # Priority 3: Generate from structured fields (legacy support)
-        subject = candidate.get('subject', '')
-        object_val = candidate.get('object', '')
-        approach = candidate.get('approach', '')
-        solution = candidate.get('solution', '')
-        remarks = candidate.get('remarks', '')
+        subject = candidate.get("subject", "")
+        object_val = candidate.get("object", "")
+        approach = candidate.get("approach", "")
+        solution = candidate.get("solution", "")
+        remarks = candidate.get("remarks", "")
 
         # Build fact text from available components
         fact_parts = []
@@ -597,14 +733,14 @@ class FactExtractor:
 
         # Join parts with appropriate punctuation
         if fact_parts:
-            fact_text = '. '.join(part.strip() for part in fact_parts if part.strip())
+            fact_text = ". ".join(part.strip() for part in fact_parts if part.strip())
             # Ensure proper sentence ending
-            if fact_text and not fact_text.endswith('.'):
-                fact_text += '.'
+            if fact_text and not fact_text.endswith("."):
+                fact_text += "."
             return fact_text
 
         # Fallback: try to construct from any available text fields
-        text_fields = ['statement', 'description', 'content', 'text']
+        text_fields = ["statement", "description", "content", "text"]
         for field in text_fields:
             if candidate.get(field):
                 return candidate[field].strip()
@@ -631,15 +767,15 @@ class FactExtractor:
         """
         # Map extraction domains to filter domains
         domain_mapping = {
-            'medical': 'medical',
-            'herbal': 'adhd_herbal',
-            'adhd': 'adhd_herbal',
-            'research': 'medical',
-            'technical': 'general',
-            'general': 'general'
+            "medical": "medical",
+            "herbal": "adhd_herbal",
+            "adhd": "adhd_herbal",
+            "research": "medical",
+            "technical": "general",
+            "general": "general",
         }
 
-        return domain_mapping.get(extraction_domain, 'general')
+        return domain_mapping.get(extraction_domain, "general")
 
     def _generate_fact_keywords(self, fact: Fact) -> List[str]:
         """Generate keywords for fact indexing.
@@ -655,19 +791,70 @@ class FactExtractor:
         text_parts.extend(fact.structured_metadata.primary_entities)
         text_parts.extend(fact.structured_metadata.domain_concepts)
 
-        combined_text = ' '.join(text_parts).lower()
+        combined_text = " ".join(text_parts).lower()
 
         # Extract meaningful words (simple keyword extraction)
-        words = re.findall(r'\b[a-zA-Z]{3,}\b', combined_text)
+        words = re.findall(r"\b[a-zA-Z]{3,}\b", combined_text)
 
         # Filter out common stop words
         stop_words = {
-            'the', 'and', 'for', 'are', 'but', 'not', 'you', 'all', 'can', 'had',
-            'her', 'was', 'one', 'our', 'out', 'day', 'get', 'has', 'him', 'his',
-            'how', 'its', 'may', 'new', 'now', 'old', 'see', 'two', 'who', 'boy',
-            'did', 'man', 'men', 'oil', 'run', 'say', 'she', 'too', 'use', 'way',
-            'with', 'this', 'that', 'they', 'have', 'from', 'will', 'been', 'each',
-            'which', 'their', 'said', 'there', 'what', 'were', 'when', 'where'
+            "the",
+            "and",
+            "for",
+            "are",
+            "but",
+            "not",
+            "you",
+            "all",
+            "can",
+            "had",
+            "her",
+            "was",
+            "one",
+            "our",
+            "out",
+            "day",
+            "get",
+            "has",
+            "him",
+            "his",
+            "how",
+            "its",
+            "may",
+            "new",
+            "now",
+            "old",
+            "see",
+            "two",
+            "who",
+            "boy",
+            "did",
+            "man",
+            "men",
+            "oil",
+            "run",
+            "say",
+            "she",
+            "too",
+            "use",
+            "way",
+            "with",
+            "this",
+            "that",
+            "they",
+            "have",
+            "from",
+            "will",
+            "been",
+            "each",
+            "which",
+            "their",
+            "said",
+            "there",
+            "what",
+            "were",
+            "when",
+            "where",
         }
 
         keywords = [word for word in words if word not in stop_words]

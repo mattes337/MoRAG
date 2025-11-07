@@ -1,13 +1,13 @@
 """Document converters for MoRAG."""
 
+from .archive import ArchiveConverter
 from .base import DocumentConverter
+from .excel import ExcelConverter
 from .markitdown_base import MarkitdownConverter
 from .pdf import PDFConverter
-from .word import WordConverter
-from .excel import ExcelConverter
 from .presentation import PresentationConverter
 from .text import TextConverter
-from .archive import ArchiveConverter
+from .word import WordConverter
 
 __all__ = [
     "DocumentConverter",

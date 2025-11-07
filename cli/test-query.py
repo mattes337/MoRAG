@@ -8,14 +8,14 @@ This script allows testing various query mechanisms against Neo4j and Qdrant dat
 with support for multi-hop reasoning and different query strategies.
 """
 
-import sys
-import os
+import argparse
 import asyncio
 import json
+import os
+import sys
 import time
 from pathlib import Path
-from typing import Optional, List, Dict, Any
-import argparse
+from typing import Any, Dict, List, Optional
 
 # Add the project root to the path
 project_root = Path(__file__).parent.parent
@@ -23,26 +23,45 @@ sys.path.insert(0, str(project_root))
 
 # Load environment variables from the project root
 from dotenv import load_dotenv
-env_path = project_root / '.env'
+
+env_path = project_root / ".env"
 load_dotenv(env_path)
 
 # Import MoRAG components
 try:
+    from morag.database_factory import (
+        get_default_neo4j_storage,
+        get_default_qdrant_storage,
+    )
+    from morag.models.enhanced_query import (
+        EnhancedQueryRequest,
+        EntityQueryRequest,
+        ExpansionStrategy,
+        FusionStrategy,
+        GraphTraversalRequest,
+        QueryType,
+    )
     from morag_graph import (
-        Neo4jStorage, QdrantStorage, Neo4jConfig, QdrantConfig,
-        HybridRetrievalCoordinator, ContextExpansionEngine,
-        QueryEntityExtractor, GraphCRUD, GraphTraversal, GraphAnalytics
+        ContextExpansionEngine,
+        GraphAnalytics,
+        GraphCRUD,
+        GraphTraversal,
+        HybridRetrievalCoordinator,
+        Neo4jConfig,
+        Neo4jStorage,
+        QdrantConfig,
+        QdrantStorage,
+        QueryEntityExtractor,
     )
     from morag_graph.operations import GraphPath
-    from morag.models.enhanced_query import (
-        QueryType, ExpansionStrategy, FusionStrategy,
-        EnhancedQueryRequest, EntityQueryRequest, GraphTraversalRequest
-    )
-    from morag.database_factory import get_default_neo4j_storage, get_default_qdrant_storage
     from morag_reasoning import (
-        ReasoningStrategy, PathSelectionAgent, ReasoningPathFinder,
-        IterativeRetriever, LLMClient
+        IterativeRetriever,
+        LLMClient,
+        PathSelectionAgent,
+        ReasoningPathFinder,
+        ReasoningStrategy,
     )
+
     COMPONENTS_AVAILABLE = True
 except ImportError as e:
     print(f"[FAIL] Error importing MoRAG components: {e}")
@@ -148,7 +167,9 @@ async def test_qdrant_connection(args) -> Optional[QdrantStorage]:
         # Get collection info
         info = await storage.get_collection_info()
         print("[OK] Qdrant connection successful")
-        print(f"📊 Collection '{info['collection_name']}' contains {info['total_points']} points")
+        print(
+            f"📊 Collection '{info['collection_name']}' contains {info['total_points']} points"
+        )
         print(f"   Vector size: {info['vector_size']}")
         print(f"   Host: {info['host']}:{info['port']}")
 
@@ -159,8 +180,12 @@ async def test_qdrant_connection(args) -> Optional[QdrantStorage]:
         return None
 
 
-async def test_simple_query(query: str, neo4j_storage: Optional[Neo4jStorage],
-                          qdrant_storage: Optional[QdrantStorage], args):
+async def test_simple_query(
+    query: str,
+    neo4j_storage: Optional[Neo4jStorage],
+    qdrant_storage: Optional[QdrantStorage],
+    args,
+):
     """Test simple query against available databases."""
     print_section(f"Simple Query: '{query}'")
 
@@ -170,13 +195,17 @@ async def test_simple_query(query: str, neo4j_storage: Optional[Neo4jStorage],
     if neo4j_storage and args.neo4j:
         try:
             print("🔍 Searching Neo4j entities...")
-            entities = await neo4j_storage.search_entities(query, limit=args.max_results)
+            entities = await neo4j_storage.search_entities(
+                query, limit=args.max_results
+            )
             results["neo4j_entities"] = [
                 {
                     "id": e.id,
                     "name": e.name,
                     "type": e.type,
-                    "description": e.description[:100] + "..." if e.description and len(e.description) > 100 else e.description
+                    "description": e.description[:100] + "..."
+                    if e.description and len(e.description) > 100
+                    else e.description,
                 }
                 for e in entities
             ]
@@ -188,13 +217,17 @@ async def test_simple_query(query: str, neo4j_storage: Optional[Neo4jStorage],
     if qdrant_storage and args.qdrant:
         try:
             print("🔍 Searching Qdrant vectors...")
-            entities = await qdrant_storage.search_entities(query, limit=args.max_results)
+            entities = await qdrant_storage.search_entities(
+                query, limit=args.max_results
+            )
             results["qdrant_entities"] = [
                 {
                     "id": e.id,
                     "name": e.name,
                     "type": e.type,
-                    "description": e.description[:100] + "..." if e.description and len(e.description) > 100 else e.description
+                    "description": e.description[:100] + "..."
+                    if e.description and len(e.description) > 100
+                    else e.description,
                 }
                 for e in entities
             ]
@@ -209,7 +242,9 @@ async def test_simple_query(query: str, neo4j_storage: Optional[Neo4jStorage],
         print("[FAIL] No results found")
 
 
-async def test_entity_query(entity_name: str, neo4j_storage: Optional[Neo4jStorage], args):
+async def test_entity_query(
+    entity_name: str, neo4j_storage: Optional[Neo4jStorage], args
+):
     """Test entity-specific queries."""
     if not neo4j_storage:
         print("[WARN]  Entity queries require Neo4j connection")
@@ -235,15 +270,21 @@ async def test_entity_query(entity_name: str, neo4j_storage: Optional[Neo4jStora
             print(f"🔗 Found {len(relations)} relations")
 
             for rel in relations[:5]:  # Show first 5
-                print(f"   {rel.source_entity_id} --[{rel.relation_type}]--> {rel.target_entity_id}")
+                print(
+                    f"   {rel.source_entity_id} --[{rel.relation_type}]--> {rel.target_entity_id}"
+                )
         except Exception as e:
             print(f"   [WARN]  Could not get relations: {e}")
 
         # Find neighbors using graph traversal
         try:
             traversal = GraphTraversal(neo4j_storage)
-            neighbors = await traversal.find_neighbors(entity.id, max_distance=args.expansion_depth)
-            print(f"👥 Found {len(neighbors)} neighbors within distance {args.expansion_depth}")
+            neighbors = await traversal.find_neighbors(
+                entity.id, max_distance=args.expansion_depth
+            )
+            print(
+                f"👥 Found {len(neighbors)} neighbors within distance {args.expansion_depth}"
+            )
 
             for neighbor in neighbors[:3]:  # Show first 3
                 print(f"   {neighbor.name} ({neighbor.type})")
@@ -254,8 +295,9 @@ async def test_entity_query(entity_name: str, neo4j_storage: Optional[Neo4jStora
         print(f"[FAIL] Entity query failed: {e}")
 
 
-async def test_multi_hop_reasoning(query: str, start_entities: List[str],
-                                 neo4j_storage: Optional[Neo4jStorage], args):
+async def test_multi_hop_reasoning(
+    query: str, start_entities: List[str], neo4j_storage: Optional[Neo4jStorage], args
+):
     """Test multi-hop reasoning capabilities."""
     if not neo4j_storage:
         print("[WARN]  Multi-hop reasoning requires Neo4j connection")
@@ -269,7 +311,7 @@ async def test_multi_hop_reasoning(query: str, start_entities: List[str],
         llm_client = LLMClient(
             provider="gemini",
             api_key=os.getenv("GEMINI_API_KEY"),
-            model=os.getenv("MORAG_GEMINI_MODEL", "gemini-2.5-flash")
+            model=os.getenv("MORAG_GEMINI_MODEL", "gemini-2.5-flash"),
         )
 
         # Create reasoning components
@@ -282,10 +324,12 @@ async def test_multi_hop_reasoning(query: str, start_entities: List[str],
             "start_entities": start_entities,
             "strategy": args.reasoning_strategy,
             "max_depth": args.max_depth,
-            "max_paths": args.max_paths
+            "max_paths": args.max_paths,
         }
 
-        print(f"[PROCESSING] Finding reasoning paths (strategy: {args.reasoning_strategy})...")
+        print(
+            f"[PROCESSING] Finding reasoning paths (strategy: {args.reasoning_strategy})..."
+        )
         start_time = time.time()
 
         reasoning_paths = await path_finder.find_reasoning_paths(
@@ -299,17 +343,18 @@ async def test_multi_hop_reasoning(query: str, start_entities: List[str],
         # Show first few paths
         for i, path in enumerate(reasoning_paths[:3]):
             print(f"\n   Path {i+1}:")
-            if hasattr(path, 'entities'):
+            if hasattr(path, "entities"):
                 print(f"     Entities: {' -> '.join(path.entities[:5])}")
-            if hasattr(path, 'confidence'):
+            if hasattr(path, "confidence"):
                 print(f"     Confidence: {path.confidence:.3f}")
 
     except Exception as e:
         print(f"[FAIL] Multi-hop reasoning failed: {e}")
 
 
-async def test_graph_traversal(start_entity: str, end_entity: str,
-                             neo4j_storage: Optional[Neo4jStorage], args):
+async def test_graph_traversal(
+    start_entity: str, end_entity: str, neo4j_storage: Optional[Neo4jStorage], args
+):
     """Test graph traversal between entities."""
     if not neo4j_storage:
         print("[WARN]  Graph traversal requires Neo4j connection")
@@ -334,14 +379,16 @@ async def test_graph_traversal(start_entity: str, end_entity: str,
         start_id = start_entities[0].id
         end_id = end_entities[0].id
 
-        print(f"🎯 Finding paths from {start_entities[0].name} to {end_entities[0].name}")
+        print(
+            f"🎯 Finding paths from {start_entities[0].name} to {end_entities[0].name}"
+        )
 
         # Find shortest path
         path = await traversal.find_shortest_path(start_id, end_id)
         if path:
             print(f"[OK] Shortest path found with {len(path.entities)} entities")
             print(f"   Path: {' -> '.join(path.entities[:10])}")  # Show first 10
-            if hasattr(path, 'total_weight'):
+            if hasattr(path, "total_weight"):
                 print(f"   Weight: {path.total_weight:.3f}")
         else:
             print("[FAIL] No path found between entities")
@@ -442,8 +489,12 @@ async def test_graph_analytics(neo4j_storage: Optional[Neo4jStorage], args):
         print(f"[FAIL] Graph analytics failed: {e}")
 
 
-async def test_hybrid_retrieval(query: str, neo4j_storage: Optional[Neo4jStorage],
-                              qdrant_storage: Optional[QdrantStorage], args):
+async def test_hybrid_retrieval(
+    query: str,
+    neo4j_storage: Optional[Neo4jStorage],
+    qdrant_storage: Optional[QdrantStorage],
+    args,
+):
     """Test hybrid retrieval combining vector and graph search."""
     if not neo4j_storage or not qdrant_storage:
         print("[WARN]  Hybrid retrieval requires both Neo4j and Qdrant connections")
@@ -460,21 +511,27 @@ async def test_hybrid_retrieval(query: str, neo4j_storage: Optional[Neo4jStorage
             graph_weight=0.4,
             max_results=args.max_results,
             expansion_depth=args.expansion_depth,
-            fusion_strategy=args.fusion_strategy
+            fusion_strategy=args.fusion_strategy,
         )
 
-        print(f"[PROCESSING] Running hybrid retrieval (fusion: {args.fusion_strategy})...")
+        print(
+            f"[PROCESSING] Running hybrid retrieval (fusion: {args.fusion_strategy})..."
+        )
         start_time = time.time()
 
         # This would typically use the HybridRetrievalCoordinator
         # For now, we'll simulate by running both searches separately
 
         # Vector search
-        vector_results = await qdrant_storage.search_entities(query, limit=args.max_results)
+        vector_results = await qdrant_storage.search_entities(
+            query, limit=args.max_results
+        )
         print(f"   📊 Vector search: {len(vector_results)} results")
 
         # Graph search
-        graph_results = await neo4j_storage.search_entities(query, limit=args.max_results)
+        graph_results = await neo4j_storage.search_entities(
+            query, limit=args.max_results
+        )
         print(f"   🕸️  Graph search: {len(graph_results)} results")
 
         end_time = time.time()
@@ -489,7 +546,7 @@ async def test_hybrid_retrieval(query: str, neo4j_storage: Optional[Neo4jStorage
                 "source": "vector",
                 "name": result.name,
                 "type": result.type,
-                "score": getattr(result, 'score', 0.0)
+                "score": getattr(result, "score", 0.0),
             }
 
         # Add graph results
@@ -498,7 +555,7 @@ async def test_hybrid_retrieval(query: str, neo4j_storage: Optional[Neo4jStorage
                 "source": "graph",
                 "name": result.name,
                 "type": result.type,
-                "score": getattr(result, 'score', 0.0)
+                "score": getattr(result, "score", 0.0),
             }
 
         if all_results:
@@ -515,25 +572,25 @@ def print_usage_examples():
     """Print usage examples."""
     examples = [
         "# Basic query against both databases",
-        "python test-query.py --all-dbs \"artificial intelligence\"",
+        'python test-query.py --all-dbs "artificial intelligence"',
         "",
         "# Entity-focused query with Neo4j",
-        "python test-query.py --neo4j --entity-query \"Apple Inc\" \"company partnerships\"",
+        'python test-query.py --neo4j --entity-query "Apple Inc" "company partnerships"',
         "",
         "# Multi-hop reasoning",
-        "python test-query.py --neo4j --enable-multi-hop --start-entities \"Apple Inc\" \"AI research\" \"How are Apple's AI efforts connected?\"",
+        'python test-query.py --neo4j --enable-multi-hop --start-entities "Apple Inc" "AI research" "How are Apple\'s AI efforts connected?"',
         "",
         "# Graph traversal between entities",
-        "python test-query.py --neo4j --test-traversal --start-entity \"Apple Inc\" --end-entity \"Stanford University\" \"connection path\"",
+        'python test-query.py --neo4j --test-traversal --start-entity "Apple Inc" --end-entity "Stanford University" "connection path"',
         "",
         "# Graph analytics and statistics",
-        "python test-query.py --neo4j --test-analytics \"database overview\"",
+        'python test-query.py --neo4j --test-analytics "database overview"',
         "",
         "# Hybrid retrieval test",
-        "python test-query.py --all-dbs --test-hybrid \"machine learning applications\"",
+        'python test-query.py --all-dbs --test-hybrid "machine learning applications"',
         "",
         "# Run all tests",
-        "python test-query.py --all-dbs --test-all --start-entities \"Apple Inc\" --start-entity \"Apple Inc\" --end-entity \"AI research\" \"comprehensive test\"",
+        'python test-query.py --all-dbs --test-all --start-entities "Apple Inc" --start-entity "Apple Inc" --end-entity "AI research" "comprehensive test"',
     ]
 
     print("📖 Usage Examples:")
@@ -551,49 +608,108 @@ async def main():
     parser = argparse.ArgumentParser(
         description="Test MoRAG query mechanisms",
         epilog="Use --help for detailed options or run with no arguments to see examples.",
-        formatter_class=argparse.RawDescriptionHelpFormatter
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
     # Database selection
     parser.add_argument("--neo4j", action="store_true", help="Test Neo4j queries")
     parser.add_argument("--qdrant", action="store_true", help="Test Qdrant queries")
-    parser.add_argument("--all-dbs", action="store_true", help="Test all available databases")
+    parser.add_argument(
+        "--all-dbs", action="store_true", help="Test all available databases"
+    )
 
     # Query parameters
     parser.add_argument("query", help="Query text to test")
-    parser.add_argument("--max-results", type=int, default=10, help="Maximum results (default: 10)")
-    parser.add_argument("--query-type", choices=["simple", "entity_focused", "relation_focused", "multi_hop", "analytical"],
-                       default="simple", help="Query type (default: simple)")
+    parser.add_argument(
+        "--max-results", type=int, default=10, help="Maximum results (default: 10)"
+    )
+    parser.add_argument(
+        "--query-type",
+        choices=[
+            "simple",
+            "entity_focused",
+            "relation_focused",
+            "multi_hop",
+            "analytical",
+        ],
+        default="simple",
+        help="Query type (default: simple)",
+    )
 
     # Multi-hop reasoning
-    parser.add_argument("--enable-multi-hop", action="store_true", help="Enable multi-hop reasoning")
-    parser.add_argument("--start-entities", nargs="+", help="Starting entities for multi-hop reasoning")
-    parser.add_argument("--reasoning-strategy", choices=["forward_chaining", "backward_chaining", "bidirectional"],
-                       default="forward_chaining", help="Reasoning strategy (default: forward_chaining)")
-    parser.add_argument("--max-depth", type=int, default=3, help="Maximum reasoning depth (default: 3)")
-    parser.add_argument("--max-paths", type=int, default=10, help="Maximum reasoning paths (default: 10)")
+    parser.add_argument(
+        "--enable-multi-hop", action="store_true", help="Enable multi-hop reasoning"
+    )
+    parser.add_argument(
+        "--start-entities", nargs="+", help="Starting entities for multi-hop reasoning"
+    )
+    parser.add_argument(
+        "--reasoning-strategy",
+        choices=["forward_chaining", "backward_chaining", "bidirectional"],
+        default="forward_chaining",
+        help="Reasoning strategy (default: forward_chaining)",
+    )
+    parser.add_argument(
+        "--max-depth", type=int, default=3, help="Maximum reasoning depth (default: 3)"
+    )
+    parser.add_argument(
+        "--max-paths",
+        type=int,
+        default=10,
+        help="Maximum reasoning paths (default: 10)",
+    )
 
     # Graph traversal
-    parser.add_argument("--test-traversal", action="store_true", help="Test graph traversal")
+    parser.add_argument(
+        "--test-traversal", action="store_true", help="Test graph traversal"
+    )
     parser.add_argument("--start-entity", help="Start entity for traversal")
     parser.add_argument("--end-entity", help="End entity for traversal")
 
     # Analytics and statistics
-    parser.add_argument("--test-analytics", action="store_true", help="Test graph analytics")
-    parser.add_argument("--test-hybrid", action="store_true", help="Test hybrid retrieval")
+    parser.add_argument(
+        "--test-analytics", action="store_true", help="Test graph analytics"
+    )
+    parser.add_argument(
+        "--test-hybrid", action="store_true", help="Test hybrid retrieval"
+    )
 
     # Expansion and fusion
-    parser.add_argument("--expansion-strategy", choices=["direct_neighbors", "breadth_first", "shortest_path", "adaptive", "none"],
-                       default="adaptive", help="Context expansion strategy (default: adaptive)")
-    parser.add_argument("--expansion-depth", type=int, default=2, help="Expansion depth (default: 2)")
-    parser.add_argument("--fusion-strategy", choices=["weighted", "reciprocal_rank_fusion", "adaptive", "vector_only", "graph_only"],
-                       default="adaptive", help="Result fusion strategy (default: adaptive)")
+    parser.add_argument(
+        "--expansion-strategy",
+        choices=[
+            "direct_neighbors",
+            "breadth_first",
+            "shortest_path",
+            "adaptive",
+            "none",
+        ],
+        default="adaptive",
+        help="Context expansion strategy (default: adaptive)",
+    )
+    parser.add_argument(
+        "--expansion-depth", type=int, default=2, help="Expansion depth (default: 2)"
+    )
+    parser.add_argument(
+        "--fusion-strategy",
+        choices=[
+            "weighted",
+            "reciprocal_rank_fusion",
+            "adaptive",
+            "vector_only",
+            "graph_only",
+        ],
+        default="adaptive",
+        help="Result fusion strategy (default: adaptive)",
+    )
 
     # Entity queries
     parser.add_argument("--entity-query", help="Test entity-specific queries")
 
     # Test selection
-    parser.add_argument("--test-all", action="store_true", help="Run all available tests")
+    parser.add_argument(
+        "--test-all", action="store_true", help="Run all available tests"
+    )
 
     # Output options
     parser.add_argument("--json", action="store_true", help="Output results as JSON")
@@ -619,7 +735,9 @@ async def main():
         return 1
 
     if not COMPONENTS_AVAILABLE:
-        print("[FAIL] MoRAG components not available. Please install required packages.")
+        print(
+            "[FAIL] MoRAG components not available. Please install required packages."
+        )
         return 1
 
     print_header("MoRAG Query Testing CLI")
@@ -655,11 +773,15 @@ async def main():
 
         # Multi-hop reasoning test
         if args.enable_multi_hop and args.start_entities:
-            await test_multi_hop_reasoning(args.query, args.start_entities, neo4j_storage, args)
+            await test_multi_hop_reasoning(
+                args.query, args.start_entities, neo4j_storage, args
+            )
 
         # Graph traversal test
         if args.test_traversal and args.start_entity and args.end_entity:
-            await test_graph_traversal(args.start_entity, args.end_entity, neo4j_storage, args)
+            await test_graph_traversal(
+                args.start_entity, args.end_entity, neo4j_storage, args
+            )
 
         # Graph analytics test
         if args.test_analytics:
@@ -675,7 +797,9 @@ async def main():
             # Show summary
             print("📊 Test Summary:")
             print(f"   Query: '{args.query}'")
-            print(f"   Databases tested: {'Neo4j' if neo4j_storage else ''} {'Qdrant' if qdrant_storage else ''}")
+            print(
+                f"   Databases tested: {'Neo4j' if neo4j_storage else ''} {'Qdrant' if qdrant_storage else ''}"
+            )
             print(f"   Query type: {args.query_type}")
             if args.enable_multi_hop:
                 print(f"   Multi-hop reasoning: {args.reasoning_strategy}")
@@ -691,6 +815,7 @@ async def main():
             print(f"[FAIL] Test failed: {e}")
         if args.verbose:
             import traceback
+
             traceback.print_exc()
         return 1
 

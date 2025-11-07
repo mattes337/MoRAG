@@ -1,11 +1,11 @@
 """FactCriticAgent for evaluating relevance of raw facts and assigning scores."""
 
-import structlog
 from typing import Optional
-from pydantic_ai import Agent
 
+import structlog
 from morag_reasoning.llm import LLMClient
-from morag_reasoning.recursive_fact_models import RawFact, ScoredFact, FCAResponse
+from morag_reasoning.recursive_fact_models import FCAResponse, RawFact, ScoredFact
+from pydantic_ai import Agent
 
 
 class FactCriticAgent:
@@ -24,7 +24,7 @@ class FactCriticAgent:
         self.agent = Agent(
             model=llm_client.get_model(),
             result_type=FCAResponse,
-            system_prompt=self._get_system_prompt()
+            system_prompt=self._get_system_prompt(),
         )
 
     def _get_system_prompt(self) -> str:
@@ -61,10 +61,7 @@ Return the original raw fact enhanced with:
 Be objective and consistent in your scoring. Focus on how well the fact helps answer the user's specific question."""
 
     async def evaluate_fact(
-        self,
-        user_query: str,
-        raw_fact: RawFact,
-        language: Optional[str] = None
+        self, user_query: str, raw_fact: RawFact, language: Optional[str] = None
     ) -> ScoredFact:
         """Evaluate a raw fact and assign a relevance score.
 
@@ -76,9 +73,7 @@ Be objective and consistent in your scoring. Focus on how well the fact helps an
             ScoredFact with relevance score and source description
         """
         self.logger.debug(
-            "Evaluating fact",
-            query=user_query,
-            fact=raw_fact.fact_text[:100]
+            "Evaluating fact", query=user_query, fact=raw_fact.fact_text[:100]
         )
 
         try:
@@ -96,7 +91,7 @@ Be objective and consistent in your scoring. Focus on how well the fact helps an
                     "Fact evaluation completed",
                     fact=raw_fact.fact_text[:100],
                     score=scored_fact.score,
-                    source=scored_fact.source_description
+                    source=scored_fact.source_description,
                 )
 
                 return scored_fact
@@ -104,23 +99,26 @@ Be objective and consistent in your scoring. Focus on how well the fact helps an
             except Exception as agent_error:
                 # Check if this is a malformed function call error
                 error_str = str(agent_error)
-                if "MALFORMED_FUNCTION_CALL" in error_str or "Content field missing" in error_str:
+                if (
+                    "MALFORMED_FUNCTION_CALL" in error_str
+                    or "Content field missing" in error_str
+                ):
                     self.logger.warning(
                         "PydanticAI agent failed with malformed function call, using fallback evaluation",
                         fact=raw_fact.fact_text[:100],
-                        error=error_str
+                        error=error_str,
                     )
                     # Use fallback evaluation method
-                    return await self._fallback_evaluation(user_query, raw_fact, language)
+                    return await self._fallback_evaluation(
+                        user_query, raw_fact, language
+                    )
                 else:
                     # Re-raise other errors
                     raise agent_error
 
         except Exception as e:
             self.logger.error(
-                "Error evaluating fact",
-                fact=raw_fact.fact_text[:100],
-                error=str(e)
+                "Error evaluating fact", fact=raw_fact.fact_text[:100], error=str(e)
             )
             # Return fact with low score as fallback
             return ScoredFact(
@@ -131,10 +129,12 @@ Be objective and consistent in your scoring. Focus on how well the fact helps an
                 source_metadata=raw_fact.source_metadata,
                 extracted_from_depth=raw_fact.extracted_from_depth,
                 score=0.1,  # Low score for error cases
-                source_description=f"Document: {raw_fact.source_metadata.document_name or 'Unknown'}, Chunk: {raw_fact.source_metadata.chunk_index or 0}"
+                source_description=f"Document: {raw_fact.source_metadata.document_name or 'Unknown'}, Chunk: {raw_fact.source_metadata.chunk_index or 0}",
             )
 
-    def _create_evaluation_prompt(self, user_query: str, raw_fact: RawFact, language: Optional[str] = None) -> str:
+    def _create_evaluation_prompt(
+        self, user_query: str, raw_fact: RawFact, language: Optional[str] = None
+    ) -> str:
         """Create the prompt for fact evaluation."""
 
         # Build comprehensive source context focusing on meaningful information
@@ -150,7 +150,9 @@ Be objective and consistent in your scoring. Focus on how well the fact helps an
 
         # Extract entity name from metadata if available
         if raw_fact.source_metadata.additional_metadata:
-            entity_name = raw_fact.source_metadata.additional_metadata.get("entity_name")
+            entity_name = raw_fact.source_metadata.additional_metadata.get(
+                "entity_name"
+            )
 
         if raw_fact.source_metadata.document_name:
             metadata_info.append(f"Document: {raw_fact.source_metadata.document_name}")
@@ -200,17 +202,17 @@ Return the fact with an assigned score and source description."""
         # Add language instruction if specified
         if language:
             language_names = {
-                'en': 'English',
-                'de': 'German',
-                'fr': 'French',
-                'es': 'Spanish',
-                'it': 'Italian',
-                'pt': 'Portuguese',
-                'nl': 'Dutch',
-                'ru': 'Russian',
-                'zh': 'Chinese',
-                'ja': 'Japanese',
-                'ko': 'Korean'
+                "en": "English",
+                "de": "German",
+                "fr": "French",
+                "es": "Spanish",
+                "it": "Italian",
+                "pt": "Portuguese",
+                "nl": "Dutch",
+                "ru": "Russian",
+                "zh": "Chinese",
+                "ja": "Japanese",
+                "ko": "Korean",
             }
             language_name = language_names.get(language, language)
             prompt += f"\n\nIMPORTANT: Provide source description in {language_name} ({language})."
@@ -222,7 +224,7 @@ Return the fact with an assigned score and source description."""
         user_query: str,
         raw_facts: list[RawFact],
         batch_size: int = 10,
-        language: Optional[str] = None
+        language: Optional[str] = None,
     ) -> list[ScoredFact]:
         """Evaluate multiple facts in batches for efficiency.
 
@@ -240,14 +242,14 @@ Return the fact with an assigned score and source description."""
         self.logger.info(
             "Starting batch fact evaluation",
             total_facts=len(raw_facts),
-            batch_size=batch_size
+            batch_size=batch_size,
         )
 
         scored_facts = []
 
         # Process facts in batches
         for i in range(0, len(raw_facts), batch_size):
-            batch = raw_facts[i:i + batch_size]
+            batch = raw_facts[i : i + batch_size]
             self.logger.debug(f"Processing batch {i//batch_size + 1}")
 
             # Evaluate each fact in the batch
@@ -260,33 +262,32 @@ Return the fact with an assigned score and source description."""
                     self.logger.warning(
                         "Failed to evaluate fact in batch",
                         fact=fact.fact_text[:100],
-                        error=str(e)
+                        error=str(e),
                     )
                     # Add with low score as fallback
-                    batch_results.append(ScoredFact(
-                        fact_text=fact.fact_text,
-                        source_node_id=fact.source_node_id,
-                        source_property=fact.source_property,
-                        source_qdrant_chunk_id=fact.source_qdrant_chunk_id,
-                        source_metadata=fact.source_metadata,
-                        extracted_from_depth=fact.extracted_from_depth,
-                        score=0.1,
-                        source_description=f"Document: {fact.source_metadata.document_name or 'Unknown'}, Chunk: {fact.source_metadata.chunk_index or 0}"
-                    ))
+                    batch_results.append(
+                        ScoredFact(
+                            fact_text=fact.fact_text,
+                            source_node_id=fact.source_node_id,
+                            source_property=fact.source_property,
+                            source_qdrant_chunk_id=fact.source_qdrant_chunk_id,
+                            source_metadata=fact.source_metadata,
+                            extracted_from_depth=fact.extracted_from_depth,
+                            score=0.1,
+                            source_description=f"Document: {fact.source_metadata.document_name or 'Unknown'}, Chunk: {fact.source_metadata.chunk_index or 0}",
+                        )
+                    )
 
             scored_facts.extend(batch_results)
 
         self.logger.info(
-            "Batch fact evaluation completed",
-            total_evaluated=len(scored_facts)
+            "Batch fact evaluation completed", total_evaluated=len(scored_facts)
         )
 
         return scored_facts
 
     def apply_relevance_decay(
-        self,
-        scored_facts: list[ScoredFact],
-        decay_rate: float = 0.2
+        self, scored_facts: list[ScoredFact], decay_rate: float = 0.2
     ) -> list["FinalFact"]:
         """Apply depth-based relevance decay to scored facts.
 
@@ -303,7 +304,7 @@ Return the fact with an assigned score and source description."""
         self.logger.info(
             "Applying relevance decay",
             total_facts=len(scored_facts),
-            decay_rate=decay_rate
+            decay_rate=decay_rate,
         )
 
         from morag_reasoning.recursive_fact_models import FinalFact
@@ -323,25 +324,19 @@ Return the fact with an assigned score and source description."""
                 extracted_from_depth=fact.extracted_from_depth,
                 score=fact.score,
                 source_description=fact.source_description,
-                final_decayed_score=final_decayed_score
+                final_decayed_score=final_decayed_score,
             )
             final_facts.append(final_fact)
 
         # Sort by final decayed score, highest first
         final_facts.sort(key=lambda x: x.final_decayed_score, reverse=True)
 
-        self.logger.info(
-            "Relevance decay applied",
-            facts_processed=len(final_facts)
-        )
+        self.logger.info("Relevance decay applied", facts_processed=len(final_facts))
 
         return final_facts
 
     async def _fallback_evaluation(
-        self,
-        user_query: str,
-        raw_fact: RawFact,
-        language: Optional[str] = None
+        self, user_query: str, raw_fact: RawFact, language: Optional[str] = None
     ) -> ScoredFact:
         """Fallback evaluation method when PydanticAI agent fails.
 
@@ -379,33 +374,31 @@ SOURCE: Document 'Medical Guide', Chapter 3, Page 45"""
 
             # Use direct LLM call instead of PydanticAI agent
             response_text = await self.llm_client.generate(
-                prompt,
-                max_tokens=200,
-                temperature=0.1
+                prompt, max_tokens=200, temperature=0.1
             )
 
             # Parse the response
             score = 0.5  # Default score
             source_description = f"Document: {raw_fact.source_metadata.document_name or 'Unknown'}, Chunk: {raw_fact.source_metadata.chunk_index or 0}"
 
-            lines = response_text.strip().split('\n')
+            lines = response_text.strip().split("\n")
             for line in lines:
                 line = line.strip()
-                if line.startswith('SCORE:'):
+                if line.startswith("SCORE:"):
                     try:
-                        score_str = line.replace('SCORE:', '').strip()
+                        score_str = line.replace("SCORE:", "").strip()
                         score = float(score_str)
                         score = max(0.0, min(1.0, score))  # Clamp to valid range
                     except ValueError:
                         self.logger.warning(f"Could not parse score from: {line}")
-                elif line.startswith('SOURCE:'):
-                    source_description = line.replace('SOURCE:', '').strip()
+                elif line.startswith("SOURCE:"):
+                    source_description = line.replace("SOURCE:", "").strip()
 
             self.logger.debug(
                 "Fallback fact evaluation completed",
                 fact=raw_fact.fact_text[:100],
                 score=score,
-                source=source_description
+                source=source_description,
             )
 
             return ScoredFact(
@@ -416,14 +409,14 @@ SOURCE: Document 'Medical Guide', Chapter 3, Page 45"""
                 source_metadata=raw_fact.source_metadata,
                 extracted_from_depth=raw_fact.extracted_from_depth,
                 score=score,
-                source_description=source_description
+                source_description=source_description,
             )
 
         except Exception as e:
             self.logger.error(
                 "Fallback evaluation also failed",
                 fact=raw_fact.fact_text[:100],
-                error=str(e)
+                error=str(e),
             )
             # Return with default low score
             return ScoredFact(
@@ -434,5 +427,5 @@ SOURCE: Document 'Medical Guide', Chapter 3, Page 45"""
                 source_metadata=raw_fact.source_metadata,
                 extracted_from_depth=raw_fact.extracted_from_depth,
                 score=0.1,
-                source_description=f"Document: {raw_fact.source_metadata.document_name or 'Unknown'}, Chunk: {raw_fact.source_metadata.chunk_index or 0}"
+                source_description=f"Document: {raw_fact.source_metadata.document_name or 'Unknown'}, Chunk: {raw_fact.source_metadata.chunk_index or 0}",
             )

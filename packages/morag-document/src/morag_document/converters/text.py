@@ -20,7 +20,14 @@ class TextConverter(MarkitdownConverter):
     def __init__(self):
         """Initialize Text converter."""
         super().__init__()
-        self.supported_formats: Set[str] = {"text", "txt", "markdown", "md", "html", "htm"}
+        self.supported_formats: Set[str] = {
+            "text",
+            "txt",
+            "markdown",
+            "md",
+            "html",
+            "htm",
+        }
 
     async def supports_format(self, format_type: str) -> bool:
         """Check if format is supported.

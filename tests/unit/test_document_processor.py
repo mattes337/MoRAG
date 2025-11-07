@@ -1,8 +1,10 @@
-import pytest
 import tempfile
 from pathlib import Path
-from morag_document import document_processor, DocumentType
+
+import pytest
 from morag_core.exceptions import ValidationError
+from morag_document import DocumentType, document_processor
+
 
 def test_document_type_detection():
     """Test document type detection."""
@@ -14,12 +16,14 @@ def test_document_type_detection():
     with pytest.raises(ValidationError):
         document_processor.detect_document_type("test.xyz")
 
+
 @pytest.mark.asyncio
 async def test_markdown_parsing():
     """Test parsing of markdown files."""
     # Create a test markdown file
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
-        f.write("""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
+        f.write(
+            """
 # Test Document
 
 This is a test document with multiple sections.
@@ -31,7 +35,8 @@ Some content in section 1.
 ## Section 2
 
 Some content in section 2.
-        """)
+        """
+        )
         temp_path = f.name
 
     try:
@@ -45,12 +50,15 @@ Some content in section 2.
     finally:
         Path(temp_path).unlink()
 
+
 @pytest.mark.asyncio
 async def test_text_file_parsing():
     """Test parsing of text files."""
     # Create a test text file
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
-        f.write("This is a simple text file for testing.\n\nIt has multiple paragraphs.")
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+        f.write(
+            "This is a simple text file for testing.\n\nIt has multiple paragraphs."
+        )
         temp_path = f.name
 
     try:
@@ -63,6 +71,7 @@ async def test_text_file_parsing():
     finally:
         Path(temp_path).unlink()
 
+
 def test_file_validation():
     """Test file validation."""
     # Test non-existent file
@@ -70,7 +79,7 @@ def test_file_validation():
         document_processor.validate_file("non_existent_file.pdf")
 
     # Test unsupported file type
-    with tempfile.NamedTemporaryFile(suffix='.xyz', delete=False) as f:
+    with tempfile.NamedTemporaryFile(suffix=".xyz", delete=False) as f:
         temp_path = f.name
 
     try:
@@ -79,10 +88,11 @@ def test_file_validation():
     finally:
         Path(temp_path).unlink()
 
+
 def test_file_size_validation():
     """Test file size validation."""
     # Create a small file that should pass validation
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
         f.write("Small test file")
         temp_path = f.name
 
@@ -97,11 +107,12 @@ def test_file_size_validation():
     finally:
         Path(temp_path).unlink()
 
+
 @pytest.mark.asyncio
 async def test_docling_fallback():
     """Test docling fallback when docling is not available."""
     # Create a test PDF-like file (actually text)
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.pdf', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".pdf", delete=False) as f:
         f.write("This is a fake PDF file for testing fallback.")
         temp_path = f.name
 
@@ -116,8 +127,10 @@ async def test_docling_fallback():
     finally:
         Path(temp_path).unlink()
 
+
 def test_table_to_markdown():
     """Test table to markdown conversion."""
+
     # Create a mock table element
     class MockTable:
         def __init__(self, text):
@@ -132,11 +145,12 @@ def test_table_to_markdown():
     if "content not available" not in result:
         assert "Header1 | Header2" in result
 
+
 @pytest.mark.asyncio
 async def test_empty_file_handling():
     """Test handling of empty files."""
     # Create an empty file
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
         temp_path = f.name
 
     try:
@@ -150,13 +164,16 @@ async def test_empty_file_handling():
     finally:
         Path(temp_path).unlink()
 
+
 @pytest.mark.asyncio
 async def test_large_document_chunking():
     """Test processing of larger documents."""
     # Create a larger test document
-    large_content = "\n\n".join([f"This is paragraph {i} with some content." for i in range(50)])
+    large_content = "\n\n".join(
+        [f"This is paragraph {i} with some content." for i in range(50)]
+    )
 
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
         f.write(large_content)
         temp_path = f.name
 
@@ -170,6 +187,7 @@ async def test_large_document_chunking():
     finally:
         Path(temp_path).unlink()
 
+
 def test_supported_file_types():
     """Test that all supported file types are recognized."""
     supported_extensions = [".pdf", ".docx", ".doc", ".md", ".markdown", ".txt"]
@@ -177,6 +195,7 @@ def test_supported_file_types():
     for ext in supported_extensions:
         doc_type = document_processor.detect_document_type(f"test{ext}")
         assert doc_type in DocumentType
+
 
 def test_case_insensitive_extensions():
     """Test that file extensions are case insensitive."""

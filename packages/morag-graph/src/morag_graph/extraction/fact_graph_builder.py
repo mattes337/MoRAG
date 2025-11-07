@@ -9,11 +9,11 @@ The main functionality is now distributed across:
 This file provides backward compatibility.
 """
 
-# Re-export the refactored components for backward compatibility
-from .graph_builder_interface import FactGraphBuilder
-
 # Export additional components if needed
 from .fact_graph_operations import FactGraphOperations
+
+# Re-export the refactored components for backward compatibility
+from .graph_builder_interface import FactGraphBuilder
 from .graph_utilities import GraphUtilities
 
-__all__ = ['FactGraphBuilder', 'FactGraphOperations', 'GraphUtilities']
+__all__ = ["FactGraphBuilder", "FactGraphOperations", "GraphUtilities"]

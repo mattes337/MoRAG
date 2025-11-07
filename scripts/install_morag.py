@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """Installation script for MoRAG modular system."""
 
-import os
-import sys
-import subprocess
-import json
-from pathlib import Path
-from typing import Dict, List, Any, Optional
 import argparse
+import json
 import logging
+import os
+import subprocess
+import sys
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -25,7 +25,7 @@ class MoRAGInstaller:
             "services": "packages/morag-services",
             "web": "packages/morag-web",
             "youtube": "packages/morag-youtube",
-            "main": "packages/morag"
+            "main": "packages/morag",
         }
 
     def check_system_requirements(self) -> bool:
@@ -47,7 +47,9 @@ class MoRAGInstaller:
         # Check for optional tools based on install type
         if self.install_type in ["full", "web"]:
             if not shutil.which("chromium") and not shutil.which("google-chrome"):
-                logger.warning("Chromium/Chrome not found - web scraping may be limited")
+                logger.warning(
+                    "Chromium/Chrome not found - web scraping may be limited"
+                )
 
         if self.install_type in ["full", "youtube"]:
             if not shutil.which("ffmpeg"):
@@ -72,7 +74,10 @@ class MoRAGInstaller:
             self.pip_exe = venv_path / "bin" / "pip"
 
         # Upgrade pip
-        subprocess.run([str(self.pip_exe), "install", "--upgrade", "pip", "setuptools", "wheel"], check=True)
+        subprocess.run(
+            [str(self.pip_exe), "install", "--upgrade", "pip", "setuptools", "wheel"],
+            check=True,
+        )
 
         logger.info("Virtual environment created")
 
@@ -96,7 +101,9 @@ class MoRAGInstaller:
         for package_name in packages_to_install:
             package_path = self.install_dir / self.packages[package_name]
             logger.info(f"Installing {package_name} package")
-            subprocess.run([str(self.pip_exe), "install", "-e", str(package_path)], check=True)
+            subprocess.run(
+                [str(self.pip_exe), "install", "-e", str(package_path)], check=True
+            )
 
     def setup_configuration(self) -> None:
         """Set up configuration files."""
@@ -115,7 +122,7 @@ class MoRAGInstaller:
             "max_workers": 4,
             "chunk_size": 1000,
             "chunk_overlap": 200,
-            "log_level": "INFO"
+            "log_level": "INFO",
         }
 
         config_path = config_dir / "morag_config.json"
@@ -350,10 +357,19 @@ morag process-url https://example.com
 def main():
     """Main entry point for installation script."""
     parser = argparse.ArgumentParser(description="Install MoRAG modular system")
-    parser.add_argument("--install-dir", "-d", default="./morag_install", help="Installation directory")
-    parser.add_argument("--type", "-t", choices=["core", "web", "youtube", "full"], default="full",
-                       help="Installation type")
-    parser.add_argument("--no-venv", action="store_true", help="Skip virtual environment creation")
+    parser.add_argument(
+        "--install-dir", "-d", default="./morag_install", help="Installation directory"
+    )
+    parser.add_argument(
+        "--type",
+        "-t",
+        choices=["core", "web", "youtube", "full"],
+        default="full",
+        help="Installation type",
+    )
+    parser.add_argument(
+        "--no-venv", action="store_true", help="Skip virtual environment creation"
+    )
 
     args = parser.parse_args()
 
@@ -362,7 +378,11 @@ def main():
     print(f"Installing MoRAG ({args.type}) to: {install_dir}")
 
     if install_dir.exists() and any(install_dir.iterdir()):
-        confirm = input("Directory exists and is not empty. Continue? (yes/no): ").lower().strip()
+        confirm = (
+            input("Directory exists and is not empty. Continue? (yes/no): ")
+            .lower()
+            .strip()
+        )
         if confirm not in ["yes", "y"]:
             print("Installation cancelled")
             return
@@ -373,4 +393,5 @@ def main():
 
 if __name__ == "__main__":
     import shutil
+
     main()

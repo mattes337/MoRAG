@@ -12,23 +12,23 @@ import asyncio
 import sys
 import tempfile
 from pathlib import Path
+
 import structlog
 
 # Add the src directory to the path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from morag_video import VideoProcessor, VideoConfig, VideoService
-from morag_video import VideoConverter
 from morag_core.interfaces.converter import ConversionOptions
+from morag_video import VideoConfig, VideoConverter, VideoProcessor, VideoService
 
 logger = structlog.get_logger()
 
 
 async def demo_video_processor_integration():
     """Demonstrate enhanced video processor with automatic audio processing."""
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("🎬 DEMO: Enhanced Video Processor with Automatic Audio Processing")
-    print("="*80)
+    print("=" * 80)
 
     # Note: This demo uses mock data since we don't have actual video files
     print("\n📋 Configuration:")
@@ -48,7 +48,7 @@ async def demo_video_processor_integration():
         enable_enhanced_audio=True,
         enable_speaker_diarization=True,
         enable_topic_segmentation=True,
-        audio_model_size="base"
+        audio_model_size="base",
     )
 
     print(f"\n🔧 Video Configuration:")
@@ -80,9 +80,9 @@ async def demo_video_processor_integration():
 
 async def demo_video_converter_enhanced_markdown():
     """Demonstrate enhanced video converter with conversational format."""
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("📄 DEMO: Enhanced Video Converter - Conversational Format")
-    print("="*80)
+    print("=" * 80)
 
     print("\n📋 Conversion Features:")
     print("- Topic headers with timestamps")
@@ -94,23 +94,28 @@ async def demo_video_converter_enhanced_markdown():
     options = ConversionOptions(
         include_metadata=True,
         format_options={
-            'include_audio': True,
-            'enable_enhanced_audio': True,
-            'enable_speaker_diarization': True,
-            'enable_topic_segmentation': True,
-            'audio_model_size': 'base'
-        }
+            "include_audio": True,
+            "enable_enhanced_audio": True,
+            "enable_speaker_diarization": True,
+            "enable_topic_segmentation": True,
+            "audio_model_size": "base",
+        },
     )
 
     print(f"\n🔧 Conversion Options:")
     print(f"- Include Metadata: {options.include_metadata}")
     print(f"- Include Audio: {options.format_options.get('include_audio')}")
     print(f"- Enhanced Audio: {options.format_options.get('enable_enhanced_audio')}")
-    print(f"- Speaker Diarization: {options.format_options.get('enable_speaker_diarization')}")
-    print(f"- Topic Segmentation: {options.format_options.get('enable_topic_segmentation')}")
+    print(
+        f"- Speaker Diarization: {options.format_options.get('enable_speaker_diarization')}"
+    )
+    print(
+        f"- Topic Segmentation: {options.format_options.get('enable_topic_segmentation')}"
+    )
 
     print("\n📝 Enhanced Markdown Format:")
-    print("""
+    print(
+        """
 # Video Analysis: sample_video
 
 ## Video Information
@@ -141,7 +146,8 @@ async def demo_video_converter_enhanced_markdown():
 **SPEAKER_00**: Thank you for the detailed explanation.
 **SPEAKER_01**: Happy to help. Let's schedule a follow-up meeting.
 **SPEAKER_00**: Sounds good. I'll send out the calendar invite.
-    """)
+    """
+    )
 
     print("\n🎯 Key Features:")
     print("✅ Topic headers as main sections (# Topic Name)")
@@ -154,9 +160,9 @@ async def demo_video_converter_enhanced_markdown():
 
 async def demo_task_integration():
     """Demonstrate video task integration with enhanced audio processing."""
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("⚙️ DEMO: Video Task Integration")
-    print("="*80)
+    print("=" * 80)
 
     print("\n📋 Task Processing:")
     print("- Celery task: process_video_file")
@@ -171,14 +177,15 @@ async def demo_task_integration():
         "enable_topic_segmentation": True,
         "audio_model_size": "base",
         "generate_thumbnails": True,
-        "thumbnail_count": 5
+        "thumbnail_count": 5,
     }
 
     for key, value in task_config.items():
         print(f"- {key}: {value}")
 
     print("\n📝 Task Result Structure:")
-    print("""
+    print(
+        """
 {
     "video_metadata": {
         "duration": 120.0,
@@ -211,7 +218,8 @@ async def demo_task_integration():
     "thumbnails": ["/tmp/thumb_1.jpg", "/tmp/thumb_2.jpg"],
     "processing_time": 15.2
 }
-    """)
+    """
+    )
 
     print("\n🎯 Integration Benefits:")
     print("✅ Single API call processes video + enhanced audio")
@@ -223,13 +231,14 @@ async def demo_task_integration():
 
 async def demo_configuration_options():
     """Demonstrate configuration options for enhanced processing."""
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("⚙️ DEMO: Configuration Options")
-    print("="*80)
+    print("=" * 80)
 
     print("\n📋 Enhanced Audio Processing Settings:")
     print("From src/morag/core/config.py:")
-    print("""
+    print(
+        """
 # Audio Processing Configuration
 enable_speaker_diarization: bool = True
 speaker_diarization_model: str = "pyannote/speaker-diarization-3.1"
@@ -243,10 +252,12 @@ min_topic_sentences: int = 3
 max_topics: int = 10
 topic_embedding_model: str = "all-MiniLM-L6-v2"
 use_llm_topic_summarization: bool = True
-    """)
+    """
+    )
 
     print("\n🔧 Video Configuration Options:")
-    print("""
+    print(
+        """
 VideoConfig(
     # Basic video processing
     extract_audio=True,
@@ -260,7 +271,8 @@ VideoConfig(
     enable_topic_segmentation=True,
     audio_model_size="base"  # tiny, base, small, medium, large
 )
-    """)
+    """
+    )
 
     print("\n🎯 Customization Options:")
     print("✅ Enable/disable enhanced audio processing")
@@ -284,9 +296,9 @@ async def main():
         await demo_task_integration()
         await demo_configuration_options()
 
-        print("\n" + "="*80)
+        print("\n" + "=" * 80)
         print("✅ INTEGRATION COMPLETE")
-        print("="*80)
+        print("=" * 80)
         print("\n🎯 Summary of Implemented Features:")
         print("1. ✅ Enhanced VideoProcessor with automatic audio processing")
         print("2. ✅ VideoConfig with enhanced audio options")
@@ -307,6 +319,7 @@ async def main():
     except Exception as e:
         print(f"\n❌ Demo failed: {e}")
         import traceback
+
         traceback.print_exc()
 
 

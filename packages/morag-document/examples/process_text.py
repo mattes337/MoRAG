@@ -1,19 +1,17 @@
 """Example script for processing text."""
 
+import asyncio
 import os
 import sys
-import asyncio
 from pathlib import Path
 
 # Add parent directory to path to import morag_document
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from morag_core.interfaces.service import ServiceConfig
 from morag_core.interfaces.converter import ChunkingStrategy
+from morag_core.interfaces.service import ServiceConfig
 from morag_core.utils.logging import configure_logging
-
 from morag_document.service import DocumentService
-
 
 # Sample text for processing
 SAMPLE_TEXT = """

@@ -1,14 +1,14 @@
 """Tests for fact extraction functionality."""
 
-import pytest
 import asyncio
-from unittest.mock import Mock, AsyncMock
 from datetime import datetime
+from unittest.mock import AsyncMock, Mock
 
-from morag_graph.models.fact import Fact, FactRelation, FactType, FactRelationType
+import pytest
 from morag_graph.extraction.fact_extractor import FactExtractor
-from morag_graph.extraction.fact_validator import FactValidator
 from morag_graph.extraction.fact_graph_builder import FactGraphBuilder
+from morag_graph.extraction.fact_validator import FactValidator
+from morag_graph.models.fact import Fact, FactRelation, FactRelationType, FactType
 from morag_graph.services.fact_extraction_service import FactExtractionService
 
 
@@ -25,7 +25,7 @@ class TestFactModel:
             source_chunk_id="chunk_123",
             source_document_id="doc_456",
             extraction_confidence=0.9,
-            fact_type=FactType.RESEARCH
+            fact_type=FactType.RESEARCH,
         )
 
         assert fact.subject == "Machine Learning"
@@ -47,7 +47,7 @@ class TestFactModel:
             source_chunk_id="chunk_1",
             source_document_id="doc_1",
             extraction_confidence=0.8,
-            fact_type=FactType.PROCESS
+            fact_type=FactType.PROCESS,
         )
         assert complete_fact.is_complete()
 
@@ -58,7 +58,7 @@ class TestFactModel:
             source_chunk_id="chunk_1",
             source_document_id="doc_1",
             extraction_confidence=0.8,
-            fact_type=FactType.PROCESS
+            fact_type=FactType.PROCESS,
         )
         assert not incomplete_fact.is_complete()
 
@@ -72,7 +72,7 @@ class TestFactModel:
             source_document_id="doc_1",
             extraction_confidence=0.85,
             fact_type=FactType.DEFINITION,
-            keywords=["test", "example"]
+            keywords=["test", "example"],
         )
 
         props = fact.get_neo4j_properties()
@@ -102,7 +102,7 @@ class TestFactValidator:
             source_chunk_id="chunk_1",
             source_document_id="doc_1",
             extraction_confidence=0.9,
-            fact_type=FactType.RESEARCH
+            fact_type=FactType.RESEARCH,
         )
 
         is_valid, issues = self.validator.validate_fact(fact)
@@ -118,7 +118,7 @@ class TestFactValidator:
             source_chunk_id="chunk_1",
             source_document_id="doc_1",
             extraction_confidence=0.8,
-            fact_type=FactType.RESEARCH
+            fact_type=FactType.RESEARCH,
         )
 
         is_valid, issues = self.validator.validate_fact(fact)
@@ -134,12 +134,14 @@ class TestFactValidator:
             source_chunk_id="chunk_1",
             source_document_id="doc_1",
             extraction_confidence=0.5,  # Below threshold
-            fact_type=FactType.RESEARCH
+            fact_type=FactType.RESEARCH,
         )
 
         is_valid, issues = self.validator.validate_fact(fact)
         assert not is_valid
-        assert any("Confidence" in issue and "below threshold" in issue for issue in issues)
+        assert any(
+            "Confidence" in issue and "below threshold" in issue for issue in issues
+        )
 
     def test_invalid_fact_missing_actionable_content(self):
         """Test validation fails for missing actionable content."""
@@ -149,7 +151,7 @@ class TestFactValidator:
             source_chunk_id="chunk_1",
             source_document_id="doc_1",
             extraction_confidence=0.8,
-            fact_type=FactType.RESEARCH
+            fact_type=FactType.RESEARCH,
         )
 
         is_valid, issues = self.validator.validate_fact(fact)
@@ -166,7 +168,7 @@ class TestFactValidator:
                 source_chunk_id="chunk_1",
                 source_document_id="doc_1",
                 extraction_confidence=0.9,
-                fact_type=FactType.RESEARCH
+                fact_type=FactType.RESEARCH,
             ),
             Fact(
                 subject="it",  # Invalid - generic subject
@@ -175,16 +177,16 @@ class TestFactValidator:
                 source_chunk_id="chunk_2",
                 source_document_id="doc_1",
                 extraction_confidence=0.8,
-                fact_type=FactType.RESEARCH
-            )
+                fact_type=FactType.RESEARCH,
+            ),
         ]
 
         result = self.validator.validate_facts_batch(facts)
 
-        assert result['total_facts'] == 2
-        assert result['valid_facts'] == 1
-        assert result['invalid_facts'] == 1
-        assert result['validation_rate'] == 0.5
+        assert result["total_facts"] == 2
+        assert result["valid_facts"] == 1
+        assert result["invalid_facts"] == 1
+        assert result["validation_rate"] == 0.5
 
 
 class TestFactExtractor:
@@ -195,9 +197,7 @@ class TestFactExtractor:
         # Mock the LLM client
         self.mock_llm_client = Mock()
         self.extractor = FactExtractor(
-            model_id="test-model",
-            api_key="test-key",
-            min_confidence=0.7
+            model_id="test-model", api_key="test-key", min_confidence=0.7
         )
         self.extractor.llm_client = self.mock_llm_client
 
@@ -255,7 +255,7 @@ class TestFactExtractor:
             source_chunk_id="chunk_1",
             source_document_id="doc_1",
             extraction_confidence=0.9,
-            fact_type=FactType.RESEARCH
+            fact_type=FactType.RESEARCH,
         )
 
         keywords = self.extractor._generate_fact_keywords(fact)
@@ -282,7 +282,7 @@ class TestFactRelation:
             target_fact_id="fact_2",
             relation_type=FactRelationType.SUPPORTS,
             confidence=0.8,
-            context="Fact 1 provides evidence for Fact 2"
+            context="Fact 1 provides evidence for Fact 2",
         )
 
         assert relation.source_fact_id == "fact_1"
@@ -298,7 +298,7 @@ class TestFactRelation:
             target_fact_id="fact_2",
             relation_type=FactRelationType.ELABORATES,
             confidence=0.75,
-            context="Additional details"
+            context="Additional details",
         )
 
         props = relation.get_neo4j_properties()
@@ -320,42 +320,45 @@ class TestFactExtractionIntegration:
 
         service = FactExtractionService(
             neo4j_storage=mock_storage,
-            enable_relationships=False  # Disable for simpler test
+            enable_relationships=False,  # Disable for simpler test
         )
 
         # Mock the fact extractor
-        service.fact_extractor.extract_facts = AsyncMock(return_value=[
-            Fact(
-                subject="Test Subject",
-                object="test object",
-                approach="test approach",
-                source_chunk_id="chunk_1",
-                source_document_id="doc_1",
-                extraction_confidence=0.9,
-                fact_type=FactType.RESEARCH
-            )
-        ])
+        service.fact_extractor.extract_facts = AsyncMock(
+            return_value=[
+                Fact(
+                    subject="Test Subject",
+                    object="test object",
+                    approach="test approach",
+                    source_chunk_id="chunk_1",
+                    source_document_id="doc_1",
+                    extraction_confidence=0.9,
+                    fact_type=FactType.RESEARCH,
+                )
+            ]
+        )
 
         # Mock fact operations
         service.fact_operations.store_facts = AsyncMock(return_value=["fact_1"])
 
         # Mock document chunks
         from morag_graph.models.document_chunk import DocumentChunk
+
         chunks = [
             DocumentChunk(
                 id="chunk_1",
                 document_id="doc_1",
                 content="Test content for fact extraction.",
-                index=0
+                index=0,
             )
         ]
 
         result = await service.extract_facts_from_chunks(chunks, domain="test")
 
-        assert result['statistics']['chunks_processed'] == 1
-        assert result['statistics']['facts_extracted'] == 1
-        assert len(result['facts']) == 1
-        assert result['facts'][0].subject == "Test Subject"
+        assert result["statistics"]["chunks_processed"] == 1
+        assert result["statistics"]["facts_extracted"] == 1
+        assert len(result["facts"]) == 1
+        assert result["facts"][0].subject == "Test Subject"
 
 
 if __name__ == "__main__":

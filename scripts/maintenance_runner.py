@@ -18,8 +18,10 @@ import asyncio
 import json
 import os
 import sys
+
 # Ensure local packages are importable without installing
 from pathlib import Path
+
 project_root = Path(__file__).resolve().parents[1]
 for rel in [
     "packages/morag-graph/src",
@@ -31,13 +33,14 @@ for rel in [
     if str(p) not in sys.path:
         sys.path.insert(0, str(p))
 
-from typing import Any, Dict, List, Callable
+from typing import Any, Callable, Dict, List
 
 import structlog
 
 # Load .env at startup so Neo4j and LLM credentials are available
 try:
     from dotenv import load_dotenv  # type: ignore
+
     load_dotenv()
 except Exception:
     # Silent fallback if python-dotenv is not installed
@@ -63,7 +66,10 @@ def parse_kwh_overrides() -> Dict[str, Any]:
         "MORAG_KWH_MAX_MOVE_RATIO": ("max_move_ratio", float),
         "MORAG_KWH_SHARE": ("cooccurrence_min_share", float),
         "MORAG_KWH_BATCH_SIZE": ("batch_size", int),
-        "MORAG_KWH_DETACH_MOVED": ("detach_moved", lambda v: v.strip().lower() == "true"),
+        "MORAG_KWH_DETACH_MOVED": (
+            "detach_moved",
+            lambda v: v.strip().lower() == "true",
+        ),
         # Linking defaults to True and uses LLM to infer types; no envs for toggling/type
         "MORAG_KWH_DRY_RUN": ("dry_run", lambda v: v.strip().lower() == "true"),
         "MORAG_KWH_JOB_TAG": ("job_tag", str),
@@ -77,7 +83,11 @@ def parse_kwh_overrides() -> Dict[str, Any]:
             try:
                 overrides[param_key] = caster(val)
             except Exception:
-                logger.warning("Invalid env value for keyword hierarchization override", key=env_key, value=val)
+                logger.warning(
+                    "Invalid env value for keyword hierarchization override",
+                    key=env_key,
+                    value=val,
+                )
 
     # Ensure link_entities defaults to True if not provided
     if "link_entities" not in overrides:
@@ -88,7 +98,6 @@ def parse_kwh_overrides() -> Dict[str, Any]:
         overrides["dry_run"] = False
 
     return overrides
-
 
 
 def parse_kwd_overrides() -> Dict[str, Any]:
@@ -103,8 +112,14 @@ def parse_kwd_overrides() -> Dict[str, Any]:
         "MORAG_KWD_LIMIT_ENTITIES": ("limit_entities", int),
         "MORAG_KWD_APPLY": ("dry_run", lambda v: not (v.strip().lower() == "true")),
         "MORAG_KWD_JOB_TAG": ("job_tag", str),
-        "MORAG_KWD_ENABLE_ROTATION": ("enable_rotation", lambda v: v.strip().lower() == "true"),
-        "MORAG_KWD_PROCESS_ALL_SMALL": ("process_all_if_small", lambda v: v.strip().lower() == "true"),
+        "MORAG_KWD_ENABLE_ROTATION": (
+            "enable_rotation",
+            lambda v: v.strip().lower() == "true",
+        ),
+        "MORAG_KWD_PROCESS_ALL_SMALL": (
+            "process_all_if_small",
+            lambda v: v.strip().lower() == "true",
+        ),
     }
 
 
@@ -116,9 +131,18 @@ def parse_rel_merger_overrides() -> Dict[str, Any]:
         "MORAG_REL_LIMIT_RELATIONS": ("limit_relations", int),
         "MORAG_REL_DRY_RUN": ("dry_run", lambda v: v.strip().lower() == "true"),
         "MORAG_REL_JOB_TAG": ("job_tag", str),
-        "MORAG_REL_ENABLE_ROTATION": ("enable_rotation", lambda v: v.strip().lower() == "true"),
-        "MORAG_REL_MERGE_BIDIRECTIONAL": ("merge_bidirectional", lambda v: v.strip().lower() == "true"),
-        "MORAG_REL_MERGE_TRANSITIVE": ("merge_transitive", lambda v: v.strip().lower() == "true"),
+        "MORAG_REL_ENABLE_ROTATION": (
+            "enable_rotation",
+            lambda v: v.strip().lower() == "true",
+        ),
+        "MORAG_REL_MERGE_BIDIRECTIONAL": (
+            "merge_bidirectional",
+            lambda v: v.strip().lower() == "true",
+        ),
+        "MORAG_REL_MERGE_TRANSITIVE": (
+            "merge_transitive",
+            lambda v: v.strip().lower() == "true",
+        ),
         "MORAG_REL_MIN_CONFIDENCE": ("min_confidence", float),
     }
 
@@ -129,7 +153,11 @@ def parse_rel_merger_overrides() -> Dict[str, Any]:
             try:
                 overrides[param_key] = caster(val)
             except Exception:
-                logger.warning("Invalid env value for relationship merger override", key=env_key, value=val)
+                logger.warning(
+                    "Invalid env value for relationship merger override",
+                    key=env_key,
+                    value=val,
+                )
 
     # Ensure dry_run defaults to False (apply changes by default)
     if "dry_run" not in overrides:
@@ -151,13 +179,21 @@ def parse_rel_merger_overrides() -> Dict[str, Any]:
     if "job_tag" in overrides:
         logger.info("Using explicit job_tag for rotation", job_tag=overrides["job_tag"])
     else:
-        logger.info("Using default date-based job_tag for rotation (set MORAG_REL_JOB_TAG for custom rotation)")
+        logger.info(
+            "Using default date-based job_tag for rotation (set MORAG_REL_JOB_TAG for custom rotation)"
+        )
 
     # Log batch size clarification if set
     if "limit_relations" in overrides:
-        logger.info("Rotation batch size configured", limit_relations=overrides["limit_relations"])
+        logger.info(
+            "Rotation batch size configured",
+            limit_relations=overrides["limit_relations"],
+        )
     if "batch_size" in overrides:
-        logger.info("Merge batch size configured (internal processing)", batch_size=overrides["batch_size"])
+        logger.info(
+            "Merge batch size configured (internal processing)",
+            batch_size=overrides["batch_size"],
+        )
 
     return overrides
 
@@ -168,9 +204,18 @@ def parse_cleanup_overrides() -> Dict[str, Any]:
         "MORAG_REL_CLEANUP_DRY_RUN": ("dry_run", lambda v: v.strip().lower() == "true"),
         "MORAG_REL_CLEANUP_BATCH_SIZE": ("batch_size", int),
         "MORAG_REL_CLEANUP_MIN_CONFIDENCE": ("min_confidence", float),
-        "MORAG_REL_CLEANUP_REMOVE_UNRELATED": ("remove_unrelated", lambda v: v.strip().lower() == "true"),
-        "MORAG_REL_CLEANUP_REMOVE_GENERIC": ("remove_generic", lambda v: v.strip().lower() == "true"),
-        "MORAG_REL_CLEANUP_CONSOLIDATE_SIMILAR": ("consolidate_similar", lambda v: v.strip().lower() == "true"),
+        "MORAG_REL_CLEANUP_REMOVE_UNRELATED": (
+            "remove_unrelated",
+            lambda v: v.strip().lower() == "true",
+        ),
+        "MORAG_REL_CLEANUP_REMOVE_GENERIC": (
+            "remove_generic",
+            lambda v: v.strip().lower() == "true",
+        ),
+        "MORAG_REL_CLEANUP_CONSOLIDATE_SIMILAR": (
+            "consolidate_similar",
+            lambda v: v.strip().lower() == "true",
+        ),
         "MORAG_REL_CLEANUP_SIMILARITY_THRESHOLD": ("similarity_threshold", float),
         "MORAG_REL_CLEANUP_JOB_TAG": ("job_tag", str),
     }
@@ -182,7 +227,11 @@ def parse_cleanup_overrides() -> Dict[str, Any]:
             try:
                 overrides[param_key] = caster(val)
             except Exception:
-                logger.warning("Invalid env value for relationship cleanup override", key=env_key, value=val)
+                logger.warning(
+                    "Invalid env value for relationship cleanup override",
+                    key=env_key,
+                    value=val,
+                )
 
     # Ensure dry_run defaults to False (apply changes by default)
     if "dry_run" not in overrides:
@@ -203,8 +252,14 @@ def parse_kwd_overrides() -> Dict[str, Any]:
         "MORAG_KWD_LIMIT_ENTITIES": ("limit_entities", int),
         "MORAG_KWD_DRY_RUN": ("dry_run", lambda v: v.strip().lower() == "true"),
         "MORAG_KWD_JOB_TAG": ("job_tag", str),
-        "MORAG_KWD_ENABLE_ROTATION": ("enable_rotation", lambda v: v.strip().lower() == "true"),
-        "MORAG_KWD_PROCESS_ALL_SMALL": ("process_all_if_small", lambda v: v.strip().lower() == "true"),
+        "MORAG_KWD_ENABLE_ROTATION": (
+            "enable_rotation",
+            lambda v: v.strip().lower() == "true",
+        ),
+        "MORAG_KWD_PROCESS_ALL_SMALL": (
+            "process_all_if_small",
+            lambda v: v.strip().lower() == "true",
+        ),
     }
 
     overrides: Dict[str, Any] = {}
@@ -214,7 +269,11 @@ def parse_kwd_overrides() -> Dict[str, Any]:
             try:
                 overrides[param_key] = caster(val)
             except Exception:
-                logger.warning("Invalid env value for keyword deduplication override", key=env_key, value=val)
+                logger.warning(
+                    "Invalid env value for keyword deduplication override",
+                    key=env_key,
+                    value=val,
+                )
 
     # Ensure dry_run defaults to False (safe default for deduplication)
     if "dry_run" not in overrides:
@@ -232,23 +291,36 @@ def parse_kwd_overrides() -> Dict[str, Any]:
     if "job_tag" in overrides:
         logger.info("Using explicit job_tag for rotation", job_tag=overrides["job_tag"])
     else:
-        logger.info("Using default date-based job_tag for rotation (set MORAG_KWD_JOB_TAG for custom rotation)")
+        logger.info(
+            "Using default date-based job_tag for rotation (set MORAG_KWD_JOB_TAG for custom rotation)"
+        )
 
     # Log batch size clarification if set
     if "limit_entities" in overrides:
-        logger.info("Rotation batch size configured", limit_entities=overrides["limit_entities"])
+        logger.info(
+            "Rotation batch size configured", limit_entities=overrides["limit_entities"]
+        )
     if "batch_size" in overrides:
-        logger.info("Merge batch size configured (internal processing)", batch_size=overrides["batch_size"])
+        logger.info(
+            "Merge batch size configured (internal processing)",
+            batch_size=overrides["batch_size"],
+        )
 
     return overrides
 
 
 async def run_keyword_hierarchization_job() -> Dict[str, Any]:
-    from morag_graph.maintenance.keyword_hierarchization import run_keyword_hierarchization
+    from morag_graph.maintenance.keyword_hierarchization import (
+        run_keyword_hierarchization,
+    )
 
     overrides = parse_kwh_overrides()
     limit_keywords = int(overrides.pop("limit_keywords", 5))
-    logger.info("Running job: keyword_hierarchization", overrides=overrides, limit_keywords=limit_keywords)
+    logger.info(
+        "Running job: keyword_hierarchization",
+        overrides=overrides,
+        limit_keywords=limit_keywords,
+    )
     result = await run_keyword_hierarchization(overrides, limit_keywords=limit_keywords)
     return {"job": "keyword_hierarchization", "result": result}
 
@@ -265,8 +337,8 @@ async def run_keyword_linking_job() -> Dict[str, Any]:
 
 
 async def run_keyword_deduplication_job() -> Dict[str, Any]:
-    from morag_graph.maintenance.keyword_deduplication import run_keyword_deduplication
     from morag_graph.maintenance.base import MaintenanceJobError, PartialFailureError
+    from morag_graph.maintenance.keyword_deduplication import run_keyword_deduplication
 
     overrides = parse_kwd_overrides()
     logger.info("Running job: keyword_deduplication", overrides=overrides)
@@ -275,28 +347,30 @@ async def run_keyword_deduplication_job() -> Dict[str, Any]:
         result = await run_keyword_deduplication(overrides)
         return {"job": "keyword_deduplication", "result": result, "status": "success"}
     except PartialFailureError as e:
-        logger.warning("Job completed with partial failures",
-                      successful=e.successful_count,
-                      failed=e.failed_count,
-                      error=str(e))
+        logger.warning(
+            "Job completed with partial failures",
+            successful=e.successful_count,
+            failed=e.failed_count,
+            error=str(e),
+        )
         return {
             "job": "keyword_deduplication",
             "result": {"error": str(e), "partial_success": True},
-            "status": "partial_failure"
+            "status": "partial_failure",
         }
     except MaintenanceJobError as e:
         logger.error("Job failed with maintenance error", error=str(e))
         return {
             "job": "keyword_deduplication",
             "result": {"error": str(e)},
-            "status": "failed"
+            "status": "failed",
         }
     except Exception as e:
         logger.error("Job failed with unexpected error", error=str(e))
         return {
             "job": "keyword_deduplication",
             "result": {"error": f"Unexpected error: {str(e)}"},
-            "status": "failed"
+            "status": "failed",
         }
 
 
@@ -319,7 +393,9 @@ async def run_relationship_cleanup_job() -> Dict[str, Any]:
 
 
 async def run_isolated_nodes_cleanup_job() -> Dict[str, Any]:
-    from morag_graph.maintenance.isolated_nodes_cleanup import run_isolated_nodes_cleanup
+    from morag_graph.maintenance.isolated_nodes_cleanup import (
+        run_isolated_nodes_cleanup,
+    )
 
     logger.info("Running job: isolated_nodes_cleanup")
     result = await run_isolated_nodes_cleanup()
@@ -330,7 +406,14 @@ async def main_async() -> int:
     # Jobs to run; if not set, run all (deduplication first for optimal order)
     jobs_env = os.getenv("MORAG_MAINT_JOBS")
     if not jobs_env:
-        jobs = ["keyword_deduplication", "keyword_hierarchization", "keyword_linking", "relationship_merger", "relationship_cleanup", "isolated_nodes_cleanup"]
+        jobs = [
+            "keyword_deduplication",
+            "keyword_hierarchization",
+            "keyword_linking",
+            "relationship_merger",
+            "relationship_cleanup",
+            "isolated_nodes_cleanup",
+        ]
     else:
         jobs = [j.strip() for j in jobs_env.split(",") if j.strip()]
 
@@ -373,7 +456,9 @@ async def main_async() -> int:
                     break
             elif status == "partial_failure":
                 error_msg = summary.get("result", {}).get("error", "Partial failure")
-                logger.warning("Maintenance job had partial failures", job=job, error=error_msg)
+                logger.warning(
+                    "Maintenance job had partial failures", job=job, error=error_msg
+                )
                 # Don't add to errors list for partial failures unless fail_fast is enabled
                 if fail_fast:
                     errors.append(f"{job}: {error_msg}")
@@ -402,8 +487,8 @@ async def main_async() -> int:
             "successful": len(successful_jobs),
             "partial_failures": len(partial_failures),
             "failed": len(failed_jobs),
-            "success_rate": len(successful_jobs) / len(jobs) if jobs else 0
-        }
+            "success_rate": len(successful_jobs) / len(jobs) if jobs else 0,
+        },
     }
     print(json.dumps(output, indent=2))
     return 0 if len(errors) == 0 else 1

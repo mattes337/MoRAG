@@ -1,24 +1,25 @@
 """Tests for reasoning agents."""
 
-import pytest
 import asyncio
 import os
-from unittest.mock import Mock, AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
+
+import pytest
 
 # Set up test environment
 os.environ["GEMINI_API_KEY"] = "test-key"
 
-from agents.reasoning.path_selection import PathSelectionAgent
-from agents.reasoning.reasoning import ReasoningAgent
-from agents.reasoning.decision_making import DecisionMakingAgent
+from agents.base.config import AgentConfig
 from agents.reasoning.context_analysis import ContextAnalysisAgent
+from agents.reasoning.decision_making import DecisionMakingAgent
 from agents.reasoning.models import (
+    ContextAnalysisResult,
+    DecisionResult,
     PathSelectionResult,
     ReasoningResult,
-    DecisionResult,
-    ContextAnalysisResult
 )
-from agents.base.config import AgentConfig
+from agents.reasoning.path_selection import PathSelectionAgent
+from agents.reasoning.reasoning import ReasoningAgent
 
 
 class TestPathSelectionAgent:
@@ -40,12 +41,15 @@ class TestPathSelectionAgent:
         """Test simple path selection."""
         query = "What causes diabetes?"
         available_paths = [
-            {"path_id": "direct_search", "description": "Direct medical database search"},
+            {
+                "path_id": "direct_search",
+                "description": "Direct medical database search",
+            },
             {"path_id": "graph_traversal", "description": "Knowledge graph traversal"},
-            {"path_id": "semantic_search", "description": "Semantic similarity search"}
+            {"path_id": "semantic_search", "description": "Semantic similarity search"},
         ]
 
-        with patch.object(path_agent, '_call_model') as mock_llm:
+        with patch.object(path_agent, "_call_model") as mock_llm:
             mock_llm.return_value = {
                 "selected_paths": [
                     {
@@ -53,22 +57,22 @@ class TestPathSelectionAgent:
                         "path_type": "direct",
                         "confidence": 0.9,
                         "reasoning": "Medical query best served by direct database search",
-                        "expected_quality": 0.85
+                        "expected_quality": 0.85,
                     },
                     {
                         "path_id": "graph_traversal",
                         "path_type": "graph",
                         "confidence": 0.7,
                         "reasoning": "Graph can provide related concepts",
-                        "expected_quality": 0.75
-                    }
+                        "expected_quality": 0.75,
+                    },
                 ],
                 "selection_strategy": "medical_focused",
                 "confidence": "high",
                 "metadata": {
                     "primary_path": "direct_search",
-                    "total_paths_considered": 3
-                }
+                    "total_paths_considered": 3,
+                },
             }
 
             result = await path_agent.select_paths(query, available_paths)
@@ -83,13 +87,19 @@ class TestPathSelectionAgent:
         """Test complex path selection with multiple criteria."""
         query = "How do machine learning algorithms compare in terms of accuracy and efficiency for medical diagnosis?"
         available_paths = [
-            {"path_id": "comparative_analysis", "description": "Comparative analysis engine"},
-            {"path_id": "performance_metrics", "description": "Performance metrics database"},
+            {
+                "path_id": "comparative_analysis",
+                "description": "Comparative analysis engine",
+            },
+            {
+                "path_id": "performance_metrics",
+                "description": "Performance metrics database",
+            },
             {"path_id": "research_papers", "description": "Research paper analysis"},
-            {"path_id": "case_studies", "description": "Medical case studies"}
+            {"path_id": "case_studies", "description": "Medical case studies"},
         ]
 
-        with patch.object(path_agent, '_call_model') as mock_llm:
+        with patch.object(path_agent, "_call_model") as mock_llm:
             mock_llm.return_value = {
                 "selected_paths": [
                     {
@@ -97,22 +107,22 @@ class TestPathSelectionAgent:
                         "path_type": "analytical",
                         "confidence": 0.95,
                         "reasoning": "Perfect for comparison queries",
-                        "expected_quality": 0.9
+                        "expected_quality": 0.9,
                     },
                     {
                         "path_id": "performance_metrics",
                         "path_type": "data",
                         "confidence": 0.85,
                         "reasoning": "Provides quantitative data",
-                        "expected_quality": 0.8
-                    }
+                        "expected_quality": 0.8,
+                    },
                 ],
                 "selection_strategy": "multi_source_comparison",
                 "confidence": "high",
                 "metadata": {
                     "primary_path": "comparative_analysis",
-                    "total_paths_considered": 4
-                }
+                    "total_paths_considered": 4,
+                },
             }
 
             result = await path_agent.select_paths(query, available_paths)
@@ -137,10 +147,10 @@ class TestReasoningAgent:
         premises = [
             "All patients with diabetes have elevated blood glucose",
             "John has diabetes",
-            "Therefore, John has elevated blood glucose"
+            "Therefore, John has elevated blood glucose",
         ]
 
-        with patch.object(reasoning_agent, '_call_model') as mock_llm:
+        with patch.object(reasoning_agent, "_call_model") as mock_llm:
             mock_llm.return_value = {
                 "reasoning_type": "deductive",
                 "steps": [
@@ -148,27 +158,27 @@ class TestReasoningAgent:
                         "step_number": 1,
                         "description": "Identify major premise",
                         "content": "All patients with diabetes have elevated blood glucose",
-                        "confidence": 0.95
+                        "confidence": 0.95,
                     },
                     {
                         "step_number": 2,
                         "description": "Identify minor premise",
                         "content": "John has diabetes",
-                        "confidence": 0.9
+                        "confidence": 0.9,
                     },
                     {
                         "step_number": 3,
                         "description": "Draw logical conclusion",
                         "content": "John has elevated blood glucose",
-                        "confidence": 0.9
-                    }
+                        "confidence": 0.9,
+                    },
                 ],
                 "conclusion": "John has elevated blood glucose",
                 "confidence": "high",
                 "metadata": {
                     "validity": True,
-                    "evidence": ["Medical knowledge", "Logical deduction"]
-                }
+                    "evidence": ["Medical knowledge", "Logical deduction"],
+                },
             }
 
             result = await reasoning_agent.reason(premises)
@@ -185,10 +195,10 @@ class TestReasoningAgent:
         observations = [
             "Patient A with hypertension developed heart disease",
             "Patient B with hypertension developed heart disease",
-            "Patient C with hypertension developed heart disease"
+            "Patient C with hypertension developed heart disease",
         ]
 
-        with patch.object(reasoning_agent, '_call_model') as mock_llm:
+        with patch.object(reasoning_agent, "_call_model") as mock_llm:
             mock_llm.return_value = {
                 "reasoning_type": "inductive",
                 "steps": [
@@ -196,21 +206,21 @@ class TestReasoningAgent:
                         "step_number": 1,
                         "description": "Analyze pattern in observations",
                         "content": "Multiple patients with hypertension developed heart disease",
-                        "confidence": 0.8
+                        "confidence": 0.8,
                     },
                     {
                         "step_number": 2,
                         "description": "Generalize from specific cases",
                         "content": "Hypertension may be a risk factor for heart disease",
-                        "confidence": 0.75
-                    }
+                        "confidence": 0.75,
+                    },
                 ],
                 "conclusion": "Hypertension is likely a risk factor for heart disease",
                 "confidence": "medium",
                 "metadata": {
                     "validity": True,
-                    "evidence": ["Patient observations", "Statistical patterns"]
-                }
+                    "evidence": ["Patient observations", "Statistical patterns"],
+                },
             }
 
             result = await reasoning_agent.reason(observations)
@@ -236,40 +246,40 @@ class TestDecisionMakingAgent:
         options = [
             {"option": "metformin", "description": "First-line diabetes medication"},
             {"option": "insulin", "description": "Injectable glucose control"},
-            {"option": "lifestyle_only", "description": "Diet and exercise only"}
+            {"option": "lifestyle_only", "description": "Diet and exercise only"},
         ]
         criteria = ["effectiveness", "side_effects", "patient_compliance", "cost"]
 
-        with patch.object(decision_agent, '_call_model') as mock_llm:
+        with patch.object(decision_agent, "_call_model") as mock_llm:
             mock_llm.return_value = {
                 "recommended_option": "metformin",
                 "confidence": "high",
                 "reasoning": "First-line treatment for type 2 diabetes with good safety profile",
                 "metadata": {
                     "option_scores": [
-                    {
-                        "option": "metformin",
-                        "total_score": 0.85,
-                        "criteria_scores": {
-                            "effectiveness": 0.8,
-                            "side_effects": 0.9,
-                            "patient_compliance": 0.85,
-                            "cost": 0.9
-                        }
-                    },
-                    {
-                        "option": "insulin",
-                        "total_score": 0.7,
-                        "criteria_scores": {
-                            "effectiveness": 0.95,
-                            "side_effects": 0.6,
-                            "patient_compliance": 0.5,
-                            "cost": 0.7
-                        }
-                    }
+                        {
+                            "option": "metformin",
+                            "total_score": 0.85,
+                            "criteria_scores": {
+                                "effectiveness": 0.8,
+                                "side_effects": 0.9,
+                                "patient_compliance": 0.85,
+                                "cost": 0.9,
+                            },
+                        },
+                        {
+                            "option": "insulin",
+                            "total_score": 0.7,
+                            "criteria_scores": {
+                                "effectiveness": 0.95,
+                                "side_effects": 0.6,
+                                "patient_compliance": 0.5,
+                                "cost": 0.7,
+                            },
+                        },
                     ],
-                    "risk_assessment": "low_risk"
-                }
+                    "risk_assessment": "low_risk",
+                },
             }
 
             result = await decision_agent.make_decision(context, options, criteria)
@@ -298,24 +308,24 @@ class TestContextAnalysisAgent:
             "patient_age": 65,
             "medical_history": ["hypertension", "diabetes"],
             "current_medications": ["lisinopril", "metformin"],
-            "allergies": ["penicillin"]
+            "allergies": ["penicillin"],
         }
 
-        with patch.object(context_agent, '_call_model') as mock_llm:
+        with patch.object(context_agent, "_call_model") as mock_llm:
             mock_llm.return_value = {
                 "context_summary": "Medical consultation for elderly patient with diabetes and hypertension",
                 "key_factors": [
                     "patient_age",
                     "medical_history",
                     "drug_interactions",
-                    "allergies"
+                    "allergies",
                 ],
                 "relevance_score": 0.9,
                 "relevant_context": [
                     "Patient age: 75",
                     "Medical history: diabetes, hypertension",
                     "Current medications: lisinopril, metformin",
-                    "Allergies: penicillin"
+                    "Allergies: penicillin",
                 ],
                 "confidence": "high",
                 "metadata": {
@@ -325,9 +335,9 @@ class TestContextAnalysisAgent:
                     "recommendations": [
                         "Consider age-appropriate dosing",
                         "Check for drug interactions",
-                        "Avoid penicillin-based medications"
-                    ]
-                }
+                        "Avoid penicillin-based medications",
+                    ],
+                },
             }
 
             result = await context_agent.analyze_context(query, context_info)
@@ -352,7 +362,7 @@ class TestReasoningAgentsIntegration:
             "patient_age": 75,
             "condition": "coronary artery disease",
             "comorbidities": ["diabetes", "hypertension"],
-            "surgical_risk": "moderate"
+            "surgical_risk": "moderate",
         }
 
         # Initialize agents
@@ -367,9 +377,9 @@ class TestReasoningAgentsIntegration:
         context_agent = ContextAnalysisAgent(context_config)
 
         # Mock responses
-        with patch.object(context_agent, '_call_model') as mock_context, \
-             patch.object(decision_agent, '_call_model') as mock_decision:
-
+        with patch.object(context_agent, "_call_model") as mock_context, patch.object(
+            decision_agent, "_call_model"
+        ) as mock_decision:
             mock_context.return_value = {
                 "context_summary": "Medical consultation for elderly patient with coronary artery disease",
                 "key_factors": ["age", "comorbidities", "surgical_risk"],
@@ -378,25 +388,22 @@ class TestReasoningAgentsIntegration:
                     "Patient age: 75",
                     "Condition: coronary artery disease",
                     "Comorbidities: diabetes, hypertension",
-                    "Surgical risk: moderate"
+                    "Surgical risk: moderate",
                 ],
                 "confidence": "high",
                 "metadata": {
                     "context_type": "medical_consultation",
                     "relevance": "high",
                     "risk_factors": ["advanced_age", "multiple_comorbidities"],
-                    "recommendations": ["Consider non-surgical options"]
-                }
+                    "recommendations": ["Consider non-surgical options"],
+                },
             }
 
             mock_decision.return_value = {
                 "recommended_option": "conservative_treatment",
                 "confidence": "high",
                 "reasoning": "High surgical risk due to age and comorbidities",
-                "metadata": {
-                    "option_scores": [],
-                    "risk_assessment": "high_risk"
-                }
+                "metadata": {"option_scores": [], "risk_assessment": "high_risk"},
             }
 
             # Run reasoning pipeline
@@ -404,7 +411,7 @@ class TestReasoningAgentsIntegration:
             decision_result = await decision_agent.make_decision(
                 str(context),
                 [{"option": "surgery"}, {"option": "conservative_treatment"}],
-                ["effectiveness", "risk", "quality_of_life"]
+                ["effectiveness", "risk", "quality_of_life"],
             )
 
             # Verify results

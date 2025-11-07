@@ -4,36 +4,44 @@ Simple build test script that catches import and syntax errors.
 This script tries to import all Python modules to catch runtime import errors.
 """
 
-import sys
-import os
+import argparse
 import importlib.util
+import os
+import sys
 import traceback
 from pathlib import Path
 from typing import List, Tuple
-import argparse
 
 
 def find_python_modules(directory: Path) -> List[Tuple[Path, str]]:
     """Find all Python modules and their import paths."""
     modules = []
     exclude_patterns = [
-        '__pycache__', '.git', '.venv', 'venv', 'env',
-        '.pytest_cache', 'node_modules', '.mypy_cache',
-        'build', 'dist', '.tox'
+        "__pycache__",
+        ".git",
+        ".venv",
+        "venv",
+        "env",
+        ".pytest_cache",
+        "node_modules",
+        ".mypy_cache",
+        "build",
+        "dist",
+        ".tox",
     ]
 
-    for py_file in directory.rglob('*.py'):
+    for py_file in directory.rglob("*.py"):
         # Skip excluded directories
         if any(pattern in str(py_file) for pattern in exclude_patterns):
             continue
 
         # Skip __init__.py files for now (they often have complex imports)
-        if py_file.name == '__init__.py':
+        if py_file.name == "__init__.py":
             continue
 
         # Convert file path to module path
         relative_path = py_file.relative_to(directory)
-        module_path = str(relative_path.with_suffix('')).replace(os.sep, '.')
+        module_path = str(relative_path.with_suffix("")).replace(os.sep, ".")
 
         modules.append((py_file, module_path))
 
@@ -69,10 +77,10 @@ def test_module_import(file_path: Path, module_path: str) -> Tuple[bool, str]:
 def test_syntax_only(file_path: Path) -> Tuple[bool, str]:
     """Test only syntax without importing."""
     try:
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, "r", encoding="utf-8") as f:
             content = f.read()
 
-        compile(content, str(file_path), 'exec')
+        compile(content, str(file_path), "exec")
         return True, ""
 
     except SyntaxError as e:
@@ -83,13 +91,18 @@ def test_syntax_only(file_path: Path) -> Tuple[bool, str]:
 
 def main():
     """Main function."""
-    parser = argparse.ArgumentParser(description='Test Python modules for import and syntax errors')
-    parser.add_argument('paths', nargs='*', default=['packages'],
-                       help='Paths to test (directories)')
-    parser.add_argument('--syntax-only', action='store_true',
-                       help='Only check syntax, do not try to import')
-    parser.add_argument('--verbose', action='store_true',
-                       help='Show verbose output')
+    parser = argparse.ArgumentParser(
+        description="Test Python modules for import and syntax errors"
+    )
+    parser.add_argument(
+        "paths", nargs="*", default=["packages"], help="Paths to test (directories)"
+    )
+    parser.add_argument(
+        "--syntax-only",
+        action="store_true",
+        help="Only check syntax, do not try to import",
+    )
+    parser.add_argument("--verbose", action="store_true", help="Show verbose output")
 
     args = parser.parse_args()
 
@@ -149,5 +162,5 @@ def main():
         return 1
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

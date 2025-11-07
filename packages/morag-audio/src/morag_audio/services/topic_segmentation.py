@@ -1,16 +1,16 @@
 """Enhanced topic segmentation service with advanced features."""
 
 import asyncio
-import time
-from pathlib import Path
-from typing import Dict, Any, List, Optional, Tuple, Union, Set
-from dataclasses import dataclass, field
 import re
-import structlog
-import numpy as np
+import time
 from collections import Counter
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
-from morag_core.exceptions import ProcessingError, ExternalServiceError
+import numpy as np
+import structlog
+from morag_core.exceptions import ExternalServiceError, ProcessingError
 from morag_core.utils import get_safe_device
 
 logger = structlog.get_logger(__name__)
@@ -18,6 +18,7 @@ logger = structlog.get_logger(__name__)
 # Try to import optional dependencies
 try:
     import spacy
+
     SPACY_AVAILABLE = True
     logger.info("SpaCy is available for NLP processing")
 except (ImportError, OSError) as e:
@@ -27,6 +28,7 @@ except (ImportError, OSError) as e:
 # Import language detection service
 try:
     from morag_core.services.language_detection import get_language_service
+
     LANGUAGE_DETECTION_AVAILABLE = True
 except ImportError:
     LANGUAGE_DETECTION_AVAILABLE = False
@@ -34,39 +36,50 @@ except ImportError:
 
 try:
     import nltk
+
     try:
-        nltk.data.find('tokenizers/punkt')
+        nltk.data.find("tokenizers/punkt")
         NLTK_AVAILABLE = True
     except LookupError:
         try:
-            nltk.download('punkt', quiet=True)
+            nltk.download("punkt", quiet=True)
             NLTK_AVAILABLE = True
         except Exception:
             NLTK_AVAILABLE = False
-            logger.warning("NLTK punkt tokenizer not available, using basic sentence splitting")
+            logger.warning(
+                "NLTK punkt tokenizer not available, using basic sentence splitting"
+            )
 except ImportError:
     NLTK_AVAILABLE = False
     logger.warning("NLTK not available, using basic sentence splitting")
 
 try:
     from sentence_transformers import SentenceTransformer
+
     SENTENCE_TRANSFORMERS_AVAILABLE = True
 except (ImportError, OSError) as e:
     SENTENCE_TRANSFORMERS_AVAILABLE = False
-    logger.warning("sentence-transformers not available, using basic topic segmentation", error=str(e))
+    logger.warning(
+        "sentence-transformers not available, using basic topic segmentation",
+        error=str(e),
+    )
 
 try:
     from sklearn.cluster import AgglomerativeClustering
     from sklearn.metrics.pairwise import cosine_similarity
+
     SKLEARN_AVAILABLE = True
 except (ImportError, OSError) as e:
     SKLEARN_AVAILABLE = False
-    logger.warning("scikit-learn not available, using basic topic segmentation", error=str(e))
+    logger.warning(
+        "scikit-learn not available, using basic topic segmentation", error=str(e)
+    )
 
 
 @dataclass
 class TopicSegment:
     """Represents a topic segment with timing and metadata."""
+
     topic_id: str
     title: Optional[str] = None
     summary: Optional[str] = None
@@ -80,13 +93,18 @@ class TopicSegment:
 
     def __post_init__(self):
         # Calculate duration if not provided
-        if self.duration == 0.0 and self.start_time is not None and self.end_time is not None:
+        if (
+            self.duration == 0.0
+            and self.start_time is not None
+            and self.end_time is not None
+        ):
             self.duration = self.end_time - self.start_time
 
 
 @dataclass
 class TopicSegmentationResult:
     """Result of topic segmentation process."""
+
     segments: List[TopicSegment]
     total_topics: int
     total_duration: float
@@ -100,13 +118,15 @@ class TopicSegmentationResult:
 class TopicSegmentationService:
     """Enhanced topic segmentation with advanced features."""
 
-    def __init__(self,
-                 embedding_model: str = "all-MiniLM-L6-v2",
-                 similarity_threshold: float = 0.5,
-                 min_segment_length: int = 3,
-                 max_segments: int = 10,
-                 device: str = "auto",
-                 summarization_service: Optional[Any] = None):
+    def __init__(
+        self,
+        embedding_model: str = "all-MiniLM-L6-v2",
+        similarity_threshold: float = 0.5,
+        min_segment_length: int = 3,
+        max_segments: int = 10,
+        device: str = "auto",
+        summarization_service: Optional[Any] = None,
+    ):
         """Initialize the topic segmentation service.
 
         Args:
@@ -134,36 +154,51 @@ class TopicSegmentationService:
         """Initialize the sentence transformer model with safe device configuration."""
         try:
             safe_device = get_safe_device(self.preferred_device)
-            logger.info("Initializing sentence embedding model",
-                       model=self.embedding_model_name,
-                       device=safe_device)
+            logger.info(
+                "Initializing sentence embedding model",
+                model=self.embedding_model_name,
+                device=safe_device,
+            )
 
             try:
-                self.embedding_model = SentenceTransformer(self.embedding_model_name, device=safe_device)
+                self.embedding_model = SentenceTransformer(
+                    self.embedding_model_name, device=safe_device
+                )
                 self.model_loaded = True
-                logger.info("Sentence embedding model initialized successfully", device=safe_device)
+                logger.info(
+                    "Sentence embedding model initialized successfully",
+                    device=safe_device,
+                )
             except Exception as init_error:
                 if safe_device != "cpu":
-                    logger.warning("GPU model initialization failed, trying CPU", error=str(init_error))
+                    logger.warning(
+                        "GPU model initialization failed, trying CPU",
+                        error=str(init_error),
+                    )
                     # Force CPU initialization
-                    self.embedding_model = SentenceTransformer(self.embedding_model_name, device="cpu")
+                    self.embedding_model = SentenceTransformer(
+                        self.embedding_model_name, device="cpu"
+                    )
                     self.model_loaded = True
                     logger.info("Sentence embedding model initialized on CPU fallback")
                 else:
                     raise
 
         except Exception as e:
-            logger.warning("Failed to initialize sentence embedding model",
-                          error=str(e))
+            logger.warning(
+                "Failed to initialize sentence embedding model", error=str(e)
+            )
             self.embedding_model = None
             self.model_loaded = False
 
-    async def segment_transcript(self,
-                               transcript: str,
-                               transcript_segments: Optional[List[Dict[str, Any]]] = None,
-                               similarity_threshold: Optional[float] = None,
-                               min_segment_length: Optional[int] = None,
-                               max_segments: Optional[int] = None) -> TopicSegmentationResult:
+    async def segment_transcript(
+        self,
+        transcript: str,
+        transcript_segments: Optional[List[Dict[str, Any]]] = None,
+        similarity_threshold: Optional[float] = None,
+        min_segment_length: Optional[int] = None,
+        max_segments: Optional[int] = None,
+    ) -> TopicSegmentationResult:
         """Segment transcript into topics.
 
         Args:
@@ -184,16 +219,20 @@ class TopicSegmentationService:
         max_segments = max_segments or self.max_segments
 
         try:
-            logger.info("Starting topic segmentation",
-                       transcript_length=len(transcript),
-                       segments_count=len(transcript_segments) if transcript_segments else 0)
+            logger.info(
+                "Starting topic segmentation",
+                transcript_length=len(transcript),
+                segments_count=len(transcript_segments) if transcript_segments else 0,
+            )
 
             # Extract sentences from transcript
             sentences = await self._extract_sentences(transcript)
 
             # If transcript is too short, return single topic
             if len(sentences) < min_segment_length * 2:
-                logger.info("Transcript too short for segmentation, creating single topic")
+                logger.info(
+                    "Transcript too short for segmentation, creating single topic"
+                )
                 return await self._create_single_topic_result(
                     transcript, sentences, transcript_segments, time.time() - start_time
                 )
@@ -204,17 +243,12 @@ class TopicSegmentationService:
 
                 # Detect topic boundaries
                 boundaries = await self._detect_topic_boundaries(
-                    embeddings,
-                    similarity_threshold,
-                    min_segment_length,
-                    max_segments
+                    embeddings, similarity_threshold, min_segment_length, max_segments
                 )
 
                 # Create topic segments
                 segments = await self._create_topic_segments(
-                    sentences,
-                    boundaries,
-                    transcript_segments
+                    sentences, boundaries, transcript_segments
                 )
 
                 # Generate summaries if summarization service is available
@@ -224,9 +258,7 @@ class TopicSegmentationService:
                 # Fallback to simple segmentation
                 logger.info("Using fallback topic segmentation")
                 segments = await self._fallback_segmentation(
-                    sentences,
-                    transcript_segments,
-                    max_segments
+                    sentences, transcript_segments, max_segments
                 )
 
             # Calculate total duration
@@ -239,27 +271,30 @@ class TopicSegmentationService:
                 total_topics=len(segments),
                 total_duration=total_duration,
                 processing_time=time.time() - start_time,
-                model_used=self.embedding_model_name if self.model_loaded else "fallback",
+                model_used=self.embedding_model_name
+                if self.model_loaded
+                else "fallback",
                 similarity_threshold=similarity_threshold,
                 min_segment_length=min_segment_length,
-                max_segments=max_segments
+                max_segments=max_segments,
             )
 
-            logger.info("Topic segmentation completed",
-                       topics_detected=result.total_topics,
-                       processing_time=result.processing_time)
+            logger.info(
+                "Topic segmentation completed",
+                topics_detected=result.total_topics,
+                processing_time=result.processing_time,
+            )
 
             return result
 
         except Exception as e:
-            logger.error("Topic segmentation failed",
-                        error=str(e))
+            logger.error("Topic segmentation failed", error=str(e))
             # Fallback to simple segmentation
             return await self._create_single_topic_result(
                 transcript,
-                sentences if 'sentences' in locals() else [],
+                sentences if "sentences" in locals() else [],
                 transcript_segments,
-                time.time() - start_time
+                time.time() - start_time,
             )
 
     async def _extract_sentences(self, text: str) -> List[str]:
@@ -271,27 +306,44 @@ class TopicSegmentationService:
         if SPACY_AVAILABLE and LANGUAGE_DETECTION_AVAILABLE:
             try:
                 language_service = get_language_service()
-                detected_language, nlp_model = language_service.detect_and_get_model(text)
+                detected_language, nlp_model = language_service.detect_and_get_model(
+                    text
+                )
 
                 if nlp_model:
-                    logger.debug("Using language-specific SpaCy model for sentence extraction",
-                               language=detected_language)
+                    logger.debug(
+                        "Using language-specific SpaCy model for sentence extraction",
+                        language=detected_language,
+                    )
 
                     # Process in chunks to avoid memory issues with long texts
                     max_length = 100000  # spaCy default
                     if len(text) > max_length:
-                        chunks = [text[i:i+max_length] for i in range(0, len(text), max_length)]
+                        chunks = [
+                            text[i : i + max_length]
+                            for i in range(0, len(text), max_length)
+                        ]
                         all_sentences = []
                         for chunk in chunks:
                             doc = nlp_model(chunk)
-                            all_sentences.extend([sent.text.strip() for sent in doc.sents if sent.text.strip()])
+                            all_sentences.extend(
+                                [
+                                    sent.text.strip()
+                                    for sent in doc.sents
+                                    if sent.text.strip()
+                                ]
+                            )
                         return all_sentences
                     else:
                         doc = nlp_model(text)
-                        return [sent.text.strip() for sent in doc.sents if sent.text.strip()]
+                        return [
+                            sent.text.strip() for sent in doc.sents if sent.text.strip()
+                        ]
                 else:
-                    logger.debug("No suitable SpaCy model found for detected language",
-                               language=detected_language)
+                    logger.debug(
+                        "No suitable SpaCy model found for detected language",
+                        language=detected_language,
+                    )
             except Exception as e:
                 logger.warning("spaCy sentence extraction failed", error=str(e))
 
@@ -299,6 +351,7 @@ class TopicSegmentationService:
         if NLTK_AVAILABLE:
             try:
                 from nltk.tokenize import sent_tokenize
+
                 return [sent.strip() for sent in sent_tokenize(text) if sent.strip()]
             except Exception as e:
                 logger.warning("NLTK sentence extraction failed", error=str(e))
@@ -306,7 +359,7 @@ class TopicSegmentationService:
         # Fallback to simple splitting
         logger.info("Using simple sentence splitting")
         # Split on common sentence terminators followed by space and capital letter
-        simple_sentences = re.split(r'(?<=[.!?])\s+(?=[A-Z])', text)
+        simple_sentences = re.split(r"(?<=[.!?])\s+(?=[A-Z])", text)
         return [sent.strip() for sent in simple_sentences if sent.strip()]
 
     async def _generate_embeddings(self, sentences: List[str]) -> np.ndarray:
@@ -317,9 +370,7 @@ class TopicSegmentationService:
         try:
             # Run embedding generation in thread pool to avoid blocking
             embeddings = await asyncio.to_thread(
-                self.embedding_model.encode,
-                sentences,
-                show_progress_bar=False
+                self.embedding_model.encode, sentences, show_progress_bar=False
             )
             return embeddings
         except Exception as e:
@@ -327,11 +378,13 @@ class TopicSegmentationService:
             # Return empty array on error
             return np.array([])
 
-    async def _detect_topic_boundaries(self,
-                                     embeddings: np.ndarray,
-                                     similarity_threshold: float,
-                                     min_segment_length: int,
-                                     max_segments: int) -> List[int]:
+    async def _detect_topic_boundaries(
+        self,
+        embeddings: np.ndarray,
+        similarity_threshold: float,
+        min_segment_length: int,
+        max_segments: int,
+    ) -> List[int]:
         """Detect topic boundaries based on embedding similarity."""
         if len(embeddings) == 0:
             return []
@@ -340,14 +393,16 @@ class TopicSegmentationService:
             # Calculate cosine similarity between consecutive sentences
             similarities = []
             for i in range(len(embeddings) - 1):
-                sim = cosine_similarity([embeddings[i]], [embeddings[i+1]])[0][0]
+                sim = cosine_similarity([embeddings[i]], [embeddings[i + 1]])[0][0]
                 similarities.append(sim)
 
             # Find potential boundaries where similarity drops below threshold
             potential_boundaries = []
             for i, sim in enumerate(similarities):
                 if sim < similarity_threshold:
-                    potential_boundaries.append(i + 1)  # +1 because boundary is after sentence i
+                    potential_boundaries.append(
+                        i + 1
+                    )  # +1 because boundary is after sentence i
 
             # Apply constraints (min segment length, max segments)
             boundaries = [0]  # Start with beginning of text
@@ -387,10 +442,12 @@ class TopicSegmentationService:
 
             return boundaries
 
-    async def _create_topic_segments(self,
-                                   sentences: List[str],
-                                   boundaries: List[int],
-                                   transcript_segments: Optional[List[Dict[str, Any]]] = None) -> List[TopicSegment]:
+    async def _create_topic_segments(
+        self,
+        sentences: List[str],
+        boundaries: List[int],
+        transcript_segments: Optional[List[Dict[str, Any]]] = None,
+    ) -> List[TopicSegment]:
         """Create topic segments from boundaries."""
         if not sentences or not boundaries or len(boundaries) < 2:
             return []
@@ -399,7 +456,7 @@ class TopicSegmentationService:
 
         for i in range(len(boundaries) - 1):
             start_idx = boundaries[i]
-            end_idx = boundaries[i+1]
+            end_idx = boundaries[i + 1]
 
             # Get sentences for this segment
             segment_sentences = sentences[start_idx:end_idx]
@@ -410,7 +467,7 @@ class TopicSegmentationService:
             topic_segment = TopicSegment(
                 topic_id=f"TOPIC_{i:02d}",
                 sentences=segment_sentences,
-                confidence=0.8  # Default confidence
+                confidence=0.8,  # Default confidence
             )
 
             # Extract keywords
@@ -421,16 +478,18 @@ class TopicSegmentationService:
                 await self._calculate_topic_timing(topic_segment, transcript_segments)
 
                 # Calculate speaker distribution if available
-                if any('speaker' in segment for segment in transcript_segments):
-                    await self._calculate_speaker_distribution(topic_segment, transcript_segments)
+                if any("speaker" in segment for segment in transcript_segments):
+                    await self._calculate_speaker_distribution(
+                        topic_segment, transcript_segments
+                    )
 
             topic_segments.append(topic_segment)
 
         return topic_segments
 
-    async def _calculate_topic_timing(self,
-                                    topic_segment: TopicSegment,
-                                    transcript_segments: List[Dict[str, Any]]):
+    async def _calculate_topic_timing(
+        self, topic_segment: TopicSegment, transcript_segments: List[Dict[str, Any]]
+    ):
         """Calculate timing for topic segment based on transcript segments."""
         # Join all sentences in the topic
         topic_text = " ".join(topic_segment.sentences)
@@ -438,26 +497,36 @@ class TopicSegmentationService:
         # Try to find matching transcript segments
         matching_segments = []
         for segment in transcript_segments:
-            if self._simple_text_match(segment.get('text', ''), topic_text):
+            if self._simple_text_match(segment.get("text", ""), topic_text):
                 matching_segments.append(segment)
 
         if matching_segments:
             # Calculate timing based on matching segments
-            topic_segment.start_time = min(seg.get('start', 0.0) for seg in matching_segments)
-            topic_segment.end_time = max(seg.get('end', 0.0) for seg in matching_segments)
+            topic_segment.start_time = min(
+                seg.get("start", 0.0) for seg in matching_segments
+            )
+            topic_segment.end_time = max(
+                seg.get("end", 0.0) for seg in matching_segments
+            )
             topic_segment.duration = topic_segment.end_time - topic_segment.start_time
         else:
             # Fallback: Map proportionally to transcript length
-            total_transcript_length = sum(len(segment.get('text', '')) for segment in transcript_segments)
+            total_transcript_length = sum(
+                len(segment.get("text", "")) for segment in transcript_segments
+            )
             topic_length = len(topic_text)
 
             if total_transcript_length > 0:
                 topic_ratio = topic_length / total_transcript_length
-                total_duration = transcript_segments[-1].get('end', 0.0) - transcript_segments[0].get('start', 0.0)
+                total_duration = transcript_segments[-1].get(
+                    "end", 0.0
+                ) - transcript_segments[0].get("start", 0.0)
 
                 # Estimate position in transcript
                 topic_sentences_joined = " ".join(topic_segment.sentences)
-                full_transcript = " ".join(segment.get('text', '') for segment in transcript_segments)
+                full_transcript = " ".join(
+                    segment.get("text", "") for segment in transcript_segments
+                )
 
                 try:
                     # Find approximate position
@@ -466,29 +535,43 @@ class TopicSegmentationService:
 
                     if position >= 0:
                         position_ratio = position / len(full_transcript)
-                        topic_segment.start_time = transcript_segments[0].get('start', 0.0) + (position_ratio * total_duration)
-                        topic_segment.end_time = topic_segment.start_time + (topic_ratio * total_duration)
+                        topic_segment.start_time = transcript_segments[0].get(
+                            "start", 0.0
+                        ) + (position_ratio * total_duration)
+                        topic_segment.end_time = topic_segment.start_time + (
+                            topic_ratio * total_duration
+                        )
                     else:
                         # Couldn't find exact match, use proportional mapping
                         raise ValueError("Exact match not found")
                 except Exception:
                     # Simple proportional mapping as ultimate fallback
                     segments_count = len(transcript_segments)
-                    segments_per_topic = segments_count // (len(topic_segment.sentences) or 1)
+                    segments_per_topic = segments_count // (
+                        len(topic_segment.sentences) or 1
+                    )
 
                     if segments_per_topic > 0:
-                        start_segment_idx = topic_segment.topic_id.split('_')[1]
+                        start_segment_idx = topic_segment.topic_id.split("_")[1]
                         start_segment_idx = int(start_segment_idx) * segments_per_topic
-                        end_segment_idx = min(start_segment_idx + segments_per_topic, segments_count - 1)
+                        end_segment_idx = min(
+                            start_segment_idx + segments_per_topic, segments_count - 1
+                        )
 
-                        topic_segment.start_time = transcript_segments[start_segment_idx].get('start', 0.0)
-                        topic_segment.end_time = transcript_segments[end_segment_idx].get('end', 0.0)
+                        topic_segment.start_time = transcript_segments[
+                            start_segment_idx
+                        ].get("start", 0.0)
+                        topic_segment.end_time = transcript_segments[
+                            end_segment_idx
+                        ].get("end", 0.0)
                     else:
                         # Ultimate fallback
                         topic_segment.start_time = 0.0
                         topic_segment.end_time = total_duration
 
-                topic_segment.duration = topic_segment.end_time - topic_segment.start_time
+                topic_segment.duration = (
+                    topic_segment.end_time - topic_segment.start_time
+                )
 
     def _simple_text_match(self, text1: str, text2: str) -> bool:
         """Simple text matching to find if text1 is part of text2 or vice versa."""
@@ -497,22 +580,25 @@ class TopicSegmentationService:
 
         return text1 in text2 or text2 in text1
 
-    async def _calculate_speaker_distribution(self,
-                                            topic_segment: TopicSegment,
-                                            transcript_segments: List[Dict[str, Any]]):
+    async def _calculate_speaker_distribution(
+        self, topic_segment: TopicSegment, transcript_segments: List[Dict[str, Any]]
+    ):
         """Calculate speaker distribution within topic segment."""
         speaker_times = {}
 
         # Find segments that overlap with topic timing
         for segment in transcript_segments:
-            if 'speaker' not in segment:
+            if "speaker" not in segment:
                 continue
 
-            segment_start = segment.get('start', 0.0)
-            segment_end = segment.get('end', 0.0)
+            segment_start = segment.get("start", 0.0)
+            segment_end = segment.get("end", 0.0)
 
             # Check for overlap
-            if segment_end < topic_segment.start_time or segment_start > topic_segment.end_time:
+            if (
+                segment_end < topic_segment.start_time
+                or segment_start > topic_segment.end_time
+            ):
                 continue
 
             # Calculate overlap duration
@@ -523,7 +609,7 @@ class TopicSegmentationService:
             if overlap_duration <= 0:
                 continue
 
-            speaker = segment.get('speaker', 'UNKNOWN')
+            speaker = segment.get("speaker", "UNKNOWN")
             if speaker not in speaker_times:
                 speaker_times[speaker] = 0.0
 
@@ -536,7 +622,9 @@ class TopicSegmentationService:
                 speaker: time / total_time for speaker, time in speaker_times.items()
             }
 
-    async def _extract_keywords(self, sentences: List[str], max_keywords: int = 10) -> List[str]:
+    async def _extract_keywords(
+        self, sentences: List[str], max_keywords: int = 10
+    ) -> List[str]:
         """Extract keywords from sentences."""
         if not sentences:
             return []
@@ -548,11 +636,15 @@ class TopicSegmentationService:
         if SPACY_AVAILABLE and LANGUAGE_DETECTION_AVAILABLE:
             try:
                 language_service = get_language_service()
-                detected_language, nlp_model = language_service.detect_and_get_model(text)
+                detected_language, nlp_model = language_service.detect_and_get_model(
+                    text
+                )
 
                 if nlp_model:
-                    logger.debug("Using language-specific SpaCy model for keyword extraction",
-                               language=detected_language)
+                    logger.debug(
+                        "Using language-specific SpaCy model for keyword extraction",
+                        language=detected_language,
+                    )
 
                     doc = nlp_model(text)
                     # Extract nouns and proper nouns as keywords
@@ -565,30 +657,104 @@ class TopicSegmentationService:
                     keyword_counts = Counter(keywords)
                     return [kw for kw, _ in keyword_counts.most_common(max_keywords)]
                 else:
-                    logger.debug("No suitable SpaCy model found for keyword extraction",
-                               language=detected_language)
+                    logger.debug(
+                        "No suitable SpaCy model found for keyword extraction",
+                        language=detected_language,
+                    )
             except Exception as e:
                 logger.warning("spaCy keyword extraction failed", error=str(e))
 
         # Simple fallback
         words = text.lower().split()
         # Remove common stop words
-        stop_words = {"the", "a", "an", "and", "or", "but", "is", "are", "was", "were",
-                     "be", "been", "being", "in", "on", "at", "to", "for", "with",
-                     "by", "about", "against", "between", "into", "through", "during",
-                     "before", "after", "above", "below", "from", "up", "down", "of",
-                     "off", "over", "under", "again", "further", "then", "once", "here",
-                     "there", "when", "where", "why", "how", "all", "any", "both", "each",
-                     "few", "more", "most", "other", "some", "such", "no", "nor", "not",
-                     "only", "own", "same", "so", "than", "too", "very", "s", "t", "can",
-                     "will", "just", "don", "should", "now"}
+        stop_words = {
+            "the",
+            "a",
+            "an",
+            "and",
+            "or",
+            "but",
+            "is",
+            "are",
+            "was",
+            "were",
+            "be",
+            "been",
+            "being",
+            "in",
+            "on",
+            "at",
+            "to",
+            "for",
+            "with",
+            "by",
+            "about",
+            "against",
+            "between",
+            "into",
+            "through",
+            "during",
+            "before",
+            "after",
+            "above",
+            "below",
+            "from",
+            "up",
+            "down",
+            "of",
+            "off",
+            "over",
+            "under",
+            "again",
+            "further",
+            "then",
+            "once",
+            "here",
+            "there",
+            "when",
+            "where",
+            "why",
+            "how",
+            "all",
+            "any",
+            "both",
+            "each",
+            "few",
+            "more",
+            "most",
+            "other",
+            "some",
+            "such",
+            "no",
+            "nor",
+            "not",
+            "only",
+            "own",
+            "same",
+            "so",
+            "than",
+            "too",
+            "very",
+            "s",
+            "t",
+            "can",
+            "will",
+            "just",
+            "don",
+            "should",
+            "now",
+        }
 
-        filtered_words = [word for word in words if word not in stop_words and len(word) > 2]
+        filtered_words = [
+            word for word in words if word not in stop_words and len(word) > 2
+        ]
         word_counts = Counter(filtered_words)
 
         return [word for word, _ in word_counts.most_common(max_keywords)]
 
-    async def _generate_topic_summaries(self, segments: List[TopicSegment]) -> List[TopicSegment]:
+    async def _generate_topic_summaries(
+        self, segments: List[TopicSegment]
+    ) -> List[TopicSegment]:
         """Generate summaries for topic segments."""
         if not self.summarization_service or not segments:
             return segments
@@ -601,28 +767,30 @@ class TopicSegmentationService:
                 # Generate summary and title
                 try:
                     summary_result = await self.summarization_service.summarize(
-                        segment_text,
-                        max_length=100,
-                        generate_title=True
+                        segment_text, max_length=100, generate_title=True
                     )
 
                     if summary_result:
-                        segment.summary = summary_result.get('summary')
-                        segment.title = summary_result.get('title')
+                        segment.summary = summary_result.get("summary")
+                        segment.title = summary_result.get("title")
                 except Exception as e:
-                    logger.warning("Failed to generate summary for topic",
-                                 topic_id=segment.topic_id,
-                                 error=str(e))
+                    logger.warning(
+                        "Failed to generate summary for topic",
+                        topic_id=segment.topic_id,
+                        error=str(e),
+                    )
         except Exception as e:
             logger.error("Topic summary generation failed", error=str(e))
 
         return segments
 
-    async def _create_single_topic_result(self,
-                                        transcript: str,
-                                        sentences: List[str],
-                                        transcript_segments: Optional[List[Dict[str, Any]]],
-                                        processing_time: float) -> TopicSegmentationResult:
+    async def _create_single_topic_result(
+        self,
+        transcript: str,
+        sentences: List[str],
+        transcript_segments: Optional[List[Dict[str, Any]]],
+        processing_time: float,
+    ) -> TopicSegmentationResult:
         """Create a single topic result when segmentation is not meaningful."""
         # Extract sentences if not provided
         if not sentences:
@@ -630,9 +798,7 @@ class TopicSegmentationService:
 
         # Create single topic segment
         topic_segment = TopicSegment(
-            topic_id="TOPIC_00",
-            sentences=sentences,
-            confidence=1.0
+            topic_id="TOPIC_00", sentences=sentences, confidence=1.0
         )
 
         # Extract keywords
@@ -640,17 +806,21 @@ class TopicSegmentationService:
 
         # Calculate timing if transcript segments are available
         if transcript_segments:
-            topic_segment.start_time = transcript_segments[0].get('start', 0.0)
-            topic_segment.end_time = transcript_segments[-1].get('end', 0.0)
+            topic_segment.start_time = transcript_segments[0].get("start", 0.0)
+            topic_segment.end_time = transcript_segments[-1].get("end", 0.0)
             topic_segment.duration = topic_segment.end_time - topic_segment.start_time
 
             # Calculate speaker distribution if available
-            if any('speaker' in segment for segment in transcript_segments):
-                await self._calculate_speaker_distribution(topic_segment, transcript_segments)
+            if any("speaker" in segment for segment in transcript_segments):
+                await self._calculate_speaker_distribution(
+                    topic_segment, transcript_segments
+                )
 
         # Generate summary if summarization service is available
         if self.summarization_service:
-            segments_with_summary = await self._generate_topic_summaries([topic_segment])
+            segments_with_summary = await self._generate_topic_summaries(
+                [topic_segment]
+            )
             topic_segment = segments_with_summary[0]
 
         return TopicSegmentationResult(
@@ -661,13 +831,15 @@ class TopicSegmentationService:
             model_used="single_topic",
             similarity_threshold=self.similarity_threshold,
             min_segment_length=self.min_segment_length,
-            max_segments=1
+            max_segments=1,
         )
 
-    async def _fallback_segmentation(self,
-                                   sentences: List[str],
-                                   transcript_segments: Optional[List[Dict[str, Any]]],
-                                   max_segments: int) -> List[TopicSegment]:
+    async def _fallback_segmentation(
+        self,
+        sentences: List[str],
+        transcript_segments: Optional[List[Dict[str, Any]]],
+        max_segments: int,
+    ) -> List[TopicSegment]:
         """Provide fallback segmentation when models are unavailable."""
         if not sentences:
             return []
@@ -683,7 +855,9 @@ class TopicSegmentationService:
 
             for i in range(num_segments):
                 start_idx = i * segment_size
-                end_idx = (i + 1) * segment_size if i < num_segments - 1 else len(sentences)
+                end_idx = (
+                    (i + 1) * segment_size if i < num_segments - 1 else len(sentences)
+                )
 
                 segment_sentences = sentences[start_idx:end_idx]
                 if not segment_sentences:
@@ -692,7 +866,7 @@ class TopicSegmentationService:
                 topic_segment = TopicSegment(
                     topic_id=f"TOPIC_{i:02d}",
                     sentences=segment_sentences,
-                    confidence=0.6  # Lower confidence for fallback
+                    confidence=0.6,  # Lower confidence for fallback
                 )
 
                 # Extract keywords
@@ -700,11 +874,15 @@ class TopicSegmentationService:
 
                 # Calculate timing if transcript segments are available
                 if transcript_segments:
-                    await self._calculate_topic_timing(topic_segment, transcript_segments)
+                    await self._calculate_topic_timing(
+                        topic_segment, transcript_segments
+                    )
 
                     # Calculate speaker distribution if available
-                    if any('speaker' in segment for segment in transcript_segments):
-                        await self._calculate_speaker_distribution(topic_segment, transcript_segments)
+                    if any("speaker" in segment for segment in transcript_segments):
+                        await self._calculate_speaker_distribution(
+                            topic_segment, transcript_segments
+                        )
 
                 topic_segments.append(topic_segment)
 
@@ -713,8 +891,6 @@ class TopicSegmentationService:
         except Exception as e:
             logger.error("Fallback segmentation failed", error=str(e))
             # Create a single segment as ultimate fallback
-            return [TopicSegment(
-                topic_id="TOPIC_00",
-                sentences=sentences,
-                confidence=0.5
-            )]
+            return [
+                TopicSegment(topic_id="TOPIC_00", sentences=sentences, confidence=0.5)
+            ]

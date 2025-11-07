@@ -7,24 +7,38 @@ that can chain multiple processing steps together.
 import asyncio
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, List, Any, Optional, Union, Callable, Awaitable, TypeVar, Generic
-import structlog
+from typing import (
+    Any,
+    Awaitable,
+    Callable,
+    Dict,
+    Generic,
+    List,
+    Optional,
+    TypeVar,
+    Union,
+)
 
+import structlog
 from morag_core.exceptions import ProcessingError
-from .services import MoRAGServices, ProcessingResult, ContentType
+
+from .services import ContentType, MoRAGServices, ProcessingResult
 
 logger = structlog.get_logger(__name__)
 
-T = TypeVar('T')
-U = TypeVar('U')
+T = TypeVar("T")
+U = TypeVar("U")
+
 
 class PipelineStepType(str, Enum):
     """Types of pipeline steps."""
+
     PROCESS = "process"  # Process content (file/URL)
     TRANSFORM = "transform"  # Transform content (e.g., text extraction)
     EMBED = "embed"  # Generate embeddings
     FILTER = "filter"  # Filter content
     CUSTOM = "custom"  # Custom processing function
+
 
 @dataclass
 class PipelineContext:
@@ -32,6 +46,7 @@ class PipelineContext:
 
     This class stores intermediate results and metadata during pipeline execution.
     """
+
     # Input data
     input_paths: List[str] = field(default_factory=list)
     input_urls: List[str] = field(default_factory=list)
@@ -55,12 +70,14 @@ class PipelineContext:
         self.errors[item_id] = error_message
         logger.error(f"Pipeline error for {item_id}: {error_message}")
 
+
 @dataclass
 class PipelineStep(Generic[T, U]):
     """A step in a processing pipeline.
 
     Each step takes input data, processes it, and produces output data.
     """
+
     name: str
     step_type: PipelineStepType
     process_fn: Callable[[T, PipelineContext], Awaitable[U]]
@@ -93,6 +110,7 @@ class PipelineStep(Generic[T, U]):
                         context.add_error(item, str(e))
             raise ProcessingError(f"Error in pipeline step '{self.name}': {str(e)}")
 
+
 class Pipeline:
     """Content processing pipeline.
 
@@ -112,7 +130,7 @@ class Pipeline:
         self.steps: List[PipelineStep] = []
         self.max_concurrent_items = services.config.max_concurrent_tasks
 
-    def add_step(self, step: PipelineStep) -> 'Pipeline':
+    def add_step(self, step: PipelineStep) -> "Pipeline":
         """Add a step to the pipeline.
 
         Args:
@@ -124,7 +142,7 @@ class Pipeline:
         self.steps.append(step)
         return self
 
-    def process_content(self, name: str = "process_content") -> 'Pipeline':
+    def process_content(self, name: str = "process_content") -> "Pipeline":
         """Add a content processing step.
 
         This step processes files or URLs based on their content type.
@@ -135,18 +153,17 @@ class Pipeline:
         Returns:
             Self for method chaining
         """
+
         async def process_fn(item: str, context: PipelineContext) -> ProcessingResult:
             return await self.services.process_content(item)
 
         step = PipelineStep(
-            name=name,
-            step_type=PipelineStepType.PROCESS,
-            process_fn=process_fn
+            name=name, step_type=PipelineStepType.PROCESS, process_fn=process_fn
         )
 
         return self.add_step(step)
 
-    def extract_text(self, name: str = "extract_text") -> 'Pipeline':
+    def extract_text(self, name: str = "extract_text") -> "Pipeline":
         """Add a text extraction step.
 
         This step extracts text from processing results.
@@ -157,7 +174,10 @@ class Pipeline:
         Returns:
             Self for method chaining
         """
-        async def process_fn(results: Dict[str, ProcessingResult], context: PipelineContext) -> Dict[str, str]:
+
+        async def process_fn(
+            results: Dict[str, ProcessingResult], context: PipelineContext
+        ) -> Dict[str, str]:
             texts = {}
             for item_id, result in results.items():
                 if result.success and result.text_content:
@@ -169,12 +189,12 @@ class Pipeline:
             step_type=PipelineStepType.TRANSFORM,
             process_fn=process_fn,
             input_key="results",
-            output_key="texts"
+            output_key="texts",
         )
 
         return self.add_step(step)
 
-    def extract_metadata(self, name: str = "extract_metadata") -> 'Pipeline':
+    def extract_metadata(self, name: str = "extract_metadata") -> "Pipeline":
         """Add a metadata extraction step.
 
         This step extracts metadata from processing results.
@@ -185,7 +205,10 @@ class Pipeline:
         Returns:
             Self for method chaining
         """
-        async def process_fn(results: Dict[str, ProcessingResult], context: PipelineContext) -> Dict[str, Dict[str, Any]]:
+
+        async def process_fn(
+            results: Dict[str, ProcessingResult], context: PipelineContext
+        ) -> Dict[str, Dict[str, Any]]:
             metadata = {}
             for item_id, result in results.items():
                 if result.success and result.metadata:
@@ -197,12 +220,12 @@ class Pipeline:
             step_type=PipelineStepType.TRANSFORM,
             process_fn=process_fn,
             input_key="results",
-            output_key="metadata"
+            output_key="metadata",
         )
 
         return self.add_step(step)
 
-    def generate_embeddings(self, name: str = "generate_embeddings") -> 'Pipeline':
+    def generate_embeddings(self, name: str = "generate_embeddings") -> "Pipeline":
         """Add an embedding generation step.
 
         This step generates embeddings for extracted texts.
@@ -213,7 +236,10 @@ class Pipeline:
         Returns:
             Self for method chaining
         """
-        async def process_fn(texts: Dict[str, str], context: PipelineContext) -> Dict[str, Union[List[float], float]]:
+
+        async def process_fn(
+            texts: Dict[str, str], context: PipelineContext
+        ) -> Dict[str, Union[List[float], float]]:
             embeddings = {}
 
             # Process in batches to avoid overwhelming the embedding service
@@ -221,7 +247,7 @@ class Pipeline:
             batch_size = 10  # Adjust based on embedding service capacity
 
             for i in range(0, len(items), batch_size):
-                batch_items = items[i:i+batch_size]
+                batch_items = items[i : i + batch_size]
                 batch_texts = [text for _, text in batch_items]
                 batch_ids = [item_id for item_id, _ in batch_items]
 
@@ -239,17 +265,19 @@ class Pipeline:
             step_type=PipelineStepType.EMBED,
             process_fn=process_fn,
             input_key="texts",
-            output_key="embeddings"
+            output_key="embeddings",
         )
 
         return self.add_step(step)
 
-    def custom_step(self,
-                   name: str,
-                   process_fn: Callable[[Any, PipelineContext], Awaitable[Any]],
-                   input_key: Optional[str] = None,
-                   output_key: Optional[str] = None,
-                   config: Optional[Dict[str, Any]] = None) -> 'Pipeline':
+    def custom_step(
+        self,
+        name: str,
+        process_fn: Callable[[Any, PipelineContext], Awaitable[Any]],
+        input_key: Optional[str] = None,
+        output_key: Optional[str] = None,
+        config: Optional[Dict[str, Any]] = None,
+    ) -> "Pipeline":
         """Add a custom processing step.
 
         Args:
@@ -268,15 +296,17 @@ class Pipeline:
             process_fn=process_fn,
             input_key=input_key,
             output_key=output_key,
-            config=config or {}
+            config=config or {},
         )
 
         return self.add_step(step)
 
-    async def execute(self,
-                     input_paths: Optional[List[str]] = None,
-                     input_urls: Optional[List[str]] = None,
-                     input_texts: Optional[List[str]] = None) -> PipelineContext:
+    async def execute(
+        self,
+        input_paths: Optional[List[str]] = None,
+        input_urls: Optional[List[str]] = None,
+        input_texts: Optional[List[str]] = None,
+    ) -> PipelineContext:
         """Execute the pipeline.
 
         Args:
@@ -292,7 +322,7 @@ class Pipeline:
             input_paths=input_paths or [],
             input_urls=input_urls or [],
             input_texts=input_texts or [],
-            total_steps=len(self.steps)
+            total_steps=len(self.steps),
         )
 
         # Combine all inputs
@@ -315,7 +345,9 @@ class Pipeline:
                     if step.input_key in context.__dict__:
                         input_data = getattr(context, step.input_key)
                     else:
-                        raise ProcessingError(f"Input key '{step.input_key}' not found in context")
+                        raise ProcessingError(
+                            f"Input key '{step.input_key}' not found in context"
+                        )
                 else:
                     # Use previous step's output
                     input_data = None
@@ -331,7 +363,9 @@ class Pipeline:
                 if i == 0 and step.step_type == PipelineStepType.PROCESS:
                     context.results = output_data
 
-                logger.info(f"Completed pipeline step {i+1}/{len(self.steps)}: {step.name}")
+                logger.info(
+                    f"Completed pipeline step {i+1}/{len(self.steps)}: {step.name}"
+                )
             except Exception as e:
                 logger.exception(f"Error in pipeline step {step.name}", error=str(e))
                 # Continue with next step if possible
@@ -354,7 +388,7 @@ class Pipeline:
         return await self.execute(input_paths=paths, input_urls=urls)
 
     @classmethod
-    def create_default_pipeline(cls, services: MoRAGServices) -> 'Pipeline':
+    def create_default_pipeline(cls, services: MoRAGServices) -> "Pipeline":
         """Create a default pipeline with common processing steps.
 
         Args:

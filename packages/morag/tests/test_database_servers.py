@@ -1,12 +1,14 @@
 """Tests for database server array functionality."""
 
-import pytest
-from unittest.mock import Mock, patch, AsyncMock
-from fastapi.testclient import TestClient
+from unittest.mock import AsyncMock, Mock, patch
 
+import pytest
+from fastapi.testclient import TestClient
 from morag.database_factory import (
-    DatabaseConnectionFactory, parse_database_servers,
-    get_neo4j_storages, get_qdrant_storages
+    DatabaseConnectionFactory,
+    get_neo4j_storages,
+    get_qdrant_storages,
+    parse_database_servers,
 )
 from morag_graph import DatabaseServerConfig, DatabaseType
 
@@ -23,15 +25,15 @@ class TestDatabaseConnectionFactory:
                 "port": 7687,
                 "username": "neo4j",
                 "password": "password",
-                "database_name": "test_db"
+                "database_name": "test_db",
             },
             {
                 "type": "qdrant",
                 "hostname": "localhost",
                 "port": 6333,
                 "password": "api_key",
-                "database_name": "test_collection"
-            }
+                "database_name": "test_collection",
+            },
         ]
 
         configs = parse_database_servers(server_data)
@@ -47,15 +49,8 @@ class TestDatabaseConnectionFactory:
     def test_parse_database_servers_invalid(self):
         """Test parsing invalid database server configurations."""
         server_data = [
-            {
-                "type": "invalid_type",
-                "hostname": "localhost"
-            },
-            {
-                "type": "neo4j",
-                "hostname": "localhost",
-                "port": 7687
-            }
+            {"type": "invalid_type", "hostname": "localhost"},
+            {"type": "neo4j", "hostname": "localhost", "port": 7687},
         ]
 
         configs = parse_database_servers(server_data)
@@ -72,7 +67,7 @@ class TestDatabaseConnectionFactory:
         configs = parse_database_servers([])
         assert configs == []
 
-    @patch('morag.database_factory.Neo4jStorage')
+    @patch("morag.database_factory.Neo4jStorage")
     async def test_create_neo4j_storage(self, mock_neo4j_storage):
         """Test creating Neo4j storage from configuration."""
         config = DatabaseServerConfig(
@@ -80,7 +75,7 @@ class TestDatabaseConnectionFactory:
             hostname="neo4j://localhost:7687",
             username="neo4j",
             password="password",
-            database_name="test_db"
+            database_name="test_db",
         )
 
         # Mock the connect method
@@ -94,7 +89,7 @@ class TestDatabaseConnectionFactory:
         mock_storage_instance.connect.assert_called_once()
         assert storage is not None
 
-    @patch('morag.database_factory.QdrantStorage')
+    @patch("morag.database_factory.QdrantStorage")
     def test_create_qdrant_storage(self, mock_qdrant_storage):
         """Test creating Qdrant storage from configuration."""
         config = DatabaseServerConfig(
@@ -102,7 +97,7 @@ class TestDatabaseConnectionFactory:
             hostname="localhost",
             port=6333,
             password="api_key",
-            database_name="test_collection"
+            database_name="test_collection",
         )
 
         factory = DatabaseConnectionFactory()
@@ -113,10 +108,7 @@ class TestDatabaseConnectionFactory:
 
     def test_create_storage_invalid_type(self):
         """Test creating storage with invalid type."""
-        config = DatabaseServerConfig(
-            type=DatabaseType.NEO4J,
-            hostname="localhost"
-        )
+        config = DatabaseServerConfig(type=DatabaseType.NEO4J, hostname="localhost")
 
         factory = DatabaseConnectionFactory()
 
@@ -132,6 +124,7 @@ class TestDatabaseServerIntegration:
     def mock_app(self):
         """Create a mock FastAPI app for testing."""
         from morag.server import create_app
+
         app = create_app()
         return TestClient(app)
 
@@ -145,9 +138,9 @@ class TestDatabaseServerIntegration:
                     "type": "qdrant",
                     "hostname": "localhost",
                     "port": 6333,
-                    "database_name": "test_collection"
+                    "database_name": "test_collection",
                 }
-            ]
+            ],
         }
 
         # This will likely fail due to missing dependencies, but tests the structure
@@ -166,9 +159,9 @@ class TestDatabaseServerIntegration:
                     "hostname": "neo4j://localhost:7687",
                     "username": "neo4j",
                     "password": "password",
-                    "database_name": "test_db"
+                    "database_name": "test_db",
                 }
-            ]
+            ],
         }
 
         response = mock_app.post("/api/v2/query", json=request_data)
@@ -185,9 +178,9 @@ class TestDatabaseServerIntegration:
                     "hostname": "neo4j://localhost:7687",
                     "username": "neo4j",
                     "password": "password",
-                    "database_name": "test_db"
+                    "database_name": "test_db",
                 }
-            ]
+            ],
         }
 
         response = mock_app.post("/api/v2/graph/analytics", json=request_data)
@@ -206,7 +199,7 @@ class TestDatabaseServerConfig:
             port=7687,
             username="neo4j",
             password="password",
-            database_name="test_db"
+            database_name="test_db",
         )
 
         assert config.type == DatabaseType.NEO4J
@@ -223,7 +216,7 @@ class TestDatabaseServerConfig:
             hostname="localhost",
             port=7687,
             username="neo4j",
-            database_name="test_db"
+            database_name="test_db",
         )
 
         key = config.get_connection_key()
@@ -237,10 +230,7 @@ class TestDatabaseServerConfig:
         assert config.is_default_config()
 
         # Non-default config
-        config = DatabaseServerConfig(
-            type=DatabaseType.NEO4J,
-            hostname="localhost"
-        )
+        config = DatabaseServerConfig(type=DatabaseType.NEO4J, hostname="localhost")
         assert not config.is_default_config()
 
 

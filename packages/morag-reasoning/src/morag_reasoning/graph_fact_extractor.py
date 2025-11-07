@@ -1,21 +1,23 @@
 """Enhanced graph-based fact extraction from traversal results."""
 
 import time
-from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 from enum import Enum
-import structlog
+from typing import Any, Dict, List, Optional
 
+import structlog
 from morag_core.config import get_settings
+
 from .llm import LLMClient
 
 logger = structlog.get_logger(__name__)
 
 # Import traversal components
 try:
-    from morag_graph.traversal import TraversalResult, QueryContext
-    from morag_graph.operations.traversal import GraphPath
     from morag_graph.models import Entity, Relation
+    from morag_graph.operations.traversal import GraphPath
+    from morag_graph.traversal import QueryContext, TraversalResult
+
     GRAPH_COMPONENTS_AVAILABLE = True
 except ImportError:
     GRAPH_COMPONENTS_AVAILABLE = False
@@ -24,6 +26,7 @@ except ImportError:
 
 class FactType(Enum):
     """Types of facts that can be extracted."""
+
     DIRECT = "direct"  # Single entity-relation-entity triplet
     CHAIN = "chain"  # Multi-hop relationship chain
     CONTEXTUAL = "contextual"  # Facts requiring document context
@@ -34,6 +37,7 @@ class FactType(Enum):
 @dataclass
 class ExtractedFact:
     """Represents a fact extracted from graph traversal."""
+
     fact_id: str
     content: str
     fact_type: FactType
@@ -49,6 +53,7 @@ class ExtractedFact:
 @dataclass
 class FactExtractionContext:
     """Context for fact extraction from traversal results."""
+
     query: str
     query_intent: str
     target_entities: List[str]
@@ -60,11 +65,7 @@ class FactExtractionContext:
 class GraphFactExtractor:
     """Enhanced fact extraction from graph traversal results."""
 
-    def __init__(
-        self,
-        llm_client: LLMClient,
-        config: Optional[Dict[str, Any]] = None
-    ):
+    def __init__(self, llm_client: LLMClient, config: Optional[Dict[str, Any]] = None):
         """Initialize the graph fact extractor.
 
         Args:
@@ -76,28 +77,26 @@ class GraphFactExtractor:
         self.settings = get_settings()
 
         # Extraction parameters
-        self.max_facts_per_path = self.config.get('max_facts_per_path', 10)
-        self.min_confidence_threshold = self.config.get('min_confidence_threshold', 0.3)
-        self.enable_chain_facts = self.config.get('enable_chain_facts', True)
-        self.enable_contextual_facts = self.config.get('enable_contextual_facts', True)
-        self.enable_inferred_facts = self.config.get('enable_inferred_facts', True)
+        self.max_facts_per_path = self.config.get("max_facts_per_path", 10)
+        self.min_confidence_threshold = self.config.get("min_confidence_threshold", 0.3)
+        self.enable_chain_facts = self.config.get("enable_chain_facts", True)
+        self.enable_contextual_facts = self.config.get("enable_contextual_facts", True)
+        self.enable_inferred_facts = self.config.get("enable_inferred_facts", True)
 
         # Performance settings
-        self.batch_size = self.config.get('batch_size', 5)
-        self.max_extraction_time = self.config.get('max_extraction_time', 30.0)
+        self.batch_size = self.config.get("batch_size", 5)
+        self.max_extraction_time = self.config.get("max_extraction_time", 30.0)
 
         logger.info(
             "Graph fact extractor initialized",
             max_facts_per_path=self.max_facts_per_path,
             min_confidence_threshold=self.min_confidence_threshold,
             enable_chain_facts=self.enable_chain_facts,
-            enable_contextual_facts=self.enable_contextual_facts
+            enable_contextual_facts=self.enable_contextual_facts,
         )
 
     async def extract_facts(
-        self,
-        traversal_result: 'TraversalResult',
-        query_context: 'QueryContext'
+        self, traversal_result: "TraversalResult", query_context: "QueryContext"
     ) -> List[ExtractedFact]:
         """Extract facts from graph traversal results.
 
@@ -122,7 +121,7 @@ class GraphFactExtractor:
                 "Starting graph fact extraction",
                 query=query_context.query,
                 num_paths=len(traversal_result.discovered_paths),
-                strategy=traversal_result.strategy_used.value
+                strategy=traversal_result.strategy_used.value,
             )
 
             # Create extraction context
@@ -136,7 +135,7 @@ class GraphFactExtractor:
             # Process paths in batches
             paths = [p.path for p in traversal_result.discovered_paths]
             for i in range(0, len(paths), self.batch_size):
-                batch = paths[i:i + self.batch_size]
+                batch = paths[i : i + self.batch_size]
                 batch_facts = await self._extract_facts_from_path_batch(
                     batch, extraction_context
                 )
@@ -149,9 +148,7 @@ class GraphFactExtractor:
 
             # Extract chain facts if enabled
             if self.enable_chain_facts:
-                chain_facts = await self._extract_chain_facts(
-                    paths, extraction_context
-                )
+                chain_facts = await self._extract_chain_facts(paths, extraction_context)
                 all_facts.extend(chain_facts)
 
             # Extract contextual facts if enabled
@@ -163,8 +160,7 @@ class GraphFactExtractor:
 
             # Filter by confidence threshold
             filtered_facts = [
-                f for f in all_facts
-                if f.confidence >= self.min_confidence_threshold
+                f for f in all_facts if f.confidence >= self.min_confidence_threshold
             ]
 
             # Deduplicate facts
@@ -177,7 +173,7 @@ class GraphFactExtractor:
                 total_facts=len(all_facts),
                 filtered_facts=len(filtered_facts),
                 unique_facts=len(unique_facts),
-                extraction_time=extraction_time
+                extraction_time=extraction_time,
             )
 
             return unique_facts
@@ -187,16 +183,14 @@ class GraphFactExtractor:
             return []
 
     def _create_extraction_context(
-        self,
-        traversal_result: 'TraversalResult',
-        query_context: 'QueryContext'
+        self, traversal_result: "TraversalResult", query_context: "QueryContext"
     ) -> FactExtractionContext:
         """Create context for fact extraction."""
         # Extract relationship chains from paths
         relationship_chains = []
         for path_score in traversal_result.discovered_paths:
             path = path_score.path
-            if hasattr(path, 'relations') and path.relations:
+            if hasattr(path, "relations") and path.relations:
                 chain = [rel.type for rel in path.relations]
                 relationship_chains.append(chain)
 
@@ -204,15 +198,13 @@ class GraphFactExtractor:
             query=query_context.query,
             query_intent=query_context.intent,
             target_entities=query_context.entities,
-            traversal_depth=traversal_result.metadata.get('max_depth_reached', 0),
+            traversal_depth=traversal_result.metadata.get("max_depth_reached", 0),
             relationship_chains=relationship_chains,
-            document_context={}
+            document_context={},
         )
 
     async def _extract_facts_from_path_batch(
-        self,
-        paths: List['GraphPath'],
-        context: FactExtractionContext
+        self, paths: List["GraphPath"], context: FactExtractionContext
     ) -> List[ExtractedFact]:
         """Extract facts from a batch of paths."""
         facts = []
@@ -228,14 +220,12 @@ class GraphFactExtractor:
         return facts
 
     async def _extract_facts_from_single_path(
-        self,
-        path: 'GraphPath',
-        context: FactExtractionContext
+        self, path: "GraphPath", context: FactExtractionContext
     ) -> List[ExtractedFact]:
         """Extract facts from a single graph path with enhanced context."""
         facts = []
 
-        if not hasattr(path, 'entities') or not hasattr(path, 'relations'):
+        if not hasattr(path, "entities") or not hasattr(path, "relations"):
             return facts
 
         # Extract direct facts (entity-relation-entity triplets)
@@ -261,23 +251,27 @@ class GraphFactExtractor:
                     confidence=enhanced_confidence,
                     source_entities=[source_entity.id, target_entity.id],
                     source_relations=[relation.id],
-                    source_documents=self._get_source_documents(source_entity, target_entity),
+                    source_documents=self._get_source_documents(
+                        source_entity, target_entity
+                    ),
                     extraction_path=[entity.id for entity in path.entities],
                     context={
-                        'relation_type': relation.type,
-                        'source_entity_type': getattr(source_entity, 'type', 'Unknown'),
-                        'target_entity_type': getattr(target_entity, 'type', 'Unknown'),
-                        'hop_position': i,
-                        'total_hops': len(path.relations),
-                        'query_context': context.query if hasattr(context, 'query') else '',
-                        'semantic_context': self._extract_semantic_context(path, i)
+                        "relation_type": relation.type,
+                        "source_entity_type": getattr(source_entity, "type", "Unknown"),
+                        "target_entity_type": getattr(target_entity, "type", "Unknown"),
+                        "hop_position": i,
+                        "total_hops": len(path.relations),
+                        "query_context": context.query
+                        if hasattr(context, "query")
+                        else "",
+                        "semantic_context": self._extract_semantic_context(path, i),
                     },
                     metadata={
-                        'extraction_method': 'direct_triplet_enhanced',
-                        'path_length': len(path.entities),
-                        'relation_strength': getattr(relation, 'weight', 1.0),
-                        'extraction_timestamp': time.time()
-                    }
+                        "extraction_method": "direct_triplet_enhanced",
+                        "path_length": len(path.entities),
+                        "relation_strength": getattr(relation, "weight", 1.0),
+                        "extraction_timestamp": time.time(),
+                    },
                 )
                 facts.append(fact)
 
@@ -291,25 +285,27 @@ class GraphFactExtractor:
 
     def _generate_enhanced_fact_content(
         self,
-        source_entity: 'Entity',
-        relation: 'Relation',
-        target_entity: 'Entity',
+        source_entity: "Entity",
+        relation: "Relation",
+        target_entity: "Entity",
         context: FactExtractionContext,
-        hop_position: int
+        hop_position: int,
     ) -> str:
         """Generate enhanced fact content with context."""
         # Basic fact content
-        relation_text = relation.type.replace('_', ' ').lower()
+        relation_text = relation.type.replace("_", " ").lower()
         basic_content = f"{source_entity.name} {relation_text} {target_entity.name}"
 
         # Add contextual information if available
-        if hasattr(relation, 'properties') and relation.properties:
+        if hasattr(relation, "properties") and relation.properties:
             # Add relevant properties
             props = []
             for key, value in relation.properties.items():
-                if key in ['confidence', 'strength', 'weight'] and isinstance(value, (int, float)):
+                if key in ["confidence", "strength", "weight"] and isinstance(
+                    value, (int, float)
+                ):
                     props.append(f"{key}: {value:.2f}")
-                elif key in ['date', 'time', 'year'] and value:
+                elif key in ["date", "time", "year"] and value:
                     props.append(f"({value})")
 
             if props:
@@ -323,32 +319,32 @@ class GraphFactExtractor:
 
     def _calculate_enhanced_confidence(
         self,
-        relation: 'Relation',
-        source_entity: 'Entity',
-        target_entity: 'Entity',
-        context: FactExtractionContext
+        relation: "Relation",
+        source_entity: "Entity",
+        target_entity: "Entity",
+        context: FactExtractionContext,
     ) -> float:
         """Calculate enhanced confidence score."""
-        base_confidence = getattr(relation, 'confidence', 0.8)
+        base_confidence = getattr(relation, "confidence", 0.8)
 
         # Adjust based on entity types
         entity_confidence = 1.0
-        if hasattr(source_entity, 'type') and hasattr(target_entity, 'type'):
+        if hasattr(source_entity, "type") and hasattr(target_entity, "type"):
             # Higher confidence for well-defined entity types
-            known_types = {'PERSON', 'ORGANIZATION', 'LOCATION', 'CONCEPT'}
+            known_types = {"PERSON", "ORGANIZATION", "LOCATION", "CONCEPT"}
             if source_entity.type in known_types and target_entity.type in known_types:
                 entity_confidence = 1.1
 
         # Adjust based on relation strength
         relation_confidence = 1.0
-        if hasattr(relation, 'weight') and relation.weight:
+        if hasattr(relation, "weight") and relation.weight:
             relation_confidence = min(1.2, 1.0 + (relation.weight - 1.0) * 0.2)
 
         # Combine confidences
         final_confidence = base_confidence * entity_confidence * relation_confidence
         return min(1.0, final_confidence)
 
-    def _extract_semantic_context(self, path: 'GraphPath', hop_position: int) -> str:
+    def _extract_semantic_context(self, path: "GraphPath", hop_position: int) -> str:
         """Extract semantic context around a specific hop."""
         context_parts = []
 
@@ -365,9 +361,7 @@ class GraphFactExtractor:
         return " ".join(context_parts) if context_parts else ""
 
     async def _extract_chain_fact_from_path(
-        self,
-        path: 'GraphPath',
-        context: FactExtractionContext
+        self, path: "GraphPath", context: FactExtractionContext
     ) -> Optional[ExtractedFact]:
         """Extract a chain fact representing the entire path."""
         if len(path.entities) < 3:
@@ -390,23 +384,23 @@ class GraphFactExtractor:
                 source_documents=self._get_all_source_documents(path),
                 extraction_path=[entity.id for entity in path.entities],
                 context={
-                    'chain_length': len(path.entities),
-                    'start_entity': path.entities[0].name,
-                    'end_entity': path.entities[-1].name,
-                    'intermediate_entities': [e.name for e in path.entities[1:-1]]
+                    "chain_length": len(path.entities),
+                    "start_entity": path.entities[0].name,
+                    "end_entity": path.entities[-1].name,
+                    "intermediate_entities": [e.name for e in path.entities[1:-1]],
                 },
                 metadata={
-                    'extraction_method': 'chain_fact',
-                    'path_length': len(path.entities),
-                    'extraction_timestamp': time.time()
-                }
+                    "extraction_method": "chain_fact",
+                    "path_length": len(path.entities),
+                    "extraction_timestamp": time.time(),
+                },
             )
 
         except Exception as e:
             logger.warning(f"Failed to extract chain fact: {e}")
             return None
 
-    def _create_chain_description(self, path: 'GraphPath') -> str:
+    def _create_chain_description(self, path: "GraphPath") -> str:
         """Create a human-readable description of the relationship chain."""
         if len(path.entities) < 2:
             return ""
@@ -416,7 +410,7 @@ class GraphFactExtractor:
             if i + 1 < len(path.entities):
                 source = path.entities[i]
                 target = path.entities[i + 1]
-                relation_text = relation.type.replace('_', ' ').lower()
+                relation_text = relation.type.replace("_", " ").lower()
                 parts.append(f"{source.name} {relation_text} {target.name}")
 
         if len(parts) == 1:
@@ -426,14 +420,14 @@ class GraphFactExtractor:
         else:
             return f"{parts[0]}, through {len(parts)-1} connections, ultimately {parts[-1]}"
 
-    def _calculate_chain_confidence(self, path: 'GraphPath') -> float:
+    def _calculate_chain_confidence(self, path: "GraphPath") -> float:
         """Calculate confidence for a chain fact."""
         if not path.relations:
             return 0.5
 
         # Average confidence of all relations with decay for length
         relation_confidences = [
-            getattr(rel, 'confidence', 0.8) for rel in path.relations
+            getattr(rel, "confidence", 0.8) for rel in path.relations
         ]
         avg_confidence = sum(relation_confidences) / len(relation_confidences)
 
@@ -443,15 +437,13 @@ class GraphFactExtractor:
         return avg_confidence * length_penalty
 
     async def _extract_chain_facts(
-        self,
-        paths: List['GraphPath'],
-        context: FactExtractionContext
+        self, paths: List["GraphPath"], context: FactExtractionContext
     ) -> List[ExtractedFact]:
         """Extract chain facts from multi-hop paths."""
         chain_facts = []
 
         for path in paths:
-            if not hasattr(path, 'entities') or len(path.entities) < 3:
+            if not hasattr(path, "entities") or len(path.entities) < 3:
                 continue
 
             # Create chain fact for the entire path
@@ -467,26 +459,30 @@ class GraphFactExtractor:
                 fact_type=FactType.CHAIN,
                 confidence=0.7,  # Chain facts have moderate confidence
                 source_entities=[entity.id for entity in path.entities],
-                source_relations=[rel.id for rel in path.relations] if hasattr(path, 'relations') else [],
+                source_relations=[rel.id for rel in path.relations]
+                if hasattr(path, "relations")
+                else [],
                 source_documents=self._get_source_documents(*path.entities),
                 extraction_path=[entity.id for entity in path.entities],
                 context={
-                    'chain_length': len(path.entities),
-                    'relationship_types': [rel.type for rel in path.relations] if hasattr(path, 'relations') else []
+                    "chain_length": len(path.entities),
+                    "relationship_types": [rel.type for rel in path.relations]
+                    if hasattr(path, "relations")
+                    else [],
                 },
                 metadata={
-                    'extraction_method': 'relationship_chain',
-                    'path_complexity': len(path.entities) + len(path.relations) if hasattr(path, 'relations') else len(path.entities)
-                }
+                    "extraction_method": "relationship_chain",
+                    "path_complexity": len(path.entities) + len(path.relations)
+                    if hasattr(path, "relations")
+                    else len(path.entities),
+                },
             )
             chain_facts.append(chain_fact)
 
         return chain_facts
 
     async def _extract_contextual_facts(
-        self,
-        traversal_result: 'TraversalResult',
-        context: FactExtractionContext
+        self, traversal_result: "TraversalResult", context: FactExtractionContext
     ) -> List[ExtractedFact]:
         """Extract contextual facts that require document context."""
         # This would typically involve analyzing document chunks
@@ -494,9 +490,9 @@ class GraphFactExtractor:
         logger.debug("Contextual fact extraction not yet implemented")
         return []
 
-    def _build_chain_description(self, path: 'GraphPath') -> str:
+    def _build_chain_description(self, path: "GraphPath") -> str:
         """Build a human-readable description of a relationship chain."""
-        if not hasattr(path, 'entities') or not hasattr(path, 'relations'):
+        if not hasattr(path, "entities") or not hasattr(path, "relations"):
             return "Unknown relationship chain"
 
         if len(path.entities) < 2:
@@ -506,7 +502,7 @@ class GraphFactExtractor:
 
         for i, relation in enumerate(path.relations):
             if i + 1 < len(path.entities):
-                relation_text = relation.type.replace('_', ' ').lower()
+                relation_text = relation.type.replace("_", " ").lower()
                 target_entity = path.entities[i + 1]
                 description_parts.append(f" {relation_text} {target_entity.name}")
 
@@ -516,36 +512,36 @@ class GraphFactExtractor:
         """Get source document IDs for entities."""
         documents = []
         for entity in entities:
-            if hasattr(entity, 'source_doc_id') and entity.source_doc_id:
+            if hasattr(entity, "source_doc_id") and entity.source_doc_id:
                 documents.append(entity.source_doc_id)
             # Also check for document references in metadata
-            if hasattr(entity, 'metadata') and entity.metadata:
-                if 'source_documents' in entity.metadata:
-                    if isinstance(entity.metadata['source_documents'], list):
-                        documents.extend(entity.metadata['source_documents'])
+            if hasattr(entity, "metadata") and entity.metadata:
+                if "source_documents" in entity.metadata:
+                    if isinstance(entity.metadata["source_documents"], list):
+                        documents.extend(entity.metadata["source_documents"])
                     else:
-                        documents.append(str(entity.metadata['source_documents']))
+                        documents.append(str(entity.metadata["source_documents"]))
         return list(set(documents))  # Remove duplicates
 
-    def _get_all_source_documents(self, path: 'GraphPath') -> List[str]:
+    def _get_all_source_documents(self, path: "GraphPath") -> List[str]:
         """Get all source documents for entities and relations in a path."""
         documents = []
 
         # Get documents from entities
-        if hasattr(path, 'entities'):
+        if hasattr(path, "entities"):
             documents.extend(self._get_source_documents(*path.entities))
 
         # Get documents from relations
-        if hasattr(path, 'relations'):
+        if hasattr(path, "relations"):
             for relation in path.relations:
-                if hasattr(relation, 'source_doc_id') and relation.source_doc_id:
+                if hasattr(relation, "source_doc_id") and relation.source_doc_id:
                     documents.append(relation.source_doc_id)
-                if hasattr(relation, 'metadata') and relation.metadata:
-                    if 'source_documents' in relation.metadata:
-                        if isinstance(relation.metadata['source_documents'], list):
-                            documents.extend(relation.metadata['source_documents'])
+                if hasattr(relation, "metadata") and relation.metadata:
+                    if "source_documents" in relation.metadata:
+                        if isinstance(relation.metadata["source_documents"], list):
+                            documents.extend(relation.metadata["source_documents"])
                         else:
-                            documents.append(str(relation.metadata['source_documents']))
+                            documents.append(str(relation.metadata["source_documents"]))
 
         return list(set(documents))  # Remove duplicates
 
@@ -564,15 +560,13 @@ class GraphFactExtractor:
         return unique_facts
 
     async def _extract_facts_fallback(
-        self,
-        traversal_result: Any,
-        query_context: Any
+        self, traversal_result: Any, query_context: Any
     ) -> List[ExtractedFact]:
         """Fallback fact extraction when graph components are not available."""
         logger.info("Using fallback fact extraction")
 
         # Create a simple fact from the query context
-        if hasattr(query_context, 'query'):
+        if hasattr(query_context, "query"):
             fallback_fact = ExtractedFact(
                 fact_id="fallback_001",
                 content=f"Query: {query_context.query}",
@@ -582,8 +576,8 @@ class GraphFactExtractor:
                 source_relations=[],
                 source_documents=[],
                 extraction_path=[],
-                context={'fallback': True},
-                metadata={'extraction_method': 'fallback'}
+                context={"fallback": True},
+                metadata={"extraction_method": "fallback"},
             )
             return [fallback_fact]
 

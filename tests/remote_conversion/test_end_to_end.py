@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """End-to-end integration test for remote conversion system."""
 
-import sys
-import os
-import tempfile
 import json
+import os
+import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -14,6 +14,7 @@ sys.path.insert(0, str(project_root))
 sys.path.insert(0, str(project_root / "packages" / "morag-core" / "src"))
 sys.path.insert(0, str(project_root / "packages" / "morag" / "src"))
 
+
 def test_remote_job_lifecycle():
     """Test the complete remote job lifecycle."""
     print("🔄 Testing Remote Job Lifecycle")
@@ -22,11 +23,15 @@ def test_remote_job_lifecycle():
     try:
         # Import directly from specific modules to avoid circular imports
         import sys
+
         sys.path.insert(0, str(project_root / "packages" / "morag" / "src"))
 
+        from morag.models.remote_job_api import (
+            CreateRemoteJobRequest,
+            SubmitResultRequest,
+        )
         from morag.repositories.remote_job_repository import RemoteJobRepository
         from morag.services.remote_job_service import RemoteJobService
-        from morag.models.remote_job_api import CreateRemoteJobRequest, SubmitResultRequest
 
         # Create temporary directory for testing
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -43,9 +48,9 @@ def test_remote_job_lifecycle():
                 content_type="audio",
                 task_options={
                     "webhook_url": "http://example.com/webhook",
-                    "metadata": {"source": "test"}
+                    "metadata": {"source": "test"},
                 },
-                ingestion_task_id="test-ingestion-123"
+                ingestion_task_id="test-ingestion-123",
             )
 
             job = service.create_job(request)
@@ -56,9 +61,7 @@ def test_remote_job_lifecycle():
             # Step 2: Poll for jobs (simulate worker)
             print("\n2️⃣ Polling for jobs (worker simulation)...")
             available_jobs = service.poll_available_jobs(
-                worker_id="test-worker-1",
-                content_types=["audio", "video"],
-                max_jobs=1
+                worker_id="test-worker-1", content_types=["audio", "video"], max_jobs=1
             )
 
             assert len(available_jobs) == 1, "Should find one available job"
@@ -70,8 +73,12 @@ def test_remote_job_lifecycle():
             # Step 3: Check job status
             print("\n3️⃣ Checking job status...")
             status_job = service.get_job_status(job.id)
-            assert status_job.status == "processing", f"Expected processing, got {status_job.status}"
-            assert status_job.worker_id == "test-worker-1", f"Expected test-worker-1, got {status_job.worker_id}"
+            assert (
+                status_job.status == "processing"
+            ), f"Expected processing, got {status_job.status}"
+            assert (
+                status_job.worker_id == "test-worker-1"
+            ), f"Expected test-worker-1, got {status_job.worker_id}"
             print(f"✅ Status check passed")
 
             # Step 4: Submit successful result
@@ -84,15 +91,17 @@ def test_remote_job_lifecycle():
                     "speakers": ["Speaker_00", "Speaker_01"],
                     "topics": [
                         {"timestamp": 0, "topic": "Introduction"},
-                        {"timestamp": 60, "topic": "Main Discussion"}
-                    ]
+                        {"timestamp": 60, "topic": "Main Discussion"},
+                    ],
                 },
-                processing_time=45.3
+                processing_time=45.3,
             )
 
             completed_job = service.submit_result(job.id, result_request)
             assert completed_job is not None, "Result submission should succeed"
-            assert completed_job.status == "completed", f"Expected completed, got {completed_job.status}"
+            assert (
+                completed_job.status == "completed"
+            ), f"Expected completed, got {completed_job.status}"
             print(f"✅ Result submitted successfully")
             print(f"   Final Status: {completed_job.status}")
             print(f"   Processing Time: {completed_job.processing_duration:.1f}s")
@@ -117,8 +126,10 @@ def test_remote_job_lifecycle():
     except Exception as e:
         print(f"\n❌ Test failed with error: {e}")
         import traceback
+
         traceback.print_exc()
         return False
+
 
 def test_worker_polling_scenarios():
     """Test various worker polling scenarios."""
@@ -128,11 +139,12 @@ def test_worker_polling_scenarios():
     try:
         # Import directly from specific modules to avoid circular imports
         import sys
+
         sys.path.insert(0, str(project_root / "packages" / "morag" / "src"))
 
+        from morag.models.remote_job_api import CreateRemoteJobRequest
         from morag.repositories.remote_job_repository import RemoteJobRepository
         from morag.services.remote_job_service import RemoteJobService
-        from morag.models.remote_job_api import CreateRemoteJobRequest
 
         with tempfile.TemporaryDirectory() as temp_dir:
             repository = RemoteJobRepository(data_dir=temp_dir)
@@ -140,46 +152,58 @@ def test_worker_polling_scenarios():
 
             # Create jobs of different types
             print("\n1️⃣ Creating jobs of different types...")
-            audio_job = service.create_job(CreateRemoteJobRequest(
-                source_file_path="/tmp/audio.mp3",
-                content_type="audio",
-                task_options={},
-                ingestion_task_id="audio-task"
-            ))
+            audio_job = service.create_job(
+                CreateRemoteJobRequest(
+                    source_file_path="/tmp/audio.mp3",
+                    content_type="audio",
+                    task_options={},
+                    ingestion_task_id="audio-task",
+                )
+            )
 
-            video_job = service.create_job(CreateRemoteJobRequest(
-                source_file_path="/tmp/video.mp4",
-                content_type="video",
-                task_options={},
-                ingestion_task_id="video-task"
-            ))
+            video_job = service.create_job(
+                CreateRemoteJobRequest(
+                    source_file_path="/tmp/video.mp4",
+                    content_type="video",
+                    task_options={},
+                    ingestion_task_id="video-task",
+                )
+            )
 
-            doc_job = service.create_job(CreateRemoteJobRequest(
-                source_file_path="/tmp/doc.pdf",
-                content_type="document",
-                task_options={},
-                ingestion_task_id="doc-task"
-            ))
+            doc_job = service.create_job(
+                CreateRemoteJobRequest(
+                    source_file_path="/tmp/doc.pdf",
+                    content_type="document",
+                    task_options={},
+                    ingestion_task_id="doc-task",
+                )
+            )
 
             print(f"✅ Created 3 jobs: audio, video, document")
 
             # Test audio-only worker
             print("\n2️⃣ Testing audio-only worker...")
-            audio_jobs = service.poll_available_jobs("audio-worker", ["audio"], max_jobs=5)
+            audio_jobs = service.poll_available_jobs(
+                "audio-worker", ["audio"], max_jobs=5
+            )
             assert len(audio_jobs) == 1, f"Expected 1 audio job, got {len(audio_jobs)}"
             assert audio_jobs[0].content_type == "audio"
             print(f"✅ Audio worker got audio job")
 
             # Test video-only worker
             print("\n3️⃣ Testing video-only worker...")
-            video_jobs = service.poll_available_jobs("video-worker", ["video"], max_jobs=5)
+            video_jobs = service.poll_available_jobs(
+                "video-worker", ["video"], max_jobs=5
+            )
             assert len(video_jobs) == 1, f"Expected 1 video job, got {len(video_jobs)}"
             assert video_jobs[0].content_type == "video"
             print(f"✅ Video worker got video job")
 
             # Test multi-type worker (should get document since audio/video are claimed)
             print("\n4️⃣ Testing multi-type worker...")
-            multi_jobs = service.poll_available_jobs("multi-worker", ["audio", "video", "document"], max_jobs=5)
+            multi_jobs = service.poll_available_jobs(
+                "multi-worker", ["audio", "video", "document"], max_jobs=5
+            )
             assert len(multi_jobs) == 1, f"Expected 1 job, got {len(multi_jobs)}"
             assert multi_jobs[0].content_type == "document"
             print(f"✅ Multi-type worker got remaining document job")
@@ -196,18 +220,17 @@ def test_worker_polling_scenarios():
     except Exception as e:
         print(f"\n❌ Polling test failed: {e}")
         import traceback
+
         traceback.print_exc()
         return False
+
 
 def main():
     """Run all end-to-end tests."""
     print("🚀 Remote Conversion System - End-to-End Tests")
     print("=" * 50)
 
-    tests = [
-        test_remote_job_lifecycle,
-        test_worker_polling_scenarios
-    ]
+    tests = [test_remote_job_lifecycle, test_worker_polling_scenarios]
 
     passed = 0
     failed = 0
@@ -236,6 +259,7 @@ def main():
     else:
         print(f"\n💥 {failed} test(s) failed!")
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

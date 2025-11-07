@@ -3,7 +3,8 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
+
 import structlog
 
 logger = structlog.get_logger(__name__)
@@ -12,6 +13,7 @@ logger = structlog.get_logger(__name__)
 @dataclass
 class ProcessorResult:
     """Result from a stage processor."""
+
     content: str
     metadata: Dict[str, Any]
     metrics: Dict[str, Any]
@@ -35,10 +37,7 @@ class StageProcessor(ABC):
 
     @abstractmethod
     async def process(
-        self,
-        input_file: Path,
-        output_file: Path,
-        config: Dict[str, Any]
+        self, input_file: Path, output_file: Path, config: Dict[str, Any]
     ) -> ProcessorResult:
         """Process input file and generate markdown output.
 
@@ -55,7 +54,9 @@ class StageProcessor(ABC):
         """
         pass
 
-    def create_markdown_with_metadata(self, content: str, metadata: Dict[str, Any]) -> str:
+    def create_markdown_with_metadata(
+        self, content: str, metadata: Dict[str, Any]
+    ) -> str:
         """Create markdown content with metadata header.
 
         Args:
@@ -69,15 +70,15 @@ class StageProcessor(ABC):
         yaml_lines = ["---"]
         for key, value in metadata.items():
             if value is not None:
-                if isinstance(value, str) and ('\n' in value or '"' in value):
+                if isinstance(value, str) and ("\n" in value or '"' in value):
                     # Multi-line or quoted strings
-                    yaml_lines.append(f'{key}: |')
-                    for line in str(value).split('\n'):
-                        yaml_lines.append(f'  {line}')
+                    yaml_lines.append(f"{key}: |")
+                    for line in str(value).split("\n"):
+                        yaml_lines.append(f"  {line}")
                 else:
-                    yaml_lines.append(f'{key}: {value}')
+                    yaml_lines.append(f"{key}: {value}")
         yaml_lines.append("---")
         yaml_lines.append("")
 
         # Combine with content
-        return '\n'.join(yaml_lines) + content
+        return "\n".join(yaml_lines) + content

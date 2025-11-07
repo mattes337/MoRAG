@@ -1,6 +1,7 @@
 """Processor registry for dynamic loading of file-type processors."""
 
 from typing import Dict, Optional, Type
+
 import structlog
 
 from .interface import StageProcessor
@@ -21,6 +22,7 @@ class ProcessorRegistry:
         # Register YouTube processor
         try:
             from .youtube_processor import YouTubeStageProcessor
+
             self._processor_classes["YOUTUBE"] = YouTubeStageProcessor
             logger.debug("Registered YouTube processor")
         except ImportError as e:
@@ -29,6 +31,7 @@ class ProcessorRegistry:
         # Register video processor
         try:
             from .video_processor import VideoStageProcessor
+
             self._processor_classes["VIDEO"] = VideoStageProcessor
             logger.debug("Registered video processor")
         except ImportError as e:
@@ -37,6 +40,7 @@ class ProcessorRegistry:
         # Register audio processor
         try:
             from .audio_processor import AudioStageProcessor
+
             self._processor_classes["AUDIO"] = AudioStageProcessor
             logger.debug("Registered audio processor")
         except ImportError as e:
@@ -45,6 +49,7 @@ class ProcessorRegistry:
         # Register web processor
         try:
             from .web_processor import WebStageProcessor
+
             self._processor_classes["WEB"] = WebStageProcessor
             logger.debug("Registered web processor")
         except ImportError as e:
@@ -53,6 +58,7 @@ class ProcessorRegistry:
         # Register document processor
         try:
             from .document_processor import DocumentStageProcessor
+
             self._processor_classes["DOCUMENT"] = DocumentStageProcessor
             logger.debug("Registered document processor")
         except ImportError as e:
@@ -81,7 +87,11 @@ class ProcessorRegistry:
                 logger.debug("Created processor instance", content_type=content_type)
                 return processor
             except Exception as e:
-                logger.error("Failed to create processor", content_type=content_type, error=str(e))
+                logger.error(
+                    "Failed to create processor",
+                    content_type=content_type,
+                    error=str(e),
+                )
                 return None
 
         logger.debug("No processor available", content_type=content_type)

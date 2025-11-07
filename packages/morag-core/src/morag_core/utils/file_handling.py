@@ -1,17 +1,18 @@
 """File handling utilities for MoRAG."""
 
+import glob
+import hashlib
+import mimetypes
 import os
 import shutil
-import hashlib
 import tempfile
-import glob
+import uuid
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union
-import mimetypes
-import uuid
+
 import structlog
 
-from ..exceptions import ValidationError, StorageError
+from ..exceptions import StorageError, ValidationError
 
 logger = structlog.get_logger(__name__)
 
@@ -64,13 +65,15 @@ def get_file_info(file_path: Union[str, Path]) -> Dict[str, Union[str, int]]:
         "file_path": str(file_path),
         "file_size": stats.st_size,
         "mime_type": mime_type or "application/octet-stream",
-        "extension": file_path.suffix.lower().lstrip('.'),
+        "extension": file_path.suffix.lower().lstrip("."),
         "created_at": stats.st_ctime,
         "modified_at": stats.st_mtime,
     }
 
 
-def generate_temp_path(prefix: str = "", suffix: str = "", directory: Optional[Union[str, Path]] = None) -> Path:
+def generate_temp_path(
+    prefix: str = "", suffix: str = "", directory: Optional[Union[str, Path]] = None
+) -> Path:
     """Generate temporary file path.
 
     Args:
@@ -87,6 +90,7 @@ def generate_temp_path(prefix: str = "", suffix: str = "", directory: Optional[U
     else:
         # Import settings here to avoid module-level import issues
         from ..config import settings
+
         temp_dir = Path(settings.temp_dir)
 
     ensure_directory(temp_dir)
@@ -128,52 +132,48 @@ def detect_format(file_path: Union[str, Path]) -> str:
         Format type string
     """
     file_path = Path(file_path)
-    extension = file_path.suffix.lower().lstrip('.')
+    extension = file_path.suffix.lower().lstrip(".")
 
     # Map common extensions to format types
     format_map = {
         # Documents
-        'pdf': 'pdf',
-        'txt': 'text',
-        'md': 'markdown',
-        'html': 'html',
-        'htm': 'html',
-        'xml': 'xml',
-        'json': 'json',
-        'csv': 'csv',
-
+        "pdf": "pdf",
+        "txt": "text",
+        "md": "markdown",
+        "html": "html",
+        "htm": "html",
+        "xml": "xml",
+        "json": "json",
+        "csv": "csv",
         # Office
-        'doc': 'word',
-        'docx': 'word',
-        'xls': 'excel',
-        'xlsx': 'excel',
-        'ppt': 'powerpoint',
-        'pptx': 'powerpoint',
-
+        "doc": "word",
+        "docx": "word",
+        "xls": "excel",
+        "xlsx": "excel",
+        "ppt": "powerpoint",
+        "pptx": "powerpoint",
         # Audio
-        'mp3': 'audio',
-        'wav': 'audio',
-        'ogg': 'audio',
-        'flac': 'audio',
-        'm4a': 'audio',
-
+        "mp3": "audio",
+        "wav": "audio",
+        "ogg": "audio",
+        "flac": "audio",
+        "m4a": "audio",
         # Video
-        'mp4': 'video',
-        'avi': 'video',
-        'mov': 'video',
-        'mkv': 'video',
-        'webm': 'video',
-
+        "mp4": "video",
+        "avi": "video",
+        "mov": "video",
+        "mkv": "video",
+        "webm": "video",
         # Images
-        'jpg': 'image',
-        'jpeg': 'image',
-        'png': 'image',
-        'gif': 'image',
-        'bmp': 'image',
-        'webp': 'image',
+        "jpg": "image",
+        "jpeg": "image",
+        "png": "image",
+        "gif": "image",
+        "bmp": "image",
+        "webp": "image",
     }
 
-    return format_map.get(extension, 'unknown')
+    return format_map.get(extension, "unknown")
 
 
 def get_file_hash(file_path: Union[str, Path], algorithm: str = "sha256") -> str:
@@ -197,7 +197,7 @@ def get_file_hash(file_path: Union[str, Path], algorithm: str = "sha256") -> str
     hash_obj = hashlib.new(algorithm)
 
     try:
-        with open(file_path, 'rb') as f:
+        with open(file_path, "rb") as f:
             for chunk in iter(lambda: f.read(4096), b""):
                 hash_obj.update(chunk)
         return hash_obj.hexdigest()
@@ -237,7 +237,9 @@ def is_file_readable(file_path: Union[str, Path]) -> bool:
     file_path = Path(file_path)
 
     try:
-        return file_path.exists() and file_path.is_file() and os.access(file_path, os.R_OK)
+        return (
+            file_path.exists() and file_path.is_file() and os.access(file_path, os.R_OK)
+        )
     except Exception:
         return False
 
@@ -265,24 +267,29 @@ def parse_size_string(size_str: str) -> int:
 
     # Define size multipliers
     multipliers = {
-        'B': 1,
-        'KB': 1024,
-        'MB': 1024 * 1024,
-        'GB': 1024 * 1024 * 1024,
-        'TB': 1024 * 1024 * 1024 * 1024,
+        "B": 1,
+        "KB": 1024,
+        "MB": 1024 * 1024,
+        "GB": 1024 * 1024 * 1024,
+        "TB": 1024 * 1024 * 1024 * 1024,
     }
 
     # Extract number and unit
     import re
-    match = re.match(r'^(\d+(?:\.\d+)?)\s*([KMGT]?B)$', size_str)
+
+    match = re.match(r"^(\d+(?:\.\d+)?)\s*([KMGT]?B)$", size_str)
     if not match:
-        raise ValueError(f"Invalid size format: {size_str}. Expected format like '100MB', '5GB', etc.")
+        raise ValueError(
+            f"Invalid size format: {size_str}. Expected format like '100MB', '5GB', etc."
+        )
 
     number_str, unit = match.groups()
     number = float(number_str)
 
     if unit not in multipliers:
-        raise ValueError(f"Unknown size unit: {unit}. Supported units: {list(multipliers.keys())}")
+        raise ValueError(
+            f"Unknown size unit: {unit}. Supported units: {list(multipliers.keys())}"
+        )
 
     return int(number * multipliers[unit])
 

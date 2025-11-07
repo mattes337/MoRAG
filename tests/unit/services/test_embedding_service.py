@@ -1,16 +1,16 @@
 """Unit tests for embedding service."""
 
-import pytest
 import asyncio
 from typing import List
 
+import pytest
 from morag_core.exceptions import (
     ExternalServiceError,
+    QuotaExceededError,
     RateLimitError,
     TimeoutError,
-    QuotaExceededError,
 )
-from morag_core.models.embedding import EmbeddingResult, BatchEmbeddingResult
+from morag_core.models.embedding import BatchEmbeddingResult, EmbeddingResult
 
 
 class MockEmbeddingService:
@@ -24,9 +24,7 @@ class MockEmbeddingService:
         self._health_status = "healthy"
 
     async def generate_embedding(
-        self,
-        text: str,
-        task_type: str = "retrieval_document"
+        self, text: str, task_type: str = "retrieval_document"
     ) -> EmbeddingResult:
         """Generate embedding for a single text."""
         if self._circuit_breaker_open:
@@ -54,14 +52,14 @@ class MockEmbeddingService:
         return EmbeddingResult(
             embedding=embedding,
             token_count=len(text.split()),
-            model="mock-embedding-model"
+            model="mock-embedding-model",
         )
 
     async def generate_embeddings(
         self,
         texts: List[str],
         task_type: str = "retrieval_document",
-        batch_size: int = 50
+        batch_size: int = 50,
     ) -> BatchEmbeddingResult:
         """Generate embeddings for multiple texts."""
         if not texts:
@@ -72,7 +70,7 @@ class MockEmbeddingService:
         total_tokens = 0
 
         for i in range(0, len(texts), batch_size):
-            batch = texts[i:i + batch_size]
+            batch = texts[i : i + batch_size]
             batch_embeddings = []
 
             for text in batch:
@@ -93,7 +91,7 @@ class MockEmbeddingService:
         return BatchEmbeddingResult(
             embeddings=all_embeddings,
             total_tokens=total_tokens,
-            batch_count=len(range(0, len(texts), batch_size))
+            batch_count=len(range(0, len(texts), batch_size)),
         )
 
     async def health_check(self) -> dict:
@@ -103,7 +101,7 @@ class MockEmbeddingService:
             "embedding_model": "mock-embedding-model",
             "embedding_dimension": 384,
             "circuit_breaker_open": self._circuit_breaker_open,
-            "failures": self._circuit_breaker_failures
+            "failures": self._circuit_breaker_failures,
         }
 
     def _increment_failure(self):
@@ -133,7 +131,7 @@ class TestEmbeddingService:
             "This is a sample text for embedding.",
             "Another piece of text to embed.",
             "Machine learning is fascinating.",
-            "Natural language processing enables AI."
+            "Natural language processing enables AI.",
         ]
 
     async def test_single_embedding_success(self, embedding_service):
@@ -241,12 +239,10 @@ class TestEmbeddingService:
         result = await embedding_service.generate_embedding("test")
         assert isinstance(result, EmbeddingResult)
 
-    @pytest.mark.parametrize("task_type", [
-        "retrieval_document",
-        "retrieval_query",
-        "classification",
-        "clustering"
-    ])
+    @pytest.mark.parametrize(
+        "task_type",
+        ["retrieval_document", "retrieval_query", "classification", "clustering"],
+    )
     async def test_different_task_types(self, embedding_service, task_type):
         """Test embedding generation with different task types."""
         text = "Test text for different task types"
@@ -282,10 +278,7 @@ class TestEmbeddingService:
         texts = [f"Concurrent text {i}" for i in range(5)]
 
         # Create concurrent tasks
-        tasks = [
-            embedding_service.generate_embedding(text)
-            for text in texts
-        ]
+        tasks = [embedding_service.generate_embedding(text) for text in texts]
 
         results = await asyncio.gather(*tasks)
 
@@ -310,7 +303,7 @@ class TestEmbeddingService:
             "Text with émojis 🚀 and ünïcödé",
             "Text with symbols: @#$%^&*()",
             "Mixed languages: English и русский",
-            "Numbers and symbols: 123 + 456 = 579"
+            "Numbers and symbols: 123 + 456 = 579",
         ]
 
         for text in special_texts:
@@ -326,7 +319,9 @@ class TestEmbeddingService:
         assert result.batch_count == len(sample_texts)
 
         # Test with large batch size
-        result = await embedding_service.generate_embeddings(sample_texts, batch_size=100)
+        result = await embedding_service.generate_embeddings(
+            sample_texts, batch_size=100
+        )
         assert len(result.embeddings) == len(sample_texts)
         assert result.batch_count == 1
 

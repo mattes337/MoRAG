@@ -1,21 +1,24 @@
 """Tests for semantic chunking system."""
 
-import pytest
 import asyncio
-import sys
 import os
+import sys
+
+import pytest
 
 # Add the packages directory to the Python path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'packages', 'morag-core', 'src'))
+sys.path.insert(
+    0, os.path.join(os.path.dirname(__file__), "..", "packages", "morag-core", "src")
+)
 
+from morag_core.ai import SemanticChunkingAgent
 from morag_core.chunking import (
+    ChunkerFactory,
     ChunkingConfig,
     ChunkingStrategy,
     SemanticChunker,
-    ChunkerFactory,
     create_chunker,
 )
-from morag_core.ai import SemanticChunkingAgent
 
 
 class TestChunkingConfig:
@@ -27,7 +30,7 @@ class TestChunkingConfig:
             strategy=ChunkingStrategy.SEMANTIC,
             max_chunk_size=3000,
             min_chunk_size=400,
-            overlap_size=150
+            overlap_size=150,
         )
 
         assert config.strategy == ChunkingStrategy.SEMANTIC
@@ -53,12 +56,16 @@ class TestChunkingConfig:
         config.validate_config()  # Should not raise
 
         # Invalid config - min >= max
-        with pytest.raises(ValueError, match="min_chunk_size must be less than max_chunk_size"):
+        with pytest.raises(
+            ValueError, match="min_chunk_size must be less than max_chunk_size"
+        ):
             config = ChunkingConfig(max_chunk_size=1000, min_chunk_size=1000)
             config.validate_config()
 
         # Invalid config - overlap >= min
-        with pytest.raises(ValueError, match="overlap_size must be less than min_chunk_size"):
+        with pytest.raises(
+            ValueError, match="overlap_size must be less than min_chunk_size"
+        ):
             config = ChunkingConfig(min_chunk_size=500, overlap_size=500)
             config.validate_config()
 
@@ -91,9 +98,7 @@ class TestChunkingConfig:
     def test_config_serialization(self):
         """Test configuration serialization."""
         config = ChunkingConfig(
-            strategy=ChunkingStrategy.HYBRID,
-            max_chunk_size=3000,
-            min_chunk_size=300
+            strategy=ChunkingStrategy.HYBRID, max_chunk_size=3000, min_chunk_size=300
         )
 
         # Test to_dict
@@ -155,7 +160,9 @@ class TestSemanticChunker:
 
     def test_chunker_creation(self):
         """Test creating semantic chunker."""
-        config = ChunkingConfig(max_chunk_size=2000, strategy=ChunkingStrategy.SIZE_BASED)
+        config = ChunkingConfig(
+            max_chunk_size=2000, strategy=ChunkingStrategy.SIZE_BASED
+        )
         chunker = SemanticChunker(config)
 
         assert chunker.config.max_chunk_size == 2000
@@ -177,7 +184,7 @@ class TestSemanticChunker:
             max_chunk_size=200,
             min_chunk_size=50,
             overlap_size=20,
-            use_ai_analysis=False
+            use_ai_analysis=False,
         )
         chunker = SemanticChunker(config)
 
@@ -196,7 +203,7 @@ class TestSemanticChunker:
             max_chunk_size=200,
             min_chunk_size=50,
             overlap_size=20,
-            use_ai_analysis=False
+            use_ai_analysis=False,
         )
         chunker = SemanticChunker(config)
 
@@ -206,7 +213,7 @@ class TestSemanticChunker:
         assert len(chunks) >= 1
         # Each chunk should end with sentence punctuation (except possibly the last one)
         for chunk in chunks[:-1]:
-            assert chunk.rstrip().endswith(('.', '!', '?'))
+            assert chunk.rstrip().endswith((".", "!", "?"))
 
     @pytest.mark.asyncio
     async def test_paragraph_based_chunking(self):
@@ -216,7 +223,7 @@ class TestSemanticChunker:
             max_chunk_size=300,
             min_chunk_size=50,
             overlap_size=20,
-            use_ai_analysis=False
+            use_ai_analysis=False,
         )
         chunker = SemanticChunker(config)
 
@@ -243,7 +250,7 @@ Third paragraph with more content."""
             max_chunk_size=200,
             min_chunk_size=50,
             overlap_size=20,
-            use_ai_analysis=False
+            use_ai_analysis=False,
         )
         chunker = SemanticChunker(config)
 
@@ -272,18 +279,24 @@ Third paragraph with more content."""
     @pytest.mark.asyncio
     async def test_config_override_with_kwargs(self):
         """Test overriding configuration with kwargs."""
-        config = ChunkingConfig(max_chunk_size=2000, strategy=ChunkingStrategy.SIZE_BASED)
+        config = ChunkingConfig(
+            max_chunk_size=2000, strategy=ChunkingStrategy.SIZE_BASED
+        )
         chunker = SemanticChunker(config)
 
         text = "This is a test. " * 50
 
         # Override max_chunk_size via kwargs
-        chunks = await chunker.chunk_text(text, max_chunk_size=100, strategy=ChunkingStrategy.SIZE_BASED)
+        chunks = await chunker.chunk_text(
+            text, max_chunk_size=100, strategy=ChunkingStrategy.SIZE_BASED
+        )
 
         # Should use the overridden max_chunk_size
         # Note: The chunking algorithm may create larger chunks due to word boundary preservation
         for chunk in chunks:
-            assert len(chunk) <= 200  # Allow tolerance for word boundaries and sentence preservation
+            assert (
+                len(chunk) <= 200
+            )  # Allow tolerance for word boundaries and sentence preservation
 
 
 class TestChunkerFactory:
@@ -325,7 +338,9 @@ class TestChunkerFactory:
         assert chunker.config.max_chunk_size == 2000
 
         # Create with strategy
-        chunker = create_chunker(strategy=ChunkingStrategy.SIZE_BASED, max_chunk_size=1500)
+        chunker = create_chunker(
+            strategy=ChunkingStrategy.SIZE_BASED, max_chunk_size=1500
+        )
         assert chunker.config.strategy == ChunkingStrategy.SIZE_BASED
         assert chunker.config.max_chunk_size == 1500
 
@@ -342,7 +357,7 @@ class TestIntegration:
             strategy=ChunkingStrategy.SIZE_BASED,
             max_chunk_size=500,
             min_chunk_size=100,
-            overlap_size=50
+            overlap_size=50,
         )
 
         # Sample document text
@@ -373,7 +388,9 @@ class TestIntegration:
         combined_words = set(combined_text.split())
 
         # Most words should be preserved (allowing for some overlap)
-        preserved_ratio = len(original_words.intersection(combined_words)) / len(original_words)
+        preserved_ratio = len(original_words.intersection(combined_words)) / len(
+            original_words
+        )
         assert preserved_ratio > 0.8  # At least 80% of words preserved
 
 

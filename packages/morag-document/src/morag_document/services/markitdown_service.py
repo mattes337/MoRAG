@@ -2,11 +2,11 @@
 
 import asyncio
 from pathlib import Path
-from typing import Optional, Dict, Any, Union
-import structlog
+from typing import Any, Dict, Optional, Union
 
-from morag_core.interfaces.converter import ConversionError, UnsupportedFormatError
+import structlog
 from morag_core.config import get_settings
+from morag_core.interfaces.converter import ConversionError, UnsupportedFormatError
 
 logger = structlog.get_logger(__name__)
 
@@ -43,7 +43,9 @@ class MarkitdownService:
                 "Markitdown is not installed. Please install with: pip install markitdown"
             ) from e
         except Exception as e:
-            raise ConversionError(f"Failed to initialize markitdown service: {e}") from e
+            raise ConversionError(
+                f"Failed to initialize markitdown service: {e}"
+            ) from e
 
     async def _configure_markitdown(self) -> None:
         """Configure markitdown based on settings."""
@@ -51,20 +53,27 @@ class MarkitdownService:
             return
 
         # Configure Azure Document Intelligence if enabled
-        if hasattr(self.settings, 'markitdown_use_azure_doc_intel') and self.settings.markitdown_use_azure_doc_intel:
-            if hasattr(self.settings, 'markitdown_azure_endpoint') and self.settings.markitdown_azure_endpoint:
+        if (
+            hasattr(self.settings, "markitdown_use_azure_doc_intel")
+            and self.settings.markitdown_use_azure_doc_intel
+        ):
+            if (
+                hasattr(self.settings, "markitdown_azure_endpoint")
+                and self.settings.markitdown_azure_endpoint
+            ):
                 logger.info("Configuring markitdown with Azure Document Intelligence")
                 # Note: Azure DI configuration will be implemented in Phase 3
 
         # Configure LLM-based image description if enabled
-        if hasattr(self.settings, 'markitdown_use_llm_image_description') and self.settings.markitdown_use_llm_image_description:
+        if (
+            hasattr(self.settings, "markitdown_use_llm_image_description")
+            and self.settings.markitdown_use_llm_image_description
+        ):
             logger.info("Configuring markitdown with LLM image description")
             # Note: LLM image description will be implemented in Phase 3
 
     async def convert_file(
-        self,
-        file_path: Union[str, Path],
-        options: Optional[Dict[str, Any]] = None
+        self, file_path: Union[str, Path], options: Optional[Dict[str, Any]] = None
     ) -> str:
         """Convert file to markdown using markitdown.
 
@@ -97,23 +106,24 @@ class MarkitdownService:
             # Run markitdown conversion in thread pool to avoid blocking
             loop = asyncio.get_event_loop()
             result = await loop.run_in_executor(
-                None,
-                self._convert_sync,
-                str(file_path),
-                options
+                None, self._convert_sync, str(file_path), options
             )
 
             if not result or not result.text_content:
-                raise ConversionError(f"Markitdown returned empty content for file: {file_path}")
+                raise ConversionError(
+                    f"Markitdown returned empty content for file: {file_path}"
+                )
 
             # Additional validation for all supported file types
             if not self._validate_conversion_quality(result.text_content, file_path):
-                raise ConversionError(f"Conversion failed - output does not appear to be proper markdown: {file_path}")
+                raise ConversionError(
+                    f"Conversion failed - output does not appear to be proper markdown: {file_path}"
+                )
 
             logger.info(
                 "File converted successfully",
                 file_path=str(file_path),
-                content_length=len(result.text_content)
+                content_length=len(result.text_content),
             )
 
             return result.text_content
@@ -121,31 +131,37 @@ class MarkitdownService:
         except Exception as e:
             if isinstance(e, (ConversionError, UnsupportedFormatError)):
                 raise
-            logger.error("Markitdown conversion failed", file_path=str(file_path), error=str(e))
+            logger.error(
+                "Markitdown conversion failed", file_path=str(file_path), error=str(e)
+            )
             raise ConversionError(f"Failed to convert file with markitdown: {e}") from e
 
     def _convert_sync(self, file_path: str, options: Dict[str, Any]):
         """Synchronous conversion method for thread pool execution."""
         try:
             # For markdown files, try to read directly with proper encoding first
-            if file_path.lower().endswith(('.md', '.markdown')):
+            if file_path.lower().endswith((".md", ".markdown")):
                 try:
-                    with open(file_path, 'r', encoding='utf-8') as f:
+                    with open(file_path, "r", encoding="utf-8") as f:
                         content = f.read()
+
                     # Create a simple result object that mimics markitdown's output
                     class SimpleResult:
                         def __init__(self, text_content):
                             self.text_content = text_content
+
                     return SimpleResult(content)
                 except UnicodeDecodeError:
                     # If UTF-8 fails, try with different encodings
-                    for encoding in ['latin-1', 'cp1252', 'iso-8859-1']:
+                    for encoding in ["latin-1", "cp1252", "iso-8859-1"]:
                         try:
-                            with open(file_path, 'r', encoding=encoding) as f:
+                            with open(file_path, "r", encoding=encoding) as f:
                                 content = f.read()
+
                             class SimpleResult:
                                 def __init__(self, text_content):
                                     self.text_content = text_content
+
                             return SimpleResult(content)
                         except UnicodeDecodeError:
                             continue
@@ -168,11 +184,37 @@ class MarkitdownService:
 
         # Markitdown supports these formats (as of version 0.0.1a2)
         return [
-            'pdf', 'docx', 'pptx', 'xlsx', 'xls', 'doc', 'ppt',
-            'html', 'htm', 'xml', 'csv', 'json', 'txt', 'md',
-            'jpg', 'jpeg', 'png', 'gif', 'bmp', 'tiff', 'webp',
-            'mp3', 'wav', 'mp4', 'avi', 'mov', 'wmv', 'flv',
-            'zip', 'epub', 'ipynb'
+            "pdf",
+            "docx",
+            "pptx",
+            "xlsx",
+            "xls",
+            "doc",
+            "ppt",
+            "html",
+            "htm",
+            "xml",
+            "csv",
+            "json",
+            "txt",
+            "md",
+            "jpg",
+            "jpeg",
+            "png",
+            "gif",
+            "bmp",
+            "tiff",
+            "webp",
+            "mp3",
+            "wav",
+            "mp4",
+            "avi",
+            "mov",
+            "wmv",
+            "flv",
+            "zip",
+            "epub",
+            "ipynb",
         ]
 
     async def supports_format(self, format_type: str) -> bool:
@@ -185,7 +227,7 @@ class MarkitdownService:
             True if format is supported
         """
         supported_formats = await self.get_supported_formats()
-        return format_type.lower().lstrip('.') in supported_formats
+        return format_type.lower().lstrip(".") in supported_formats
 
     async def get_conversion_info(self, file_path: Union[str, Path]) -> Dict[str, Any]:
         """Get information about what markitdown would extract from a file.
@@ -201,15 +243,15 @@ class MarkitdownService:
         if not file_path.exists():
             raise ConversionError(f"File not found: {file_path}")
 
-        format_type = file_path.suffix.lower().lstrip('.')
+        format_type = file_path.suffix.lower().lstrip(".")
         is_supported = await self.supports_format(format_type)
 
         return {
-            'file_path': str(file_path),
-            'format': format_type,
-            'supported': is_supported,
-            'file_size': file_path.stat().st_size,
-            'service': 'markitdown'
+            "file_path": str(file_path),
+            "format": format_type,
+            "supported": is_supported,
+            "file_size": file_path.stat().st_size,
+            "service": "markitdown",
         }
 
     def _validate_conversion_quality(self, content: str, file_path: Path) -> bool:
@@ -228,17 +270,17 @@ class MarkitdownService:
         file_ext = file_path.suffix.lower()
 
         # For certain file types, we expect specific content patterns
-        if file_ext in ['.pdf', '.doc', '.docx', '.ppt', '.pptx']:
+        if file_ext in [".pdf", ".doc", ".docx", ".ppt", ".pptx"]:
             return self._validate_document_conversion(content, file_ext)
-        elif file_ext in ['.html', '.htm']:
+        elif file_ext in [".html", ".htm"]:
             return self._validate_html_conversion(content)
-        elif file_ext in ['.csv', '.xlsx', '.xls']:
+        elif file_ext in [".csv", ".xlsx", ".xls"]:
             return self._validate_data_conversion(content)
-        elif file_ext in ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp']:
+        elif file_ext in [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff", ".webp"]:
             return self._validate_image_conversion(content)
-        elif file_ext in ['.json', '.xml']:
+        elif file_ext in [".json", ".xml"]:
             return self._validate_structured_data_conversion(content)
-        elif file_ext in ['.txt', '.md']:
+        elif file_ext in [".txt", ".md"]:
             return self._validate_text_conversion(content)
         else:
             # For other formats, use general validation
@@ -250,19 +292,22 @@ class MarkitdownService:
 
         # Check for basic markdown structure
         markdown_patterns = [
-            r'^#+ ',  # Headers
-            r'^\* ',  # Bullet points
-            r'^\d+\. ',  # Numbered lists
-            r'\*\*.*?\*\*',  # Bold text
-            r'`.*?`',  # Code
-            r'^\|.*\|',  # Tables
+            r"^#+ ",  # Headers
+            r"^\* ",  # Bullet points
+            r"^\d+\. ",  # Numbered lists
+            r"\*\*.*?\*\*",  # Bold text
+            r"`.*?`",  # Code
+            r"^\|.*\|",  # Tables
         ]
 
-        pattern_matches = sum(1 for pattern in markdown_patterns
-                            if re.search(pattern, content, re.MULTILINE))
+        pattern_matches = sum(
+            1
+            for pattern in markdown_patterns
+            if re.search(pattern, content, re.MULTILINE)
+        )
 
         # Check for signs of raw text extraction
-        lines = content.split('\n')
+        lines = content.split("\n")
         non_empty_lines = [line.strip() for line in lines if line.strip()]
 
         if not non_empty_lines:
@@ -273,7 +318,7 @@ class MarkitdownService:
         long_line_ratio = long_lines / len(non_empty_lines) if non_empty_lines else 0
 
         # Check for very few line breaks relative to content length
-        line_break_ratio = content.count('\n') / max(1, len(content))
+        line_break_ratio = content.count("\n") / max(1, len(content))
 
         # Document should have some structure and reasonable formatting
         has_structure = pattern_matches >= 1 or long_line_ratio < 0.7
@@ -287,12 +332,14 @@ class MarkitdownService:
         import re
 
         # Should have some markdown structure or at least proper paragraphs
-        has_headers = bool(re.search(r'^#+ ', content, re.MULTILINE))
-        has_paragraphs = '\n\n' in content
-        has_lists = bool(re.search(r'^\* |^\d+\. ', content, re.MULTILINE))
+        has_headers = bool(re.search(r"^#+ ", content, re.MULTILINE))
+        has_paragraphs = "\n\n" in content
+        has_lists = bool(re.search(r"^\* |^\d+\. ", content, re.MULTILINE))
 
         # Should not contain raw HTML tags (unless intentionally preserved)
-        html_tag_ratio = len(re.findall(r'<[^>]+>', content)) / max(1, len(content.split()))
+        html_tag_ratio = len(re.findall(r"<[^>]+>", content)) / max(
+            1, len(content.split())
+        )
 
         return (has_headers or has_paragraphs or has_lists) and html_tag_ratio < 0.1
 
@@ -302,16 +349,20 @@ class MarkitdownService:
         import re
 
         # Should have table structure or clear data organization
-        has_tables = bool(re.search(r'^\|.*\|', content, re.MULTILINE))
-        has_structured_data = bool(re.search(r'^\w+:\s+\w+', content, re.MULTILINE))
-        has_headers = bool(re.search(r'^#+ ', content, re.MULTILINE))
+        has_tables = bool(re.search(r"^\|.*\|", content, re.MULTILINE))
+        has_structured_data = bool(re.search(r"^\w+:\s+\w+", content, re.MULTILINE))
+        has_headers = bool(re.search(r"^#+ ", content, re.MULTILINE))
 
         # Should not be just a wall of text
-        lines = content.split('\n')
+        lines = content.split("\n")
         non_empty_lines = [line for line in lines if line.strip()]
-        avg_line_length = sum(len(line) for line in non_empty_lines) / max(1, len(non_empty_lines))
+        avg_line_length = sum(len(line) for line in non_empty_lines) / max(
+            1, len(non_empty_lines)
+        )
 
-        return (has_tables or has_structured_data or has_headers) and avg_line_length < 300
+        return (
+            has_tables or has_structured_data or has_headers
+        ) and avg_line_length < 300
 
     def _validate_image_conversion(self, content: str) -> bool:
         """Validate image conversion (OCR results)."""
@@ -320,7 +371,7 @@ class MarkitdownService:
             return False
 
         # Should not be just error messages or empty content
-        error_indicators = ['error', 'failed', 'unable', 'cannot', 'not supported']
+        error_indicators = ["error", "failed", "unable", "cannot", "not supported"]
         content_lower = content.lower()
 
         if any(indicator in content_lower for indicator in error_indicators):
@@ -339,9 +390,9 @@ class MarkitdownService:
         import re
 
         # Should have some structure
-        has_headers = bool(re.search(r'^#+ ', content, re.MULTILINE))
-        has_structure = bool(re.search(r'^\w+:\s+', content, re.MULTILINE))
-        has_code_blocks = '```' in content
+        has_headers = bool(re.search(r"^#+ ", content, re.MULTILINE))
+        has_structure = bool(re.search(r"^\w+:\s+", content, re.MULTILINE))
+        has_code_blocks = "```" in content
 
         return has_headers or has_structure or has_code_blocks
 
@@ -357,7 +408,7 @@ class MarkitdownService:
             return False
 
         # Should not be just error messages
-        error_indicators = ['error', 'failed', 'unable', 'cannot', 'not supported']
+        error_indicators = ["error", "failed", "unable", "cannot", "not supported"]
         content_lower = content.lower()
 
         return not any(indicator in content_lower for indicator in error_indicators)

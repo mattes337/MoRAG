@@ -1,13 +1,14 @@
 """Error handling utilities for MoRAG Stages."""
 
 from functools import wraps
-from typing import Callable, TypeVar, Any
+from typing import Any, Callable, TypeVar
+
 import structlog
 
-from .exceptions import StageValidationError, StageExecutionError
+from .exceptions import StageExecutionError, StageValidationError
 
 # Type variables for proper type hinting
-F = TypeVar('F', bound=Callable[..., Any])
+F = TypeVar("F", bound=Callable[..., Any])
 
 logger = structlog.get_logger(__name__)
 
@@ -32,6 +33,7 @@ def stage_error_handler(operation_name: str) -> Callable[[F], F]:
             # Implementation here
             pass
     """
+
     def decorator(func: F) -> F:
         @wraps(func)
         async def async_wrapper(self, *args, **kwargs):
@@ -42,11 +44,11 @@ def stage_error_handler(operation_name: str) -> Callable[[F], F]:
                 logger.error(
                     f"{operation_name} validation failed",
                     operation=operation_name,
-                    stage_type=getattr(self, 'stage_type', 'unknown'),
+                    stage_type=getattr(self, "stage_type", "unknown"),
                     error=str(e),
                     error_type=type(e).__name__,
-                    invalid_files=getattr(e, 'invalid_files', []),
-                    details=getattr(e, 'details', {})
+                    invalid_files=getattr(e, "invalid_files", []),
+                    details=getattr(e, "details", {}),
                 )
                 raise
             except StageExecutionError as e:
@@ -54,11 +56,11 @@ def stage_error_handler(operation_name: str) -> Callable[[F], F]:
                 logger.error(
                     f"{operation_name} execution failed",
                     operation=operation_name,
-                    stage_type=getattr(self, 'stage_type', 'unknown'),
+                    stage_type=getattr(self, "stage_type", "unknown"),
                     error=str(e),
                     error_type=type(e).__name__,
-                    original_error=str(getattr(e, 'original_error', 'None')),
-                    details=getattr(e, 'details', {})
+                    original_error=str(getattr(e, "original_error", "None")),
+                    details=getattr(e, "details", {}),
                 )
                 raise
             except Exception as e:
@@ -66,19 +68,19 @@ def stage_error_handler(operation_name: str) -> Callable[[F], F]:
                 logger.error(
                     f"{operation_name} failed with unexpected error",
                     operation=operation_name,
-                    stage_type=getattr(self, 'stage_type', 'unknown'),
+                    stage_type=getattr(self, "stage_type", "unknown"),
                     error=str(e),
                     error_type=type(e).__name__,
-                    exc_info=True  # Include full traceback in logs
+                    exc_info=True,  # Include full traceback in logs
                 )
                 raise StageExecutionError(
                     f"{operation_name} failed: {str(e)}",
-                    stage_type=getattr(self, 'stage_type', None),
+                    stage_type=getattr(self, "stage_type", None),
                     original_error=e,
                     details={
-                        'operation': operation_name,
-                        'original_error_type': type(e).__name__
-                    }
+                        "operation": operation_name,
+                        "original_error_type": type(e).__name__,
+                    },
                 ) from e
 
         @wraps(func)
@@ -90,11 +92,11 @@ def stage_error_handler(operation_name: str) -> Callable[[F], F]:
                 logger.error(
                     f"{operation_name} validation failed",
                     operation=operation_name,
-                    stage_type=getattr(self, 'stage_type', 'unknown'),
+                    stage_type=getattr(self, "stage_type", "unknown"),
                     error=str(e),
                     error_type=type(e).__name__,
-                    invalid_files=getattr(e, 'invalid_files', []),
-                    details=getattr(e, 'details', {})
+                    invalid_files=getattr(e, "invalid_files", []),
+                    details=getattr(e, "details", {}),
                 )
                 raise
             except StageExecutionError as e:
@@ -102,11 +104,11 @@ def stage_error_handler(operation_name: str) -> Callable[[F], F]:
                 logger.error(
                     f"{operation_name} execution failed",
                     operation=operation_name,
-                    stage_type=getattr(self, 'stage_type', 'unknown'),
+                    stage_type=getattr(self, "stage_type", "unknown"),
                     error=str(e),
                     error_type=type(e).__name__,
-                    original_error=str(getattr(e, 'original_error', 'None')),
-                    details=getattr(e, 'details', {})
+                    original_error=str(getattr(e, "original_error", "None")),
+                    details=getattr(e, "details", {}),
                 )
                 raise
             except Exception as e:
@@ -114,23 +116,24 @@ def stage_error_handler(operation_name: str) -> Callable[[F], F]:
                 logger.error(
                     f"{operation_name} failed with unexpected error",
                     operation=operation_name,
-                    stage_type=getattr(self, 'stage_type', 'unknown'),
+                    stage_type=getattr(self, "stage_type", "unknown"),
                     error=str(e),
                     error_type=type(e).__name__,
-                    exc_info=True  # Include full traceback in logs
+                    exc_info=True,  # Include full traceback in logs
                 )
                 raise StageExecutionError(
                     f"{operation_name} failed: {str(e)}",
-                    stage_type=getattr(self, 'stage_type', None),
+                    stage_type=getattr(self, "stage_type", None),
                     original_error=e,
                     details={
-                        'operation': operation_name,
-                        'original_error_type': type(e).__name__
-                    }
+                        "operation": operation_name,
+                        "original_error_type": type(e).__name__,
+                    },
                 ) from e
 
         # Return appropriate wrapper based on whether the function is async
         import inspect
+
         if inspect.iscoroutinefunction(func):
             return async_wrapper  # type: ignore
         else:
@@ -151,6 +154,7 @@ def validation_error_handler(operation_name: str) -> Callable[[F], F]:
     Returns:
         Decorated function that wraps exceptions in StageValidationError
     """
+
     def decorator(func: F) -> F:
         @wraps(func)
         def wrapper(self, *args, **kwargs):
@@ -163,21 +167,22 @@ def validation_error_handler(operation_name: str) -> Callable[[F], F]:
                 logger.error(
                     f"{operation_name} validation failed",
                     operation=operation_name,
-                    stage_type=getattr(self, 'stage_type', 'unknown'),
+                    stage_type=getattr(self, "stage_type", "unknown"),
                     error=str(e),
                     error_type=type(e).__name__,
-                    exc_info=True
+                    exc_info=True,
                 )
                 raise StageValidationError(
                     f"{operation_name} validation failed: {str(e)}",
-                    stage_type=getattr(self, 'stage_type', None),
+                    stage_type=getattr(self, "stage_type", None),
                     details={
-                        'operation': operation_name,
-                        'original_error_type': type(e).__name__
-                    }
+                        "operation": operation_name,
+                        "original_error_type": type(e).__name__,
+                    },
                 ) from e
 
         return wrapper  # type: ignore
+
     return decorator
 
 
@@ -193,6 +198,7 @@ def standalone_validation_handler(operation_name: str) -> Callable[[F], F]:
     Returns:
         Decorated function that handles validation errors gracefully
     """
+
     def decorator(func: F) -> F:
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -210,4 +216,5 @@ def standalone_validation_handler(operation_name: str) -> Callable[[F], F]:
                 return False
 
         return wrapper  # type: ignore
+
     return decorator

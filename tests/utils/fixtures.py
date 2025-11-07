@@ -1,20 +1,21 @@
 """Test fixtures for MoRAG testing."""
 
-import pytest
-import tempfile
-import shutil
-from pathlib import Path
-from typing import Dict, List, Any, Generator
 import asyncio
+import shutil
+import tempfile
+from pathlib import Path
+from typing import Any, Dict, Generator, List
+
+import pytest
 
 from .mocks import (
-    MockStorage,
-    MockEmbeddingService,
-    MockProcessor,
-    MockTaskManager,
-    MockFileSystem,
     MockConfiguration,
-    MockLogger
+    MockEmbeddingService,
+    MockFileSystem,
+    MockLogger,
+    MockProcessor,
+    MockStorage,
+    MockTaskManager,
 )
 
 
@@ -40,18 +41,21 @@ def sample_files(temp_directory: Path) -> Dict[str, Path]:
     files = {}
 
     # Text file
-    files['text'] = temp_directory / "sample.txt"
-    files['text'].write_text("""
+    files["text"] = temp_directory / "sample.txt"
+    files["text"].write_text(
+        """
 This is a sample text document for testing.
 It contains multiple lines and paragraphs.
 
 This is the second paragraph with more content
 to test text processing capabilities.
-    """.strip())
+    """.strip()
+    )
 
     # Markdown file
-    files['markdown'] = temp_directory / "sample.md"
-    files['markdown'].write_text("""
+    files["markdown"] = temp_directory / "sample.md"
+    files["markdown"].write_text(
+        """
 # Sample Document
 
 This is a **sample** markdown document.
@@ -65,11 +69,13 @@ This is a **sample** markdown document.
 ## Section 2
 
 Some more content with `code` and [links](https://example.com).
-    """.strip())
+    """.strip()
+    )
 
     # JSON file
-    files['json'] = temp_directory / "sample.json"
-    files['json'].write_text("""
+    files["json"] = temp_directory / "sample.json"
+    files["json"].write_text(
+        """
 {
     "name": "Test Document",
     "type": "sample",
@@ -79,16 +85,17 @@ Some more content with `code` and [links](https://example.com).
         "version": "1.0"
     }
 }
-    """.strip())
+    """.strip()
+    )
 
     # Binary file (fake)
-    files['binary'] = temp_directory / "sample.bin"
-    files['binary'].write_bytes(b'\x00\x01\x02\x03\x04\x05')
+    files["binary"] = temp_directory / "sample.bin"
+    files["binary"].write_bytes(b"\x00\x01\x02\x03\x04\x05")
 
     # Large text file
-    files['large'] = temp_directory / "large.txt"
+    files["large"] = temp_directory / "large.txt"
     large_content = "This is a large file. " * 1000
-    files['large'].write_text(large_content)
+    files["large"].write_text(large_content)
 
     return files
 
@@ -102,22 +109,22 @@ def sample_documents() -> List[Dict[str, Any]]:
             "title": "Introduction to Machine Learning",
             "content": "Machine learning is a subset of artificial intelligence...",
             "type": "article",
-            "metadata": {"author": "John Doe", "date": "2024-01-01"}
+            "metadata": {"author": "John Doe", "date": "2024-01-01"},
         },
         {
             "id": "doc_2",
             "title": "Deep Learning Fundamentals",
             "content": "Deep learning uses neural networks with multiple layers...",
             "type": "tutorial",
-            "metadata": {"author": "Jane Smith", "date": "2024-01-02"}
+            "metadata": {"author": "Jane Smith", "date": "2024-01-02"},
         },
         {
             "id": "doc_3",
             "title": "Natural Language Processing",
             "content": "NLP combines computational linguistics with machine learning...",
             "type": "guide",
-            "metadata": {"author": "Bob Johnson", "date": "2024-01-03"}
-        }
+            "metadata": {"author": "Bob Johnson", "date": "2024-01-03"},
+        },
     ]
 
 
@@ -129,20 +136,20 @@ def sample_entities() -> List[Dict[str, Any]]:
             "id": "entity_1",
             "name": "Machine Learning",
             "type": "Technology",
-            "attributes": {"field": "AI", "year_established": "1950s"}
+            "attributes": {"field": "AI", "year_established": "1950s"},
         },
         {
             "id": "entity_2",
             "name": "John Doe",
             "type": "Person",
-            "attributes": {"role": "Researcher", "expertise": "ML"}
+            "attributes": {"role": "Researcher", "expertise": "ML"},
         },
         {
             "id": "entity_3",
             "name": "Stanford University",
             "type": "Organization",
-            "attributes": {"type": "University", "location": "California"}
-        }
+            "attributes": {"type": "University", "location": "California"},
+        },
     ]
 
 
@@ -155,15 +162,15 @@ def sample_relations() -> List[Dict[str, Any]]:
             "source_id": "entity_2",
             "target_id": "entity_1",
             "type": "RESEARCHES",
-            "attributes": {"since": "2020", "expertise_level": "expert"}
+            "attributes": {"since": "2020", "expertise_level": "expert"},
         },
         {
             "id": "rel_2",
             "source_id": "entity_2",
             "target_id": "entity_3",
             "type": "AFFILIATED_WITH",
-            "attributes": {"role": "Professor", "department": "Computer Science"}
-        }
+            "attributes": {"role": "Professor", "department": "Computer Science"},
+        },
     ]
 
 
@@ -224,7 +231,7 @@ def api_headers():
     return {
         "Content-Type": "application/json",
         "Authorization": "Bearer test-token",
-        "User-Agent": "MoRAG-Test/1.0"
+        "User-Agent": "MoRAG-Test/1.0",
     }
 
 
@@ -234,7 +241,7 @@ def sample_embeddings() -> List[List[float]]:
     return [
         [0.1, 0.2, 0.3, 0.4] * 96,  # 384-dim vector
         [0.5, 0.6, 0.7, 0.8] * 96,
-        [0.9, 0.1, 0.2, 0.3] * 96
+        [0.9, 0.1, 0.2, 0.3] * 96,
     ]
 
 
@@ -247,22 +254,22 @@ def sample_chunks() -> List[Dict[str, Any]]:
             "text": "This is the first chunk of text for testing purposes.",
             "start_index": 0,
             "end_index": 53,
-            "metadata": {"section": "introduction"}
+            "metadata": {"section": "introduction"},
         },
         {
             "id": "chunk_2",
             "text": "This is the second chunk with different content to test chunking.",
             "start_index": 54,
             "end_index": 119,
-            "metadata": {"section": "body"}
+            "metadata": {"section": "body"},
         },
         {
             "id": "chunk_3",
             "text": "This is the final chunk to complete the test content.",
             "start_index": 120,
             "end_index": 173,
-            "metadata": {"section": "conclusion"}
-        }
+            "metadata": {"section": "conclusion"},
+        },
     ]
 
 
@@ -273,19 +280,19 @@ def database_config():
         "qdrant": {
             "host": "localhost",
             "port": 6333,
-            "collection_name": "test_collection"
+            "collection_name": "test_collection",
         },
         "neo4j": {
             "uri": "bolt://localhost:7687",
             "user": "test",
             "password": "test",
-            "database": "test_db"
+            "database": "test_db",
         },
         "redis": {
             "host": "localhost",
             "port": 6379,
-            "db": 15  # Use separate DB for tests
-        }
+            "db": 15,  # Use separate DB for tests
+        },
     }
 
 
@@ -296,13 +303,13 @@ def ai_service_config():
         "gemini": {
             "api_key": "test-gemini-key",
             "model": "gemini-pro",
-            "embedding_model": "embedding-001"
+            "embedding_model": "embedding-001",
         },
         "openai": {
             "api_key": "test-openai-key",
             "model": "gpt-4",
-            "embedding_model": "text-embedding-ada-002"
-        }
+            "embedding_model": "text-embedding-ada-002",
+        },
     }
 
 
@@ -315,7 +322,7 @@ def processing_config():
         "batch_size": 50,
         "max_workers": 4,
         "timeout": 30,
-        "retry_attempts": 3
+        "retry_attempts": 3,
     }
 
 
@@ -349,7 +356,7 @@ async def async_mock_services():
         "storage": MockStorage(),
         "embedding": MockEmbeddingService(),
         "processor": MockProcessor(),
-        "task_manager": MockTaskManager()
+        "task_manager": MockTaskManager(),
     }
 
     # Connect storage
@@ -371,16 +378,18 @@ class TestDataGenerator:
         entity_types = ["Person", "Organization", "Technology", "Location", "Concept"]
 
         for i in range(count):
-            entities.append({
-                "id": f"entity_{i}",
-                "name": f"Test Entity {i}",
-                "type": entity_types[i % len(entity_types)],
-                "attributes": {
-                    "test_attribute": f"value_{i}",
-                    "created_at": "2024-01-01",
-                    "index": i
+            entities.append(
+                {
+                    "id": f"entity_{i}",
+                    "name": f"Test Entity {i}",
+                    "type": entity_types[i % len(entity_types)],
+                    "attributes": {
+                        "test_attribute": f"value_{i}",
+                        "created_at": "2024-01-01",
+                        "index": i,
+                    },
                 }
-            })
+            )
 
         return entities
 
@@ -391,16 +400,15 @@ class TestDataGenerator:
         relation_types = ["RELATED_TO", "PART_OF", "SIMILAR_TO", "DEPENDS_ON"]
 
         for i in range(entity_count - 1):
-            relations.append({
-                "id": f"relation_{i}",
-                "source_id": f"entity_{i}",
-                "target_id": f"entity_{i + 1}",
-                "type": relation_types[i % len(relation_types)],
-                "attributes": {
-                    "strength": 0.8,
-                    "created_at": "2024-01-01"
+            relations.append(
+                {
+                    "id": f"relation_{i}",
+                    "source_id": f"entity_{i}",
+                    "target_id": f"entity_{i + 1}",
+                    "type": relation_types[i % len(relation_types)],
+                    "attributes": {"strength": 0.8, "created_at": "2024-01-01"},
                 }
-            })
+            )
 
         return relations
 
@@ -411,17 +419,19 @@ class TestDataGenerator:
         document_types = ["article", "paper", "tutorial", "guide", "reference"]
 
         for i in range(count):
-            documents.append({
-                "id": f"doc_{i}",
-                "title": f"Test Document {i}",
-                "content": f"This is test document {i} with sample content for testing purposes.",
-                "type": document_types[i % len(document_types)],
-                "metadata": {
-                    "author": f"Author {i}",
-                    "created_at": "2024-01-01",
-                    "word_count": 15 + i * 5
+            documents.append(
+                {
+                    "id": f"doc_{i}",
+                    "title": f"Test Document {i}",
+                    "content": f"This is test document {i} with sample content for testing purposes.",
+                    "type": document_types[i % len(document_types)],
+                    "metadata": {
+                        "author": f"Author {i}",
+                        "created_at": "2024-01-01",
+                        "word_count": 15 + i * 5,
+                    },
                 }
-            })
+            )
 
         return documents
 

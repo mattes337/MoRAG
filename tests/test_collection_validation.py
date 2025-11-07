@@ -8,7 +8,7 @@ import sys
 from unittest.mock import patch
 
 # Add the project root to the path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 
 def test_environment_variable_validation():
@@ -17,19 +17,21 @@ def test_environment_variable_validation():
     # Test 1: Missing environment variable should fail
     print("Test 1: Testing missing QDRANT_COLLECTION_NAME...")
     with patch.dict(os.environ, {}, clear=True):
-        if 'QDRANT_COLLECTION_NAME' in os.environ:
-            del os.environ['QDRANT_COLLECTION_NAME']
+        if "QDRANT_COLLECTION_NAME" in os.environ:
+            del os.environ["QDRANT_COLLECTION_NAME"]
 
         # Test that services fail without collection name
         try:
             # Import and test the validation logic directly
-            qdrant_host = os.getenv('QDRANT_HOST', 'localhost')
-            qdrant_port = int(os.getenv('QDRANT_PORT', '6333'))
-            qdrant_api_key = os.getenv('QDRANT_API_KEY')
-            collection_name = os.getenv('QDRANT_COLLECTION_NAME')
+            qdrant_host = os.getenv("QDRANT_HOST", "localhost")
+            qdrant_port = int(os.getenv("QDRANT_PORT", "6333"))
+            qdrant_api_key = os.getenv("QDRANT_API_KEY")
+            collection_name = os.getenv("QDRANT_COLLECTION_NAME")
 
             if not collection_name:
-                raise ValueError("QDRANT_COLLECTION_NAME environment variable is required")
+                raise ValueError(
+                    "QDRANT_COLLECTION_NAME environment variable is required"
+                )
 
             print("❌ Expected ValueError but none was raised")
             return False
@@ -43,13 +45,15 @@ def test_environment_variable_validation():
 
     # Test 2: Present environment variable should work
     print("Test 2: Testing present QDRANT_COLLECTION_NAME...")
-    with patch.dict(os.environ, {'QDRANT_COLLECTION_NAME': 'test_collection'}):
+    with patch.dict(os.environ, {"QDRANT_COLLECTION_NAME": "test_collection"}):
         try:
-            collection_name = os.getenv('QDRANT_COLLECTION_NAME')
+            collection_name = os.getenv("QDRANT_COLLECTION_NAME")
             if not collection_name:
-                raise ValueError("QDRANT_COLLECTION_NAME environment variable is required")
+                raise ValueError(
+                    "QDRANT_COLLECTION_NAME environment variable is required"
+                )
 
-            if collection_name == 'test_collection':
+            if collection_name == "test_collection":
                 print("✅ Correctly accepted valid environment variable")
             else:
                 print(f"❌ Wrong collection name: {collection_name}")
@@ -69,7 +73,9 @@ def test_storage_validation():
     # Simulate the validation logic from QdrantVectorStorage
     def validate_collection_name(collection_name):
         if not collection_name:
-            raise ValueError("collection_name is required - set QDRANT_COLLECTION_NAME environment variable")
+            raise ValueError(
+                "collection_name is required - set QDRANT_COLLECTION_NAME environment variable"
+            )
         return collection_name
 
     # Test with None
@@ -115,16 +121,13 @@ def test_environment_files():
     """Test that environment files have consistent collection names."""
     print("Test 4: Testing environment file consistency...")
 
-    env_files = [
-        '.env.example',
-        '.env.prod.example'
-    ]
+    env_files = [".env.example", ".env.prod.example"]
 
     for env_file in env_files:
         if os.path.exists(env_file):
-            with open(env_file, 'r') as f:
+            with open(env_file, "r") as f:
                 content = f.read()
-                if 'QDRANT_COLLECTION_NAME=morag_documents' in content:
+                if "QDRANT_COLLECTION_NAME=morag_documents" in content:
                     print(f"✅ {env_file} has correct collection name")
                 else:
                     print(f"❌ {env_file} has incorrect or missing collection name")
@@ -143,7 +146,7 @@ def main():
     tests = [
         test_environment_variable_validation,
         test_storage_validation,
-        test_environment_files
+        test_environment_files,
     ]
 
     passed = 0

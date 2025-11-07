@@ -1,9 +1,11 @@
-import pytest
 import asyncio
 import uuid
-from unittest.mock import patch, AsyncMock, MagicMock
-from morag_services.storage import qdrant_service, QdrantService
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 from morag_core.exceptions import StorageError
+from morag_services.storage import QdrantService, qdrant_service
+
 
 @pytest.fixture
 def mock_qdrant_service():
@@ -23,12 +25,9 @@ def mock_qdrant_service():
         optimizer_status=MagicMock(status=MagicMock(value="ok")),
         config=MagicMock(
             params=MagicMock(
-                vectors=MagicMock(
-                    size=768,
-                    distance=MagicMock(value="Cosine")
-                )
+                vectors=MagicMock(size=768, distance=MagicMock(value="Cosine"))
             )
-        )
+        ),
     )
     mock_client.upsert = MagicMock()
     mock_client.search.return_value = []
@@ -40,6 +39,7 @@ def mock_qdrant_service():
     service.client = mock_client
     return service
 
+
 class TestQdrantService:
     """Test Qdrant service functionality."""
 
@@ -48,12 +48,12 @@ class TestQdrantService:
         """Test successful Qdrant connection."""
         service = QdrantService()
 
-        with patch('morag.services.storage.QdrantClient') as mock_client_class:
+        with patch("morag.services.storage.QdrantClient") as mock_client_class:
             mock_client = MagicMock()
             mock_client.get_collections.return_value = MagicMock(collections=[])
             mock_client_class.return_value = mock_client
 
-            with patch('asyncio.to_thread', new_callable=AsyncMock) as mock_to_thread:
+            with patch("asyncio.to_thread", new_callable=AsyncMock) as mock_to_thread:
                 mock_to_thread.return_value = MagicMock(collections=[])
 
                 await service.connect()
@@ -66,7 +66,7 @@ class TestQdrantService:
         """Test Qdrant connection failure."""
         service = QdrantService()
 
-        with patch('morag.services.storage.QdrantClient') as mock_client_class:
+        with patch("morag.services.storage.QdrantClient") as mock_client_class:
             mock_client_class.side_effect = Exception("Connection failed")
 
             with pytest.raises(StorageError) as exc_info:
@@ -79,7 +79,7 @@ class TestQdrantService:
         """Test Qdrant disconnection."""
         service = mock_qdrant_service
 
-        with patch('asyncio.to_thread', new_callable=AsyncMock) as mock_to_thread:
+        with patch("asyncio.to_thread", new_callable=AsyncMock) as mock_to_thread:
             await service.disconnect()
 
             mock_to_thread.assert_called_once()
@@ -90,11 +90,11 @@ class TestQdrantService:
         """Test creating a new collection."""
         service = mock_qdrant_service
 
-        with patch('asyncio.to_thread', new_callable=AsyncMock) as mock_to_thread:
+        with patch("asyncio.to_thread", new_callable=AsyncMock) as mock_to_thread:
             # Mock empty collections list
             mock_to_thread.side_effect = [
                 MagicMock(collections=[]),  # get_collections
-                None  # create_collection
+                None,  # create_collection
             ]
 
             await service.create_collection(vector_size=768, force_recreate=False)
@@ -106,7 +106,7 @@ class TestQdrantService:
         """Test creating collection when it already exists without force."""
         service = mock_qdrant_service
 
-        with patch('asyncio.to_thread', new_callable=AsyncMock) as mock_to_thread:
+        with patch("asyncio.to_thread", new_callable=AsyncMock) as mock_to_thread:
             # Mock existing collection
             existing_collection = MagicMock()
             existing_collection.name = service.collection_name
@@ -122,14 +122,14 @@ class TestQdrantService:
         """Test force recreating an existing collection."""
         service = mock_qdrant_service
 
-        with patch('asyncio.to_thread', new_callable=AsyncMock) as mock_to_thread:
+        with patch("asyncio.to_thread", new_callable=AsyncMock) as mock_to_thread:
             # Mock existing collection
             existing_collection = MagicMock()
             existing_collection.name = service.collection_name
             mock_to_thread.side_effect = [
                 MagicMock(collections=[existing_collection]),  # get_collections
                 None,  # delete_collection
-                None   # create_collection
+                None,  # create_collection
             ]
 
             await service.create_collection(vector_size=768, force_recreate=True)
@@ -148,13 +148,13 @@ class TestQdrantService:
                 "source": "test.pdf",
                 "source_type": "document",
                 "chunk_index": 0,
-                "metadata": {"test": True}
+                "metadata": {"test": True},
             }
         ]
 
         embeddings = [[0.1] * 768]
 
-        with patch('asyncio.to_thread', new_callable=AsyncMock) as mock_to_thread:
+        with patch("asyncio.to_thread", new_callable=AsyncMock) as mock_to_thread:
             point_ids = await service.store_chunks(chunks, embeddings)
 
             assert len(point_ids) == 1
@@ -188,16 +188,14 @@ class TestQdrantService:
             "summary": "Test summary",
             "source": "test.pdf",
             "source_type": "document",
-            "metadata": {"test": True}
+            "metadata": {"test": True},
         }
 
-        with patch('asyncio.to_thread', new_callable=AsyncMock) as mock_to_thread:
+        with patch("asyncio.to_thread", new_callable=AsyncMock) as mock_to_thread:
             mock_to_thread.return_value = [mock_result]
 
             results = await service.search_similar(
-                query_embedding=[0.1] * 768,
-                limit=10,
-                score_threshold=0.7
+                query_embedding=[0.1] * 768, limit=10, score_threshold=0.7
             )
 
             assert len(results) == 1
@@ -210,14 +208,14 @@ class TestQdrantService:
         """Test search with filters."""
         service = mock_qdrant_service
 
-        with patch('asyncio.to_thread', new_callable=AsyncMock) as mock_to_thread:
+        with patch("asyncio.to_thread", new_callable=AsyncMock) as mock_to_thread:
             mock_to_thread.return_value = []
 
             results = await service.search_similar(
                 query_embedding=[0.1] * 768,
                 limit=10,
                 score_threshold=0.7,
-                filters={"source": "test.pdf"}
+                filters={"source": "test.pdf"},
             )
 
             assert len(results) == 0
@@ -232,10 +230,10 @@ class TestQdrantService:
         mock_point = MagicMock()
         mock_point.id = "test-id"
 
-        with patch('asyncio.to_thread', new_callable=AsyncMock) as mock_to_thread:
+        with patch("asyncio.to_thread", new_callable=AsyncMock) as mock_to_thread:
             mock_to_thread.side_effect = [
                 ([mock_point], None),  # scroll result
-                None  # delete result
+                None,  # delete result
             ]
 
             deleted_count = await service.delete_by_source("test.pdf")
@@ -248,7 +246,7 @@ class TestQdrantService:
         """Test getting collection information."""
         service = mock_qdrant_service
 
-        with patch('asyncio.to_thread', new_callable=AsyncMock) as mock_to_thread:
+        with patch("asyncio.to_thread", new_callable=AsyncMock) as mock_to_thread:
             mock_info = MagicMock()
             mock_info.vectors_count = 100
             mock_info.indexed_vectors_count = 100
@@ -280,11 +278,12 @@ class TestQdrantService:
         # Test with connection but operation failure
         service.client = MagicMock()
 
-        with patch('asyncio.to_thread', new_callable=AsyncMock) as mock_to_thread:
+        with patch("asyncio.to_thread", new_callable=AsyncMock) as mock_to_thread:
             mock_to_thread.side_effect = Exception("Operation failed")
 
             with pytest.raises(StorageError):
                 await service.get_collection_info()
+
 
 class TestQdrantServiceIntegration:
     """Test Qdrant service integration scenarios."""
@@ -295,10 +294,10 @@ class TestQdrantServiceIntegration:
         service = mock_qdrant_service
 
         # Test collection creation
-        with patch('asyncio.to_thread', new_callable=AsyncMock) as mock_to_thread:
+        with patch("asyncio.to_thread", new_callable=AsyncMock) as mock_to_thread:
             mock_to_thread.side_effect = [
                 MagicMock(collections=[]),  # get_collections
-                None  # create_collection
+                None,  # create_collection
             ]
 
             await service.create_collection(vector_size=768)
@@ -311,12 +310,12 @@ class TestQdrantServiceIntegration:
                 "source": "integration.pdf",
                 "source_type": "document",
                 "chunk_index": 0,
-                "metadata": {"integration": True}
+                "metadata": {"integration": True},
             }
         ]
         embeddings = [[0.5] * 768]
 
-        with patch('asyncio.to_thread', new_callable=AsyncMock):
+        with patch("asyncio.to_thread", new_callable=AsyncMock):
             point_ids = await service.store_chunks(chunks, embeddings)
             assert len(point_ids) == 1
 
@@ -326,7 +325,7 @@ class TestQdrantServiceIntegration:
         mock_result.score = 0.95
         mock_result.payload = chunks[0]
 
-        with patch('asyncio.to_thread', new_callable=AsyncMock) as mock_to_thread:
+        with patch("asyncio.to_thread", new_callable=AsyncMock) as mock_to_thread:
             mock_to_thread.return_value = [mock_result]
 
             results = await service.search_similar([0.5] * 768)

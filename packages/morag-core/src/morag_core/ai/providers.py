@@ -1,24 +1,31 @@
 """AI model providers for MoRAG agents."""
 
 import os
-from typing import Optional, Dict, Any, Type, TypeVar, Union
-from pydantic import BaseModel, Field
+from typing import Any, Dict, Optional, Type, TypeVar, Union
+
 import structlog
+from pydantic import BaseModel, Field
 
 logger = structlog.get_logger(__name__)
 
-T = TypeVar('T', bound=BaseModel)
+T = TypeVar("T", bound=BaseModel)
 
 
 class ProviderConfig(BaseModel):
     """Configuration for AI providers."""
 
     api_key: Optional[str] = Field(default=None, description="API key for the provider")
-    base_url: Optional[str] = Field(default=None, description="Base URL for the provider API")
+    base_url: Optional[str] = Field(
+        default=None, description="Base URL for the provider API"
+    )
     timeout: int = Field(default=30, description="Request timeout in seconds")
     max_retries: int = Field(default=3, description="Maximum retry attempts")
-    extra_headers: Dict[str, str] = Field(default_factory=dict, description="Extra headers for requests")
-    extra_params: Dict[str, Any] = Field(default_factory=dict, description="Extra parameters for requests")
+    extra_headers: Dict[str, str] = Field(
+        default_factory=dict, description="Extra headers for requests"
+    )
+    extra_params: Dict[str, Any] = Field(
+        default_factory=dict, description="Extra parameters for requests"
+    )
 
 
 class GeminiProvider:
@@ -36,7 +43,9 @@ class GeminiProvider:
         # Get API key from config or environment
         self.api_key = self.config.api_key or os.getenv("GEMINI_API_KEY")
         if not self.api_key:
-            self.logger.warning("No Gemini API key found in config or GEMINI_API_KEY environment variable")
+            self.logger.warning(
+                "No Gemini API key found in config or GEMINI_API_KEY environment variable"
+            )
 
         self._configure_provider()
 
@@ -49,7 +58,9 @@ class GeminiProvider:
                 genai.configure(api_key=self.api_key)
                 self.logger.info("Gemini provider configured successfully")
             else:
-                self.logger.warning("Gemini provider not configured - no API key available")
+                self.logger.warning(
+                    "Gemini provider not configured - no API key available"
+                )
 
         except ImportError as e:
             self.logger.error("Failed to import google.generativeai", error=str(e))
@@ -87,6 +98,7 @@ class GeminiProvider:
         """
         try:
             import google.generativeai as genai
+
             return self.api_key is not None
         except ImportError:
             return False
@@ -101,14 +113,21 @@ class GeminiProvider:
             "name": "gemini",
             "available": self.is_available(),
             "api_key_configured": self.api_key is not None,
-            "config": self.config.model_dump(exclude={"api_key"})  # Exclude sensitive data
+            "config": self.config.model_dump(
+                exclude={"api_key"}
+            ),  # Exclude sensitive data
         }
 
 
 class OutlinesProvider:
     """Outlines provider for structured generation with guaranteed valid outputs."""
 
-    def __init__(self, config: Optional[ProviderConfig] = None, provider: str = "gemini", model: str = "gemini-1.5-flash"):
+    def __init__(
+        self,
+        config: Optional[ProviderConfig] = None,
+        provider: str = "gemini",
+        model: str = "gemini-1.5-flash",
+    ):
         """Initialize the Outlines provider.
 
         Args:
@@ -175,7 +194,9 @@ class OutlinesProvider:
                 raise ValueError(f"Unsupported provider for Outlines: {self.provider}")
 
         except Exception as e:
-            self.logger.error("Failed to create Outlines model", error=str(e), provider=self.provider)
+            self.logger.error(
+                "Failed to create Outlines model", error=str(e), provider=self.provider
+            )
             raise
 
     def _create_gemini_outlines_model(self):
@@ -187,7 +208,7 @@ class OutlinesProvider:
             # Use OpenAI-compatible endpoint for Gemini
             client = openai.OpenAI(
                 base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
-                api_key=self.api_key
+                api_key=self.api_key,
             )
 
             # Map Gemini model names to OpenAI-compatible format
@@ -197,7 +218,9 @@ class OutlinesProvider:
             return from_openai(client, model_name)
 
         except ImportError as e:
-            self.logger.error("Failed to import required packages for Gemini Outlines", error=str(e))
+            self.logger.error(
+                "Failed to import required packages for Gemini Outlines", error=str(e)
+            )
             raise ImportError(
                 "openai package is required for Gemini Outlines integration. "
                 "Install it with: pip install openai"
@@ -245,6 +268,7 @@ class OutlinesProvider:
         """
         try:
             import outlines
+
             return self.api_key is not None
         except ImportError:
             return False
@@ -261,7 +285,9 @@ class OutlinesProvider:
             "model": self.model,
             "available": self.is_available(),
             "api_key_configured": self.api_key is not None,
-            "config": self.config.model_dump(exclude={"api_key"})  # Exclude sensitive data
+            "config": self.config.model_dump(
+                exclude={"api_key"}
+            ),  # Exclude sensitive data
         }
 
 
@@ -275,10 +301,7 @@ class ProviderFactory:
 
     @classmethod
     def create_provider(
-        cls,
-        provider_name: str,
-        config: Optional[ProviderConfig] = None,
-        **kwargs
+        cls, provider_name: str, config: Optional[ProviderConfig] = None, **kwargs
     ) -> Union[GeminiProvider, OutlinesProvider]:
         """Create a provider instance.
 

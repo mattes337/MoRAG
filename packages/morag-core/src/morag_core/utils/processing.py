@@ -1,15 +1,16 @@
 """Processing utilities for MoRAG."""
 
 import json
+from dataclasses import asdict, dataclass
 from datetime import datetime
-from pathlib import Path
-from typing import Dict, List, Any, Optional, Union
-from dataclasses import dataclass, asdict
 from enum import Enum
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Union
 
 
 class ContentType(Enum):
     """Supported content types."""
+
     AUDIO = "audio"
     VIDEO = "video"
     DOCUMENT = "document"
@@ -20,13 +21,15 @@ class ContentType(Enum):
 
 class ProcessingMode(Enum):
     """Processing modes."""
+
     PROCESSING = "processing"  # Immediate results only
-    INGESTION = "ingestion"    # Background processing + storage
+    INGESTION = "ingestion"  # Background processing + storage
 
 
 @dataclass
 class ProcessingMetadata:
     """Metadata for processing operations."""
+
     timestamp: str
     processing_time: float
     content_type: str
@@ -43,7 +46,7 @@ def create_processing_metadata(
     processing_time: float,
     mode: ProcessingMode,
     model_info: Dict[str, Any],
-    options: Dict[str, Any]
+    options: Dict[str, Any],
 ) -> ProcessingMetadata:
     """Create processing metadata."""
     source_path_obj = Path(source_path)
@@ -55,11 +58,13 @@ def create_processing_metadata(
         source_path=str(source_path),
         source_size=source_path_obj.stat().st_size if source_path_obj.exists() else 0,
         model_info=model_info,
-        options=options
+        options=options,
     )
 
 
-def get_output_paths(input_path: Union[str, Path], mode: ProcessingMode) -> Dict[str, Path]:
+def get_output_paths(
+    input_path: Union[str, Path], mode: ProcessingMode
+) -> Dict[str, Path]:
     """Get standardized output file paths."""
     input_path = Path(input_path)
     stem = input_path.stem
@@ -67,12 +72,12 @@ def get_output_paths(input_path: Union[str, Path], mode: ProcessingMode) -> Dict
 
     if mode == ProcessingMode.PROCESSING:
         return {
-            'intermediate_json': parent / f"{stem}_intermediate.json",
-            'result_json': parent / f"{stem}_processing_result.json"
+            "intermediate_json": parent / f"{stem}_intermediate.json",
+            "result_json": parent / f"{stem}_processing_result.json",
         }
     else:  # INGESTION
         return {
-            'intermediate_json': parent / f"{stem}_intermediate.json",
-            'intermediate_md': parent / f"{stem}_intermediate.md",
-            'result_json': parent / f"{stem}_ingestion_result.json"
+            "intermediate_json": parent / f"{stem}_intermediate.json",
+            "intermediate_md": parent / f"{stem}_intermediate.md",
+            "result_json": parent / f"{stem}_ingestion_result.json",
         }

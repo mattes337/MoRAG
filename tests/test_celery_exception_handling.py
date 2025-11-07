@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 """Test Celery exception handling fixes for ExternalServiceError re-raising."""
 
-import sys
-import os
 import asyncio
-from unittest.mock import patch, MagicMock
+import os
+import sys
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 # Add the project root to the Python path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
+
 
 def test_external_service_error_re_raising():
     """Test that ExternalServiceError is properly re-raised in Celery tasks."""
@@ -31,7 +32,7 @@ def test_external_service_error_re_raising():
             e = original_exception
 
             # This is the exact logic from the fixed ingest_tasks.py
-            if hasattr(e, 'service') and hasattr(type(e), '__init__'):
+            if hasattr(e, "service") and hasattr(type(e), "__init__"):
                 # For ExternalServiceError and similar exceptions that need service parameter
                 try:
                     raise type(e)(str(e).replace(f"{e.service} error: ", ""), e.service)
@@ -55,13 +56,17 @@ def test_external_service_error_re_raising():
             print("❌ Should have raised an exception")
             return False
         except ExternalServiceError as e:
-            if hasattr(e, 'service') and e.service == "gemini":
-                print("✅ ExternalServiceError properly re-raised with service parameter")
+            if hasattr(e, "service") and e.service == "gemini":
+                print(
+                    "✅ ExternalServiceError properly re-raised with service parameter"
+                )
             else:
                 print(f"❌ ExternalServiceError missing service parameter: {e}")
                 return False
         except Exception as e:
-            print(f"✅ ExternalServiceError fallback to generic Exception: {type(e).__name__}")
+            print(
+                f"✅ ExternalServiceError fallback to generic Exception: {type(e).__name__}"
+            )
             # This is acceptable as a fallback
 
         # Test 2: Verify the original error scenario is fixed
@@ -70,7 +75,7 @@ def test_external_service_error_re_raising():
         # Simulate the exact error from the logs
         rate_limit_error = ExternalServiceError(
             "Embedding generation failed: Rate limit exceeded after 3 retries: 429 RESOURCE_EXHAUSTED",
-            "gemini"
+            "gemini",
         )
 
         try:
@@ -78,13 +83,15 @@ def test_external_service_error_re_raising():
             print("❌ Should have raised an exception")
             return False
         except ExternalServiceError as e:
-            if hasattr(e, 'service') and e.service == "gemini":
+            if hasattr(e, "service") and e.service == "gemini":
                 print("✅ Rate limit ExternalServiceError properly re-raised")
             else:
                 print(f"❌ Rate limit error missing service parameter: {e}")
                 return False
         except Exception as e:
-            print(f"✅ Rate limit error fallback to generic Exception: {type(e).__name__}")
+            print(
+                f"✅ Rate limit error fallback to generic Exception: {type(e).__name__}"
+            )
             # This is acceptable as a fallback
 
         # Test 3: Test with other exception types to ensure they still work
@@ -125,7 +132,7 @@ def test_celery_task_error_context():
         non_existent_file = "/tmp/non_existent_file_12345.pdf"
 
         # Mock the task's self parameter
-        with patch('morag.ingest_tasks.get_morag_api') as mock_api:
+        with patch("morag.ingest_tasks.get_morag_api") as mock_api:
             # Make the API raise an ExternalServiceError
             mock_api_instance = MagicMock()
             mock_api_instance.process_file.side_effect = ExternalServiceError(
@@ -162,17 +169,28 @@ def test_indefinite_retry_configuration():
     print("=" * 50)
 
     try:
-        from morag_core.config import settings
-        from unittest.mock import patch
         import os
+        from unittest.mock import patch
+
+        from morag_core.config import settings
 
         # Test default configuration
         print("🔍 Testing default retry configuration...")
-        assert hasattr(settings, 'retry_indefinitely'), "Settings should have retry_indefinitely attribute"
-        assert hasattr(settings, 'retry_base_delay'), "Settings should have retry_base_delay attribute"
-        assert hasattr(settings, 'retry_max_delay'), "Settings should have retry_max_delay attribute"
-        assert hasattr(settings, 'retry_exponential_base'), "Settings should have retry_exponential_base attribute"
-        assert hasattr(settings, 'retry_jitter'), "Settings should have retry_jitter attribute"
+        assert hasattr(
+            settings, "retry_indefinitely"
+        ), "Settings should have retry_indefinitely attribute"
+        assert hasattr(
+            settings, "retry_base_delay"
+        ), "Settings should have retry_base_delay attribute"
+        assert hasattr(
+            settings, "retry_max_delay"
+        ), "Settings should have retry_max_delay attribute"
+        assert hasattr(
+            settings, "retry_exponential_base"
+        ), "Settings should have retry_exponential_base attribute"
+        assert hasattr(
+            settings, "retry_jitter"
+        ), "Settings should have retry_jitter attribute"
 
         print(f"✅ Default retry_indefinitely: {settings.retry_indefinitely}")
         print(f"✅ Default retry_base_delay: {settings.retry_base_delay}")
@@ -182,21 +200,35 @@ def test_indefinite_retry_configuration():
 
         # Test environment variable override
         print("🔍 Testing environment variable override...")
-        with patch.dict(os.environ, {
-            'MORAG_RETRY_INDEFINITELY': 'false',
-            'MORAG_RETRY_BASE_DELAY': '2.0',
-            'MORAG_RETRY_MAX_DELAY': '600.0',
-            'MORAG_RETRY_EXPONENTIAL_BASE': '3.0',
-            'MORAG_RETRY_JITTER': 'false'
-        }):
+        with patch.dict(
+            os.environ,
+            {
+                "MORAG_RETRY_INDEFINITELY": "false",
+                "MORAG_RETRY_BASE_DELAY": "2.0",
+                "MORAG_RETRY_MAX_DELAY": "600.0",
+                "MORAG_RETRY_EXPONENTIAL_BASE": "3.0",
+                "MORAG_RETRY_JITTER": "false",
+            },
+        ):
             from morag_core.config import Settings
+
             test_settings = Settings()
 
-            assert test_settings.retry_indefinitely == False, f"Expected False, got {test_settings.retry_indefinitely}"
-            assert test_settings.retry_base_delay == 2.0, f"Expected 2.0, got {test_settings.retry_base_delay}"
-            assert test_settings.retry_max_delay == 600.0, f"Expected 600.0, got {test_settings.retry_max_delay}"
-            assert test_settings.retry_exponential_base == 3.0, f"Expected 3.0, got {test_settings.retry_exponential_base}"
-            assert test_settings.retry_jitter == False, f"Expected False, got {test_settings.retry_jitter}"
+            assert (
+                test_settings.retry_indefinitely == False
+            ), f"Expected False, got {test_settings.retry_indefinitely}"
+            assert (
+                test_settings.retry_base_delay == 2.0
+            ), f"Expected 2.0, got {test_settings.retry_base_delay}"
+            assert (
+                test_settings.retry_max_delay == 600.0
+            ), f"Expected 600.0, got {test_settings.retry_max_delay}"
+            assert (
+                test_settings.retry_exponential_base == 3.0
+            ), f"Expected 3.0, got {test_settings.retry_exponential_base}"
+            assert (
+                test_settings.retry_jitter == False
+            ), f"Expected False, got {test_settings.retry_jitter}"
 
             print("✅ Environment variable override works correctly")
 
@@ -230,7 +262,9 @@ def test_retry_delay_calculation():
             print(f"   Attempt {attempt}: {delay:.2f}s")
 
             # Verify delay is reasonable
-            assert delay >= base_delay, f"Delay should be at least base_delay, got {delay}"
+            assert (
+                delay >= base_delay
+            ), f"Delay should be at least base_delay, got {delay}"
             assert delay <= max_delay, f"Delay should not exceed max_delay, got {delay}"
 
         # Test that delay caps at max_delay
@@ -244,7 +278,9 @@ def test_retry_delay_calculation():
         print("🔍 Testing jitter calculation...")
         base_delay = 10.0
         jitter = (time.time() % 1) * 0.1 * base_delay  # 10% jitter
-        assert 0 <= jitter <= base_delay * 0.1, f"Jitter should be 0-10% of base delay, got {jitter}"
+        assert (
+            0 <= jitter <= base_delay * 0.1
+        ), f"Jitter should be 0-10% of base delay, got {jitter}"
         print(f"✅ Jitter calculation: {jitter:.3f}s (10% of {base_delay}s)")
 
         return True

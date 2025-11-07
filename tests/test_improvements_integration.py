@@ -7,13 +7,20 @@ Tests configuration debugging, word boundary preservation, PDF processing, and c
 import asyncio
 import os
 import sys
-from pathlib import Path
 import tempfile
+from pathlib import Path
 
 # Add the packages to the Python path
-sys.path.insert(0, str(Path(__file__).parent.parent / "packages" / "morag-core" / "src"))
-sys.path.insert(0, str(Path(__file__).parent.parent / "packages" / "morag-document" / "src"))
-sys.path.insert(0, str(Path(__file__).parent.parent / "packages" / "morag-services" / "src"))
+sys.path.insert(
+    0, str(Path(__file__).parent.parent / "packages" / "morag-core" / "src")
+)
+sys.path.insert(
+    0, str(Path(__file__).parent.parent / "packages" / "morag-document" / "src")
+)
+sys.path.insert(
+    0, str(Path(__file__).parent.parent / "packages" / "morag-services" / "src")
+)
+
 
 def test_configuration_debugging():
     """Test configuration debugging output."""
@@ -35,7 +42,9 @@ def test_configuration_debugging():
         print(f"✅ Configuration loaded successfully")
         print(f"   - Default chunk size: {settings.default_chunk_size}")
         print(f"   - Max page chunk size: {settings.max_page_chunk_size}")
-        print(f"   - Page-based chunking enabled: {settings.enable_page_based_chunking}")
+        print(
+            f"   - Page-based chunking enabled: {settings.enable_page_based_chunking}"
+        )
         print(f"   - Default chunking strategy: {settings.default_chunking_strategy}")
 
         return True
@@ -73,10 +82,14 @@ def test_word_boundary_detection():
             boundary_forward = converter._find_word_boundary(text, position, "forward")
 
             print(f"✅ Text: '{text[:30]}...'")
-            print(f"   Position {position} -> Backward: {boundary_back}, Forward: {boundary_forward}")
+            print(
+                f"   Position {position} -> Backward: {boundary_back}, Forward: {boundary_forward}"
+            )
 
             # Basic validation that boundaries are within text bounds
-            if not (0 <= boundary_back <= len(text) and 0 <= boundary_forward <= len(text)):
+            if not (
+                0 <= boundary_back <= len(text) and 0 <= boundary_forward <= len(text)
+            ):
                 print(f"❌ Boundary out of range")
                 all_passed = False
 
@@ -96,9 +109,9 @@ async def test_pdf_processing():
     print("=" * 50)
 
     try:
-        from morag_document.converters.pdf import PDFConverter
         from morag_core.interfaces.converter import ConversionOptions
         from morag_core.models.document import Document, DocumentMetadata, DocumentType
+        from morag_document.converters.pdf import PDFConverter
 
         converter = PDFConverter()
 
@@ -107,15 +120,16 @@ async def test_pdf_processing():
 
         # Create a simple test document (we can't test actual PDF without a file)
         metadata = DocumentMetadata(
-            source_type=DocumentType.PDF,
-            source_name="test.pdf"
+            source_type=DocumentType.PDF, source_name="test.pdf"
         )
         document = Document(metadata=metadata)
         options = ConversionOptions(format_type="pdf")
 
         print("✅ PDF converter initialized successfully")
         print(f"   - Supported formats: {converter.supported_formats}")
-        print(f"   - Docling integration: {'Available' if converter._docling_available else 'Not available (fallback to pypdf)'}")
+        print(
+            f"   - Docling integration: {'Available' if converter._docling_available else 'Not available (fallback to pypdf)'}"
+        )
 
         return True
 
@@ -130,9 +144,14 @@ async def test_contextual_retrieval():
     print("=" * 50)
 
     try:
+        from morag_core.models.document import (
+            Document,
+            DocumentChunk,
+            DocumentMetadata,
+            DocumentType,
+        )
         from morag_services.contextual_retrieval import ContextualRetrievalService
         from morag_services.embedding import GeminiEmbeddingService
-        from morag_core.models.document import Document, DocumentChunk, DocumentMetadata, DocumentType
 
         # Create a mock embedding service (without API key for testing)
         embedding_service = GeminiEmbeddingService(api_key="test_key")
@@ -144,7 +163,7 @@ async def test_contextual_retrieval():
         metadata = DocumentMetadata(
             source_type=DocumentType.TEXT,
             source_name="test_document.txt",
-            title="Test Document"
+            title="Test Document",
         )
         document = Document(metadata=metadata)
         document.raw_text = "This is a test document about machine learning and artificial intelligence."
@@ -154,13 +173,13 @@ async def test_contextual_retrieval():
             document_id=document.id,
             content="Machine learning is a subset of artificial intelligence.",
             page_number=1,
-            section="Introduction"
+            section="Introduction",
         )
         chunk2 = DocumentChunk(
             document_id=document.id,
             content="Deep learning uses neural networks with multiple layers.",
             page_number=1,
-            section="Deep Learning"
+            section="Deep Learning",
         )
 
         document.chunks = [chunk1, chunk2]
@@ -193,16 +212,15 @@ async def test_chunking_with_word_boundaries():
     print("=" * 50)
 
     try:
-        from morag_document.converters.base import DocumentConverter
-        from morag_core.interfaces.converter import ConversionOptions, ChunkingStrategy
+        from morag_core.interfaces.converter import ChunkingStrategy, ConversionOptions
         from morag_core.models.document import Document, DocumentMetadata, DocumentType
+        from morag_document.converters.base import DocumentConverter
 
         converter = DocumentConverter()
 
         # Create test document
         metadata = DocumentMetadata(
-            source_type=DocumentType.TEXT,
-            source_name="test_chunking.txt"
+            source_type=DocumentType.TEXT, source_name="test_chunking.txt"
         )
         document = Document(metadata=metadata)
         document.raw_text = (
@@ -218,7 +236,7 @@ async def test_chunking_with_word_boundaries():
             format_type="text",
             chunking_strategy=ChunkingStrategy.CHARACTER,
             chunk_size=100,  # Small size to force splitting
-            chunk_overlap=20
+            chunk_overlap=20,
         )
 
         # Clear previous chunks
@@ -284,7 +302,9 @@ async def main():
     print(f"\nOverall: {passed}/{total} tests passed")
 
     if passed == total:
-        print("🎉 All tests passed! Document processing improvements are working correctly.")
+        print(
+            "🎉 All tests passed! Document processing improvements are working correctly."
+        )
     else:
         print("⚠️ Some tests failed. Please review the output above for details.")
 

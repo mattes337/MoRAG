@@ -14,8 +14,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 import structlog
-
-from morag_graph.storage.neo4j_storage import Neo4jStorage, Neo4jConfig
+from morag_graph.storage.neo4j_storage import Neo4jConfig, Neo4jStorage
 
 logger = structlog.get_logger(__name__)
 
@@ -23,6 +22,7 @@ logger = structlog.get_logger(__name__)
 @dataclass
 class IsolatedNodesCleanupConfig:
     """Configuration for isolated nodes cleanup."""
+
     dry_run: bool = True
     batch_size: int = 100
     job_tag: str = ""
@@ -36,6 +36,7 @@ class IsolatedNodesCleanupConfig:
 @dataclass
 class IsolatedNodesCleanupResult:
     """Result of isolated nodes cleanup operation."""
+
     total_nodes_checked: int = 0
     isolated_nodes_found: int = 0
     isolated_nodes_removed: int = 0
@@ -63,7 +64,7 @@ class IsolatedNodesCleanupService:
         result = IsolatedNodesCleanupResult(
             dry_run=self.cleanup_config.dry_run,
             job_tag=self.cleanup_config.job_tag,
-            details={}
+            details={},
         )
 
         try:
@@ -81,7 +82,9 @@ class IsolatedNodesCleanupService:
 
             # Remove isolated nodes
             if self.cleanup_config.dry_run:
-                self.logger.info(f"[DRY RUN] Would remove {len(isolated_nodes)} isolated nodes")
+                self.logger.info(
+                    f"[DRY RUN] Would remove {len(isolated_nodes)} isolated nodes"
+                )
                 result.isolated_nodes_removed = len(isolated_nodes)
             else:
                 removed_count = await self._remove_isolated_nodes(isolated_nodes)
@@ -91,7 +94,7 @@ class IsolatedNodesCleanupService:
             # Store details
             result.details = {
                 "isolated_node_samples": isolated_nodes[:10] if isolated_nodes else [],
-                "batch_size": self.cleanup_config.batch_size
+                "batch_size": self.cleanup_config.batch_size,
             }
 
         except Exception as e:
@@ -115,11 +118,13 @@ class IsolatedNodesCleanupService:
 
         isolated_nodes = []
         for record in result:
-            isolated_nodes.append({
-                "id": record["node_id"],
-                "name": record["node_name"],
-                "labels": record["node_labels"]
-            })
+            isolated_nodes.append(
+                {
+                    "id": record["node_id"],
+                    "name": record["node_name"],
+                    "labels": record["node_labels"],
+                }
+            )
 
         return isolated_nodes
 
@@ -135,7 +140,7 @@ class IsolatedNodesCleanupService:
 
         # Process in batches
         for i in range(0, len(isolated_nodes), self.cleanup_config.batch_size):
-            batch = isolated_nodes[i:i + self.cleanup_config.batch_size]
+            batch = isolated_nodes[i : i + self.cleanup_config.batch_size]
             node_ids = [node["id"] for node in batch]
 
             # Delete nodes by ID
@@ -153,7 +158,9 @@ class IsolatedNodesCleanupService:
             batch_deleted = result[0]["deleted"] if result else 0
             removed_count += batch_deleted
 
-            self.logger.info(f"Removed {batch_deleted} isolated nodes in batch {i // self.cleanup_config.batch_size + 1}")
+            self.logger.info(
+                f"Removed {batch_deleted} isolated nodes in batch {i // self.cleanup_config.batch_size + 1}"
+            )
 
         return removed_count
 
@@ -163,11 +170,13 @@ def parse_isolated_nodes_cleanup_overrides() -> IsolatedNodesCleanupConfig:
     return IsolatedNodesCleanupConfig(
         dry_run=os.getenv("MORAG_ISOLATED_CLEANUP_DRY_RUN", "true").lower() == "true",
         batch_size=int(os.getenv("MORAG_ISOLATED_CLEANUP_BATCH_SIZE", "100")),
-        job_tag=os.getenv("MORAG_ISOLATED_CLEANUP_JOB_TAG", "")
+        job_tag=os.getenv("MORAG_ISOLATED_CLEANUP_JOB_TAG", ""),
     )
 
 
-async def run_isolated_nodes_cleanup(config_overrides: Optional[IsolatedNodesCleanupConfig] = None) -> Dict[str, Any]:
+async def run_isolated_nodes_cleanup(
+    config_overrides: Optional[IsolatedNodesCleanupConfig] = None,
+) -> Dict[str, Any]:
     """Run isolated nodes cleanup with the given configuration.
 
     Args:
@@ -186,7 +195,10 @@ async def run_isolated_nodes_cleanup(config_overrides: Optional[IsolatedNodesCle
         password=os.getenv("NEO4J_PASSWORD", "password"),
         database=os.getenv("NEO4J_DATABASE", "neo4j"),
         verify_ssl=os.getenv("NEO4J_VERIFY_SSL", "true").lower() == "true",
-        trust_all_certificates=os.getenv("NEO4J_TRUST_ALL_CERTIFICATES", "false").lower() == "true",
+        trust_all_certificates=os.getenv(
+            "NEO4J_TRUST_ALL_CERTIFICATES", "false"
+        ).lower()
+        == "true",
     )
     storage = Neo4jStorage(neo4j_config)
 
@@ -206,7 +218,7 @@ async def run_isolated_nodes_cleanup(config_overrides: Optional[IsolatedNodesCle
             "execution_time_seconds": result.execution_time_seconds,
             "dry_run": result.dry_run,
             "job_tag": result.job_tag,
-            "details": result.details
+            "details": result.details,
         }
 
     finally:

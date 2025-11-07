@@ -1,9 +1,9 @@
 """Base storage interface for graph data."""
 
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional, Any, Set
+from typing import Any, Dict, List, Optional, Set
 
-from ..models import Entity, Relation, Graph
+from ..models import Entity, Graph, Relation
 from ..models.types import EntityId, RelationId
 
 
@@ -61,10 +61,7 @@ class BaseStorage(ABC):
         pass
 
     @abstractmethod
-    async def get_entities(
-        self,
-        entity_ids: List[EntityId]
-    ) -> List[Entity]:
+    async def get_entities(self, entity_ids: List[EntityId]) -> List[Entity]:
         """Get multiple entities by IDs.
 
         Args:
@@ -77,10 +74,7 @@ class BaseStorage(ABC):
 
     @abstractmethod
     async def search_entities(
-        self,
-        query: str,
-        entity_type: Optional[str] = None,
-        limit: int = 10
+        self, query: str, entity_type: Optional[str] = None, limit: int = 10
     ) -> List[Entity]:
         """Search for entities by name or attributes.
 
@@ -155,10 +149,7 @@ class BaseStorage(ABC):
         pass
 
     @abstractmethod
-    async def get_relations(
-        self,
-        relation_ids: List[RelationId]
-    ) -> List[Relation]:
+    async def get_relations(self, relation_ids: List[RelationId]) -> List[Relation]:
         """Get multiple relations by IDs.
 
         Args:
@@ -174,7 +165,7 @@ class BaseStorage(ABC):
         self,
         entity_id: EntityId,
         relation_type: Optional[str] = None,
-        direction: str = "both"  # "in", "out", "both"
+        direction: str = "both",  # "in", "out", "both"
     ) -> List[Relation]:
         """Get all relations for an entity.
 
@@ -217,7 +208,7 @@ class BaseStorage(ABC):
         self,
         entity_id: EntityId,
         relation_type: Optional[str] = None,
-        max_depth: int = 1
+        max_depth: int = 1,
     ) -> List[Entity]:
         """Get neighboring entities.
 
@@ -233,10 +224,7 @@ class BaseStorage(ABC):
 
     @abstractmethod
     async def find_path(
-        self,
-        source_entity_id: EntityId,
-        target_entity_id: EntityId,
-        max_depth: int = 3
+        self, source_entity_id: EntityId, target_entity_id: EntityId, max_depth: int = 3
     ) -> List[List[EntityId]]:
         """Find paths between two entities.
 
@@ -260,10 +248,7 @@ class BaseStorage(ABC):
         pass
 
     @abstractmethod
-    async def get_graph(
-        self,
-        entity_ids: Optional[List[EntityId]] = None
-    ) -> Graph:
+    async def get_graph(self, entity_ids: Optional[List[EntityId]] = None) -> Graph:
         """Get a graph or subgraph.
 
         Args:

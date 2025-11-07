@@ -12,13 +12,7 @@ from typing import List
 # Set up environment
 os.environ["GEMINI_API_KEY"] = "your-api-key-here"  # Replace with actual key
 
-from agents import (
-    get_agent,
-    create_agent,
-    AgentConfig,
-    PromptConfig,
-    list_agents
-)
+from agents import AgentConfig, PromptConfig, create_agent, get_agent, list_agents
 
 
 async def fact_extraction_example():
@@ -39,9 +33,7 @@ async def fact_extraction_example():
     try:
         # Extract facts
         result = await fact_agent.extract_facts(
-            text=text,
-            domain="medical",
-            max_facts=10
+            text=text, domain="medical", max_facts=10
         )
 
         print(f"Extracted {result.total_facts} facts:")
@@ -68,7 +60,7 @@ async def query_analysis_example():
         "What are the benefits of meditation for stress reduction?",
         "How does machine learning compare to traditional programming?",
         "Can you explain the process of photosynthesis?",
-        "What is Python?"
+        "What is Python?",
     ]
 
     try:
@@ -103,10 +95,7 @@ async def entity_extraction_example():
     """
 
     try:
-        result = await entity_agent.extract_entities(
-            text=text,
-            domain="technology"
-        )
+        result = await entity_agent.extract_entities(text=text, domain="technology")
 
         print(f"Extracted {result.total_entities} entities:")
         for entity in result.entities:
@@ -132,15 +121,12 @@ async def batch_processing_example():
         "Vitamin D (1000-4000 IU daily) supports bone health and immune function.",
         "Regular exercise (150 minutes weekly) reduces cardiovascular disease risk by 30%.",
         "Green tea contains catechins that have antioxidant properties.",
-        "Meditation practice (10-20 minutes daily) can reduce stress and anxiety."
+        "Meditation practice (10-20 minutes daily) can reduce stress and anxiety.",
     ]
 
     try:
         # Process all texts in batch
-        results = await fact_agent.extract_facts_batch(
-            texts=texts,
-            domain="health"
-        )
+        results = await fact_agent.extract_facts_batch(texts=texts, domain="health")
 
         print(f"Processed {len(results)} texts:")
         for i, result in enumerate(results, 1):
@@ -164,13 +150,13 @@ async def custom_configuration_example():
             domain="medical",
             include_examples=True,
             min_confidence=0.8,
-            custom_instructions="Focus only on evidence-based medical facts."
+            custom_instructions="Focus only on evidence-based medical facts.",
         ),
         agent_config={
             "max_facts": 5,
             "filter_generic_advice": True,
-            "focus_on_actionable": True
-        }
+            "focus_on_actionable": True,
+        },
     )
 
     # Create agent with custom configuration
@@ -223,9 +209,7 @@ async def multi_agent_workflow_example():
         # Step 2: Extract relevant facts from document
         fact_agent = get_agent("fact_extraction")
         facts = await fact_agent.extract_facts(
-            text=document,
-            domain="health",
-            query_context=user_query
+            text=document, domain="health", query_context=user_query
         )
 
         print(f"\nExtracted Facts ({facts.total_facts}):")
@@ -239,7 +223,7 @@ async def multi_agent_workflow_example():
         )
 
         print(f"\nGenerated Summary:")
-        print(summary.summary if hasattr(summary, 'summary') else str(summary))
+        print(summary.summary if hasattr(summary, "summary") else str(summary))
 
     except Exception as e:
         print(f"Error in workflow: {e}")
@@ -270,8 +254,13 @@ async def main():
 
 if __name__ == "__main__":
     # Check if API key is set
-    if not os.getenv("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY") == "your-api-key-here":
-        print("Please set your GEMINI_API_KEY environment variable before running examples.")
+    if (
+        not os.getenv("GEMINI_API_KEY")
+        or os.getenv("GEMINI_API_KEY") == "your-api-key-here"
+    ):
+        print(
+            "Please set your GEMINI_API_KEY environment variable before running examples."
+        )
         print("export GEMINI_API_KEY=your_actual_api_key")
         exit(1)
 

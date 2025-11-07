@@ -1,30 +1,37 @@
 """Recursive fact retrieval endpoints."""
 
-from fastapi import APIRouter, HTTPException, Depends
-from typing import Optional
-import structlog
 import asyncio
 import random
-import httpx
+from typing import Optional
 
-from morag_reasoning import (
-    RecursiveFactRetrievalRequest, RecursiveFactRetrievalResponse,
-    RecursiveFactRetrievalService, LLMClient, LLMConfig
+import httpx
+import structlog
+from fastapi import APIRouter, Depends, HTTPException
+from morag.database_factory import (
+    DatabaseConnectionFactory,
+    get_connected_default_neo4j_storage,
+    get_connected_default_qdrant_storage,
+    get_default_neo4j_storage,
+    get_default_qdrant_storage,
+    get_neo4j_storages,
+    get_qdrant_storages,
 )
 from morag.dependencies import get_llm_client
-from morag.database_factory import (
-    get_default_neo4j_storage, get_default_qdrant_storage,
-    get_connected_default_neo4j_storage, get_connected_default_qdrant_storage,
-    get_neo4j_storages, get_qdrant_storages, DatabaseConnectionFactory
-)
 from morag_graph import DatabaseType
+from morag_reasoning import (
+    LLMClient,
+    LLMConfig,
+    RecursiveFactRetrievalRequest,
+    RecursiveFactRetrievalResponse,
+    RecursiveFactRetrievalService,
+)
 
 router = APIRouter(prefix="/api/v2", tags=["recursive-fact-retrieval"])
 logger = structlog.get_logger(__name__)
 
 
 async def get_recursive_fact_retrieval_service(
-    request: RecursiveFactRetrievalRequest
+    request: RecursiveFactRetrievalRequest,
 ) -> RecursiveFactRetrievalService:
     """Get recursive fact retrieval service with specified databases."""
 
@@ -34,7 +41,7 @@ async def get_recursive_fact_retrieval_service(
     # Create stronger LLM client for final synthesis (could use a different model)
     stronger_llm_config = LLMConfig(
         api_key=llm_client.config.api_key,
-        model=llm_client.config.model  # Could be configured to use a stronger model
+        model=llm_client.config.model,  # Could be configured to use a stronger model
     )
     stronger_llm_client = LLMClient(stronger_llm_config)
 
@@ -47,17 +54,23 @@ async def get_recursive_fact_retrieval_service(
         for server_config in request.database_servers:
             if server_config.get("type") == DatabaseType.NEO4J.value:
                 from morag_graph import DatabaseServerConfig
+
                 config = DatabaseServerConfig(**server_config)
-                neo4j_storage = await DatabaseConnectionFactory.create_neo4j_storage(config)
+                neo4j_storage = await DatabaseConnectionFactory.create_neo4j_storage(
+                    config
+                )
             elif server_config.get("type") == DatabaseType.QDRANT.value:
                 from morag_graph import DatabaseServerConfig
+
                 config = DatabaseServerConfig(**server_config)
-                qdrant_storage = await DatabaseConnectionFactory.create_qdrant_storage(config)
+                qdrant_storage = await DatabaseConnectionFactory.create_qdrant_storage(
+                    config
+                )
 
         if not neo4j_storage or not qdrant_storage:
             raise HTTPException(
                 status_code=400,
-                detail="Both Neo4j and Qdrant database configurations are required"
+                detail="Both Neo4j and Qdrant database configurations are required",
             )
     else:
         # Use default connections with optional database/collection override
@@ -71,8 +84,8 @@ async def get_recursive_fact_retrieval_service(
     # Initialize embedding service for enhanced retrieval
     embedding_service = None
     try:
-        from morag_services.embedding import GeminiEmbeddingService
         from morag_core.config import LLMConfig
+        from morag_services.embedding import GeminiEmbeddingService
 
         llm_config = LLMConfig.from_env_and_overrides()
         if llm_config.api_key:
@@ -88,14 +101,12 @@ async def get_recursive_fact_retrieval_service(
         neo4j_storage=neo4j_storage,
         qdrant_storage=qdrant_storage,
         embedding_service=embedding_service,
-        stronger_llm_client=stronger_llm_client
+        stronger_llm_client=stronger_llm_client,
     )
 
 
 @router.post("/recursive-fact-retrieval", response_model=RecursiveFactRetrievalResponse)
-async def recursive_fact_retrieval(
-    request: RecursiveFactRetrievalRequest
-):
+async def recursive_fact_retrieval(request: RecursiveFactRetrievalRequest):
     """
     Perform recursive fact retrieval using graph-based RAG system.
 
@@ -128,7 +139,7 @@ async def recursive_fact_retrieval(
             "Starting recursive fact retrieval",
             query=request.user_query,
             max_depth=request.max_depth,
-            decay_rate=request.decay_rate
+            decay_rate=request.decay_rate,
         )
 
         # Get service with specified databases
@@ -150,7 +161,7 @@ async def recursive_fact_retrieval(
                     query_id=response.query_id,
                     total_facts=len(response.final_facts),
                     confidence=response.confidence_score,
-                    processing_time_ms=response.processing_time_ms
+                    processing_time_ms=response.processing_time_ms,
                 )
 
                 return response
@@ -159,31 +170,33 @@ async def recursive_fact_retrieval(
                 if e.response.status_code == 503 and "overloaded" in str(e).lower():
                     if attempt < max_retries - 1:
                         # Exponential backoff with jitter
-                        delay = base_delay * (2 ** attempt) + random.uniform(0, 1)
+                        delay = base_delay * (2**attempt) + random.uniform(0, 1)
                         logger.warning(
                             "Model overloaded, retrying",
                             attempt=attempt + 1,
                             delay=delay,
-                            error=str(e)
+                            error=str(e),
                         )
                         await asyncio.sleep(delay)
                         continue
                     else:
-                        logger.error("Max retries exceeded for model overload", error=str(e))
+                        logger.error(
+                            "Max retries exceeded for model overload", error=str(e)
+                        )
                         raise HTTPException(
                             status_code=503,
-                            detail="The AI model is currently overloaded. Please try again later."
+                            detail="The AI model is currently overloaded. Please try again later.",
                         )
                 else:
                     raise
             except Exception as e:
                 if attempt < max_retries - 1:
-                    delay = base_delay * (2 ** attempt)
+                    delay = base_delay * (2**attempt)
                     logger.warning(
                         "Retrieval failed, retrying",
                         attempt=attempt + 1,
                         delay=delay,
-                        error=str(e)
+                        error=str(e),
                     )
                     await asyncio.sleep(delay)
                     continue
@@ -195,8 +208,7 @@ async def recursive_fact_retrieval(
     except Exception as e:
         logger.error("Recursive fact retrieval failed", error=str(e))
         raise HTTPException(
-            status_code=500,
-            detail=f"Recursive fact retrieval failed: {str(e)}"
+            status_code=500, detail=f"Recursive fact retrieval failed: {str(e)}"
         )
 
 
@@ -216,7 +228,7 @@ async def get_recursive_fact_retrieval_info():
             "Final answer synthesis with stronger LLM",
             "Configurable depth limits and thresholds",
             "Support for custom database configurations",
-            "Comprehensive traversal tracking and debugging"
+            "Comprehensive traversal tracking and debugging",
         ],
         "parameters": {
             "user_query": "The original query from the user (required)",
@@ -230,7 +242,7 @@ async def get_recursive_fact_retrieval_info():
             "neo4j_database": "Neo4j database name (optional)",
             "qdrant_collection": "Qdrant collection name (optional)",
             "language": "Language for processing (optional)",
-            "database_servers": "Custom database server configurations (optional)"
+            "database_servers": "Custom database server configurations (optional)",
         },
         "response_fields": {
             "query_id": "Unique identifier for the query",
@@ -247,7 +259,7 @@ async def get_recursive_fact_retrieval_info():
             "fca_llm_calls": "Number of FactCriticAgent LLM calls",
             "final_llm_calls": "Number of final synthesis LLM calls",
             "final_answer": "Final synthesized answer (null if facts_only=true)",
-            "confidence_score": "Overall confidence in the answer"
+            "confidence_score": "Overall confidence in the answer",
         },
         "algorithm": {
             "step_1": "Extract initial entities from user query using EntityIdentificationService",
@@ -257,8 +269,8 @@ async def get_recursive_fact_retrieval_info():
             "step_5": "Evaluate fact relevance using FactCriticAgent (skipped if skip_fact_evaluation=true)",
             "step_6": "Apply depth-based relevance decay (skipped if skip_fact_evaluation=true)",
             "step_7": "Filter facts by minimum score and limit total count",
-            "step_8": "Synthesize final answer using stronger LLM (skipped if facts_only=true)"
-        }
+            "step_8": "Synthesize final answer using stronger LLM (skipped if facts_only=true)",
+        },
     }
 
 
@@ -270,10 +282,7 @@ async def check_recursive_fact_retrieval_health():
         test_request = RecursiveFactRetrievalRequest(user_query="test")
         service = await get_recursive_fact_retrieval_service(test_request)
 
-        health = {
-            "status": "healthy",
-            "components": {}
-        }
+        health = {"status": "healthy", "components": {}}
 
         # Check Neo4j connection
         try:
@@ -293,7 +302,9 @@ async def check_recursive_fact_retrieval_health():
 
         # Check LLM clients
         health["components"]["llm_client"] = service.llm_client is not None
-        health["components"]["stronger_llm_client"] = service.stronger_llm_client is not None
+        health["components"]["stronger_llm_client"] = (
+            service.stronger_llm_client is not None
+        )
 
         # Overall status
         if not all(health["components"].values()):
@@ -303,7 +314,4 @@ async def check_recursive_fact_retrieval_health():
 
     except Exception as e:
         logger.error("Health check failed", error=str(e))
-        return {
-            "status": "unhealthy",
-            "error": str(e)
-        }
+        return {"status": "unhealthy", "error": str(e)}

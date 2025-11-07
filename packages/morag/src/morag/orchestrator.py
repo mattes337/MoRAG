@@ -1,13 +1,13 @@
 """Main orchestrator for MoRAG system."""
 
 import asyncio
-from typing import Dict, Any, List, Optional, Union
 from pathlib import Path
-import structlog
+from typing import Any, Dict, List, Optional, Union
 
+import structlog
 from morag_core.models import Document, DocumentChunk, ProcessingResult
-from morag_services import MoRAGServices, ServiceConfig, ContentType
-from morag_web import WebProcessor, WebConverter
+from morag_services import ContentType, MoRAGServices, ServiceConfig
+from morag_web import WebConverter, WebProcessor
 from morag_youtube import YouTubeProcessor
 
 logger = structlog.get_logger(__name__)
@@ -36,7 +36,7 @@ class MoRAGOrchestrator:
         self,
         content: Union[str, Path, Dict[str, Any]],
         content_type: ContentType,
-        options: Optional[Dict[str, Any]] = None
+        options: Optional[Dict[str, Any]] = None,
     ) -> ProcessingResult:
         """Process content of any supported type.
 
@@ -48,9 +48,11 @@ class MoRAGOrchestrator:
         Returns:
             Processing result with extracted content and metadata
         """
-        logger.info("Starting content processing",
-                   content_type=content_type.value,
-                   options=options)
+        logger.info(
+            "Starting content processing",
+            content_type=content_type.value,
+            options=options,
+        )
 
         try:
             # Route to appropriate processor based on content type
@@ -70,23 +72,21 @@ class MoRAGOrchestrator:
                 raise ValueError(f"Unsupported content type: {content_type}")
 
         except Exception as e:
-            logger.error("Content processing failed",
-                        content_type=content_type.value,
-                        error=str(e))
+            logger.error(
+                "Content processing failed",
+                content_type=content_type.value,
+                error=str(e),
+            )
             raise
 
     async def _process_web_content(
-        self,
-        content: Union[str, Dict[str, Any]],
-        options: Optional[Dict[str, Any]]
+        self, content: Union[str, Dict[str, Any]], options: Optional[Dict[str, Any]]
     ) -> ProcessingResult:
         """Process web content using services."""
         return await self.services.process_url(content, options)
 
     async def _process_youtube_content(
-        self,
-        content: Union[str, Dict[str, Any]],
-        options: Optional[Dict[str, Any]]
+        self, content: Union[str, Dict[str, Any]], options: Optional[Dict[str, Any]]
     ) -> ProcessingResult:
         """Process YouTube content using services."""
         return await self.services.process_youtube(content, options)
@@ -94,15 +94,17 @@ class MoRAGOrchestrator:
     async def _process_document_content(
         self,
         content: Union[str, Path, Dict[str, Any]],
-        options: Optional[Dict[str, Any]]
+        options: Optional[Dict[str, Any]],
     ) -> ProcessingResult:
         """Process document content using services."""
-        return await self.services.process_content(content, ContentType.DOCUMENT, options)
+        return await self.services.process_content(
+            content, ContentType.DOCUMENT, options
+        )
 
     async def _process_audio_content(
         self,
         content: Union[str, Path, Dict[str, Any]],
-        options: Optional[Dict[str, Any]]
+        options: Optional[Dict[str, Any]],
     ) -> ProcessingResult:
         """Process audio content using services."""
         return await self.services.process_content(content, ContentType.AUDIO, options)
@@ -110,7 +112,7 @@ class MoRAGOrchestrator:
     async def _process_video_content(
         self,
         content: Union[str, Path, Dict[str, Any]],
-        options: Optional[Dict[str, Any]]
+        options: Optional[Dict[str, Any]],
     ) -> ProcessingResult:
         """Process video content using services."""
         return await self.services.process_content(content, ContentType.VIDEO, options)
@@ -118,15 +120,13 @@ class MoRAGOrchestrator:
     async def _process_image_content(
         self,
         content: Union[str, Path, Dict[str, Any]],
-        options: Optional[Dict[str, Any]]
+        options: Optional[Dict[str, Any]],
     ) -> ProcessingResult:
         """Process image content using services."""
         return await self.services.process_content(content, ContentType.IMAGE, options)
 
     async def process_batch(
-        self,
-        items: List[Dict[str, Any]],
-        options: Optional[Dict[str, Any]] = None
+        self, items: List[Dict[str, Any]], options: Optional[Dict[str, Any]] = None
     ) -> List[ProcessingResult]:
         """Process multiple items in batch.
 
@@ -142,41 +142,42 @@ class MoRAGOrchestrator:
         results = []
         for i, item in enumerate(items):
             try:
-                content = item['content']
-                content_type = ContentType(item['content_type'])
-                item_options = {**(options or {}), **(item.get('options', {}))}
+                content = item["content"]
+                content_type = ContentType(item["content_type"])
+                item_options = {**(options or {}), **(item.get("options", {}))}
 
                 result = await self.process_content(content, content_type, item_options)
                 results.append(result)
 
-                logger.debug("Processed batch item",
-                           item_index=i,
-                           content_type=content_type.value,
-                           success=result.success)
+                logger.debug(
+                    "Processed batch item",
+                    item_index=i,
+                    content_type=content_type.value,
+                    success=result.success,
+                )
 
             except Exception as e:
-                logger.error("Failed to process batch item",
-                           item_index=i,
-                           error=str(e))
-                results.append(ProcessingResult(
-                    content="",
-                    metadata={"error": str(e)},
-                    processing_time=0.0,
-                    success=False,
-                    error_message=str(e)
-                ))
+                logger.error("Failed to process batch item", item_index=i, error=str(e))
+                results.append(
+                    ProcessingResult(
+                        content="",
+                        metadata={"error": str(e)},
+                        processing_time=0.0,
+                        success=False,
+                        error_message=str(e),
+                    )
+                )
 
-        logger.info("Batch processing completed",
-                   total_items=len(items),
-                   successful_items=len([r for r in results if r.success]))
+        logger.info(
+            "Batch processing completed",
+            total_items=len(items),
+            successful_items=len([r for r in results if r.success]),
+        )
 
         return results
 
     async def search_similar(
-        self,
-        query: str,
-        limit: int = 10,
-        filters: Optional[Dict[str, Any]] = None
+        self, query: str, limit: int = 10, filters: Optional[Dict[str, Any]] = None
     ) -> List[Dict[str, Any]]:
         """Search for similar content using vector similarity.
 

@@ -2,14 +2,15 @@
 """Test script to verify GeminiEmbeddingService fixes."""
 
 import asyncio
-import sys
 import os
+import sys
 from pathlib import Path
 
 # Add the packages to the Python path
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root / "packages" / "morag-core" / "src"))
 sys.path.insert(0, str(project_root / "packages" / "morag-services" / "src"))
+
 
 async def test_embedding_service_instantiation():
     """Test that GeminiEmbeddingService can be instantiated without errors."""
@@ -22,16 +23,21 @@ async def test_embedding_service_instantiation():
         service = GeminiEmbeddingService(
             api_key="dummy_key_for_testing",
             embedding_model="text-embedding-004",
-            generation_model="gemini-2.0-flash-001"
+            generation_model="gemini-2.0-flash-001",
         )
 
         print("✅ Successfully instantiated GeminiEmbeddingService")
 
         # Check that it has all required methods
         required_methods = [
-            'initialize', 'shutdown', 'health_check',
-            'generate_embedding', 'generate_embeddings',
-            'get_embedding_dimension', 'get_supported_models', 'get_max_tokens'
+            "initialize",
+            "shutdown",
+            "health_check",
+            "generate_embedding",
+            "generate_embeddings",
+            "get_embedding_dimension",
+            "get_supported_models",
+            "get_max_tokens",
         ]
 
         missing_methods = []
@@ -63,7 +69,9 @@ async def test_embedding_service_instantiation():
         # Test health check (without real API key)
         try:
             health = await service.health_check()
-            print(f"✅ Health check method works (status: {health.get('status', 'unknown')})")
+            print(
+                f"✅ Health check method works (status: {health.get('status', 'unknown')})"
+            )
         except Exception as e:
             print(f"⚠️  Health check failed (expected without real API key): {e}")
 
@@ -78,8 +86,10 @@ async def test_embedding_service_instantiation():
         else:
             print(f"❌ Unexpected error: {e}")
             import traceback
+
             traceback.print_exc()
             return False
+
 
 async def main():
     """Main test function."""
@@ -97,6 +107,7 @@ async def main():
         print("❌ Tests failed. Check the errors above.")
 
     return success
+
 
 if __name__ == "__main__":
     success = asyncio.run(main())

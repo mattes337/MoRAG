@@ -8,18 +8,19 @@ This module provides a unified configuration management system that:
 5. Reduces configuration coupling across packages
 """
 
-import os
-import yaml
 import json
+import os
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, Type, TypeVar, Union
-from pathlib import Path
 from functools import lru_cache
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Type, TypeVar, Union
+
 import structlog
+import yaml
 
 logger = structlog.get_logger(__name__)
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 class ConfigurationSource(ABC):
@@ -45,14 +46,14 @@ class EnvironmentSource(ConfigurationSource):
     def load(self, package: str) -> Dict[str, Any]:
         """Load environment variables for package."""
         config = {}
-        package_name = package.upper().replace('-', '_')
+        package_name = package.upper().replace("-", "_")
         package_prefix = f"{self.env_prefix}{package_name}_"
 
         # Load package-specific variables
         for key, value in os.environ.items():
             if key.startswith(package_prefix):
                 # Convert MORAG_AUDIO_MAX_DURATION to max_duration
-                config_key = key[len(package_prefix):].lower()
+                config_key = key[len(package_prefix) :].lower()
                 config[config_key] = self._convert_value(value)
 
         # Load global MORAG_ variables as fallbacks
@@ -60,7 +61,7 @@ class EnvironmentSource(ConfigurationSource):
         for key, value in os.environ.items():
             if key.startswith(global_prefix) and not key.startswith(package_prefix):
                 # Convert MORAG_CHUNK_SIZE to chunk_size
-                config_key = key[len(global_prefix):].lower()
+                config_key = key[len(global_prefix) :].lower()
                 if config_key not in config:  # Don't override package-specific
                     config[config_key] = self._convert_value(value)
 
@@ -72,19 +73,19 @@ class EnvironmentSource(ConfigurationSource):
     def _convert_value(self, value: str) -> Any:
         """Convert string environment value to appropriate type."""
         # Handle boolean values
-        if value.lower() in ('true', 'false'):
-            return value.lower() == 'true'
+        if value.lower() in ("true", "false"):
+            return value.lower() == "true"
 
         # Handle numeric values
         try:
-            if '.' in value:
+            if "." in value:
                 return float(value)
             return int(value)
         except ValueError:
             pass
 
         # Handle JSON values
-        if value.startswith('{') or value.startswith('['):
+        if value.startswith("{") or value.startswith("["):
             try:
                 return json.loads(value)
             except json.JSONDecodeError:
@@ -106,18 +107,20 @@ class FileSource(ConfigurationSource):
             return {}
 
         try:
-            with open(self.config_path, 'r', encoding='utf-8') as f:
-                if self.config_path.suffix.lower() in ['.yaml', '.yml']:
+            with open(self.config_path, "r", encoding="utf-8") as f:
+                if self.config_path.suffix.lower() in [".yaml", ".yml"]:
                     data = yaml.safe_load(f) or {}
-                elif self.config_path.suffix.lower() == '.json':
+                elif self.config_path.suffix.lower() == ".json":
                     data = json.load(f)
                 else:
-                    logger.warning(f"Unsupported config file format: {self.config_path}")
+                    logger.warning(
+                        f"Unsupported config file format: {self.config_path}"
+                    )
                     return {}
 
             # Extract package-specific config
-            package_config = data.get('packages', {}).get(package, {})
-            global_config = data.get('global', {})
+            package_config = data.get("packages", {}).get(package, {})
+            global_config = data.get("global", {})
 
             # Merge global and package-specific (package overrides global)
             merged_config = {**global_config, **package_config}
@@ -136,38 +139,38 @@ class DefaultsSource(ConfigurationSource):
 
     def __init__(self):
         self.defaults = {
-            'morag-core': {
-                'log_level': 'INFO',
-                'temp_dir': './temp',
-                'chunk_size': 4000,
-                'chunk_overlap': 200,
+            "morag-core": {
+                "log_level": "INFO",
+                "temp_dir": "./temp",
+                "chunk_size": 4000,
+                "chunk_overlap": 200,
             },
-            'morag-audio': {
-                'model': 'whisper-1',
-                'max_duration': 600,
-                'enable_diarization': False,
-                'chunk_length': 30,
+            "morag-audio": {
+                "model": "whisper-1",
+                "max_duration": 600,
+                "enable_diarization": False,
+                "chunk_length": 30,
             },
-            'morag-document': {
-                'max_file_size': '100MB',
-                'enable_ocr': True,
-                'preserve_formatting': True,
+            "morag-document": {
+                "max_file_size": "100MB",
+                "enable_ocr": True,
+                "preserve_formatting": True,
             },
-            'morag-services': {
-                'max_workers': 4,
-                'timeout': 30,
-                'retry_attempts': 3,
+            "morag-services": {
+                "max_workers": 4,
+                "timeout": 30,
+                "retry_attempts": 3,
             },
-            'morag-graph': {
-                'max_entities': 100,
-                'max_relations': 50,
-                'confidence_threshold': 0.7,
+            "morag-graph": {
+                "max_entities": 100,
+                "max_relations": 50,
+                "confidence_threshold": 0.7,
             },
-            'morag-embedding': {
-                'batch_size': 100,
-                'model': 'text-embedding-004',
-                'enable_caching': True,
-            }
+            "morag-embedding": {
+                "batch_size": 100,
+                "model": "text-embedding-004",
+                "enable_caching": True,
+            },
         }
 
     def load(self, package: str) -> Dict[str, Any]:
@@ -205,7 +208,7 @@ class ConfigurationManager:
                 self._sources.append(FileSource(file_path))
             else:
                 # Try common locations
-                for common_path in ['config.yaml', 'config.yml', 'morag.yaml']:
+                for common_path in ["config.yaml", "config.yml", "morag.yaml"]:
                     if Path(common_path).exists():
                         self._sources.append(FileSource(common_path))
                         break
@@ -235,7 +238,7 @@ class ConfigurationManager:
 
     def get_global_config(self) -> Dict[str, Any]:
         """Get global configuration that applies to all packages."""
-        return self.get_package_config('global')
+        return self.get_package_config("global")
 
     def get_config_value(self, package: str, key: str, default: Any = None) -> Any:
         """Get a specific configuration value.
@@ -251,7 +254,7 @@ class ConfigurationManager:
         config = self.get_package_config(package)
 
         # Handle dot notation (e.g., 'llm.model')
-        keys = key.split('.')
+        keys = key.split(".")
         current = config
 
         for k in keys:
@@ -274,7 +277,7 @@ class ConfigurationManager:
             self._overrides[package] = {}
 
         # Handle dot notation
-        keys = key.split('.')
+        keys = key.split(".")
         current = self._overrides[package]
 
         for k in keys[:-1]:
@@ -336,20 +339,22 @@ class ConfigurationManager:
 
         # Get packages from sources
         for source in self._sources:
-            if hasattr(source, 'defaults'):
+            if hasattr(source, "defaults"):
                 packages.update(source.defaults.keys())
 
         # Add packages from environment variables
         for key in os.environ:
             if key.startswith(self.env_prefix):
-                parts = key[len(self.env_prefix):].split('_')
+                parts = key[len(self.env_prefix) :].split("_")
                 if len(parts) > 1:
                     package = f"morag-{parts[0].lower()}"
                     packages.add(package)
 
         return sorted(list(packages))
 
-    def validate_config(self, package: str, schema: Optional[Dict[str, Any]] = None) -> List[str]:
+    def validate_config(
+        self, package: str, schema: Optional[Dict[str, Any]] = None
+    ) -> List[str]:
         """Validate package configuration against schema.
 
         Args:
@@ -384,54 +389,68 @@ class ConfigurationManager:
                 if source_config:
                     # Merge with lower priority configs
                     merged_config = self._deep_merge(merged_config, source_config)
-                    logger.debug(f"Loaded config from {source.__class__.__name__} for {package}")
+                    logger.debug(
+                        f"Loaded config from {source.__class__.__name__} for {package}"
+                    )
             except Exception as e:
-                logger.warning(f"Failed to load config from {source.__class__.__name__} for {package}: {e}")
+                logger.warning(
+                    f"Failed to load config from {source.__class__.__name__} for {package}: {e}"
+                )
 
         return merged_config
 
-    def _deep_merge(self, base: Dict[str, Any], update: Dict[str, Any]) -> Dict[str, Any]:
+    def _deep_merge(
+        self, base: Dict[str, Any], update: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Deep merge two dictionaries."""
         result = base.copy()
 
         for key, value in update.items():
-            if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+            if (
+                key in result
+                and isinstance(result[key], dict)
+                and isinstance(value, dict)
+            ):
                 result[key] = self._deep_merge(result[key], value)
             else:
                 result[key] = value
 
         return result
 
-    def _validate_against_schema(self, config: Dict[str, Any], schema: Dict[str, Any]) -> List[str]:
+    def _validate_against_schema(
+        self, config: Dict[str, Any], schema: Dict[str, Any]
+    ) -> List[str]:
         """Validate configuration against schema."""
         errors = []
 
         # Simple schema validation
-        required = schema.get('required', [])
+        required = schema.get("required", [])
         for field in required:
             if field not in config:
                 errors.append(f"Required field '{field}' missing")
 
-        properties = schema.get('properties', {})
+        properties = schema.get("properties", {})
         for field, value in config.items():
             if field in properties:
                 field_schema = properties[field]
-                field_type = field_schema.get('type')
+                field_type = field_schema.get("type")
 
                 if field_type and not self._check_type(value, field_type):
-                    errors.append(f"Field '{field}' has invalid type (expected {field_type})")
+                    errors.append(
+                        f"Field '{field}' has invalid type (expected {field_type})"
+                    )
 
         return errors
 
     def _check_type(self, value: Any, expected_type: str) -> bool:
         """Check if value matches expected type."""
         type_map = {
-            'string': str,
-            'integer': int,
-            'number': (int, float),
-            'boolean': bool,
-            'array': list,
-            'object': dict,
+            "string": str,
+            "integer": int,
+            "number": (int, float),
+            "boolean": bool,
+            "array": list,
+            "object": dict,
         }
 
         expected = type_map.get(expected_type)

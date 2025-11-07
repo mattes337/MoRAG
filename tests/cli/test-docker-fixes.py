@@ -11,32 +11,39 @@ Usage:
     python tests/cli/test-docker-fixes.py
 """
 
-import requests
-import time
+import json
 import subprocess
 import sys
-import json
+import time
 from pathlib import Path
+
+import requests
+
 
 def test_qdrant_health_endpoint():
     """Test Qdrant health endpoints directly."""
     print("🔍 Testing Qdrant health endpoints...")
 
     # Test different health endpoints
-    endpoints = ['/healthz', '/livez', '/readyz', '/health']
+    endpoints = ["/healthz", "/livez", "/readyz", "/health"]
 
     for endpoint in endpoints:
         try:
             response = requests.get(f"http://localhost:6333{endpoint}", timeout=5)
             if response.status_code == 200:
-                print(f"✅ Qdrant {endpoint} endpoint working (status: {response.status_code})")
+                print(
+                    f"✅ Qdrant {endpoint} endpoint working (status: {response.status_code})"
+                )
                 return True
             else:
-                print(f"❌ Qdrant {endpoint} endpoint failed (status: {response.status_code})")
+                print(
+                    f"❌ Qdrant {endpoint} endpoint failed (status: {response.status_code})"
+                )
         except requests.exceptions.RequestException as e:
             print(f"❌ Qdrant {endpoint} endpoint error: {e}")
 
     return False
+
 
 def test_docker_compose_health():
     """Test docker-compose health checks."""
@@ -48,22 +55,22 @@ def test_docker_compose_health():
             ["docker-compose", "ps", "--format", "json"],
             capture_output=True,
             text=True,
-            check=True
+            check=True,
         )
 
         services = json.loads(result.stdout) if result.stdout.strip() else []
 
         for service in services:
-            name = service.get('Name', 'Unknown')
-            state = service.get('State', 'Unknown')
-            health = service.get('Health', 'Unknown')
+            name = service.get("Name", "Unknown")
+            state = service.get("State", "Unknown")
+            health = service.get("Health", "Unknown")
 
             print(f"Service: {name}")
             print(f"  State: {state}")
             print(f"  Health: {health}")
 
-            if 'qdrant' in name.lower():
-                if health == 'healthy':
+            if "qdrant" in name.lower():
+                if health == "healthy":
                     print(f"✅ {name} is healthy")
                 else:
                     print(f"❌ {name} health check failed: {health}")
@@ -78,6 +85,7 @@ def test_docker_compose_health():
         print(f"❌ Failed to parse docker-compose output: {e}")
         return False
 
+
 def test_api_health():
     """Test MoRAG API health endpoint."""
     print("🚀 Testing MoRAG API health...")
@@ -89,11 +97,11 @@ def test_api_health():
             print(f"✅ MoRAG API is healthy")
 
             # Check Qdrant status in API response
-            if 'services' in health_data and 'qdrant' in health_data['services']:
-                qdrant_status = health_data['services']['qdrant']
+            if "services" in health_data and "qdrant" in health_data["services"]:
+                qdrant_status = health_data["services"]["qdrant"]
                 print(f"  Qdrant status via API: {qdrant_status}")
 
-                if qdrant_status.get('status') == 'healthy':
+                if qdrant_status.get("status") == "healthy":
                     print("✅ Qdrant is healthy via API")
                     return True
                 else:
@@ -109,6 +117,7 @@ def test_api_health():
     except requests.exceptions.RequestException as e:
         print(f"❌ MoRAG API health check error: {e}")
         return False
+
 
 def test_whisper_initialization():
     """Test if Whisper model can be initialized without permission errors."""
@@ -132,6 +141,7 @@ def test_whisper_initialization():
     except requests.exceptions.RequestException as e:
         print(f"❌ Audio service test error: {e}")
         return False
+
 
 def main():
     """Run all tests."""
@@ -184,6 +194,7 @@ def main():
     else:
         print("⚠️  Some tests failed. Check the output above for details.")
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

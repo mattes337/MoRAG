@@ -1,26 +1,29 @@
 """Enhanced fact relevance scoring with multi-dimensional analysis."""
 
 import time
-from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 from enum import Enum
-import structlog
+from typing import Any, Dict, List, Optional
 
+import structlog
 from morag_core.config import get_settings
-from .llm import LLMClient
+
 from .graph_fact_extractor import ExtractedFact, FactType
+from .llm import LLMClient
 
 logger = structlog.get_logger(__name__)
 
 # Optional imports for enhanced functionality
 try:
     from sentence_transformers import SentenceTransformer
+
     SENTENCE_TRANSFORMERS_AVAILABLE = True
 except ImportError:
     SENTENCE_TRANSFORMERS_AVAILABLE = False
 
 try:
     import google.generativeai as genai
+
     GEMINI_AVAILABLE = True
 except ImportError:
     GEMINI_AVAILABLE = False
@@ -29,6 +32,7 @@ except ImportError:
 @dataclass
 class ScoringDimensions:
     """Multi-dimensional scoring components."""
+
     query_relevance: float  # Semantic similarity to user query
     source_quality: float  # Document authority and reliability
     confidence: float  # Extraction and validation confidence
@@ -40,6 +44,7 @@ class ScoringDimensions:
 @dataclass
 class ScoredFact:
     """Fact with comprehensive scoring information."""
+
     fact: ExtractedFact
     overall_score: float
     scoring_dimensions: ScoringDimensions
@@ -49,6 +54,7 @@ class ScoredFact:
 
 class ScoringStrategy(Enum):
     """Strategies for fact scoring."""
+
     BALANCED = "balanced"  # Equal weight to all dimensions
     RELEVANCE_FOCUSED = "relevance_focused"  # Prioritize query relevance
     QUALITY_FOCUSED = "quality_focused"  # Prioritize source quality
@@ -59,11 +65,7 @@ class ScoringStrategy(Enum):
 class FactRelevanceScorer:
     """Enhanced fact relevance scoring with multi-dimensional analysis."""
 
-    def __init__(
-        self,
-        llm_client: LLMClient,
-        config: Optional[Dict[str, Any]] = None
-    ):
+    def __init__(self, llm_client: LLMClient, config: Optional[Dict[str, Any]] = None):
         """Initialize the fact relevance scorer.
 
         Args:
@@ -76,38 +78,37 @@ class FactRelevanceScorer:
 
         # Scoring parameters
         self.scoring_strategy = ScoringStrategy(
-            self.config.get('scoring_strategy', 'adaptive')
+            self.config.get("scoring_strategy", "adaptive")
         )
-        self.min_score_threshold = self.config.get('min_score_threshold', 0.2)
-        self.max_facts_to_score = self.config.get('max_facts_to_score', 100000)
+        self.min_score_threshold = self.config.get("min_score_threshold", 0.2)
+        self.max_facts_to_score = self.config.get("max_facts_to_score", 100000)
 
         # LLM configuration
-        self.llm_enabled = self.config.get('llm_enabled', True) and GEMINI_AVAILABLE
-        self.model_name = self.config.get('model_name', 'gemini-1.5-flash')
+        self.llm_enabled = self.config.get("llm_enabled", True) and GEMINI_AVAILABLE
+        self.model_name = self.config.get("model_name", "gemini-1.5-flash")
 
         # Semantic similarity configuration
         self.semantic_enabled = (
-            self.config.get('semantic_enabled', True) and
-            SENTENCE_TRANSFORMERS_AVAILABLE
+            self.config.get("semantic_enabled", True)
+            and SENTENCE_TRANSFORMERS_AVAILABLE
         )
         self.embedding_model_name = self.config.get(
-            'embedding_model_name',
-            'all-MiniLM-L6-v2'
+            "embedding_model_name", "all-MiniLM-L6-v2"
         )
 
         # Scoring weights (can be adjusted based on strategy)
         self.default_weights = {
-            'query_relevance': 0.3,
-            'source_quality': 0.2,
-            'confidence': 0.2,
-            'recency': 0.1,
-            'completeness': 0.1,
-            'specificity': 0.1
+            "query_relevance": 0.3,
+            "source_quality": 0.2,
+            "confidence": 0.2,
+            "recency": 0.1,
+            "completeness": 0.1,
+            "specificity": 0.1,
         }
 
         # Performance settings
-        self.batch_size = self.config.get('batch_size', 10)
-        self.enable_caching = self.config.get('enable_caching', True)
+        self.batch_size = self.config.get("batch_size", 10)
+        self.enable_caching = self.config.get("enable_caching", True)
 
         # Initialize components
         self._llm_client = None
@@ -119,7 +120,7 @@ class FactRelevanceScorer:
             scoring_strategy=self.scoring_strategy.value,
             llm_enabled=self.llm_enabled,
             semantic_enabled=self.semantic_enabled,
-            min_score_threshold=self.min_score_threshold
+            min_score_threshold=self.min_score_threshold,
         )
 
     async def initialize(self) -> None:
@@ -147,7 +148,7 @@ class FactRelevanceScorer:
         self,
         facts: List[ExtractedFact],
         query: str,
-        query_context: Optional[Dict[str, Any]] = None
+        query_context: Optional[Dict[str, Any]] = None,
     ) -> List[ScoredFact]:
         """Score facts based on relevance to the query.
 
@@ -167,14 +168,14 @@ class FactRelevanceScorer:
                 "Starting fact relevance scoring",
                 num_facts=len(facts),
                 query=query,
-                strategy=self.scoring_strategy.value
+                strategy=self.scoring_strategy.value,
             )
 
             # Initialize models if needed
             await self.initialize()
 
             # Limit facts to score
-            facts_to_score = facts[:self.max_facts_to_score]
+            facts_to_score = facts[: self.max_facts_to_score]
 
             # Determine scoring weights based on strategy
             weights = self._get_scoring_weights(query, query_context)
@@ -182,14 +183,13 @@ class FactRelevanceScorer:
             # Score facts in batches
             scored_facts = []
             for i in range(0, len(facts_to_score), self.batch_size):
-                batch = facts_to_score[i:i + self.batch_size]
+                batch = facts_to_score[i : i + self.batch_size]
                 batch_scores = await self._score_fact_batch(batch, query, weights)
                 scored_facts.extend(batch_scores)
 
             # Filter by minimum score threshold
             filtered_facts = [
-                f for f in scored_facts
-                if f.overall_score >= self.min_score_threshold
+                f for f in scored_facts if f.overall_score >= self.min_score_threshold
             ]
 
             # Sort by overall score
@@ -200,7 +200,7 @@ class FactRelevanceScorer:
                 total_facts=len(facts),
                 scored_facts=len(scored_facts),
                 filtered_facts=len(filtered_facts),
-                strategy=self.scoring_strategy.value
+                strategy=self.scoring_strategy.value,
             )
 
             return filtered_facts
@@ -213,47 +213,49 @@ class FactRelevanceScorer:
                     fact=fact,
                     overall_score=0.5,
                     scoring_dimensions=ScoringDimensions(
-                        query_relevance=0.5, source_quality=0.5, confidence=0.5,
-                        recency=0.5, completeness=0.5, specificity=0.5
+                        query_relevance=0.5,
+                        source_quality=0.5,
+                        confidence=0.5,
+                        recency=0.5,
+                        completeness=0.5,
+                        specificity=0.5,
                     ),
                     reasoning="Fallback scoring due to error",
-                    metadata={'scoring_error': str(e)}
+                    metadata={"scoring_error": str(e)},
                 )
                 for fact in facts[:10]  # Limit fallback results
             ]
 
     def _get_scoring_weights(
-        self,
-        query: str,
-        query_context: Optional[Dict[str, Any]]
+        self, query: str, query_context: Optional[Dict[str, Any]]
     ) -> Dict[str, float]:
         """Get scoring weights based on strategy and query characteristics."""
         if self.scoring_strategy == ScoringStrategy.RELEVANCE_FOCUSED:
             return {
-                'query_relevance': 0.5,
-                'source_quality': 0.15,
-                'confidence': 0.15,
-                'recency': 0.1,
-                'completeness': 0.05,
-                'specificity': 0.05
+                "query_relevance": 0.5,
+                "source_quality": 0.15,
+                "confidence": 0.15,
+                "recency": 0.1,
+                "completeness": 0.05,
+                "specificity": 0.05,
             }
         elif self.scoring_strategy == ScoringStrategy.QUALITY_FOCUSED:
             return {
-                'query_relevance': 0.25,
-                'source_quality': 0.4,
-                'confidence': 0.2,
-                'recency': 0.05,
-                'completeness': 0.05,
-                'specificity': 0.05
+                "query_relevance": 0.25,
+                "source_quality": 0.4,
+                "confidence": 0.2,
+                "recency": 0.05,
+                "completeness": 0.05,
+                "specificity": 0.05,
             }
         elif self.scoring_strategy == ScoringStrategy.CONFIDENCE_FOCUSED:
             return {
-                'query_relevance': 0.25,
-                'source_quality': 0.15,
-                'confidence': 0.4,
-                'recency': 0.05,
-                'completeness': 0.1,
-                'specificity': 0.05
+                "query_relevance": 0.25,
+                "source_quality": 0.15,
+                "confidence": 0.4,
+                "recency": 0.05,
+                "completeness": 0.1,
+                "specificity": 0.05,
             }
         elif self.scoring_strategy == ScoringStrategy.ADAPTIVE:
             # Adapt based on query characteristics
@@ -262,9 +264,7 @@ class FactRelevanceScorer:
             return self.default_weights.copy()
 
     def _adapt_weights_to_query(
-        self,
-        query: str,
-        query_context: Optional[Dict[str, Any]]
+        self, query: str, query_context: Optional[Dict[str, Any]]
     ) -> Dict[str, float]:
         """Adapt scoring weights based on query characteristics."""
         weights = self.default_weights.copy()
@@ -272,39 +272,38 @@ class FactRelevanceScorer:
         query_lower = query.lower()
 
         # For factual questions, prioritize relevance and confidence
-        if any(word in query_lower for word in ['what', 'who', 'when', 'where']):
-            weights['query_relevance'] = 0.4
-            weights['confidence'] = 0.3
-            weights['source_quality'] = 0.2
-            weights['recency'] = 0.05
-            weights['completeness'] = 0.03
-            weights['specificity'] = 0.02
+        if any(word in query_lower for word in ["what", "who", "when", "where"]):
+            weights["query_relevance"] = 0.4
+            weights["confidence"] = 0.3
+            weights["source_quality"] = 0.2
+            weights["recency"] = 0.05
+            weights["completeness"] = 0.03
+            weights["specificity"] = 0.02
 
         # For recent information queries, prioritize recency
-        elif any(word in query_lower for word in ['recent', 'latest', 'current', 'now']):
-            weights['recency'] = 0.3
-            weights['query_relevance'] = 0.3
-            weights['source_quality'] = 0.2
-            weights['confidence'] = 0.15
-            weights['completeness'] = 0.03
-            weights['specificity'] = 0.02
+        elif any(
+            word in query_lower for word in ["recent", "latest", "current", "now"]
+        ):
+            weights["recency"] = 0.3
+            weights["query_relevance"] = 0.3
+            weights["source_quality"] = 0.2
+            weights["confidence"] = 0.15
+            weights["completeness"] = 0.03
+            weights["specificity"] = 0.02
 
         # For analytical questions, prioritize completeness and quality
-        elif any(word in query_lower for word in ['analyze', 'explain', 'why', 'how']):
-            weights['completeness'] = 0.25
-            weights['source_quality'] = 0.25
-            weights['query_relevance'] = 0.25
-            weights['confidence'] = 0.15
-            weights['recency'] = 0.05
-            weights['specificity'] = 0.05
+        elif any(word in query_lower for word in ["analyze", "explain", "why", "how"]):
+            weights["completeness"] = 0.25
+            weights["source_quality"] = 0.25
+            weights["query_relevance"] = 0.25
+            weights["confidence"] = 0.15
+            weights["recency"] = 0.05
+            weights["specificity"] = 0.05
 
         return weights
 
     async def _score_fact_batch(
-        self,
-        facts: List[ExtractedFact],
-        query: str,
-        weights: Dict[str, float]
+        self, facts: List[ExtractedFact], query: str, weights: Dict[str, float]
     ) -> List[ScoredFact]:
         """Score a batch of facts."""
         scored_facts = []
@@ -320,21 +319,22 @@ class FactRelevanceScorer:
                     fact=fact,
                     overall_score=0.1,
                     scoring_dimensions=ScoringDimensions(
-                        query_relevance=0.1, source_quality=0.1, confidence=0.1,
-                        recency=0.1, completeness=0.1, specificity=0.1
+                        query_relevance=0.1,
+                        source_quality=0.1,
+                        confidence=0.1,
+                        recency=0.1,
+                        completeness=0.1,
+                        specificity=0.1,
                     ),
                     reasoning="Error during scoring",
-                    metadata={'scoring_error': str(e)}
+                    metadata={"scoring_error": str(e)},
                 )
                 scored_facts.append(fallback_score)
 
         return scored_facts
 
     async def _score_single_fact(
-        self,
-        fact: ExtractedFact,
-        query: str,
-        weights: Dict[str, float]
+        self, fact: ExtractedFact, query: str, weights: Dict[str, float]
     ) -> ScoredFact:
         """Score a single fact across all dimensions."""
         # Calculate individual dimension scores
@@ -352,17 +352,17 @@ class FactRelevanceScorer:
             confidence=confidence,
             recency=recency,
             completeness=completeness,
-            specificity=specificity
+            specificity=specificity,
         )
 
         # Calculate weighted overall score
         overall_score = (
-            query_relevance * weights['query_relevance'] +
-            source_quality * weights['source_quality'] +
-            confidence * weights['confidence'] +
-            recency * weights['recency'] +
-            completeness * weights['completeness'] +
-            specificity * weights['specificity']
+            query_relevance * weights["query_relevance"]
+            + source_quality * weights["source_quality"]
+            + confidence * weights["confidence"]
+            + recency * weights["recency"]
+            + completeness * weights["completeness"]
+            + specificity * weights["specificity"]
         )
 
         # Generate reasoning
@@ -374,16 +374,14 @@ class FactRelevanceScorer:
             scoring_dimensions=dimensions,
             reasoning=reasoning,
             metadata={
-                'scoring_method': 'multi_dimensional',
-                'weights_used': weights,
-                'fact_type': fact.fact_type.value
-            }
+                "scoring_method": "multi_dimensional",
+                "weights_used": weights,
+                "fact_type": fact.fact_type.value,
+            },
         )
 
     async def _calculate_query_relevance(
-        self,
-        fact: ExtractedFact,
-        query: str
+        self, fact: ExtractedFact, query: str
     ) -> float:
         """Calculate semantic relevance to the query."""
         if self.semantic_enabled and self._embedding_model:
@@ -393,6 +391,7 @@ class FactRelevanceScorer:
                 query_embedding = self._embedding_model.encode([query])
 
                 from sklearn.metrics.pairwise import cosine_similarity
+
                 similarity = cosine_similarity(fact_embedding, query_embedding)[0][0]
                 return max(0.0, min(1.0, similarity))
             except Exception as e:
@@ -425,37 +424,37 @@ class FactRelevanceScorer:
 
         # Fact type reliability
         fact_type_scores = {
-            FactType.DIRECT: 0.3,      # Most reliable
+            FactType.DIRECT: 0.3,  # Most reliable
             FactType.CONTEXTUAL: 0.2,  # Good reliability
-            FactType.CHAIN: 0.15,      # Moderate reliability
-            FactType.INFERRED: 0.1,    # Lower reliability
-            FactType.TEMPORAL: 0.1     # Context-dependent
+            FactType.CHAIN: 0.15,  # Moderate reliability
+            FactType.INFERRED: 0.1,  # Lower reliability
+            FactType.TEMPORAL: 0.1,  # Context-dependent
         }
         quality_score += fact_type_scores.get(fact.fact_type, 0.0)
 
         # Entity type reliability
-        if hasattr(fact, 'context') and fact.context:
+        if hasattr(fact, "context") and fact.context:
             entity_types = [
-                fact.context.get('source_entity_type', ''),
-                fact.context.get('target_entity_type', '')
+                fact.context.get("source_entity_type", ""),
+                fact.context.get("target_entity_type", ""),
             ]
-            reliable_types = {'PERSON', 'ORGANIZATION', 'LOCATION', 'CONCEPT'}
+            reliable_types = {"PERSON", "ORGANIZATION", "LOCATION", "CONCEPT"}
             reliable_count = sum(1 for et in entity_types if et in reliable_types)
             quality_score += reliable_count * 0.05
 
         # Path length penalty for chain facts
-        if fact.fact_type == FactType.CHAIN and hasattr(fact, 'metadata'):
-            path_length = fact.metadata.get('path_length', 2)
+        if fact.fact_type == FactType.CHAIN and hasattr(fact, "metadata"):
+            path_length = fact.metadata.get("path_length", 2)
             if path_length > 3:
                 penalty = min(0.2, (path_length - 3) * 0.05)
                 quality_score -= penalty
 
         # Extraction method bonus
-        if hasattr(fact, 'metadata') and fact.metadata:
-            extraction_method = fact.metadata.get('extraction_method', '')
-            if 'enhanced' in extraction_method:
+        if hasattr(fact, "metadata") and fact.metadata:
+            extraction_method = fact.metadata.get("extraction_method", "")
+            if "enhanced" in extraction_method:
                 quality_score += 0.1
-            elif 'llm' in extraction_method.lower():
+            elif "llm" in extraction_method.lower():
                 quality_score += 0.05
 
         # Boost for facts with entity sources
@@ -472,25 +471,25 @@ class FactRelevanceScorer:
         confidence_adjustments = 0.0
 
         # Boost for facts with semantic context
-        if hasattr(fact, 'context') and fact.context:
-            if fact.context.get('semantic_context'):
+        if hasattr(fact, "context") and fact.context:
+            if fact.context.get("semantic_context"):
                 confidence_adjustments += 0.05
 
             # Boost for facts with clear entity types
             entity_types = [
-                fact.context.get('source_entity_type', ''),
-                fact.context.get('target_entity_type', '')
+                fact.context.get("source_entity_type", ""),
+                fact.context.get("target_entity_type", ""),
             ]
-            if all(et and et != 'Unknown' for et in entity_types):
+            if all(et and et != "Unknown" for et in entity_types):
                 confidence_adjustments += 0.1
 
         # Adjust based on fact type
         fact_type_adjustments = {
-            FactType.DIRECT: 0.1,      # Direct facts are more reliable
-            FactType.CONTEXTUAL: 0.05, # Contextual facts are moderately reliable
-            FactType.CHAIN: -0.05,     # Chain facts have some uncertainty
-            FactType.INFERRED: -0.1,   # Inferred facts are less certain
-            FactType.TEMPORAL: 0.0     # Temporal facts depend on context
+            FactType.DIRECT: 0.1,  # Direct facts are more reliable
+            FactType.CONTEXTUAL: 0.05,  # Contextual facts are moderately reliable
+            FactType.CHAIN: -0.05,  # Chain facts have some uncertainty
+            FactType.INFERRED: -0.1,  # Inferred facts are less certain
+            FactType.TEMPORAL: 0.0,  # Temporal facts depend on context
         }
         confidence_adjustments += fact_type_adjustments.get(fact.fact_type, 0.0)
 
@@ -499,15 +498,15 @@ class FactRelevanceScorer:
             confidence_adjustments += min(0.15, len(fact.source_documents) * 0.03)
 
         # Adjust based on extraction metadata
-        if hasattr(fact, 'metadata') and fact.metadata:
+        if hasattr(fact, "metadata") and fact.metadata:
             # Boost for recent extractions (more likely to use better methods)
-            extraction_time = fact.metadata.get('extraction_timestamp', 0)
+            extraction_time = fact.metadata.get("extraction_timestamp", 0)
             if extraction_time > time.time() - 3600:  # Within last hour
                 confidence_adjustments += 0.05
 
             # Boost for enhanced extraction methods
-            extraction_method = fact.metadata.get('extraction_method', '')
-            if 'enhanced' in extraction_method:
+            extraction_method = fact.metadata.get("extraction_method", "")
+            if "enhanced" in extraction_method:
                 confidence_adjustments += 0.1
 
         final_confidence = base_confidence + confidence_adjustments
@@ -522,8 +521,8 @@ class FactRelevanceScorer:
             recency_score += 0.2
 
         # Check extraction timestamp
-        if hasattr(fact, 'metadata') and fact.metadata:
-            extraction_time = fact.metadata.get('extraction_timestamp', 0)
+        if hasattr(fact, "metadata") and fact.metadata:
+            extraction_time = fact.metadata.get("extraction_timestamp", 0)
             if extraction_time > 0:
                 # More recent extractions get higher scores
                 time_diff = time.time() - extraction_time
@@ -535,8 +534,8 @@ class FactRelevanceScorer:
                     recency_score += 0.1
 
         # Check for temporal context in fact metadata
-        if hasattr(fact, 'context') and fact.context:
-            temporal_context = fact.context.get('temporal_context')
+        if hasattr(fact, "context") and fact.context:
+            temporal_context = fact.context.get("temporal_context")
             if temporal_context:
                 # Boost for facts with explicit temporal context
                 recency_score += 0.15
@@ -550,9 +549,22 @@ class FactRelevanceScorer:
     def _contains_temporal_indicators(self, content: str) -> bool:
         """Check if content contains temporal indicators."""
         temporal_words = [
-            'recent', 'recently', 'current', 'currently', 'now', 'today',
-            'yesterday', 'tomorrow', 'this year', 'last year', 'next year',
-            'modern', 'contemporary', 'latest', 'new', 'updated'
+            "recent",
+            "recently",
+            "current",
+            "currently",
+            "now",
+            "today",
+            "yesterday",
+            "tomorrow",
+            "this year",
+            "last year",
+            "next year",
+            "modern",
+            "contemporary",
+            "latest",
+            "new",
+            "updated",
         ]
         content_lower = content.lower()
         return any(word in content_lower for word in temporal_words)
@@ -592,25 +604,29 @@ class FactRelevanceScorer:
         self,
         dimensions: ScoringDimensions,
         weights: Dict[str, float],
-        fact: ExtractedFact
+        fact: ExtractedFact,
     ) -> str:
         """Generate human-readable reasoning for the score."""
         top_dimensions = sorted(
             [
-                ('query_relevance', dimensions.query_relevance),
-                ('source_quality', dimensions.source_quality),
-                ('confidence', dimensions.confidence)
+                ("query_relevance", dimensions.query_relevance),
+                ("source_quality", dimensions.source_quality),
+                ("confidence", dimensions.confidence),
             ],
             key=lambda x: x[1],
-            reverse=True
+            reverse=True,
         )
 
         reasoning_parts = []
         for dim_name, score in top_dimensions[:2]:  # Top 2 dimensions
             if score > 0.7:
-                reasoning_parts.append(f"High {dim_name.replace('_', ' ')} ({score:.2f})")
+                reasoning_parts.append(
+                    f"High {dim_name.replace('_', ' ')} ({score:.2f})"
+                )
             elif score > 0.4:
-                reasoning_parts.append(f"Moderate {dim_name.replace('_', ' ')} ({score:.2f})")
+                reasoning_parts.append(
+                    f"Moderate {dim_name.replace('_', ' ')} ({score:.2f})"
+                )
 
         if not reasoning_parts:
             reasoning_parts.append("Low overall relevance")

@@ -1,11 +1,11 @@
 """Tests for markitdown service."""
 
-import pytest
 from pathlib import Path
-from unittest.mock import Mock, patch, AsyncMock
+from unittest.mock import AsyncMock, Mock, patch
 
-from morag_document.services.markitdown_service import MarkitdownService
+import pytest
 from morag_core.exceptions import ConversionError, UnsupportedFormatError
+from morag_document.services.markitdown_service import MarkitdownService
 
 
 class TestMarkitdownService:
@@ -42,30 +42,34 @@ class TestMarkitdownService:
 
         assert isinstance(formats, list)
         assert len(formats) > 0
-        assert 'pdf' in formats
-        assert 'docx' in formats
-        assert 'xlsx' in formats
-        assert 'pptx' in formats
+        assert "pdf" in formats
+        assert "docx" in formats
+        assert "xlsx" in formats
+        assert "pptx" in formats
 
     @pytest.mark.asyncio
     async def test_supports_format(self, service):
         """Test format support checking."""
         # Test supported formats
-        assert await service.supports_format('pdf')
-        assert await service.supports_format('docx')
-        assert await service.supports_format('xlsx')
+        assert await service.supports_format("pdf")
+        assert await service.supports_format("docx")
+        assert await service.supports_format("xlsx")
 
         # Test unsupported format
-        assert not await service.supports_format('unknown')
+        assert not await service.supports_format("unknown")
 
     @pytest.mark.asyncio
-    async def test_convert_file_success(self, service, tmp_path, mock_markitdown_result):
+    async def test_convert_file_success(
+        self, service, tmp_path, mock_markitdown_result
+    ):
         """Test successful file conversion."""
         # Create test file
         test_file = tmp_path / "test.txt"
         test_file.write_text("Test content")
 
-        with patch.object(service, '_convert_sync', return_value=mock_markitdown_result):
+        with patch.object(
+            service, "_convert_sync", return_value=mock_markitdown_result
+        ):
             result = await service.convert_file(test_file)
 
             assert result == "# Test Document\n\nThis is test content."
@@ -103,14 +107,14 @@ class TestMarkitdownService:
         empty_result = Mock()
         empty_result.text_content = ""
 
-        with patch.object(service, '_convert_sync', return_value=empty_result):
+        with patch.object(service, "_convert_sync", return_value=empty_result):
             with pytest.raises(ConversionError, match="empty content"):
                 await service.convert_file(test_file)
 
     @pytest.mark.asyncio
     async def test_convert_sync_unsupported_format(self, service):
         """Test synchronous conversion with unsupported format."""
-        with patch('markitdown.MarkItDown') as mock_markitdown_class:
+        with patch("markitdown.MarkItDown") as mock_markitdown_class:
             mock_instance = Mock()
             mock_instance.convert.side_effect = Exception("Format not supported")
             mock_markitdown_class.return_value = mock_instance
@@ -129,11 +133,11 @@ class TestMarkitdownService:
 
         info = await service.get_conversion_info(test_file)
 
-        assert info['file_path'] == str(test_file)
-        assert info['format'] == 'pdf'
-        assert info['supported'] is True
-        assert info['file_size'] > 0
-        assert info['service'] == 'markitdown'
+        assert info["file_path"] == str(test_file)
+        assert info["format"] == "pdf"
+        assert info["supported"] is True
+        assert info["file_size"] > 0
+        assert info["service"] == "markitdown"
 
     @pytest.mark.asyncio
     async def test_get_conversion_info_not_found(self, service):
@@ -147,7 +151,9 @@ class TestMarkitdownService:
         # Mock settings with Azure enabled
         mock_settings = Mock()
         mock_settings.markitdown_use_azure_doc_intel = True
-        mock_settings.markitdown_azure_endpoint = "https://test.cognitiveservices.azure.com/"
+        mock_settings.markitdown_azure_endpoint = (
+            "https://test.cognitiveservices.azure.com/"
+        )
 
         service.settings = mock_settings
 
@@ -169,7 +175,9 @@ class TestMarkitdownService:
     @pytest.mark.asyncio
     async def test_import_error_handling(self, service):
         """Test handling of markitdown import errors."""
-        with patch('builtins.__import__', side_effect=ImportError("markitdown not found")):
+        with patch(
+            "builtins.__import__", side_effect=ImportError("markitdown not found")
+        ):
             with pytest.raises(ConversionError, match="Markitdown is not installed"):
                 await service._initialize()
 

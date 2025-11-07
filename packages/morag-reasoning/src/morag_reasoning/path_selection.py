@@ -2,14 +2,15 @@
 
 import json
 import logging
-from typing import List, Optional
 from dataclasses import dataclass
+from typing import List, Optional
 
 from morag_graph.operations import GraphPath
-from .llm import LLMClient
 
 # Import agents framework
 from agents import get_agent
+
+from .llm import LLMClient
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +18,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class PathRelevanceScore:
     """Represents a path with its relevance score and reasoning."""
+
     path: GraphPath
     relevance_score: float
     confidence: float
@@ -26,6 +28,7 @@ class PathRelevanceScore:
 @dataclass
 class ReasoningStrategy:
     """Configuration for a reasoning strategy."""
+
     name: str
     description: str
     max_depth: int
@@ -58,29 +61,29 @@ class PathSelectionAgent:
                 description="Start from query entities and explore forward",
                 max_depth=4,
                 bidirectional=False,
-                use_weights=True
+                use_weights=True,
             ),
             "backward_chaining": ReasoningStrategy(
                 name="backward_chaining",
                 description="Start from potential answers and work backward",
                 max_depth=3,
                 bidirectional=False,
-                use_weights=True
+                use_weights=True,
             ),
             "bidirectional": ReasoningStrategy(
                 name="bidirectional",
                 description="Search from both ends and meet in the middle",
                 max_depth=5,
                 bidirectional=True,
-                use_weights=True
-            )
+                use_weights=True,
+            ),
         }
 
     async def select_paths(
         self,
         query: str,
         available_paths: List[GraphPath],
-        strategy: str = "forward_chaining"
+        strategy: str = "forward_chaining",
     ) -> List[PathRelevanceScore]:
         """Use LLM to select most relevant paths for answering the query.
 
@@ -103,18 +106,20 @@ class PathSelectionAgent:
             result = await self.path_agent.execute(
                 query,
                 available_paths=[self._describe_path(path) for path in available_paths],
-                strategy=strategy
+                strategy=strategy,
             )
 
             # Convert agent result to legacy format
-            selected_paths = self._convert_agent_result_to_paths(result, available_paths)
+            selected_paths = self._convert_agent_result_to_paths(
+                result, available_paths
+            )
 
             # Apply additional scoring
             scored_paths = await self._score_paths(query, selected_paths, strategy)
 
             # Sort by relevance and return top paths
             scored_paths.sort(key=lambda x: x.relevance_score, reverse=True)
-            return scored_paths[:self.max_paths]
+            return scored_paths[: self.max_paths]
 
         except Exception as e:
             self.logger.error(f"Error in path selection: {str(e)}")
@@ -157,19 +162,23 @@ Format your response as JSON:
     def _describe_path(self, path: GraphPath) -> str:
         """Create a human-readable description of a graph path."""
         if len(path.entities) < 2:
-            entity_name = path.entities[0].name if path.entities else 'Unknown'
+            entity_name = path.entities[0].name if path.entities else "Unknown"
             return f"Single entity: {entity_name}"
 
         description_parts = []
         for i in range(len(path.entities) - 1):
             entity1 = path.entities[i].name
             entity2 = path.entities[i + 1].name
-            relation = path.relations[i].type if i < len(path.relations) else "connected_to"
+            relation = (
+                path.relations[i].type if i < len(path.relations) else "connected_to"
+            )
             description_parts.append(f"{entity1} --[{relation}]--> {entity2}")
 
         return " -> ".join(description_parts)
 
-    def _parse_path_selection(self, response: str, available_paths: List[GraphPath]) -> List[PathRelevanceScore]:
+    def _parse_path_selection(
+        self, response: str, available_paths: List[GraphPath]
+    ) -> List[PathRelevanceScore]:
         """Parse LLM response to extract selected paths."""
         try:
             # Log the raw response for debugging
@@ -199,7 +208,7 @@ Format your response as JSON:
             if not response_clean.endswith("}"):
                 end = response_clean.rfind("}")
                 if end != -1:
-                    response_clean = response_clean[:end+1]
+                    response_clean = response_clean[: end + 1]
 
             self.logger.debug(f"Cleaned response: {response_clean}")
 
@@ -213,7 +222,7 @@ Format your response as JSON:
                         path=available_paths[path_id],
                         relevance_score=float(selection.get("relevance_score", 0)),
                         confidence=float(selection.get("confidence", 0)),
-                        reasoning=selection.get("reasoning", "")
+                        reasoning=selection.get("reasoning", ""),
                     )
                     selected_paths.append(path_score)
 
@@ -226,19 +235,18 @@ Format your response as JSON:
             return self._fallback_path_selection(available_paths)
 
     async def _score_paths(
-        self,
-        query: str,
-        paths: List[PathRelevanceScore],
-        strategy: str
+        self, query: str, paths: List[PathRelevanceScore], strategy: str
     ) -> List[PathRelevanceScore]:
         """Apply additional scoring based on reasoning strategy."""
-        strategy_config = self.strategies.get(strategy, self.strategies["forward_chaining"])
+        strategy_config = self.strategies.get(
+            strategy, self.strategies["forward_chaining"]
+        )
 
         for path_score in paths:
             # Apply strategy-specific adjustments
             if strategy_config.use_weights:
                 # Boost score based on path weights (if available)
-                if hasattr(path_score.path, 'total_weight'):
+                if hasattr(path_score.path, "total_weight"):
                     weight_bonus = min(path_score.path.total_weight / 10.0, 2.0)
                     path_score.relevance_score += weight_bonus
 
@@ -246,7 +254,9 @@ Format your response as JSON:
             path_length = len(path_score.path.entities)
             if path_length > strategy_config.max_depth:
                 penalty = (path_length - strategy_config.max_depth) * 0.5
-                path_score.relevance_score = max(0, path_score.relevance_score - penalty)
+                path_score.relevance_score = max(
+                    0, path_score.relevance_score - penalty
+                )
 
             # Boost confidence for shorter, more direct paths
             if path_length <= 3:
@@ -254,13 +264,17 @@ Format your response as JSON:
 
         return paths
 
-    def _fallback_path_selection(self, available_paths: List[GraphPath]) -> List[PathRelevanceScore]:
+    def _fallback_path_selection(
+        self, available_paths: List[GraphPath]
+    ) -> List[PathRelevanceScore]:
         """Fallback path selection when LLM fails."""
         fallback_paths = []
-        for path in available_paths[:self.max_paths]:
+        for path in available_paths[: self.max_paths]:
             # Simple scoring based on path length and weight
             length_score = max(0, 10 - len(path.entities))
-            weight_score = getattr(path, 'total_weight', 5.0)  # Default weight if not available
+            weight_score = getattr(
+                path, "total_weight", 5.0
+            )  # Default weight if not available
             weight_score = min(weight_score, 10)
             combined_score = (length_score + weight_score) / 2
 
@@ -268,13 +282,15 @@ Format your response as JSON:
                 path=path,
                 relevance_score=combined_score,
                 confidence=5.0,  # Medium confidence for fallback
-                reasoning="Fallback scoring based on path length and weight"
+                reasoning="Fallback scoring based on path length and weight",
             )
             fallback_paths.append(path_score)
 
         return fallback_paths
 
-    def _convert_agent_result_to_paths(self, agent_result, available_paths: List[GraphPath]) -> List[PathRelevanceScore]:
+    def _convert_agent_result_to_paths(
+        self, agent_result, available_paths: List[GraphPath]
+    ) -> List[PathRelevanceScore]:
         """Convert agent result to PathRelevanceScore objects."""
         selected_paths = []
 
@@ -286,12 +302,16 @@ Format your response as JSON:
 
             # Match with available paths (simple matching by description)
             for i, available_path in enumerate(available_paths):
-                if str(i+1) in path_description or self._describe_path(available_path) in path_description:
+                if (
+                    str(i + 1) in path_description
+                    or self._describe_path(available_path) in path_description
+                ):
                     path_score = PathRelevanceScore(
                         path=available_path,
-                        relevance_score=relevance_score * 10,  # Convert 0-1 to 0-10 scale
+                        relevance_score=relevance_score
+                        * 10,  # Convert 0-1 to 0-10 scale
                         confidence=8.0,  # High confidence from agent
-                        reasoning=reasoning
+                        reasoning=reasoning,
                     )
                     selected_paths.append(path_score)
                     break
@@ -319,7 +339,7 @@ class ReasoningPathFinder:
         start_entities: List[str],
         target_entities: Optional[List[str]] = None,
         strategy: str = "forward_chaining",
-        max_paths: int = 50
+        max_paths: int = 50,
     ) -> List[PathRelevanceScore]:
         """Find and select reasoning paths for multi-hop queries.
 
@@ -348,7 +368,9 @@ class ReasoningPathFinder:
                 query, all_paths, strategy
             )
 
-            self.logger.info(f"Selected {len(selected_paths)} paths from {len(all_paths)} candidates")
+            self.logger.info(
+                f"Selected {len(selected_paths)} paths from {len(all_paths)} candidates"
+            )
             return selected_paths
 
         except Exception as e:
@@ -360,7 +382,7 @@ class ReasoningPathFinder:
         start_entities: List[str],
         target_entities: Optional[List[str]],
         strategy: str,
-        max_paths: int
+        max_paths: int,
     ) -> List[GraphPath]:
         """Discover all possible paths using the specified strategy."""
         strategy_config = self.path_selector.strategies[strategy]
@@ -370,47 +392,54 @@ class ReasoningPathFinder:
             # Bidirectional search
             for start_entity in start_entities:
                 for target_entity in target_entities:
-                    if hasattr(self.graph_engine, 'find_bidirectional_paths'):
+                    if hasattr(self.graph_engine, "find_bidirectional_paths"):
                         paths = await self.graph_engine.find_bidirectional_paths(
                             start_entity, target_entity, strategy_config.max_depth
                         )
                         all_paths.extend(paths)
                     else:
                         # Fallback to regular path finding
-                        path = await self.graph_engine.find_shortest_path(start_entity, target_entity)
+                        path = await self.graph_engine.find_shortest_path(
+                            start_entity, target_entity
+                        )
                         if path:
                             all_paths.append(path)
 
         elif strategy == "backward_chaining" and target_entities:
             # Backward chaining from target entities
             for target_entity in target_entities:
-                if hasattr(self.graph_engine, 'traverse_backward'):
+                if hasattr(self.graph_engine, "traverse_backward"):
                     paths = await self.graph_engine.traverse_backward(
                         target_entity, strategy_config.max_depth
                     )
                     # Filter paths that connect to start entities
                     relevant_paths = [
-                        path for path in paths
-                        if any(entity.name in start_entities for entity in path.entities)
+                        path
+                        for path in paths
+                        if any(
+                            entity.name in start_entities for entity in path.entities
+                        )
                     ]
                     all_paths.extend(relevant_paths)
                 else:
                     # Fallback to forward search from start entities
                     for start_entity in start_entities:
-                        path = await self.graph_engine.find_shortest_path(start_entity, target_entity)
+                        path = await self.graph_engine.find_shortest_path(
+                            start_entity, target_entity
+                        )
                         if path:
                             all_paths.append(path)
 
         else:
             # Forward chaining (default)
             for start_entity in start_entities:
-                if hasattr(self.graph_engine, 'traverse'):
+                if hasattr(self.graph_engine, "traverse"):
                     traversal_result = await self.graph_engine.traverse(
                         start_entity,
                         algorithm="bfs",
-                        max_depth=strategy_config.max_depth
+                        max_depth=strategy_config.max_depth,
                     )
-                    all_paths.extend(traversal_result.get('paths', []))
+                    all_paths.extend(traversal_result.get("paths", []))
                 else:
                     # Fallback to finding neighbors
                     neighbors = await self.graph_engine.find_neighbors(
@@ -418,7 +447,9 @@ class ReasoningPathFinder:
                     )
                     # Create simple paths to neighbors
                     for neighbor in neighbors:
-                        path = await self.graph_engine.find_shortest_path(start_entity, neighbor.id)
+                        path = await self.graph_engine.find_shortest_path(
+                            start_entity, neighbor.id
+                        )
                         if path:
                             all_paths.append(path)
 

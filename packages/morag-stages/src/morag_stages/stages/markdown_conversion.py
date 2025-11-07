@@ -9,10 +9,11 @@ The main functionality is now distributed across:
 This file provides backward compatibility.
 """
 
+from .conversion_processors import ConversionProcessors
+from .converter_factory import ConverterFactory
+
 # Re-export the split components for backward compatibility
 from .markdown_conversion_stage import MarkdownConversionStage
-from .converter_factory import ConverterFactory
-from .conversion_processors import ConversionProcessors
 
 # Maintain backward compatibility by exporting the main class
 __all__ = ["MarkdownConversionStage", "ConverterFactory", "ConversionProcessors"]

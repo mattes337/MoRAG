@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Comprehensive test runner for all agents."""
 
-import sys
-import os
 import asyncio
+import os
 import subprocess
-from pathlib import Path
+import sys
 import time
+from pathlib import Path
 
 # Add agents to Python path
 agents_dir = Path(__file__).parent.parent
@@ -15,6 +15,7 @@ sys.path.insert(0, str(agents_dir.parent))  # Add parent directory for 'agents' 
 
 # Set up test environment
 os.environ["GEMINI_API_KEY"] = "test-key-for-testing"
+
 
 def run_test_file(test_file: str) -> tuple[bool, str, float]:
     """Run a single test file and return results."""
@@ -26,13 +27,20 @@ def run_test_file(test_file: str) -> tuple[bool, str, float]:
 
     try:
         # Run pytest on the specific file
-        result = subprocess.run([
-            sys.executable, "-m", "pytest",
-            test_file,
-            "-v",
-            "--tb=short",
-            "--no-header"
-        ], capture_output=True, text=True, cwd=agents_dir)
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "pytest",
+                test_file,
+                "-v",
+                "--tb=short",
+                "--no-header",
+            ],
+            capture_output=True,
+            text=True,
+            cwd=agents_dir,
+        )
 
         duration = time.time() - start_time
 
@@ -50,6 +58,7 @@ def run_test_file(test_file: str) -> tuple[bool, str, float]:
         print(f"💥 {test_file} - ERROR ({duration:.2f}s): {e}")
         return False, str(e), duration
 
+
 def check_agent_imports():
     """Check if all agent modules can be imported."""
     print("🔍 Checking agent imports...")
@@ -57,19 +66,47 @@ def check_agent_imports():
     import_tests = [
         ("Base Agent", "agents.base.agent", "BaseAgent"),
         ("Fact Extraction", "agents.extraction.fact_extraction", "FactExtractionAgent"),
-        ("Entity Extraction", "agents.extraction.entity_extraction", "EntityExtractionAgent"),
-        ("Relation Extraction", "agents.extraction.relation_extraction", "RelationExtractionAgent"),
-        ("Keyword Extraction", "agents.extraction.keyword_extraction", "KeywordExtractionAgent"),
+        (
+            "Entity Extraction",
+            "agents.extraction.entity_extraction",
+            "EntityExtractionAgent",
+        ),
+        (
+            "Relation Extraction",
+            "agents.extraction.relation_extraction",
+            "RelationExtractionAgent",
+        ),
+        (
+            "Keyword Extraction",
+            "agents.extraction.keyword_extraction",
+            "KeywordExtractionAgent",
+        ),
         ("Query Analysis", "agents.analysis.query_analysis", "QueryAnalysisAgent"),
-        ("Content Analysis", "agents.analysis.content_analysis", "ContentAnalysisAgent"),
-        ("Sentiment Analysis", "agents.analysis.sentiment_analysis", "SentimentAnalysisAgent"),
+        (
+            "Content Analysis",
+            "agents.analysis.content_analysis",
+            "ContentAnalysisAgent",
+        ),
+        (
+            "Sentiment Analysis",
+            "agents.analysis.sentiment_analysis",
+            "SentimentAnalysisAgent",
+        ),
         ("Topic Analysis", "agents.analysis.topic_analysis", "TopicAnalysisAgent"),
         ("Path Selection", "agents.reasoning.path_selection", "PathSelectionAgent"),
         ("Reasoning", "agents.reasoning.reasoning", "ReasoningAgent"),
         ("Decision Making", "agents.reasoning.decision_making", "DecisionMakingAgent"),
-        ("Context Analysis", "agents.reasoning.context_analysis", "ContextAnalysisAgent"),
+        (
+            "Context Analysis",
+            "agents.reasoning.context_analysis",
+            "ContextAnalysisAgent",
+        ),
         ("Summarization", "agents.generation.summarization", "SummarizationAgent"),
-        ("Response Generation", "agents.generation.response_generation", "ResponseGenerationAgent"),
+        (
+            "Response Generation",
+            "agents.generation.response_generation",
+            "ResponseGenerationAgent",
+        ),
         ("Explanation", "agents.generation.explanation", "ExplanationAgent"),
         ("Synthesis", "agents.generation.synthesis", "SynthesisAgent"),
         ("Chunking", "agents.processing.chunking", "ChunkingAgent"),
@@ -98,6 +135,7 @@ def check_agent_imports():
         print(f"\n✅ All {len(import_tests)} agent imports successful!")
         return True
 
+
 def main():
     """Main test execution function."""
     print("🚀 MoRAG Agents Framework - Comprehensive Test Suite")
@@ -115,7 +153,7 @@ def main():
         "tests/test_analysis_agents.py",
         "tests/test_reasoning_agents.py",
         "tests/test_generation_agents.py",
-        "tests/test_processing_agents.py"
+        "tests/test_processing_agents.py",
     ]
 
     # Track results
@@ -156,16 +194,19 @@ def main():
         print(f"💡 The agentic pattern implementation is ready for production use.")
         return 0
     else:
-        print(f"\n⚠️  {total_tests - passed_tests} test(s) failed. Please review the output above.")
+        print(
+            f"\n⚠️  {total_tests - passed_tests} test(s) failed. Please review the output above."
+        )
         return 1
+
 
 async def test_agent_factory():
     """Test the agent factory functionality."""
     print("\n🏭 Testing Agent Factory...")
 
     try:
-        from agents.factory.utils import create_agent, get_agent
         from agents.base.config import AgentConfig
+        from agents.factory.utils import create_agent, get_agent
 
         # Test creating agents
         config = AgentConfig(name="test_fact_extraction")
@@ -181,6 +222,7 @@ async def test_agent_factory():
     except Exception as e:
         print(f"  ❌ Agent factory test failed: {e}")
         return False
+
 
 def test_configuration_system():
     """Test the configuration system."""
@@ -202,7 +244,7 @@ def test_configuration_system():
         # Test prompt config
         prompt_config = PromptConfig(
             system_prompt="Test system prompt",
-            user_prompt_template="Test user prompt: {text}"
+            user_prompt_template="Test user prompt: {text}",
         )
         assert "Test system prompt" in prompt_config.system_prompt
         print("  ✅ Prompt configuration working")
@@ -212,6 +254,7 @@ def test_configuration_system():
     except Exception as e:
         print(f"  ❌ Configuration test failed: {e}")
         return False
+
 
 if __name__ == "__main__":
     # Run configuration tests

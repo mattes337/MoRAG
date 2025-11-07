@@ -5,33 +5,33 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Union
 
 import structlog
-
+from morag_core.config import get_settings, validate_configuration_and_log
+from morag_core.exceptions import ProcessingError, ValidationError
+from morag_core.interfaces.converter import (
+    ChunkingStrategy,
+    ConversionError,
+    ConversionOptions,
+    UnsupportedFormatError,
+)
 from morag_core.interfaces.processor import (
     BaseProcessor,
     ProcessingConfig,
     ProcessingResult,
 )
-from morag_core.interfaces.converter import (
-    ChunkingStrategy,
-    ConversionOptions,
-    ConversionError,
-    UnsupportedFormatError,
-)
 from morag_core.models.document import Document, DocumentType
-from morag_core.utils.file_handling import get_file_info, detect_format
-from morag_core.exceptions import ValidationError, ProcessingError
-from morag_core.config import get_settings, validate_configuration_and_log
-
-from .converters.base import DocumentConverter
-from .converters.pdf import PDFConverter
-from .converters.word import WordConverter
-from .converters.text import TextConverter
-from .converters.excel import ExcelConverter
-from .converters.presentation import PresentationConverter
-from .converters.archive import ArchiveConverter
+from morag_core.utils.file_handling import detect_format, get_file_info
 
 # Import converters from specialized packages
 from morag_image.converters.image_converter import ImageConverter
+
+from .converters.archive import ArchiveConverter
+from .converters.base import DocumentConverter
+from .converters.excel import ExcelConverter
+from .converters.pdf import PDFConverter
+from .converters.presentation import PresentationConverter
+from .converters.text import TextConverter
+from .converters.word import WordConverter
+
 # AudioConverter import moved to avoid circular dependency
 # from morag_audio.converters.audio_converter import AudioConverter
 # VideoConverter import moved to avoid circular dependency
@@ -83,11 +83,14 @@ class DocumentProcessor(BaseProcessor):
         # Register Audio converter (markitdown-based) - optional to avoid circular import
         try:
             from morag_audio.converters.audio_converter import AudioConverter
+
             audio_converter = AudioConverter()
             for format_type in audio_converter.supported_formats:
                 self.converters[format_type] = audio_converter
         except ImportError:
-            logger.warning("Audio converter not available - morag_audio package not installed")
+            logger.warning(
+                "Audio converter not available - morag_audio package not installed"
+            )
 
         # Register Archive converter (markitdown-based)
         archive_converter = ArchiveConverter()
@@ -97,11 +100,14 @@ class DocumentProcessor(BaseProcessor):
         # Register Video converter (markitdown-based) - optional to avoid circular import
         try:
             from morag_video.converters.video import VideoConverter
+
             video_converter = VideoConverter()
             for format_type in video_converter.supported_formats:
                 self.converters[format_type] = video_converter
         except ImportError:
-            logger.warning("Video converter not available - morag_video package not installed")
+            logger.warning(
+                "Video converter not available - morag_video package not installed"
+            )
 
     async def process(self, config: ProcessingConfig) -> ProcessingResult:
         """Process document.
@@ -121,6 +127,7 @@ class DocumentProcessor(BaseProcessor):
 
         try:
             import time
+
             start_time = time.time()
 
             # Get file path from config
@@ -138,7 +145,9 @@ class DocumentProcessor(BaseProcessor):
             # Get converter for format
             converter = self.converters.get(format_type)
             if not converter:
-                raise UnsupportedFormatError(f"No converter found for format '{format_type}'")
+                raise UnsupportedFormatError(
+                    f"No converter found for format '{format_type}'"
+                )
 
             # Get settings and log configuration for debugging
             settings = validate_configuration_and_log()
@@ -146,19 +155,22 @@ class DocumentProcessor(BaseProcessor):
             # Create conversion options
             options = ConversionOptions(
                 format_type=format_type,
-                chunking_strategy=config.chunking_strategy or ChunkingStrategy.PARAGRAPH,
+                chunking_strategy=config.chunking_strategy
+                or ChunkingStrategy.PARAGRAPH,
                 chunk_size=config.chunk_size or settings.default_chunk_size,
                 chunk_overlap=config.chunk_overlap or settings.default_chunk_overlap,
                 extract_metadata=config.extract_metadata or True,
-                progress_callback=getattr(config, 'progress_callback', None),
+                progress_callback=getattr(config, "progress_callback", None),
             )
 
             # Log the actual options being used
-            logger.info("Document processing options:",
-                       chunking_strategy=options.chunking_strategy,
-                       chunk_size=options.chunk_size,
-                       chunk_overlap=options.chunk_overlap,
-                       format_type=options.format_type)
+            logger.info(
+                "Document processing options:",
+                chunking_strategy=options.chunking_strategy,
+                chunk_size=options.chunk_size,
+                chunk_overlap=options.chunk_overlap,
+                format_type=options.format_type,
+            )
 
             # Convert document
             conversion_result = await converter.convert(file_path, options)
@@ -189,7 +201,9 @@ class DocumentProcessor(BaseProcessor):
             )
             raise ProcessingError(f"Failed to process document: {str(e)}")
 
-    async def process_file(self, file_path: Union[str, Path], **kwargs) -> ProcessingResult:
+    async def process_file(
+        self, file_path: Union[str, Path], **kwargs
+    ) -> ProcessingResult:
         """Process document file.
 
         Args:
@@ -204,10 +218,7 @@ class DocumentProcessor(BaseProcessor):
             ValidationError: If input is invalid
         """
         # Create processing config
-        config = ProcessingConfig(
-            file_path=str(file_path),
-            **kwargs
-        )
+        config = ProcessingConfig(file_path=str(file_path), **kwargs)
 
         # Process document
         return await self.process(config)

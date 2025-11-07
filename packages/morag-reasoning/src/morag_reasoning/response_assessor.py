@@ -1,12 +1,13 @@
 """Response quality assessment system for evaluating generated responses."""
 
 import time
-from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 from enum import Enum
-import structlog
+from typing import Any, Dict, List, Optional
 
+import structlog
 from morag_core.config import get_settings
+
 from .citation_integrator import CitedResponse
 from .citation_manager import CitedFact
 
@@ -15,12 +16,14 @@ logger = structlog.get_logger(__name__)
 # Optional imports for enhanced functionality
 try:
     import google.generativeai as genai
+
     GEMINI_AVAILABLE = True
 except ImportError:
     GEMINI_AVAILABLE = False
 
 try:
     from sentence_transformers import SentenceTransformer
+
     SENTENCE_TRANSFORMERS_AVAILABLE = True
 except ImportError:
     SENTENCE_TRANSFORMERS_AVAILABLE = False
@@ -28,6 +31,7 @@ except ImportError:
 
 class QualityDimension(Enum):
     """Quality assessment dimensions."""
+
     COMPLETENESS = "completeness"
     ACCURACY = "accuracy"
     RELEVANCE = "relevance"
@@ -40,6 +44,7 @@ class QualityDimension(Enum):
 @dataclass
 class QualityMetrics:
     """Quality metrics for response assessment."""
+
     completeness: float  # How well the response addresses the query
     accuracy: float  # Factual correctness of statements
     relevance: float  # Alignment with user query intent
@@ -53,6 +58,7 @@ class QualityMetrics:
 @dataclass
 class QualityAssessment:
     """Comprehensive quality assessment of a response."""
+
     metrics: QualityMetrics
     strengths: List[str]
     weaknesses: List[str]
@@ -65,6 +71,7 @@ class QualityAssessment:
 @dataclass
 class AssessmentOptions:
     """Options for response quality assessment."""
+
     enable_llm_assessment: bool = True
     enable_semantic_analysis: bool = True
     enable_citation_verification: bool = True
@@ -77,10 +84,7 @@ class AssessmentOptions:
 class ResponseQualityAssessor:
     """Comprehensive response quality assessment system."""
 
-    def __init__(
-        self,
-        config: Optional[Dict[str, Any]] = None
-    ):
+    def __init__(self, config: Optional[Dict[str, Any]] = None):
         """Initialize the response quality assessor.
 
         Args:
@@ -90,34 +94,40 @@ class ResponseQualityAssessor:
         self.settings = get_settings()
 
         # Assessment parameters
-        self.quality_weights = self.config.get('quality_weights', {
-            'completeness': 0.25,
-            'accuracy': 0.20,
-            'relevance': 0.20,
-            'coherence': 0.15,
-            'citation_quality': 0.10,
-            'readability': 0.05,
-            'consistency': 0.05
-        })
+        self.quality_weights = self.config.get(
+            "quality_weights",
+            {
+                "completeness": 0.25,
+                "accuracy": 0.20,
+                "relevance": 0.20,
+                "coherence": 0.15,
+                "citation_quality": 0.10,
+                "readability": 0.05,
+                "consistency": 0.05,
+            },
+        )
 
         # LLM configuration
-        self.llm_enabled = self.config.get('llm_enabled', True) and GEMINI_AVAILABLE
-        self.model_name = self.config.get('model_name', 'gemini-1.5-flash')
+        self.llm_enabled = self.config.get("llm_enabled", True) and GEMINI_AVAILABLE
+        self.model_name = self.config.get("model_name", "gemini-1.5-flash")
 
         # Semantic analysis configuration
         self.semantic_enabled = (
-            self.config.get('semantic_enabled', True) and
-            SENTENCE_TRANSFORMERS_AVAILABLE
+            self.config.get("semantic_enabled", True)
+            and SENTENCE_TRANSFORMERS_AVAILABLE
         )
         self.embedding_model_name = self.config.get(
-            'embedding_model_name',
-            'all-MiniLM-L6-v2'
+            "embedding_model_name", "all-MiniLM-L6-v2"
         )
 
         # Assessment thresholds
-        self.min_completeness_threshold = self.config.get('min_completeness_threshold', 0.7)
-        self.min_accuracy_threshold = self.config.get('min_accuracy_threshold', 0.8)
-        self.min_citation_quality_threshold = self.config.get('min_citation_quality_threshold', 0.6)
+        self.min_completeness_threshold = self.config.get(
+            "min_completeness_threshold", 0.7
+        )
+        self.min_accuracy_threshold = self.config.get("min_accuracy_threshold", 0.8)
+        self.min_citation_quality_threshold = self.config.get(
+            "min_citation_quality_threshold", 0.6
+        )
 
         # Initialize components
         self._llm_client = None
@@ -127,7 +137,7 @@ class ResponseQualityAssessor:
             "Response quality assessor initialized",
             llm_enabled=self.llm_enabled,
             semantic_enabled=self.semantic_enabled,
-            quality_weights=self.quality_weights
+            quality_weights=self.quality_weights,
         )
 
     async def initialize(self) -> None:
@@ -156,7 +166,7 @@ class ResponseQualityAssessor:
         response: CitedResponse,
         original_query: str,
         facts: Optional[List[CitedFact]] = None,
-        options: Optional[AssessmentOptions] = None
+        options: Optional[AssessmentOptions] = None,
     ) -> QualityAssessment:
         """Assess response quality across multiple dimensions.
 
@@ -178,14 +188,16 @@ class ResponseQualityAssessor:
                 "Starting response quality assessment",
                 response_length=len(response.content),
                 citation_count=response.citation_count,
-                assessment_depth=options.assessment_depth
+                assessment_depth=options.assessment_depth,
             )
 
             # Initialize models if needed
             await self.initialize()
 
             # Assess individual quality dimensions
-            completeness = await self._assess_completeness(response, original_query, options)
+            completeness = await self._assess_completeness(
+                response, original_query, options
+            )
             accuracy = await self._assess_accuracy(response, facts, options)
             relevance = await self._assess_relevance(response, original_query, options)
             coherence = await self._assess_coherence(response, options)
@@ -195,13 +207,13 @@ class ResponseQualityAssessor:
 
             # Calculate overall score
             overall_score = (
-                completeness * self.quality_weights['completeness'] +
-                accuracy * self.quality_weights['accuracy'] +
-                relevance * self.quality_weights['relevance'] +
-                coherence * self.quality_weights['coherence'] +
-                citation_quality * self.quality_weights['citation_quality'] +
-                readability * self.quality_weights['readability'] +
-                consistency * self.quality_weights['consistency']
+                completeness * self.quality_weights["completeness"]
+                + accuracy * self.quality_weights["accuracy"]
+                + relevance * self.quality_weights["relevance"]
+                + coherence * self.quality_weights["coherence"]
+                + citation_quality * self.quality_weights["citation_quality"]
+                + readability * self.quality_weights["readability"]
+                + consistency * self.quality_weights["consistency"]
             )
 
             # Create quality metrics
@@ -213,7 +225,7 @@ class ResponseQualityAssessor:
                 citation_quality=citation_quality,
                 readability=readability,
                 consistency=consistency,
-                overall_score=overall_score
+                overall_score=overall_score,
             )
 
             # Identify strengths and weaknesses
@@ -236,7 +248,7 @@ class ResponseQualityAssessor:
                 overall_score=overall_score,
                 completeness=completeness,
                 accuracy=accuracy,
-                assessment_time=assessment_time
+                assessment_time=assessment_time,
             )
 
             return QualityAssessment(
@@ -247,13 +259,13 @@ class ResponseQualityAssessor:
                 confidence=confidence,
                 assessment_time=assessment_time,
                 metadata={
-                    'assessment_method': 'comprehensive',
-                    'options_used': options.__dict__,
-                    'models_used': {
-                        'llm_enabled': self.llm_enabled,
-                        'semantic_enabled': self.semantic_enabled
-                    }
-                }
+                    "assessment_method": "comprehensive",
+                    "options_used": options.__dict__,
+                    "models_used": {
+                        "llm_enabled": self.llm_enabled,
+                        "semantic_enabled": self.semantic_enabled,
+                    },
+                },
             )
 
         except Exception as e:
@@ -263,23 +275,25 @@ class ResponseQualityAssessor:
             # Return fallback assessment
             return QualityAssessment(
                 metrics=QualityMetrics(
-                    completeness=0.5, accuracy=0.5, relevance=0.5, coherence=0.5,
-                    citation_quality=0.5, readability=0.5, consistency=0.5,
-                    overall_score=0.5
+                    completeness=0.5,
+                    accuracy=0.5,
+                    relevance=0.5,
+                    coherence=0.5,
+                    citation_quality=0.5,
+                    readability=0.5,
+                    consistency=0.5,
+                    overall_score=0.5,
                 ),
                 strengths=[],
                 weaknesses=["Assessment failed"],
                 improvement_suggestions=[],
                 confidence=0.0,
                 assessment_time=assessment_time,
-                metadata={'error': str(e)}
+                metadata={"error": str(e)},
             )
 
     async def _assess_completeness(
-        self,
-        response: CitedResponse,
-        query: str,
-        options: AssessmentOptions
+        self, response: CitedResponse, query: str, options: AssessmentOptions
     ) -> float:
         """Assess how completely the response addresses the query."""
         # Simple heuristic: longer responses are generally more complete
@@ -293,7 +307,7 @@ class ResponseQualityAssessor:
         citation_boost = min(0.2, response.citation_count * 0.05)
 
         # Check for key question words being addressed
-        question_words = ['what', 'who', 'when', 'where', 'why', 'how']
+        question_words = ["what", "who", "when", "where", "why", "how"]
         query_lower = query.lower()
         response_lower = response.content.lower()
 
@@ -301,10 +315,12 @@ class ResponseQualityAssessor:
         for word in question_words:
             if word in query_lower:
                 # Simple check if response contains related content
-                if any(related in response_lower for related in [word, word + 's']):
+                if any(related in response_lower for related in [word, word + "s"]):
                     addressed_questions += 1
 
-        question_coverage = addressed_questions / max(1, len([w for w in question_words if w in query_lower]))
+        question_coverage = addressed_questions / max(
+            1, len([w for w in question_words if w in query_lower])
+        )
 
         return min(1.0, base_score + citation_boost + (question_coverage * 0.3))
 
@@ -312,7 +328,7 @@ class ResponseQualityAssessor:
         self,
         response: CitedResponse,
         facts: List[CitedFact],
-        options: AssessmentOptions
+        options: AssessmentOptions,
     ) -> float:
         """Assess factual accuracy of the response."""
         if not facts:
@@ -331,10 +347,7 @@ class ResponseQualityAssessor:
         return min(1.0, avg_fact_confidence + citation_verification_boost)
 
     async def _assess_relevance(
-        self,
-        response: CitedResponse,
-        query: str,
-        options: AssessmentOptions
+        self, response: CitedResponse, query: str, options: AssessmentOptions
     ) -> float:
         """Assess relevance of response to the original query."""
         if self.semantic_enabled and self._embedding_model:
@@ -344,7 +357,10 @@ class ResponseQualityAssessor:
                 response_embedding = self._embedding_model.encode([response.content])
 
                 from sklearn.metrics.pairwise import cosine_similarity
-                similarity = cosine_similarity(query_embedding, response_embedding)[0][0]
+
+                similarity = cosine_similarity(query_embedding, response_embedding)[0][
+                    0
+                ]
                 return max(0.0, min(1.0, similarity))
             except Exception as e:
                 logger.warning(f"Semantic relevance assessment failed: {e}")
@@ -360,9 +376,7 @@ class ResponseQualityAssessor:
         return min(1.0, overlap / len(query_words))
 
     async def _assess_coherence(
-        self,
-        response: CitedResponse,
-        options: AssessmentOptions
+        self, response: CitedResponse, options: AssessmentOptions
     ) -> float:
         """Assess logical flow and structure of the response."""
         content = response.content
@@ -371,17 +385,24 @@ class ResponseQualityAssessor:
         structure_score = 0.0
 
         # Presence of paragraphs
-        paragraphs = content.split('\n\n')
+        paragraphs = content.split("\n\n")
         if len(paragraphs) > 1:
             structure_score += 0.3
 
         # Presence of transitions
-        transitions = ['however', 'therefore', 'furthermore', 'moreover', 'additionally', 'consequently']
+        transitions = [
+            "however",
+            "therefore",
+            "furthermore",
+            "moreover",
+            "additionally",
+            "consequently",
+        ]
         transition_count = sum(1 for word in transitions if word in content.lower())
         structure_score += min(0.3, transition_count * 0.1)
 
         # Sentence length variation (good coherence has varied sentence lengths)
-        sentences = content.split('.')
+        sentences = content.split(".")
         if len(sentences) > 1:
             sentence_lengths = [len(s.split()) for s in sentences if s.strip()]
             if sentence_lengths:
@@ -391,9 +412,7 @@ class ResponseQualityAssessor:
         return min(1.0, structure_score)
 
     async def _assess_citation_quality(
-        self,
-        response: CitedResponse,
-        options: AssessmentOptions
+        self, response: CitedResponse, options: AssessmentOptions
     ) -> float:
         """Assess quality and accuracy of citations."""
         if response.citation_count == 0:
@@ -421,16 +440,14 @@ class ResponseQualityAssessor:
         return min(1.0, quality_score)
 
     async def _assess_readability(
-        self,
-        response: CitedResponse,
-        options: AssessmentOptions
+        self, response: CitedResponse, options: AssessmentOptions
     ) -> float:
         """Assess readability and clarity of the response."""
         content = response.content
 
         # Simple readability metrics
         words = content.split()
-        sentences = content.split('.')
+        sentences = content.split(".")
 
         if not words or not sentences:
             return 0.5
@@ -456,9 +473,7 @@ class ResponseQualityAssessor:
         return (sentence_score + word_score) / 2
 
     async def _assess_consistency(
-        self,
-        response: CitedResponse,
-        options: AssessmentOptions
+        self, response: CitedResponse, options: AssessmentOptions
     ) -> float:
         """Assess internal logical consistency of the response."""
         # Simple consistency check: look for contradictory statements
@@ -466,11 +481,11 @@ class ResponseQualityAssessor:
 
         # Check for obvious contradictions
         contradiction_patterns = [
-            ('is', 'is not'),
-            ('can', 'cannot'),
-            ('will', 'will not'),
-            ('always', 'never'),
-            ('all', 'none')
+            ("is", "is not"),
+            ("can", "cannot"),
+            ("will", "will not"),
+            ("always", "never"),
+            ("all", "none"),
         ]
 
         contradiction_count = 0
@@ -484,8 +499,7 @@ class ResponseQualityAssessor:
         return max(0.0, consistency_score)
 
     def _identify_strengths_weaknesses(
-        self,
-        metrics: QualityMetrics
+        self, metrics: QualityMetrics
     ) -> tuple[List[str], List[str]]:
         """Identify strengths and weaknesses based on metrics."""
         strengths = []
@@ -520,16 +534,15 @@ class ResponseQualityAssessor:
         return strengths, weaknesses
 
     async def _generate_improvement_suggestions(
-        self,
-        metrics: QualityMetrics,
-        response: CitedResponse,
-        query: str
+        self, metrics: QualityMetrics, response: CitedResponse, query: str
     ) -> List[str]:
         """Generate specific improvement suggestions."""
         suggestions = []
 
         if metrics.completeness < self.min_completeness_threshold:
-            suggestions.append("Provide more comprehensive coverage of all aspects of the query")
+            suggestions.append(
+                "Provide more comprehensive coverage of all aspects of the query"
+            )
 
         if metrics.accuracy < self.min_accuracy_threshold:
             suggestions.append("Verify facts and improve source quality")
@@ -538,7 +551,9 @@ class ResponseQualityAssessor:
             suggestions.append("Add more citations and improve source references")
 
         if metrics.coherence < 0.7:
-            suggestions.append("Improve logical flow and structure with better transitions")
+            suggestions.append(
+                "Improve logical flow and structure with better transitions"
+            )
 
         if metrics.readability < 0.7:
             suggestions.append("Simplify language and improve sentence structure")
@@ -549,9 +564,7 @@ class ResponseQualityAssessor:
         return suggestions
 
     def _calculate_assessment_confidence(
-        self,
-        metrics: QualityMetrics,
-        options: AssessmentOptions
+        self, metrics: QualityMetrics, options: AssessmentOptions
     ) -> float:
         """Calculate confidence in the assessment."""
         confidence = 0.7  # Base confidence

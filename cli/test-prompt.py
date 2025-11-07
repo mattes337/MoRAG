@@ -15,15 +15,15 @@ Key options:
   --verbose            Show detailed LLM interactions
 """
 
-import sys
-import os
+import argparse
 import asyncio
 import json
+import os
+import sys
 import time
-from pathlib import Path
-from typing import Optional, List, Dict, Any
-import argparse
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 # Add the project root to the path
 project_root = Path(__file__).parent.parent
@@ -31,27 +31,48 @@ sys.path.insert(0, str(project_root))
 
 # Load environment variables from the project root
 from dotenv import load_dotenv
-env_path = project_root / '.env'
+
+env_path = project_root / ".env"
 load_dotenv(env_path)
 
 # Import MoRAG components
 try:
+    from morag.database_factory import (
+        get_default_neo4j_storage,
+        get_default_qdrant_storage,
+    )
+    from morag.models.enhanced_query import (
+        EnhancedQueryRequest,
+        EntityQueryRequest,
+        ExpansionStrategy,
+        FusionStrategy,
+        GraphTraversalRequest,
+        QueryType,
+    )
     from morag_graph import (
-        Neo4jStorage, QdrantStorage, Neo4jConfig, QdrantConfig,
-        HybridRetrievalCoordinator, ContextExpansionEngine,
-        QueryEntityExtractor, GraphCRUD, GraphTraversal, GraphAnalytics
+        ContextExpansionEngine,
+        GraphAnalytics,
+        GraphCRUD,
+        GraphTraversal,
+        HybridRetrievalCoordinator,
+        Neo4jConfig,
+        Neo4jStorage,
+        QdrantConfig,
+        QdrantStorage,
+        QueryEntityExtractor,
     )
     from morag_graph.operations import GraphPath
-    from morag.models.enhanced_query import (
-        QueryType, ExpansionStrategy, FusionStrategy,
-        EnhancedQueryRequest, EntityQueryRequest, GraphTraversalRequest
-    )
-    from morag.database_factory import get_default_neo4j_storage, get_default_qdrant_storage
     from morag_reasoning import (
-        ReasoningStrategy, PathSelectionAgent, ReasoningPathFinder,
-        IterativeRetriever, LLMClient, LLMConfig,
-        RecursiveFactRetrievalService, RecursiveFactRetrievalRequest
+        IterativeRetriever,
+        LLMClient,
+        LLMConfig,
+        PathSelectionAgent,
+        ReasoningPathFinder,
+        ReasoningStrategy,
+        RecursiveFactRetrievalRequest,
+        RecursiveFactRetrievalService,
     )
+
     COMPONENTS_AVAILABLE = True
 except ImportError as e:
     print(f"[FAIL] Error importing MoRAG components: {e}")
@@ -74,7 +95,7 @@ class PromptLogger:
             "type": "prompt",
             "timestamp": datetime.now().isoformat(),
             "context": context,
-            "content": prompt
+            "content": prompt,
         }
         self.interactions.append(interaction)
 
@@ -91,7 +112,7 @@ class PromptLogger:
             "type": "response",
             "timestamp": datetime.now().isoformat(),
             "context": context,
-            "content": response
+            "content": response,
         }
         self.interactions.append(interaction)
 
@@ -117,7 +138,7 @@ class PromptLogger:
             "total_interactions": len(self.interactions),
             "total_prompts": len(prompts),
             "total_responses": len(responses),
-            "interactions": self.interactions
+            "interactions": self.interactions,
         }
 
 
@@ -134,21 +155,25 @@ class LoggingLLMClient(LLMClient):
         messages: List[Dict[str, str]] = None,
         max_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
-        context: str = "general"
+        context: str = "general",
     ) -> str:
         """Generate response with logging."""
         # Log the prompt
         if prompt:
             self.prompt_logger.log_prompt(prompt, context)
         elif messages:
-            formatted_prompt = "\n".join([f"{m['role']}: {m['content']}" for m in messages])
+            formatted_prompt = "\n".join(
+                [f"{m['role']}: {m['content']}" for m in messages]
+            )
             self.prompt_logger.log_prompt(formatted_prompt, context)
 
         # Call the parent method
         if prompt:
             response = await super().generate(prompt, max_tokens, temperature)
         else:
-            response = await super().generate_from_messages(messages, max_tokens, temperature)
+            response = await super().generate_from_messages(
+                messages, max_tokens, temperature
+            )
 
         # Log the response
         self.prompt_logger.log_response(response, context)
@@ -156,7 +181,9 @@ class LoggingLLMClient(LLMClient):
         return response
 
 
-async def test_database_connections(args) -> tuple[Optional[Neo4jStorage], Optional[QdrantStorage]]:
+async def test_database_connections(
+    args,
+) -> tuple[Optional[Neo4jStorage], Optional[QdrantStorage]]:
     """Test and establish database connections."""
     neo4j_storage = None
     qdrant_storage = None
@@ -191,7 +218,7 @@ async def execute_prompt_with_fact_retrieval(
     neo4j_storage: Optional[Neo4jStorage],
     qdrant_storage: Optional[QdrantStorage],
     args,
-    logger: PromptLogger
+    logger: PromptLogger,
 ) -> Dict[str, Any]:
     """Execute prompt using the new fact-based retrieval system."""
 
@@ -203,7 +230,7 @@ async def execute_prompt_with_fact_retrieval(
         "performance": {},
         "facts": [],
         "traversal_steps": [],
-        "metadata": {}
+        "metadata": {},
     }
 
     start_time = time.time()
@@ -215,20 +242,23 @@ async def execute_prompt_with_fact_retrieval(
         api_key=os.getenv("GEMINI_API_KEY"),
         model=model,
         temperature=0.1,
-        max_tokens=args.max_tokens
+        max_tokens=args.max_tokens,
     )
 
     llm_client = LoggingLLMClient(llm_config, logger)
 
     try:
-        logger.log_step("Fact-Based Retrieval", "Using RecursiveFactRetrievalService for comprehensive fact extraction")
+        logger.log_step(
+            "Fact-Based Retrieval",
+            "Using RecursiveFactRetrievalService for comprehensive fact extraction",
+        )
 
         # Create fact retrieval service
         fact_service = RecursiveFactRetrievalService(
             llm_client=llm_client,
             neo4j_storage=neo4j_storage,
             qdrant_storage=qdrant_storage,
-            stronger_llm_client=llm_client  # Use same client for now
+            stronger_llm_client=llm_client,  # Use same client for now
         )
 
         # Create fact retrieval request
@@ -241,7 +271,7 @@ async def execute_prompt_with_fact_retrieval(
             max_total_facts=50,
             facts_only=False,  # Generate final answer
             skip_fact_evaluation=False,
-            language="en"
+            language="en",
         )
 
         # Execute fact retrieval
@@ -257,7 +287,7 @@ async def execute_prompt_with_fact_retrieval(
                 "score": fact.score,
                 "final_score": fact.final_decayed_score,
                 "source_description": fact.source_description,
-                "metadata": fact.source_metadata
+                "metadata": fact.source_metadata,
             }
             for fact in fact_response.final_facts
         ]
@@ -269,7 +299,7 @@ async def execute_prompt_with_fact_retrieval(
                 "depth": step.depth,
                 "facts_extracted": step.facts_extracted,
                 "decision": step.next_nodes_decision,
-                "reasoning": step.reasoning
+                "reasoning": step.reasoning,
             }
             for step in fact_response.traversal_steps
         ]
@@ -285,7 +315,7 @@ async def execute_prompt_with_fact_retrieval(
             "confidence_score": fact_response.confidence_score,
             "gta_llm_calls": fact_response.gta_llm_calls,
             "fca_llm_calls": fact_response.fca_llm_calls,
-            "final_llm_calls": fact_response.final_llm_calls
+            "final_llm_calls": fact_response.final_llm_calls,
         }
 
         # Calculate performance metrics
@@ -293,7 +323,9 @@ async def execute_prompt_with_fact_retrieval(
         results["performance"] = {
             "total_time_seconds": end_time - start_time,
             "processing_time_ms": fact_response.processing_time_ms,
-            "total_llm_calls": fact_response.gta_llm_calls + fact_response.fca_llm_calls + fact_response.final_llm_calls
+            "total_llm_calls": fact_response.gta_llm_calls
+            + fact_response.fca_llm_calls
+            + fact_response.final_llm_calls,
         }
 
         return results
@@ -310,7 +342,7 @@ async def execute_prompt_with_reasoning(
     neo4j_storage: Optional[Neo4jStorage],
     qdrant_storage: Optional[QdrantStorage],
     args,
-    logger: PromptLogger
+    logger: PromptLogger,
 ) -> Dict[str, Any]:
     """Execute prompt with multi-hop reasoning and RAG."""
 
@@ -324,8 +356,8 @@ async def execute_prompt_with_reasoning(
             "vector_chunks": [],
             "graph_entities": [],
             "graph_relations": [],
-            "reasoning_paths": []
-        }
+            "reasoning_paths": [],
+        },
     }
 
     start_time = time.time()
@@ -337,14 +369,17 @@ async def execute_prompt_with_reasoning(
         api_key=os.getenv("GEMINI_API_KEY"),
         model=model,
         temperature=0.1,
-        max_tokens=args.max_tokens
+        max_tokens=args.max_tokens,
     )
 
     llm_client = LoggingLLMClient(llm_config, logger)
 
     try:
         # Step 1: Initial query analysis
-        logger.log_step("Step 1: Query Analysis", "Analyzing the prompt to understand intent and extract entities")
+        logger.log_step(
+            "Step 1: Query Analysis",
+            "Analyzing the prompt to understand intent and extract entities",
+        )
 
         analysis_prompt = f"""
 Analyze this query directly without preambles. Provide:
@@ -363,7 +398,10 @@ Provide a structured analysis. Be direct and concise.
 
         # Step 2: Entity extraction if Neo4j is available
         if neo4j_storage and args.enable_multi_hop:
-            logger.log_step("Step 2: Entity Extraction", "Extracting entities from the query for graph traversal")
+            logger.log_step(
+                "Step 2: Entity Extraction",
+                "Extracting entities from the query for graph traversal",
+            )
 
             entity_prompt = f"""
 Extract 2-5 key entities for graph traversal from this query. No preambles or explanations.
@@ -373,9 +411,15 @@ Query: "{prompt}"
 Return only the entity names, one per line.
 """
 
-            entity_response = await llm_client.generate(entity_prompt, context="entity_extraction")
-            start_entities = [e.strip() for e in entity_response.split('\n') if e.strip()]
-            results["steps"].append({"step": "entity_extraction", "result": start_entities})
+            entity_response = await llm_client.generate(
+                entity_prompt, context="entity_extraction"
+            )
+            start_entities = [
+                e.strip() for e in entity_response.split("\n") if e.strip()
+            ]
+            results["steps"].append(
+                {"step": "entity_extraction", "result": start_entities}
+            )
 
             # Step 3: Multi-hop reasoning and graph traversal
             graph_entities = []
@@ -383,7 +427,10 @@ Return only the entity names, one per line.
             reasoning_paths = []
 
             if start_entities:
-                logger.log_step("Step 3: Graph Traversal", f"Finding entities and relations from: {start_entities}")
+                logger.log_step(
+                    "Step 3: Graph Traversal",
+                    f"Finding entities and relations from: {start_entities}",
+                )
 
                 try:
                     # Real Neo4j entity search and traversal
@@ -395,14 +442,18 @@ Return only the entity names, one per line.
                         RETURN e.name as name, labels(e) as types, e.description as description
                         LIMIT 5
                         """
-                        entity_results = await neo4j_storage._execute_query(entity_query, {"entity_name": entity_name})
+                        entity_results = await neo4j_storage._execute_query(
+                            entity_query, {"entity_name": entity_name}
+                        )
 
                         for record in entity_results:
-                            graph_entities.append({
-                                "name": record["name"],
-                                "types": record["types"],
-                                "description": record.get("description", "")
-                            })
+                            graph_entities.append(
+                                {
+                                    "name": record["name"],
+                                    "types": record["types"],
+                                    "description": record.get("description", ""),
+                                }
+                            )
 
                         # Find relations from these entities
                         relation_query = """
@@ -411,20 +462,27 @@ Return only the entity names, one per line.
                         RETURN e1.name as source, type(r) as relation_type, e2.name as target, r.description as description
                         LIMIT 10
                         """
-                        relation_results = await neo4j_storage._execute_query(relation_query, {"entity_name": entity_name})
+                        relation_results = await neo4j_storage._execute_query(
+                            relation_query, {"entity_name": entity_name}
+                        )
 
                         for record in relation_results:
-                            graph_relations.append({
-                                "source": record["source"],
-                                "relation": record["relation_type"],
-                                "target": record["target"],
-                                "description": record.get("description", "")
-                            })
+                            graph_relations.append(
+                                {
+                                    "source": record["source"],
+                                    "relation": record["relation_type"],
+                                    "target": record["target"],
+                                    "description": record.get("description", ""),
+                                }
+                            )
 
                     results["context_data"]["graph_entities"] = graph_entities
                     results["context_data"]["graph_relations"] = graph_relations
 
-                    logger.log_step("Graph Traversal", f"Found {len(graph_entities)} entities and {len(graph_relations)} relations")
+                    logger.log_step(
+                        "Graph Traversal",
+                        f"Found {len(graph_entities)} entities and {len(graph_relations)} relations",
+                    )
 
                     # Multi-hop reasoning with actual graph data
                     if graph_entities or graph_relations:
@@ -442,25 +500,30 @@ Return only the entity names, one per line.
                         Identify key reasoning paths and connections that help answer the query. Be direct and concise.
                         """
 
-                        reasoning_analysis = await llm_client.generate(reasoning_prompt, context="multi_hop_reasoning")
+                        reasoning_analysis = await llm_client.generate(
+                            reasoning_prompt, context="multi_hop_reasoning"
+                        )
                         reasoning_paths.append(reasoning_analysis)
                         results["context_data"]["reasoning_paths"] = reasoning_paths
 
-                        results["steps"].append({
-                            "step": "multi_hop_reasoning",
-                            "result": f"Analyzed {len(graph_entities)} entities and {len(graph_relations)} relations"
-                        })
+                        results["steps"].append(
+                            {
+                                "step": "multi_hop_reasoning",
+                                "result": f"Analyzed {len(graph_entities)} entities and {len(graph_relations)} relations",
+                            }
+                        )
 
                 except Exception as e:
                     logger.log_step("Graph Traversal Failed", str(e))
                     # Fallback to simple reasoning without graph data
 
-
-
         # Step 4: Vector search if Qdrant is available
         vector_chunks = []
         if qdrant_storage:
-            logger.log_step("Step 4: Vector Search", "Searching for relevant documents using vector similarity")
+            logger.log_step(
+                "Step 4: Vector Search",
+                "Searching for relevant documents using vector similarity",
+            )
 
             try:
                 vector_results = await qdrant_storage.search_entities(prompt, limit=5)
@@ -468,43 +531,58 @@ Return only the entity names, one per line.
                     {
                         "content": result.get("content", ""),
                         "metadata": result.get("metadata", {}),
-                        "score": result.get("score", 0.0)
+                        "score": result.get("score", 0.0),
                     }
                     for result in vector_results
                 ]
                 results["context_data"]["vector_chunks"] = vector_chunks
-                results["steps"].append({
-                    "step": "vector_search",
-                    "result": f"Found {len(vector_results)} relevant documents"
-                })
-                logger.log_step("Vector Search", f"Retrieved {len(vector_chunks)} chunks")
+                results["steps"].append(
+                    {
+                        "step": "vector_search",
+                        "result": f"Found {len(vector_results)} relevant documents",
+                    }
+                )
+                logger.log_step(
+                    "Vector Search", f"Retrieved {len(vector_chunks)} chunks"
+                )
             except Exception as e:
                 logger.log_step("Vector Search Failed", str(e))
 
         # Step 5: Final synthesis with actual context
-        logger.log_step("Step 5: Final Synthesis", "Combining all retrieved information to generate final response")
+        logger.log_step(
+            "Step 5: Final Synthesis",
+            "Combining all retrieved information to generate final response",
+        )
 
         # Prepare context sections
         vector_context = ""
         if vector_chunks:
-            vector_context = "\n\nRELEVANT DOCUMENT CHUNKS:\n" + "\n".join([
-                f"- {chunk['content'][:200]}..." if len(chunk['content']) > 200 else f"- {chunk['content']}"
-                for chunk in vector_chunks[:5]
-            ])
+            vector_context = "\n\nRELEVANT DOCUMENT CHUNKS:\n" + "\n".join(
+                [
+                    f"- {chunk['content'][:200]}..."
+                    if len(chunk["content"]) > 200
+                    else f"- {chunk['content']}"
+                    for chunk in vector_chunks[:5]
+                ]
+            )
 
         graph_context = ""
         if graph_entities or graph_relations:
             graph_context = "\n\nGRAPH KNOWLEDGE:\n"
             if graph_entities:
-                graph_context += "Entities:\n" + "\n".join([
-                    f"- {e['name']} ({', '.join(e['types'])}): {e['description']}"
-                    for e in graph_entities[:10]
-                ])
+                graph_context += "Entities:\n" + "\n".join(
+                    [
+                        f"- {e['name']} ({', '.join(e['types'])}): {e['description']}"
+                        for e in graph_entities[:10]
+                    ]
+                )
             if graph_relations:
-                graph_context += "\nRelations:\n" + "\n".join([
-                    f"- {r['source']} --{r['relation']}--> {r['target']}: {r['description']}"
-                    for r in graph_relations[:10]
-                ])
+                graph_context += "\nRelations:\n" + "\n".join(
+                    [
+                        f"- {r['source']} --{r['relation']}--> {r['target']}: {r['description']}"
+                        for r in graph_relations[:10]
+                    ]
+                )
 
         reasoning_context = ""
         if reasoning_paths:
@@ -523,14 +601,16 @@ Use the following information to provide a well-reasoned, comprehensive response
 Synthesize all available information to provide a detailed, accurate response. Be direct and start immediately with the main content.
 """
 
-        final_response = await llm_client.generate(synthesis_prompt, context="final_synthesis")
+        final_response = await llm_client.generate(
+            synthesis_prompt, context="final_synthesis"
+        )
         results["final_result"] = final_response
 
         # Performance metrics
         end_time = time.time()
         results["performance"] = {
             "total_time_seconds": end_time - start_time,
-            "llm_interactions": logger.step_counter
+            "llm_interactions": logger.step_counter,
         }
 
         return results
@@ -552,23 +632,44 @@ async def main():
   python test-prompt.py --neo4j --qdrant --use-fact-retrieval "What are the latest developments in machine learning?"
   python test-prompt.py --qdrant --verbose --max-tokens 12000 "What are the latest developments in machine learning?"
   python test-prompt.py --neo4j --qdrant --model gemini-1.5-pro "Analyze complex relationships in the data"
-"""
+""",
     )
 
     # Database selection
-    parser.add_argument("--neo4j", action="store_true", help="Use Neo4j for graph operations")
-    parser.add_argument("--qdrant", action="store_true", help="Use Qdrant for vector search")
+    parser.add_argument(
+        "--neo4j", action="store_true", help="Use Neo4j for graph operations"
+    )
+    parser.add_argument(
+        "--qdrant", action="store_true", help="Use Qdrant for vector search"
+    )
 
     # Reasoning options
-    parser.add_argument("--enable-multi-hop", action="store_true", help="Enable multi-hop reasoning")
-    parser.add_argument("--use-fact-retrieval", action="store_true", help="Use new fact-based retrieval system")
+    parser.add_argument(
+        "--enable-multi-hop", action="store_true", help="Enable multi-hop reasoning"
+    )
+    parser.add_argument(
+        "--use-fact-retrieval",
+        action="store_true",
+        help="Use new fact-based retrieval system",
+    )
 
     # LLM options
-    parser.add_argument("--model", type=str, help="LLM model to use (default: from MORAG_GEMINI_MODEL env var or gemini-2.5-flash)")
-    parser.add_argument("--max-tokens", type=int, default=8000, help="Maximum tokens for LLM responses (default: 8000)")
+    parser.add_argument(
+        "--model",
+        type=str,
+        help="LLM model to use (default: from MORAG_GEMINI_MODEL env var or gemini-2.5-flash)",
+    )
+    parser.add_argument(
+        "--max-tokens",
+        type=int,
+        default=8000,
+        help="Maximum tokens for LLM responses (default: 8000)",
+    )
 
     # Output options
-    parser.add_argument("--verbose", action="store_true", help="Show detailed LLM interactions")
+    parser.add_argument(
+        "--verbose", action="store_true", help="Show detailed LLM interactions"
+    )
     parser.add_argument("--output", help="Save results to JSON file")
 
     # The prompt
@@ -577,7 +678,9 @@ async def main():
     args = parser.parse_args()
 
     if not COMPONENTS_AVAILABLE:
-        print("[FAIL] MoRAG components not available. Please install required packages.")
+        print(
+            "[FAIL] MoRAG components not available. Please install required packages."
+        )
         return 1
 
     if not args.neo4j and not args.qdrant:
@@ -588,7 +691,9 @@ async def main():
     print(f"📊 Databases: Neo4j={args.neo4j}, Qdrant={args.qdrant}")
     print(f"🧠 Multi-hop reasoning: {args.enable_multi_hop}")
     print(f"🔬 Fact-based retrieval: {args.use_fact_retrieval}")
-    print(f"🤖 Model: {args.model or os.getenv('MORAG_GEMINI_MODEL', 'gemini-2.5-flash')}")
+    print(
+        f"🤖 Model: {args.model or os.getenv('MORAG_GEMINI_MODEL', 'gemini-2.5-flash')}"
+    )
     print(f"🎯 Max tokens: {args.max_tokens}")
 
     # Initialize logger
@@ -605,7 +710,9 @@ async def main():
     try:
         if args.use_fact_retrieval:
             if not neo4j_storage or not qdrant_storage:
-                print("[FAIL] Fact-based retrieval requires both Neo4j and Qdrant connections")
+                print(
+                    "[FAIL] Fact-based retrieval requires both Neo4j and Qdrant connections"
+                )
                 return 1
             results = await execute_prompt_with_fact_retrieval(
                 args.prompt, neo4j_storage, qdrant_storage, args, logger
@@ -628,10 +735,12 @@ async def main():
         summary = logger.get_summary()
         print(f"\n📊 EXECUTION SUMMARY")
         print(f"   Total LLM interactions: {summary['total_prompts']}")
-        print(f"   Processing time: {results.get('performance', {}).get('total_time_seconds', 0):.2f}s")
+        print(
+            f"   Processing time: {results.get('performance', {}).get('total_time_seconds', 0):.2f}s"
+        )
 
         if args.use_fact_retrieval:
-            metadata = results.get('metadata', {})
+            metadata = results.get("metadata", {})
             print(f"   Method: Fact-based retrieval")
             print(f"   Facts extracted: {len(results.get('facts', []))}")
             print(f"   Nodes explored: {metadata.get('total_nodes_explored', 0)}")
@@ -646,11 +755,8 @@ async def main():
 
         # Save results if requested
         if args.output:
-            output_data = {
-                "results": results,
-                "llm_interactions": summary
-            }
-            with open(args.output, 'w', encoding='utf-8') as f:
+            output_data = {"results": results, "llm_interactions": summary}
+            with open(args.output, "w", encoding="utf-8") as f:
                 json.dump(output_data, f, indent=2, ensure_ascii=False)
             print(f"💾 Results saved to: {args.output}")
 

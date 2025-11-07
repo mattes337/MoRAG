@@ -8,7 +8,7 @@ import sys
 from unittest.mock import patch
 
 # Add the project root to the path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 
 def test_storage_component():
@@ -16,7 +16,7 @@ def test_storage_component():
     print("Testing QdrantVectorStorage component...")
 
     try:
-        sys.path.insert(0, 'packages/morag-services/src')
+        sys.path.insert(0, "packages/morag-services/src")
         from morag_services.storage import QdrantVectorStorage
 
         # Test 1: Should fail with None
@@ -66,13 +66,13 @@ def test_services_component():
     print("Testing MoRAGServices component...")
 
     try:
-        sys.path.insert(0, 'packages/morag-services/src')
+        sys.path.insert(0, "packages/morag-services/src")
         from morag_services.services import MoRAGServices
 
         # Test 1: Should fail without environment variable
         with patch.dict(os.environ, {}, clear=True):
-            if 'QDRANT_COLLECTION_NAME' in os.environ:
-                del os.environ['QDRANT_COLLECTION_NAME']
+            if "QDRANT_COLLECTION_NAME" in os.environ:
+                del os.environ["QDRANT_COLLECTION_NAME"]
 
             try:
                 services = MoRAGServices()
@@ -87,20 +87,24 @@ def test_services_component():
                     return False
 
         # Test 2: Should work with environment variable
-        with patch.dict(os.environ, {'QDRANT_COLLECTION_NAME': 'test_collection'}):
+        with patch.dict(os.environ, {"QDRANT_COLLECTION_NAME": "test_collection"}):
             try:
                 services = MoRAGServices()
                 # Mock the actual storage to avoid connection issues
-                with patch('morag_services.services.QdrantVectorStorage') as mock_storage:
+                with patch(
+                    "morag_services.services.QdrantVectorStorage"
+                ) as mock_storage:
                     services._initialize_search_services()
                     # Verify that QdrantVectorStorage was called with correct collection name
                     mock_storage.assert_called_once()
                     call_kwargs = mock_storage.call_args[1]
-                    if call_kwargs['collection_name'] == 'test_collection':
+                    if call_kwargs["collection_name"] == "test_collection":
                         print("✅ Correctly passed collection name to storage")
                         return True
                     else:
-                        print(f"❌ Wrong collection name passed: {call_kwargs['collection_name']}")
+                        print(
+                            f"❌ Wrong collection name passed: {call_kwargs['collection_name']}"
+                        )
                         return False
             except Exception as e:
                 print(f"❌ Unexpected error with valid environment variable: {e}")
@@ -116,22 +120,24 @@ def test_ingest_validation():
     print("Testing ingest task validation...")
 
     try:
-        sys.path.insert(0, 'packages/morag/src')
+        sys.path.insert(0, "packages/morag/src")
 
         # Test the validation logic directly
         def validate_ingest_environment():
-            qdrant_host = os.getenv('QDRANT_HOST', 'localhost')
-            qdrant_port = int(os.getenv('QDRANT_PORT', '6333'))
-            qdrant_api_key = os.getenv('QDRANT_API_KEY')
-            collection_name_env = os.getenv('QDRANT_COLLECTION_NAME')
+            qdrant_host = os.getenv("QDRANT_HOST", "localhost")
+            qdrant_port = int(os.getenv("QDRANT_PORT", "6333"))
+            qdrant_api_key = os.getenv("QDRANT_API_KEY")
+            collection_name_env = os.getenv("QDRANT_COLLECTION_NAME")
             if not collection_name_env:
-                raise ValueError("QDRANT_COLLECTION_NAME environment variable is required")
+                raise ValueError(
+                    "QDRANT_COLLECTION_NAME environment variable is required"
+                )
             return collection_name_env
 
         # Test 1: Should fail without environment variable
         with patch.dict(os.environ, {}, clear=True):
-            if 'QDRANT_COLLECTION_NAME' in os.environ:
-                del os.environ['QDRANT_COLLECTION_NAME']
+            if "QDRANT_COLLECTION_NAME" in os.environ:
+                del os.environ["QDRANT_COLLECTION_NAME"]
 
             try:
                 validate_ingest_environment()
@@ -145,10 +151,10 @@ def test_ingest_validation():
                     return False
 
         # Test 2: Should work with environment variable
-        with patch.dict(os.environ, {'QDRANT_COLLECTION_NAME': 'test_collection'}):
+        with patch.dict(os.environ, {"QDRANT_COLLECTION_NAME": "test_collection"}):
             try:
                 result = validate_ingest_environment()
-                if result == 'test_collection':
+                if result == "test_collection":
                     print("✅ Correctly accepted valid environment variable")
                     return True
                 else:
@@ -168,11 +174,7 @@ def main():
     print("Testing component integration with unified collection name...")
     print("=" * 60)
 
-    tests = [
-        test_storage_component,
-        test_services_component,
-        test_ingest_validation
-    ]
+    tests = [test_storage_component, test_services_component, test_ingest_validation]
 
     passed = 0
     failed = 0

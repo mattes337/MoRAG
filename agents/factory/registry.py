@@ -1,8 +1,9 @@
 """Agent registry for managing agent instances."""
 
-from typing import Dict, Any, Optional, Type
 import threading
 import weakref
+from typing import Any, Dict, Optional, Type
+
 import structlog
 
 from ..base.agent import BaseAgent
@@ -29,7 +30,7 @@ class AgentRegistry:
 
     def __init__(self):
         """Initialize the registry."""
-        if hasattr(self, '_initialized'):
+        if hasattr(self, "_initialized"):
             return
 
         self._initialized = True
@@ -46,16 +47,22 @@ class AgentRegistry:
         try:
             # Import and register extraction agents
             from ..extraction import (
-                FactExtractionAgent,
                 EntityExtractionAgent,
-                RelationExtractionAgent,
+                FactExtractionAgent,
                 KeywordExtractionAgent,
+                RelationExtractionAgent,
             )
 
             self.factory.register_agent_class("fact_extraction", FactExtractionAgent)
-            self.factory.register_agent_class("entity_extraction", EntityExtractionAgent)
-            self.factory.register_agent_class("relation_extraction", RelationExtractionAgent)
-            self.factory.register_agent_class("keyword_extraction", KeywordExtractionAgent)
+            self.factory.register_agent_class(
+                "entity_extraction", EntityExtractionAgent
+            )
+            self.factory.register_agent_class(
+                "relation_extraction", RelationExtractionAgent
+            )
+            self.factory.register_agent_class(
+                "keyword_extraction", KeywordExtractionAgent
+            )
 
         except ImportError:
             self.logger.warning("Could not import extraction agents")
@@ -63,15 +70,17 @@ class AgentRegistry:
         try:
             # Import and register analysis agents
             from ..analysis import (
-                QueryAnalysisAgent,
                 ContentAnalysisAgent,
+                QueryAnalysisAgent,
                 SentimentAnalysisAgent,
                 TopicAnalysisAgent,
             )
 
             self.factory.register_agent_class("query_analysis", QueryAnalysisAgent)
             self.factory.register_agent_class("content_analysis", ContentAnalysisAgent)
-            self.factory.register_agent_class("sentiment_analysis", SentimentAnalysisAgent)
+            self.factory.register_agent_class(
+                "sentiment_analysis", SentimentAnalysisAgent
+            )
             self.factory.register_agent_class("topic_analysis", TopicAnalysisAgent)
 
         except ImportError:
@@ -80,10 +89,10 @@ class AgentRegistry:
         try:
             # Import and register reasoning agents
             from ..reasoning import (
+                ContextAnalysisAgent,
+                DecisionMakingAgent,
                 PathSelectionAgent,
                 ReasoningAgent,
-                DecisionMakingAgent,
-                ContextAnalysisAgent,
             )
 
             self.factory.register_agent_class("path_selection", PathSelectionAgent)
@@ -97,14 +106,16 @@ class AgentRegistry:
         try:
             # Import and register generation agents
             from ..generation import (
-                SummarizationAgent,
-                ResponseGenerationAgent,
                 ExplanationAgent,
+                ResponseGenerationAgent,
+                SummarizationAgent,
                 SynthesisAgent,
             )
 
             self.factory.register_agent_class("summarization", SummarizationAgent)
-            self.factory.register_agent_class("response_generation", ResponseGenerationAgent)
+            self.factory.register_agent_class(
+                "response_generation", ResponseGenerationAgent
+            )
             self.factory.register_agent_class("explanation", ExplanationAgent)
             self.factory.register_agent_class("synthesis", SynthesisAgent)
 
@@ -116,8 +127,8 @@ class AgentRegistry:
             from ..processing import (
                 ChunkingAgent,
                 ClassificationAgent,
-                ValidationAgent,
                 FilteringAgent,
+                ValidationAgent,
             )
 
             self.factory.register_agent_class("chunking", ChunkingAgent)
@@ -133,7 +144,7 @@ class AgentRegistry:
         agent_name: str,
         config: Optional[AgentConfig] = None,
         model_override: Optional[str] = None,
-        **config_overrides
+        **config_overrides,
     ) -> BaseAgent:
         """Get an agent instance, creating it if necessary.
 
@@ -157,7 +168,9 @@ class AgentRegistry:
                 del self.instances[agent_name]
 
         # Create new instance with overrides
-        agent = self.factory.create_agent(agent_name, config, model_override=model_override, **config_overrides)
+        agent = self.factory.create_agent(
+            agent_name, config, model_override=model_override, **config_overrides
+        )
 
         # Store weak reference
         self.instances[agent_name] = weakref.ref(agent)
@@ -171,7 +184,7 @@ class AgentRegistry:
         agent_name: str,
         config: Optional[AgentConfig] = None,
         model_override: Optional[str] = None,
-        **config_overrides
+        **config_overrides,
     ) -> BaseAgent:
         """Create a new agent instance (not cached).
 
@@ -184,9 +197,13 @@ class AgentRegistry:
         Returns:
             New agent instance
         """
-        return self.factory.create_agent(agent_name, config, model_override=model_override, **config_overrides)
+        return self.factory.create_agent(
+            agent_name, config, model_override=model_override, **config_overrides
+        )
 
-    def register_agent_class(self, agent_name: str, agent_class: Type[BaseAgent]) -> None:
+    def register_agent_class(
+        self, agent_name: str, agent_class: Type[BaseAgent]
+    ) -> None:
         """Register an agent class.
 
         Args:

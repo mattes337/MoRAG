@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Simple test to verify agents can be imported."""
 
-import sys
 import os
+import sys
 from pathlib import Path
 
 # Add current directory and parent to Python path
@@ -13,6 +13,7 @@ sys.path.insert(0, str(current_dir.parent))
 # Set test environment
 os.environ["GEMINI_API_KEY"] = "test-key"
 
+
 def test_basic_imports():
     """Test basic agent imports."""
     print("🧪 Testing Basic Agent Imports")
@@ -22,14 +23,17 @@ def test_basic_imports():
         # Test base imports
         from base.agent import BaseAgent
         from base.config import AgentConfig
+
         print("✅ Base agent imports successful")
 
         # Test extraction imports
         from extraction.fact_extraction import FactExtractionAgent
+
         print("✅ Fact extraction agent import successful")
 
         # Test factory imports
         from factory.utils import create_agent
+
         print("✅ Factory imports successful")
 
         return True
@@ -37,8 +41,10 @@ def test_basic_imports():
     except Exception as e:
         print(f"❌ Import failed: {e}")
         import traceback
+
         traceback.print_exc()
         return False
+
 
 def test_agent_creation():
     """Test creating an agent."""
@@ -66,8 +72,10 @@ def test_agent_creation():
     except Exception as e:
         print(f"❌ Agent creation failed: {e}")
         import traceback
+
         traceback.print_exc()
         return False
+
 
 def main():
     """Main test function."""
@@ -92,6 +100,7 @@ def main():
     else:
         print("\n⚠️  Some tests failed.")
         return 1
+
 
 if __name__ == "__main__":
     exit(main())

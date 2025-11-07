@@ -2,10 +2,11 @@
 """Test script for ingestion fixes: auto-detection and options variable fix."""
 
 import json
-import requests
 import tempfile
 import time
 from pathlib import Path
+
+import requests
 
 
 def print_section(title):
@@ -27,7 +28,7 @@ def test_auto_detection_file():
     # Create a test PDF file
     test_content = b"%PDF-1.4\n1 0 obj\n<<\n/Type /Catalog\n/Pages 2 0 R\n>>\nendobj\n2 0 obj\n<<\n/Type /Pages\n/Kids [3 0 R]\n/Count 1\n>>\nendobj\n3 0 obj\n<<\n/Type /Page\n/Parent 2 0 R\n/MediaBox [0 0 612 792]\n>>\nendobj\nxref\n0 4\n0000000000 65535 f \n0000000009 00000 n \n0000000074 00000 n \n0000000120 00000 n \ntrailer\n<<\n/Size 4\n/Root 1 0 R\n>>\nstartxref\n179\n%%EOF"
 
-    with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as f:
+    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as f:
         f.write(test_content)
         temp_file = Path(f.name)
 
@@ -35,28 +36,27 @@ def test_auto_detection_file():
         print("🔄 Testing file upload without source_type...")
 
         # Test without source_type (should auto-detect)
-        with open(temp_file, 'rb') as f:
-            files = {'file': ('test.pdf', f, 'application/pdf')}
+        with open(temp_file, "rb") as f:
+            files = {"file": ("test.pdf", f, "application/pdf")}
             data = {
-                'metadata': json.dumps({
-                    'test': 'auto_detection',
-                    'expected_type': 'document'
-                })
+                "metadata": json.dumps(
+                    {"test": "auto_detection", "expected_type": "document"}
+                )
             }
 
             response = requests.post(
-                'http://localhost:8000/api/v1/ingest/file',
+                "http://localhost:8000/api/v1/ingest/file",
                 files=files,
                 data=data,
-                timeout=30
+                timeout=30,
             )
 
         if response.status_code == 200:
             result = response.json()
             print_result("✅ Auto-detection successful", f"Task ID: {result['task_id']}")
-            print_result("Status", result['status'])
-            print_result("Message", result['message'])
-            return result['task_id']
+            print_result("Status", result["status"])
+            print_result("Message", result["message"])
+            return result["task_id"]
         else:
             print_result("❌ Auto-detection failed", f"Status: {response.status_code}")
             print_result("Error", response.text)
@@ -74,27 +74,26 @@ def test_auto_detection_url():
     print("🔄 Testing YouTube URL auto-detection...")
 
     data = {
-        'url': 'https://youtube.com/watch?v=dQw4w9WgXcQ',
-        'metadata': {
-            'test': 'auto_detection',
-            'expected_type': 'youtube'
-        }
+        "url": "https://youtube.com/watch?v=dQw4w9WgXcQ",
+        "metadata": {"test": "auto_detection", "expected_type": "youtube"},
     }
 
     response = requests.post(
-        'http://localhost:8000/api/v1/ingest/url',
-        json=data,
-        timeout=30
+        "http://localhost:8000/api/v1/ingest/url", json=data, timeout=30
     )
 
     if response.status_code == 200:
         result = response.json()
-        print_result("✅ YouTube auto-detection successful", f"Task ID: {result['task_id']}")
-        print_result("Status", result['status'])
-        print_result("Message", result['message'])
-        youtube_task_id = result['task_id']
+        print_result(
+            "✅ YouTube auto-detection successful", f"Task ID: {result['task_id']}"
+        )
+        print_result("Status", result["status"])
+        print_result("Message", result["message"])
+        youtube_task_id = result["task_id"]
     else:
-        print_result("❌ YouTube auto-detection failed", f"Status: {response.status_code}")
+        print_result(
+            "❌ YouTube auto-detection failed", f"Status: {response.status_code}"
+        )
         print_result("Error", response.text)
         youtube_task_id = None
 
@@ -102,25 +101,20 @@ def test_auto_detection_url():
     print("\n🔄 Testing web URL auto-detection...")
 
     data = {
-        'url': 'https://httpbin.org/html',
-        'metadata': {
-            'test': 'auto_detection',
-            'expected_type': 'web'
-        }
+        "url": "https://httpbin.org/html",
+        "metadata": {"test": "auto_detection", "expected_type": "web"},
     }
 
     response = requests.post(
-        'http://localhost:8000/api/v1/ingest/url',
-        json=data,
-        timeout=30
+        "http://localhost:8000/api/v1/ingest/url", json=data, timeout=30
     )
 
     if response.status_code == 200:
         result = response.json()
         print_result("✅ Web auto-detection successful", f"Task ID: {result['task_id']}")
-        print_result("Status", result['status'])
-        print_result("Message", result['message'])
-        web_task_id = result['task_id']
+        print_result("Status", result["status"])
+        print_result("Message", result["message"])
+        web_task_id = result["task_id"]
     else:
         print_result("❌ Web auto-detection failed", f"Status: {response.status_code}")
         print_result("Error", response.text)
@@ -136,31 +130,31 @@ def test_batch_auto_detection():
     print("🔄 Testing batch ingestion with mixed auto-detection...")
 
     data = {
-        'items': [
+        "items": [
             {
-                'url': 'https://httpbin.org/json',
-                'metadata': {'test': 'batch_auto_detection', 'item': 1}
+                "url": "https://httpbin.org/json",
+                "metadata": {"test": "batch_auto_detection", "item": 1},
             },
             {
-                'url': 'https://youtube.com/watch?v=dQw4w9WgXcQ',
-                'metadata': {'test': 'batch_auto_detection', 'item': 2}
-            }
+                "url": "https://youtube.com/watch?v=dQw4w9WgXcQ",
+                "metadata": {"test": "batch_auto_detection", "item": 2},
+            },
         ],
-        'webhook_url': None
+        "webhook_url": None,
     }
 
     response = requests.post(
-        'http://localhost:8000/api/v1/ingest/batch',
-        json=data,
-        timeout=30
+        "http://localhost:8000/api/v1/ingest/batch", json=data, timeout=30
     )
 
     if response.status_code == 200:
         result = response.json()
-        print_result("✅ Batch auto-detection successful", f"Batch ID: {result['batch_id']}")
-        print_result("Task IDs", result['task_ids'])
-        print_result("Total items", result['total_items'])
-        return result['task_ids']
+        print_result(
+            "✅ Batch auto-detection successful", f"Batch ID: {result['batch_id']}"
+        )
+        print_result("Task IDs", result["task_ids"])
+        print_result("Total items", result["total_items"])
+        return result["task_ids"]
     else:
         print_result("❌ Batch auto-detection failed", f"Status: {response.status_code}")
         print_result("Error", response.text)
@@ -176,22 +170,29 @@ def monitor_task(task_id, description="Task"):
 
     for attempt in range(30):  # 30 attempts, 2 seconds each = 1 minute max
         try:
-            response = requests.get(f'http://localhost:8000/api/v1/status/{task_id}')
+            response = requests.get(f"http://localhost:8000/api/v1/status/{task_id}")
 
             if response.status_code == 200:
                 status = response.json()
-                print(f"  Status: {status['status']} (Progress: {status.get('progress', 0):.1%})")
+                print(
+                    f"  Status: {status['status']} (Progress: {status.get('progress', 0):.1%})"
+                )
 
-                if status['status'] in ['SUCCESS', 'FAILURE']:
-                    if status['status'] == 'SUCCESS':
+                if status["status"] in ["SUCCESS", "FAILURE"]:
+                    if status["status"] == "SUCCESS":
                         print_result(f"✅ {description} completed", "Success")
-                        if status.get('result'):
-                            result = status['result']
-                            if 'metadata' in result:
-                                print_result("Detected source type",
-                                           result['metadata'].get('source_type', 'unknown'))
+                        if status.get("result"):
+                            result = status["result"]
+                            if "metadata" in result:
+                                print_result(
+                                    "Detected source type",
+                                    result["metadata"].get("source_type", "unknown"),
+                                )
                     else:
-                        print_result(f"❌ {description} failed", status.get('error', 'Unknown error'))
+                        print_result(
+                            f"❌ {description} failed",
+                            status.get("error", "Unknown error"),
+                        )
 
                     return status
 

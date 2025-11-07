@@ -1,17 +1,17 @@
 """Tests for markitdown-based converters."""
 
-import pytest
-import pytest_asyncio
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+import pytest_asyncio
 from morag_core.interfaces.converter import ConversionOptions, ConversionResult
 from morag_core.models.document import Document, DocumentMetadata
-
-from morag_document.converters.pdf import PDFConverter
-from morag_document.converters.word import WordConverter
 from morag_document.converters.excel import ExcelConverter
+from morag_document.converters.pdf import PDFConverter
 from morag_document.converters.presentation import PresentationConverter
+from morag_document.converters.word import WordConverter
+
 # from morag_document.converters.image import ImageConverter  # Module not available
 
 
@@ -81,8 +81,10 @@ class TestMarkitdownConverters:
         assert await converter.supports_format("png")
         assert not await converter.supports_format("pdf")
 
-    @patch('morag_document.converters.markitdown_base.MarkitdownService')
-    async def test_pdf_converter_convert(self, mock_service_class, sample_file_path, mock_markitdown_service):
+    @patch("morag_document.converters.markitdown_base.MarkitdownService")
+    async def test_pdf_converter_convert(
+        self, mock_service_class, sample_file_path, mock_markitdown_service
+    ):
         """Test PDF converter conversion."""
         mock_service_class.return_value = mock_markitdown_service
 
@@ -97,8 +99,10 @@ class TestMarkitdownConverters:
         assert isinstance(result.document, Document)
         mock_markitdown_service.convert_file.assert_called_once()
 
-    @patch('morag_document.converters.markitdown_base.MarkitdownService')
-    async def test_word_converter_convert(self, mock_service_class, tmp_path, mock_markitdown_service):
+    @patch("morag_document.converters.markitdown_base.MarkitdownService")
+    async def test_word_converter_convert(
+        self, mock_service_class, tmp_path, mock_markitdown_service
+    ):
         """Test Word converter conversion."""
         mock_service_class.return_value = mock_markitdown_service
 
@@ -117,8 +121,10 @@ class TestMarkitdownConverters:
         assert isinstance(result.document, Document)
         mock_markitdown_service.convert_file.assert_called_once()
 
-    @patch('morag_document.converters.markitdown_base.MarkitdownService')
-    async def test_excel_converter_convert(self, mock_service_class, tmp_path, mock_markitdown_service):
+    @patch("morag_document.converters.markitdown_base.MarkitdownService")
+    async def test_excel_converter_convert(
+        self, mock_service_class, tmp_path, mock_markitdown_service
+    ):
         """Test Excel converter conversion."""
         mock_service_class.return_value = mock_markitdown_service
 
@@ -137,8 +143,10 @@ class TestMarkitdownConverters:
         assert isinstance(result.document, Document)
         mock_markitdown_service.convert_file.assert_called_once()
 
-    @patch('morag_document.converters.markitdown_base.MarkitdownService')
-    async def test_presentation_converter_convert(self, mock_service_class, tmp_path, mock_markitdown_service):
+    @patch("morag_document.converters.markitdown_base.MarkitdownService")
+    async def test_presentation_converter_convert(
+        self, mock_service_class, tmp_path, mock_markitdown_service
+    ):
         """Test PowerPoint converter conversion."""
         mock_service_class.return_value = mock_markitdown_service
 
@@ -157,8 +165,10 @@ class TestMarkitdownConverters:
         assert isinstance(result.document, Document)
         mock_markitdown_service.convert_file.assert_called_once()
 
-    @patch('morag_document.converters.markitdown_base.MarkitdownService')
-    async def test_image_converter_convert(self, mock_service_class, tmp_path, mock_markitdown_service):
+    @patch("morag_document.converters.markitdown_base.MarkitdownService")
+    async def test_image_converter_convert(
+        self, mock_service_class, tmp_path, mock_markitdown_service
+    ):
         """Test Image converter conversion."""
         mock_service_class.return_value = mock_markitdown_service
 
@@ -184,7 +194,7 @@ class TestMarkitdownConverters:
             (WordConverter(), ["docx", "doc", "word"]),
             (ExcelConverter(), ["xlsx", "xls", "excel"]),
             (PresentationConverter(), ["pptx", "ppt", "powerpoint"]),
-            (ImageConverter(), ["jpg", "png", "gif", "bmp", "tiff", "webp", "svg"])
+            (ImageConverter(), ["jpg", "png", "gif", "bmp", "tiff", "webp", "svg"]),
         ]
 
         for converter, formats in converters:
@@ -209,7 +219,7 @@ class TestMarkitdownIntegration:
             WordConverter(),
             ExcelConverter(),
             PresentationConverter(),
-            ImageConverter()
+            ImageConverter(),
         ]
 
         for converter in converters:
@@ -223,19 +233,55 @@ class TestMarkitdownIntegration:
 
         # Check that all expected formats are registered
         expected_formats = {
-            "pdf", "docx", "doc", "word", "xlsx", "xls", "excel",
-            "pptx", "ppt", "powerpoint", "jpg", "jpeg", "png", "gif",
-            "bmp", "tiff", "webp", "svg", "txt", "md", "html", "htm"
+            "pdf",
+            "docx",
+            "doc",
+            "word",
+            "xlsx",
+            "xls",
+            "excel",
+            "pptx",
+            "ppt",
+            "powerpoint",
+            "jpg",
+            "jpeg",
+            "png",
+            "gif",
+            "bmp",
+            "tiff",
+            "webp",
+            "svg",
+            "txt",
+            "md",
+            "html",
+            "htm",
         }
 
         registered_formats = set(processor.converters.keys())
 
         # Check that markitdown formats are registered
         markitdown_formats = {
-            "pdf", "docx", "doc", "word", "xlsx", "xls", "excel",
-            "pptx", "ppt", "powerpoint", "jpg", "jpeg", "png", "gif",
-            "bmp", "tiff", "webp", "svg"
+            "pdf",
+            "docx",
+            "doc",
+            "word",
+            "xlsx",
+            "xls",
+            "excel",
+            "pptx",
+            "ppt",
+            "powerpoint",
+            "jpg",
+            "jpeg",
+            "png",
+            "gif",
+            "bmp",
+            "tiff",
+            "webp",
+            "svg",
         }
 
         for format_type in markitdown_formats:
-            assert format_type in registered_formats, f"Format {format_type} not registered"
+            assert (
+                format_type in registered_formats
+            ), f"Format {format_type} not registered"

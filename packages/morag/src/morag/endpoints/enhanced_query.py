@@ -1,34 +1,45 @@
 """Enhanced query endpoints for graph-augmented RAG."""
 
-from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
-from fastapi.responses import StreamingResponse
-from typing import Dict, Any, Optional
 import asyncio
 import json
 import uuid
 from datetime import datetime
-import structlog
+from typing import Any, Dict, Optional
 
-from morag.models.enhanced_query import (
-    EnhancedQueryRequest, EnhancedQueryResponse, EntityQueryRequest,
-    GraphTraversalRequest, GraphTraversalResponse, GraphAnalyticsRequest,
-    FactInfo, TraversalStepInfo, GraphContext
+import structlog
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi.responses import StreamingResponse
+from morag.database_factory import (
+    get_default_neo4j_storage,
+    get_default_qdrant_storage,
+    get_neo4j_storages,
+    get_qdrant_storages,
 )
 from morag.dependencies import (
-    get_hybrid_retrieval_coordinator, get_graph_engine,
-    create_dynamic_graph_engine, create_dynamic_hybrid_retrieval_coordinator,
-    get_recursive_fact_retrieval_service
+    create_dynamic_graph_engine,
+    create_dynamic_hybrid_retrieval_coordinator,
+    get_graph_engine,
+    get_hybrid_retrieval_coordinator,
+    get_recursive_fact_retrieval_service,
 )
-from morag.utils.response_builder import EnhancedResponseBuilder
+from morag.models.enhanced_query import (
+    EnhancedQueryRequest,
+    EnhancedQueryResponse,
+    EntityQueryRequest,
+    FactInfo,
+    GraphAnalyticsRequest,
+    GraphContext,
+    GraphTraversalRequest,
+    GraphTraversalResponse,
+    TraversalStepInfo,
+)
 from morag.utils.query_validator import QueryValidator
-from morag.database_factory import (
-    get_neo4j_storages, get_qdrant_storages,
-    get_default_neo4j_storage, get_default_qdrant_storage
-)
+from morag.utils.response_builder import EnhancedResponseBuilder
 
 # Try to import fact retrieval models
 try:
     from morag_reasoning import RecursiveFactRetrievalRequest
+
     FACT_RETRIEVAL_AVAILABLE = True
 except ImportError:
     FACT_RETRIEVAL_AVAILABLE = False
@@ -42,19 +53,18 @@ async def _handle_fact_based_query(
     request: EnhancedQueryRequest,
     query_id: str,
     start_time: datetime,
-    background_tasks: BackgroundTasks
+    background_tasks: BackgroundTasks,
 ) -> EnhancedQueryResponse:
     """Handle fact-based query using RecursiveFactRetrievalService."""
-    logger.info("Processing fact-based query",
-               query_id=query_id,
-               query=request.query[:100])
+    logger.info(
+        "Processing fact-based query", query_id=query_id, query=request.query[:100]
+    )
 
     # Get fact retrieval service
     fact_service = await get_recursive_fact_retrieval_service()
     if not fact_service:
         raise HTTPException(
-            status_code=503,
-            detail="Fact retrieval service not available"
+            status_code=503, detail="Fact retrieval service not available"
         )
 
     # Create fact retrieval request
@@ -67,19 +77,19 @@ async def _handle_fact_based_query(
         max_total_facts=request.max_total_facts,
         facts_only=request.facts_only,
         skip_fact_evaluation=request.skip_fact_evaluation,
-        language=request.language
+        language=request.language,
     )
 
     # Execute fact retrieval with timeout
     try:
         fact_response = await asyncio.wait_for(
             fact_service.retrieve_facts_recursively(fact_request),
-            timeout=request.timeout_seconds
+            timeout=request.timeout_seconds,
         )
     except asyncio.TimeoutError:
         raise HTTPException(
             status_code=408,
-            detail=f"Query timeout after {request.timeout_seconds} seconds"
+            detail=f"Query timeout after {request.timeout_seconds} seconds",
         )
 
     # Convert facts to FactInfo objects
@@ -94,7 +104,7 @@ async def _handle_fact_based_query(
             extracted_from_depth=fact.extracted_from_depth,
             score=fact.score,
             final_decayed_score=fact.final_decayed_score,
-            source_description=fact.source_description
+            source_description=fact.source_description,
         )
         facts.append(fact_info)
 
@@ -107,7 +117,7 @@ async def _handle_fact_based_query(
             depth=step.depth,
             facts_extracted=step.facts_extracted,
             next_nodes_decision=step.next_nodes_decision,
-            reasoning=step.reasoning
+            reasoning=step.reasoning,
         )
         traversal_steps.append(step_info)
 
@@ -120,10 +130,7 @@ async def _handle_fact_based_query(
         query=request.query,
         results=[],  # Empty for fact-based queries
         graph_context=GraphContext(
-            entities={},
-            relations=[],
-            expansion_path=[],
-            reasoning_steps=None
+            entities={}, relations=[], expansion_path=[], reasoning_steps=None
         ),
         total_results=len(facts),
         processing_time_ms=processing_time,
@@ -141,7 +148,7 @@ async def _handle_fact_based_query(
         total_scored_facts=fact_response.total_scored_facts,
         gta_llm_calls=fact_response.gta_llm_calls,
         fca_llm_calls=fact_response.fca_llm_calls,
-        final_llm_calls=fact_response.final_llm_calls
+        final_llm_calls=fact_response.final_llm_calls,
     )
 
     # Log query for analytics (background task)
@@ -150,13 +157,15 @@ async def _handle_fact_based_query(
         query_id=query_id,
         request=request,
         response=response,
-        processing_time=response.processing_time_ms
+        processing_time=response.processing_time_ms,
     )
 
-    logger.info("Fact-based query completed",
-               query_id=query_id,
-               fact_count=len(facts),
-               processing_time_ms=processing_time)
+    logger.info(
+        "Fact-based query completed",
+        query_id=query_id,
+        fact_count=len(facts),
+        processing_time_ms=processing_time,
+    )
 
     return response
 
@@ -164,8 +173,8 @@ async def _handle_fact_based_query(
 @router.post("/query", response_model=EnhancedQueryResponse)
 async def enhanced_query(
     request: EnhancedQueryRequest,
-    hybrid_system = Depends(get_hybrid_retrieval_coordinator),
-    background_tasks: BackgroundTasks = BackgroundTasks()
+    hybrid_system=Depends(get_hybrid_retrieval_coordinator),
+    background_tasks: BackgroundTasks = BackgroundTasks(),
 ):
     """Enhanced query endpoint with graph-augmented retrieval."""
     query_id = str(uuid.uuid4())
@@ -174,11 +183,15 @@ async def enhanced_query(
     try:
         # Check if fact-based retrieval is requested and available
         if request.use_fact_retrieval and FACT_RETRIEVAL_AVAILABLE:
-            return await _handle_fact_based_query(request, query_id, start_time, background_tasks)
+            return await _handle_fact_based_query(
+                request, query_id, start_time, background_tasks
+            )
 
         # Use dynamic database connections if provided
         if request.database_servers:
-            hybrid_system = create_dynamic_hybrid_retrieval_coordinator(request.database_servers)
+            hybrid_system = create_dynamic_hybrid_retrieval_coordinator(
+                request.database_servers
+            )
 
         # Validate request
         validator = QueryValidator()
@@ -186,34 +199,37 @@ async def enhanced_query(
         if not validation_result.is_valid:
             raise HTTPException(
                 status_code=400,
-                detail=f"Invalid query: {validation_result.error_message}"
+                detail=f"Invalid query: {validation_result.error_message}",
             )
 
         # Log warnings if any
         if validation_result.warnings:
-            logger.warning("Query validation warnings",
-                         query_id=query_id,
-                         warnings=validation_result.warnings)
+            logger.warning(
+                "Query validation warnings",
+                query_id=query_id,
+                warnings=validation_result.warnings,
+            )
 
         # Process query
-        logger.info("Processing enhanced query",
-                   query_id=query_id,
-                   query=request.query[:100],
-                   query_type=request.query_type)
+        logger.info(
+            "Processing enhanced query",
+            query_id=query_id,
+            query=request.query[:100],
+            query_type=request.query_type,
+        )
 
         # Execute retrieval with timeout
         try:
             retrieval_result = await asyncio.wait_for(
                 hybrid_system.retrieve(
-                    query=request.query,
-                    max_results=request.max_results
+                    query=request.query, max_results=request.max_results
                 ),
-                timeout=request.timeout_seconds
+                timeout=request.timeout_seconds,
             )
         except asyncio.TimeoutError:
             raise HTTPException(
                 status_code=408,
-                detail=f"Query timeout after {request.timeout_seconds} seconds"
+                detail=f"Query timeout after {request.timeout_seconds} seconds",
             )
 
         # Build response
@@ -224,7 +240,7 @@ async def enhanced_query(
             query_id=query_id,
             request=request,
             retrieval_result=retrieval_result,
-            processing_time=processing_time
+            processing_time=processing_time,
         )
 
         # Log query for analytics (background task)
@@ -233,32 +249,29 @@ async def enhanced_query(
             query_id=query_id,
             request=request,
             response=response,
-            processing_time=response.processing_time_ms
+            processing_time=response.processing_time_ms,
         )
 
-        logger.info("Enhanced query completed",
-                   query_id=query_id,
-                   result_count=len(response.results),
-                   processing_time_ms=response.processing_time_ms)
+        logger.info(
+            "Enhanced query completed",
+            query_id=query_id,
+            result_count=len(response.results),
+            processing_time_ms=response.processing_time_ms,
+        )
 
         return response
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("Error processing enhanced query",
-                    query_id=query_id,
-                    error=str(e))
-        raise HTTPException(
-            status_code=500,
-            detail=f"Internal server error: {str(e)}"
-        )
+        logger.error("Error processing enhanced query", query_id=query_id, error=str(e))
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
 @router.post("/query/stream")
 async def enhanced_query_stream(
     request: EnhancedQueryRequest,
-    hybrid_system = Depends(get_hybrid_retrieval_coordinator)
+    hybrid_system=Depends(get_hybrid_retrieval_coordinator),
 ):
     """Streaming version of enhanced query for real-time results."""
     query_id = str(uuid.uuid4())
@@ -268,7 +281,9 @@ async def enhanced_query_stream(
             # Use dynamic database connections if provided
             nonlocal hybrid_system
             if request.database_servers:
-                hybrid_system = create_dynamic_hybrid_retrieval_coordinator(request.database_servers)
+                hybrid_system = create_dynamic_hybrid_retrieval_coordinator(
+                    request.database_servers
+                )
 
             logger.info("Starting streaming query", query_id=query_id)
 
@@ -277,12 +292,11 @@ async def enhanced_query_stream(
             # the hybrid system would support streaming.
 
             # Send initial status
-            yield f"data: {{\"status\": \"processing\", \"query_id\": \"{query_id}\"}}\n\n"
+            yield f'data: {{"status": "processing", "query_id": "{query_id}"}}\n\n'
 
             # Process query
             retrieval_result = await hybrid_system.retrieve(
-                query=request.query,
-                max_results=request.max_results
+                query=request.query, max_results=request.max_results
             )
 
             # Build response
@@ -291,7 +305,7 @@ async def enhanced_query_stream(
                 query_id=query_id,
                 request=request,
                 retrieval_result=retrieval_result,
-                processing_time=0.0  # Will be calculated properly in full implementation
+                processing_time=0.0,  # Will be calculated properly in full implementation
             )
 
             # Stream results
@@ -300,7 +314,7 @@ async def enhanced_query_stream(
                     "type": "result",
                     "index": i,
                     "result": result.dict(),
-                    "query_id": query_id
+                    "query_id": query_id,
                 }
                 yield f"data: {json.dumps(partial_response)}\n\n"
 
@@ -313,29 +327,24 @@ async def enhanced_query_stream(
                 "query_id": query_id,
                 "total_results": len(response.results),
                 "graph_context": response.graph_context.dict(),
-                "processing_time_ms": response.processing_time_ms
+                "processing_time_ms": response.processing_time_ms,
             }
             yield f"data: {json.dumps(final_response)}\n\n"
 
         except Exception as e:
-            error_data = {
-                "type": "error",
-                "error": str(e),
-                "query_id": query_id
-            }
+            error_data = {"type": "error", "error": str(e), "query_id": query_id}
             yield f"data: {json.dumps(error_data)}\n\n"
 
     return StreamingResponse(
         generate_stream(),
         media_type="text/plain",
-        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"}
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
     )
 
 
 @router.post("/entity/query", response_model=Dict[str, Any])
 async def entity_query(
-    request: EntityQueryRequest,
-    graph_engine = Depends(get_graph_engine)
+    request: EntityQueryRequest, graph_engine=Depends(get_graph_engine)
 ):
     """Query specific entities and their relationships."""
     try:
@@ -343,9 +352,11 @@ async def entity_query(
         if request.database_servers:
             graph_engine = create_dynamic_graph_engine(request.database_servers)
 
-        logger.info("Processing entity query",
-                   entity_id_param=request.entity_id,
-                   entity_name_param=request.entity_name)
+        logger.info(
+            "Processing entity query",
+            entity_id_param=request.entity_id,
+            entity_name_param=request.entity_name,
+        )
 
         # Find entity
         entity = None
@@ -353,8 +364,7 @@ async def entity_query(
             entity = await graph_engine.get_entity(request.entity_id)
         elif request.entity_name:
             entities = await graph_engine.find_entities_by_name(
-                request.entity_name,
-                entity_type=request.entity_type
+                request.entity_name, entity_type=request.entity_type
             )
             entity = entities[0] if entities else None
 
@@ -367,33 +377,39 @@ async def entity_query(
             relations = await graph_engine.get_entity_relations(
                 entity.id,
                 depth=request.relation_depth,
-                max_relations=request.max_relations
+                max_relations=request.max_relations,
             )
 
         # Convert to dict format
-        entity_dict = entity.dict() if hasattr(entity, 'dict') else {
-            'id': getattr(entity, 'id', ''),
-            'name': getattr(entity, 'name', ''),
-            'type': getattr(entity, 'type', ''),
-            'properties': getattr(entity, 'properties', {})
-        }
+        entity_dict = (
+            entity.dict()
+            if hasattr(entity, "dict")
+            else {
+                "id": getattr(entity, "id", ""),
+                "name": getattr(entity, "name", ""),
+                "type": getattr(entity, "type", ""),
+                "properties": getattr(entity, "properties", {}),
+            }
+        )
 
         relations_dict = []
         for rel in relations:
-            if hasattr(rel, 'dict'):
+            if hasattr(rel, "dict"):
                 relations_dict.append(rel.dict())
             else:
-                relations_dict.append({
-                    'id': getattr(rel, 'id', ''),
-                    'name': getattr(rel, 'name', ''),
-                    'type': getattr(rel, 'type', ''),
-                    'properties': getattr(rel, 'properties', {})
-                })
+                relations_dict.append(
+                    {
+                        "id": getattr(rel, "id", ""),
+                        "name": getattr(rel, "name", ""),
+                        "type": getattr(rel, "type", ""),
+                        "properties": getattr(rel, "properties", {}),
+                    }
+                )
 
         return {
             "entity": entity_dict,
             "relations": relations_dict,
-            "relation_count": len(relations)
+            "relation_count": len(relations),
         }
 
     except HTTPException:
@@ -405,8 +421,7 @@ async def entity_query(
 
 @router.post("/graph/traverse", response_model=GraphTraversalResponse)
 async def graph_traversal(
-    request: GraphTraversalRequest,
-    graph_engine = Depends(get_graph_engine)
+    request: GraphTraversalRequest, graph_engine=Depends(get_graph_engine)
 ):
     """Perform graph traversal between entities."""
     start_time = datetime.now()
@@ -416,10 +431,12 @@ async def graph_traversal(
         if request.database_servers:
             graph_engine = create_dynamic_graph_engine(request.database_servers)
 
-        logger.info("Processing graph traversal",
-                   start_entity=request.start_entity,
-                   end_entity=request.end_entity,
-                   traversal_type=request.traversal_type)
+        logger.info(
+            "Processing graph traversal",
+            start_entity=request.start_entity,
+            end_entity=request.end_entity,
+            traversal_type=request.traversal_type,
+        )
 
         # Validate entities exist
         start_entity = await graph_engine.get_entity(request.start_entity)
@@ -439,7 +456,7 @@ async def graph_traversal(
                 request.start_entity,
                 request.end_entity,
                 max_paths=request.max_paths,
-                relation_filters=request.relation_filters
+                relation_filters=request.relation_filters,
             )
         elif request.traversal_type == "explore":
             paths = await graph_engine.explore_from_entity(
@@ -447,12 +464,12 @@ async def graph_traversal(
                 max_depth=request.max_depth,
                 max_paths=request.max_paths,
                 entity_filters=request.entity_filters,
-                relation_filters=request.relation_filters
+                relation_filters=request.relation_filters,
             )
         else:
             raise HTTPException(
                 status_code=400,
-                detail=f"Unsupported traversal type: {request.traversal_type}"
+                detail=f"Unsupported traversal type: {request.traversal_type}",
             )
 
         processing_time = (datetime.now() - start_time).total_seconds() * 1000
@@ -460,19 +477,21 @@ async def graph_traversal(
         # Convert paths to response format
         response_paths = []
         for path in paths:
-            response_paths.append({
-                "entities": getattr(path, 'entities', []),
-                "relations": getattr(path, 'relations', []),
-                "total_weight": getattr(path, 'total_weight', 1.0),
-                "confidence": getattr(path, 'confidence', 0.8)
-            })
+            response_paths.append(
+                {
+                    "entities": getattr(path, "entities", []),
+                    "relations": getattr(path, "relations", []),
+                    "total_weight": getattr(path, "total_weight", 1.0),
+                    "confidence": getattr(path, "confidence", 0.8),
+                }
+            )
 
         return GraphTraversalResponse(
             start_entity=request.start_entity,
             end_entity=request.end_entity,
             paths=response_paths,
             total_paths_found=len(paths),
-            processing_time_ms=processing_time
+            processing_time_ms=processing_time,
         )
 
     except HTTPException:
@@ -484,12 +503,13 @@ async def graph_traversal(
 
 @router.post("/graph/analytics")
 async def graph_analytics(
-    request: GraphAnalyticsRequest,
-    graph_engine = Depends(get_graph_engine)
+    request: GraphAnalyticsRequest, graph_engine=Depends(get_graph_engine)
 ):
     """Get graph analytics and statistics."""
     try:
-        logger.info("Processing graph analytics request", metric_type=request.metric_type)
+        logger.info(
+            "Processing graph analytics request", metric_type=request.metric_type
+        )
 
         # Handle custom database servers if provided
         neo4j_storages = []
@@ -506,11 +526,11 @@ async def graph_analytics(
             try:
                 stats = await graph_engine.get_graph_statistics()
                 return {
-                    "entity_count": getattr(stats, 'entity_count', 0),
-                    "relation_count": getattr(stats, 'relation_count', 0),
-                    "avg_degree": getattr(stats, 'avg_degree', 0.0),
-                    "connected_components": getattr(stats, 'connected_components', 0),
-                    "density": getattr(stats, 'density', 0.0)
+                    "entity_count": getattr(stats, "entity_count", 0),
+                    "relation_count": getattr(stats, "relation_count", 0),
+                    "avg_degree": getattr(stats, "avg_degree", 0.0),
+                    "connected_components": getattr(stats, "connected_components", 0),
+                    "density": getattr(stats, "density", 0.0),
                 }
             except Exception as e:
                 logger.warning("Graph statistics not available", error=str(e))
@@ -520,16 +540,22 @@ async def graph_analytics(
                     "avg_degree": 0.0,
                     "connected_components": 0,
                     "density": 0.0,
-                    "note": "Statistics not available"
+                    "note": "Statistics not available",
                 }
 
         elif request.metric_type == "centrality":
             try:
                 centrality = await graph_engine.calculate_centrality_measures()
                 return {
-                    "top_entities_by_degree": getattr(centrality, 'degree_centrality', [])[:10],
-                    "top_entities_by_betweenness": getattr(centrality, 'betweenness_centrality', [])[:10],
-                    "top_entities_by_pagerank": getattr(centrality, 'pagerank', [])[:10]
+                    "top_entities_by_degree": getattr(
+                        centrality, "degree_centrality", []
+                    )[:10],
+                    "top_entities_by_betweenness": getattr(
+                        centrality, "betweenness_centrality", []
+                    )[:10],
+                    "top_entities_by_pagerank": getattr(centrality, "pagerank", [])[
+                        :10
+                    ],
                 }
             except Exception as e:
                 logger.warning("Centrality measures not available", error=str(e))
@@ -537,7 +563,7 @@ async def graph_analytics(
                     "top_entities_by_degree": [],
                     "top_entities_by_betweenness": [],
                     "top_entities_by_pagerank": [],
-                    "note": "Centrality measures not available"
+                    "note": "Centrality measures not available",
                 }
 
         elif request.metric_type == "communities":
@@ -545,8 +571,14 @@ async def graph_analytics(
                 communities = await graph_engine.detect_communities()
                 return {
                     "community_count": len(communities),
-                    "largest_community_size": max(len(getattr(c, 'entities', [])) for c in communities) if communities else 0,
-                    "modularity_score": getattr(communities[0], 'modularity', 0.0) if communities else 0.0
+                    "largest_community_size": max(
+                        len(getattr(c, "entities", [])) for c in communities
+                    )
+                    if communities
+                    else 0,
+                    "modularity_score": getattr(communities[0], "modularity", 0.0)
+                    if communities
+                    else 0.0,
                 }
             except Exception as e:
                 logger.warning("Community detection not available", error=str(e))
@@ -554,13 +586,12 @@ async def graph_analytics(
                     "community_count": 0,
                     "largest_community_size": 0,
                     "modularity_score": 0.0,
-                    "note": "Community detection not available"
+                    "note": "Community detection not available",
                 }
 
         else:
             raise HTTPException(
-                status_code=400,
-                detail=f"Unknown metric type: {request.metric_type}"
+                status_code=400, detail=f"Unknown metric type: {request.metric_type}"
             )
 
     except HTTPException:
@@ -574,7 +605,7 @@ async def log_query_analytics(
     query_id: str,
     request: EnhancedQueryRequest,
     response: EnhancedQueryResponse,
-    processing_time: float
+    processing_time: float,
 ):
     """Log query for analytics (background task)."""
     try:
@@ -587,7 +618,7 @@ async def log_query_analytics(
             "processing_time_ms": processing_time,
             "confidence_score": response.confidence_score,
             "fusion_strategy": response.fusion_strategy_used,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
         }
 
         # For now, just log to structured logger

@@ -1,7 +1,8 @@
 """Validation logic for extracted facts."""
 
 import re
-from typing import List, Tuple, Dict, Any
+from typing import Any, Dict, List, Tuple
+
 import structlog
 
 from ..models.fact import Fact, FactType
@@ -10,12 +11,14 @@ from ..models.fact import Fact, FactType
 class FactValidator:
     """Validate quality and completeness of extracted facts."""
 
-    def __init__(self,
-                 min_confidence: float = 0.3,
-                 allow_vague_language: bool = True,
-                 require_entities: bool = False,
-                 min_fact_length: int = 20,
-                 strict_validation: bool = True):
+    def __init__(
+        self,
+        min_confidence: float = 0.3,
+        allow_vague_language: bool = True,
+        require_entities: bool = False,
+        min_fact_length: int = 20,
+        strict_validation: bool = True,
+    ):
         """Initialize validator with configuration.
 
         Args:
@@ -34,16 +37,42 @@ class FactValidator:
 
         # Generic words that indicate low specificity
         self.generic_subjects = {
-            'it', 'this', 'that', 'they', 'these', 'those', 'something',
-            'anything', 'everything', 'nothing', 'someone', 'anyone',
-            'everyone', 'thing', 'stuff', 'item', 'element', 'aspect'
+            "it",
+            "this",
+            "that",
+            "they",
+            "these",
+            "those",
+            "something",
+            "anything",
+            "everything",
+            "nothing",
+            "someone",
+            "anyone",
+            "everyone",
+            "thing",
+            "stuff",
+            "item",
+            "element",
+            "aspect",
         }
 
         # Words that indicate meta-commentary rather than facts
         self.meta_indicators = {
-            'document', 'text', 'paper', 'article', 'chapter', 'section',
-            'paragraph', 'sentence', 'author', 'writer', 'researcher',
-            'study shows', 'research indicates', 'paper discusses'
+            "document",
+            "text",
+            "paper",
+            "article",
+            "chapter",
+            "section",
+            "paragraph",
+            "sentence",
+            "author",
+            "writer",
+            "researcher",
+            "study shows",
+            "research indicates",
+            "paper discusses",
         }
 
     def validate_fact(self, fact: Fact) -> Tuple[bool, List[str]]:
@@ -66,7 +95,9 @@ class FactValidator:
             warnings.extend(completeness_issues)
 
         # Check specificity (with configurable vague language handling)
-        specificity_issues, vague_language_detected = self._check_specificity_enhanced(fact)
+        specificity_issues, vague_language_detected = self._check_specificity_enhanced(
+            fact
+        )
         if vague_language_detected and self.allow_vague_language:
             # Mark fact with lower confidence but don't reject
             fact.extraction_confidence = max(0.3, fact.extraction_confidence - 0.2)
@@ -84,7 +115,9 @@ class FactValidator:
 
         # Check confidence threshold
         if fact.extraction_confidence < self.min_confidence:
-            issues.append(f"Confidence {fact.extraction_confidence:.2f} below threshold {self.min_confidence}")
+            issues.append(
+                f"Confidence {fact.extraction_confidence:.2f} below threshold {self.min_confidence}"
+            )
 
         # Check for meta-commentary
         meta_issues = self._check_meta_commentary(fact)
@@ -102,14 +135,18 @@ class FactValidator:
                 fact_id=fact.id,
                 issues=issues,
                 warnings=warnings,
-                fact_text=fact.fact_text[:50] + "..." if len(fact.fact_text) > 50 else fact.fact_text
+                fact_text=fact.fact_text[:50] + "..."
+                if len(fact.fact_text) > 50
+                else fact.fact_text,
             )
         elif warnings:
             self.logger.debug(
                 "Fact validation passed with warnings",
                 fact_id=fact.id,
                 warnings=warnings,
-                fact_text=fact.fact_text[:50] + "..." if len(fact.fact_text) > 50 else fact.fact_text
+                fact_text=fact.fact_text[:50] + "..."
+                if len(fact.fact_text) > 50
+                else fact.fact_text,
             )
 
         return is_valid, issues
@@ -158,9 +195,9 @@ class FactValidator:
 
         # Check for overly vague language
         vague_patterns = [
-            r'\b(some|many|several|various|different|certain)\b',
-            r'\b(generally|usually|often|sometimes|typically)\b',
-            r'\b(might|could|may|possibly|potentially)\b'
+            r"\b(some|many|several|various|different|certain)\b",
+            r"\b(generally|usually|often|sometimes|typically)\b",
+            r"\b(might|could|may|possibly|potentially)\b",
         ]
 
         fact_text = fact.fact_text
@@ -197,9 +234,9 @@ class FactValidator:
 
         # Check for overly vague language
         vague_patterns = [
-            r'\b(some|many|several|various|different|certain)\b',
-            r'\b(generally|usually|often|sometimes|typically)\b',
-            r'\b(might|could|may|possibly|potentially)\b'
+            r"\b(some|many|several|various|different|certain)\b",
+            r"\b(generally|usually|often|sometimes|typically)\b",
+            r"\b(might|could|may|possibly|potentially)\b",
         ]
 
         fact_text = fact.fact_text
@@ -212,7 +249,9 @@ class FactValidator:
 
         # Check for sufficient detail (configurable)
         if len(fact_text) < self.min_fact_length:
-            issues.append(f"Fact too brief - lacks sufficient detail (minimum {self.min_fact_length} characters)")
+            issues.append(
+                f"Fact too brief - lacks sufficient detail (minimum {self.min_fact_length} characters)"
+            )
 
         return issues, vague_language_detected
 
@@ -230,40 +269,162 @@ class FactValidator:
         # Check for actionable verbs or concrete information
         actionable_indicators = [
             # Process verbs
-            'implement', 'configure', 'install', 'setup', 'create', 'build',
-            'develop', 'design', 'analyze', 'measure', 'test', 'validate',
-            'optimize', 'improve', 'reduce', 'increase', 'enhance', 'use',
-            'apply', 'employ', 'utilize', 'perform', 'execute', 'achieve',
+            "implement",
+            "configure",
+            "install",
+            "setup",
+            "create",
+            "build",
+            "develop",
+            "design",
+            "analyze",
+            "measure",
+            "test",
+            "validate",
+            "optimize",
+            "improve",
+            "reduce",
+            "increase",
+            "enhance",
+            "use",
+            "apply",
+            "employ",
+            "utilize",
+            "perform",
+            "execute",
+            "achieve",
             # Result verbs
-            'achieves', 'produces', 'results', 'leads', 'causes', 'enables',
-            'provides', 'delivers', 'generates', 'yields', 'accuracy',
-            'performance', 'efficiency', 'effectiveness', 'success',
+            "achieves",
+            "produces",
+            "results",
+            "leads",
+            "causes",
+            "enables",
+            "provides",
+            "delivers",
+            "generates",
+            "yields",
+            "accuracy",
+            "performance",
+            "efficiency",
+            "effectiveness",
+            "success",
             # Specific nouns
-            'method', 'technique', 'approach', 'procedure', 'process',
-            'algorithm', 'formula', 'equation', 'model', 'framework',
-            'system', 'tool', 'software', 'hardware', 'device', 'network',
-            'learning', 'training', 'classification', 'recognition', 'detection',
+            "method",
+            "technique",
+            "approach",
+            "procedure",
+            "process",
+            "algorithm",
+            "formula",
+            "equation",
+            "model",
+            "framework",
+            "system",
+            "tool",
+            "software",
+            "hardware",
+            "device",
+            "network",
+            "learning",
+            "training",
+            "classification",
+            "recognition",
+            "detection",
             # Medical/Health terms
-            'treatment', 'therapy', 'medication', 'dosage', 'dose', 'intake',
-            'administration', 'prescription', 'supplement', 'extract', 'compound',
-            'concentration', 'mg', 'gram', 'daily', 'twice', 'morning', 'evening',
-            'before', 'after', 'meals', 'empty stomach', 'with food',
+            "treatment",
+            "therapy",
+            "medication",
+            "dosage",
+            "dose",
+            "intake",
+            "administration",
+            "prescription",
+            "supplement",
+            "extract",
+            "compound",
+            "concentration",
+            "mg",
+            "gram",
+            "daily",
+            "twice",
+            "morning",
+            "evening",
+            "before",
+            "after",
+            "meals",
+            "empty stomach",
+            "with food",
             # Herbal/Natural terms
-            'herb', 'plant', 'botanical', 'natural', 'organic', 'standardized',
-            'tincture', 'capsule', 'tablet', 'tea', 'infusion', 'decoction',
-            'preparation', 'formulation', 'blend', 'mixture', 'combination',
+            "herb",
+            "plant",
+            "botanical",
+            "natural",
+            "organic",
+            "standardized",
+            "tincture",
+            "capsule",
+            "tablet",
+            "tea",
+            "infusion",
+            "decoction",
+            "preparation",
+            "formulation",
+            "blend",
+            "mixture",
+            "combination",
             # Action/Effect terms
-            'improves', 'supports', 'helps', 'assists', 'promotes', 'enhances',
-            'reduces', 'decreases', 'increases', 'boosts', 'strengthens',
-            'calms', 'soothes', 'relieves', 'alleviates', 'prevents',
+            "improves",
+            "supports",
+            "helps",
+            "assists",
+            "promotes",
+            "enhances",
+            "reduces",
+            "decreases",
+            "increases",
+            "boosts",
+            "strengthens",
+            "calms",
+            "soothes",
+            "relieves",
+            "alleviates",
+            "prevents",
             # Measurement terms
-            'study', 'research', 'clinical', 'trial', 'evidence', 'shown',
-            'demonstrated', 'proven', 'effective', 'beneficial', 'safe',
+            "study",
+            "research",
+            "clinical",
+            "trial",
+            "evidence",
+            "shown",
+            "demonstrated",
+            "proven",
+            "effective",
+            "beneficial",
+            "safe",
             # German medical terms (for multilingual support)
-            'behandlung', 'therapie', 'medikament', 'dosierung', 'einnahme',
-            'anwendung', 'extrakt', 'standardisiert', 'täglich', 'morgens',
-            'abends', 'vor', 'nach', 'mahlzeiten', 'verbessert', 'unterstützt',
-            'hilft', 'reduziert', 'erhöht', 'stärkt', 'beruhigt', 'lindert'
+            "behandlung",
+            "therapie",
+            "medikament",
+            "dosierung",
+            "einnahme",
+            "anwendung",
+            "extrakt",
+            "standardisiert",
+            "täglich",
+            "morgens",
+            "abends",
+            "vor",
+            "nach",
+            "mahlzeiten",
+            "verbessert",
+            "unterstützt",
+            "hilft",
+            "reduziert",
+            "erhöht",
+            "stärkt",
+            "beruhigt",
+            "lindert",
         ]
 
         # Use fact_text for checking
@@ -315,7 +476,9 @@ class FactValidator:
 
         valid_types = FactType.all_types()
         if fact.fact_type not in valid_types:
-            issues.append(f"Invalid fact type: '{fact.fact_type}'. Valid types: {valid_types}")
+            issues.append(
+                f"Invalid fact type: '{fact.fact_type}'. Valid types: {valid_types}"
+            )
 
         return issues
 
@@ -343,18 +506,20 @@ class FactValidator:
         # Count issue types
         issue_counts = {}
         for issue in all_issues:
-            issue_type = issue.split(':')[0] if ':' in issue else issue
+            issue_type = issue.split(":")[0] if ":" in issue else issue
             issue_counts[issue_type] = issue_counts.get(issue_type, 0) + 1
 
         return {
-            'total_facts': len(facts),
-            'valid_facts': len(valid_facts),
-            'invalid_facts': len(invalid_facts),
-            'validation_rate': len(valid_facts) / len(facts) if facts else 0,
-            'valid_fact_objects': valid_facts,
-            'invalid_fact_objects': invalid_facts,
-            'issue_counts': issue_counts,
-            'most_common_issues': sorted(issue_counts.items(), key=lambda x: x[1], reverse=True)[:5]
+            "total_facts": len(facts),
+            "valid_facts": len(valid_facts),
+            "invalid_facts": len(invalid_facts),
+            "validation_rate": len(valid_facts) / len(facts) if facts else 0,
+            "valid_fact_objects": valid_facts,
+            "invalid_fact_objects": invalid_facts,
+            "issue_counts": issue_counts,
+            "most_common_issues": sorted(
+                issue_counts.items(), key=lambda x: x[1], reverse=True
+            )[:5],
         }
 
     def get_quality_score(self, fact: Fact) -> float:

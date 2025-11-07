@@ -2,26 +2,30 @@
 """Simple test to verify the remote converter fixes without heavy imports."""
 
 import sys
-from pathlib import Path
 from dataclasses import dataclass
-from typing import Dict, Any, Optional
+from pathlib import Path
+from typing import Any, Dict, Optional
 
 # Add MoRAG packages to path
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root / "packages" / "morag-core" / "src"))
 
+
 @dataclass
 class ProcessingResult:
     """Unified processing result for remote converter."""
+
     success: bool
     text_content: str
     metadata: Dict[str, Any]
     processing_time: float
     error_message: Optional[str] = None
 
+
 @dataclass
 class MockAudioProcessingResult:
     """Mock AudioProcessingResult for testing."""
+
     transcript: str
     segments: list
     metadata: Dict[str, Any]
@@ -30,15 +34,18 @@ class MockAudioProcessingResult:
     success: bool = True
     error_message: Optional[str] = None
 
-def convert_to_unified_result(result: Any, processing_time: float = None) -> ProcessingResult:
+
+def convert_to_unified_result(
+    result: Any, processing_time: float = None
+) -> ProcessingResult:
     """Convert processor-specific result to unified ProcessingResult."""
-    if hasattr(result, 'transcript'):  # AudioProcessingResult-like
+    if hasattr(result, "transcript"):  # AudioProcessingResult-like
         return ProcessingResult(
             success=result.success,
             text_content=result.transcript,
             metadata=result.metadata,
             processing_time=processing_time or result.processing_time,
-            error_message=result.error_message
+            error_message=result.error_message,
         )
     else:
         # Fallback for unknown result types
@@ -47,8 +54,9 @@ def convert_to_unified_result(result: Any, processing_time: float = None) -> Pro
             text_content="",
             metadata={},
             processing_time=processing_time or 0.0,
-            error_message=f"Unknown result type: {type(result)}"
+            error_message=f"Unknown result type: {type(result)}",
         )
+
 
 def test_fixes():
     """Test the core fixes without heavy imports."""
@@ -63,7 +71,7 @@ def test_fixes():
             text_content="This is test content",
             metadata={"test": "data"},
             processing_time=1.5,
-            error_message=None
+            error_message=None,
         )
         print(f"✅ ProcessingResult created successfully:")
         print(f"   Success: {result.success}")
@@ -85,7 +93,7 @@ def test_fixes():
             file_path="test_audio.mp3",
             processing_time=2.3,
             success=True,
-            error_message=None
+            error_message=None,
         )
 
         # Convert to unified result
@@ -119,7 +127,7 @@ def test_fixes():
             text_content="",
             metadata={},
             processing_time=0.0,
-            error_message="Test error message"
+            error_message="Test error message",
         )
         print(f"✅ Error result created:")
         print(f"   Success: {error_result.success}")
@@ -139,12 +147,12 @@ def test_fixes():
                 "language": "en",
                 "num_speakers": 2,
                 "num_topics": 3,
-                "duration": 120.5
+                "duration": 120.5,
             },
             file_path="test.mp3",
             processing_time=5.2,
             success=True,
-            error_message=None
+            error_message=None,
         )
 
         # Test accessing attributes that VideoProcessor expects
@@ -165,12 +173,15 @@ def test_fixes():
     print("\nSummary of fixes:")
     print("1. ✅ Fixed ProcessingResult to include text_content parameter")
     print("2. ✅ Fixed method calls to use correct processor method names")
-    print("3. ✅ Added proper result conversion from processor-specific to unified format")
+    print(
+        "3. ✅ Added proper result conversion from processor-specific to unified format"
+    )
     print("4. ✅ Updated imports to avoid circular dependencies")
     print("5. ✅ Fixed VideoProcessor AudioProcessingResult attribute access")
 
     print("\nThe remote converter should now work correctly!")
     return True
+
 
 if __name__ == "__main__":
     success = test_fixes()

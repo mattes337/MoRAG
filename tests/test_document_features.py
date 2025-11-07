@@ -13,8 +13,8 @@ sys.path.insert(0, str(Path(__file__).parent / "packages" / "morag-core" / "src"
 sys.path.insert(0, str(Path(__file__).parent / "packages" / "morag-document" / "src"))
 
 from morag_core.interfaces.converter import ChunkingStrategy
-from morag_document.service import DocumentService
 from morag_document.processor import DocumentProcessor
+from morag_document.service import DocumentService
 
 
 async def test_chunking_strategies():
@@ -64,14 +64,13 @@ This is the final section of the document.
 """
 
     try:
-        from morag_document.converters.base import DocumentConverter
-        from morag_core.models.document import Document, DocumentMetadata, DocumentType
         from morag_core.interfaces.converter import ConversionOptions
+        from morag_core.models.document import Document, DocumentMetadata, DocumentType
+        from morag_document.converters.base import DocumentConverter
 
         # Create a document
         metadata = DocumentMetadata(
-            source_type=DocumentType.TEXT,
-            source_name="test_document.txt"
+            source_type=DocumentType.TEXT, source_name="test_document.txt"
         )
         document = Document(metadata=metadata, raw_text=sample_text)
 
@@ -103,12 +102,12 @@ async def test_json_output():
         service = DocumentService()
 
         # Test that the JSON conversion method exists
-        if hasattr(service, 'process_document_to_json'):
+        if hasattr(service, "process_document_to_json"):
             print("✅ Document service has process_document_to_json method")
         else:
             print("❌ Document service missing process_document_to_json method")
 
-        if hasattr(service, '_convert_to_json'):
+        if hasattr(service, "_convert_to_json"):
             print("✅ Document service has _convert_to_json method")
         else:
             print("❌ Document service missing _convert_to_json method")
@@ -127,7 +126,7 @@ async def test_pdf_chapter_support():
 
         # Test that PDF converter has chapter chunking method
         converter = PDFConverter()
-        if hasattr(converter, '_chunk_by_chapters'):
+        if hasattr(converter, "_chunk_by_chapters"):
             print("✅ PDF converter has _chunk_by_chapters method")
         else:
             print("❌ PDF converter missing _chunk_by_chapters method")
@@ -181,6 +180,7 @@ async def main():
     except Exception as e:
         print(f"\n❌ Test suite failed: {e}")
         import traceback
+
         traceback.print_exc()
 
 

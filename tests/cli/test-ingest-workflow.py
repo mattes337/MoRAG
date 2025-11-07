@@ -2,8 +2,8 @@
 """Test the complete ingest workflow to verify the fix."""
 
 import asyncio
-import sys
 import os
+import sys
 import tempfile
 from pathlib import Path
 
@@ -12,6 +12,7 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root / "packages" / "morag-core" / "src"))
 sys.path.insert(0, str(project_root / "packages" / "morag-services" / "src"))
 sys.path.insert(0, str(project_root / "packages" / "morag" / "src"))
+
 
 async def test_ingest_workflow():
     """Test the complete ingest workflow that was failing."""
@@ -35,7 +36,7 @@ async def test_ingest_workflow():
             "source_type": "test",
             "source_path": "test_document.txt",
             "test_run": True,
-            "description": "Test document for verifying ingest workflow"
+            "description": "Test document for verifying ingest workflow",
         }
 
         print("Attempting to store content in vector database...")
@@ -44,7 +45,7 @@ async def test_ingest_workflow():
         point_ids = await store_content_in_vector_db(
             content=test_content.strip(),
             metadata=test_metadata,
-            collection_name="test_collection"
+            collection_name="test_collection",
         )
 
         if point_ids:
@@ -63,22 +64,27 @@ async def test_ingest_workflow():
             print("❌ The abstract class error is still present!")
             print("   The fix may not have been applied correctly.")
             return False
-        elif "No connection could be made" in error_msg or "Connection refused" in error_msg:
+        elif (
+            "No connection could be made" in error_msg
+            or "Connection refused" in error_msg
+        ):
             print("⚠️ Qdrant connection failed (expected if Qdrant is not running)")
             print("   But the abstract class error has been fixed!")
             return True
         else:
             print(f"❌ Unexpected error: {e}")
             import traceback
+
             traceback.print_exc()
             return False
+
 
 async def test_services_availability():
     """Test if required services are available."""
     print("\nChecking service availability...")
 
     # Check environment variables
-    google_api_key = os.getenv('GOOGLE_API_KEY')
+    google_api_key = os.getenv("GOOGLE_API_KEY")
     if google_api_key:
         print("✅ GOOGLE_API_KEY is set")
     else:
@@ -87,7 +93,8 @@ async def test_services_availability():
     # Check Redis (if available)
     try:
         import redis
-        r = redis.Redis(host='localhost', port=6379, decode_responses=True)
+
+        r = redis.Redis(host="localhost", port=6379, decode_responses=True)
         r.ping()
         print("✅ Redis is available")
     except Exception:
@@ -96,7 +103,8 @@ async def test_services_availability():
     # Check Qdrant (if available)
     try:
         import requests
-        response = requests.get('http://localhost:6333/health', timeout=2)
+
+        response = requests.get("http://localhost:6333/health", timeout=2)
         if response.status_code == 200:
             print("✅ Qdrant is available")
         else:
@@ -104,13 +112,14 @@ async def test_services_availability():
     except Exception:
         print("⚠️ Qdrant is not available")
 
+
 async def main():
     """Main test function."""
     print("Testing MoRAG Ingest Workflow")
     print("=" * 50)
 
     # Set a dummy API key for testing
-    os.environ['GOOGLE_API_KEY'] = 'dummy_key_for_testing'
+    os.environ["GOOGLE_API_KEY"] = "dummy_key_for_testing"
 
     # Test service availability
     await test_services_availability()
@@ -134,6 +143,7 @@ async def main():
         print("Check the errors above for details.")
 
     return success
+
 
 if __name__ == "__main__":
     success = asyncio.run(main())

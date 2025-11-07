@@ -6,7 +6,10 @@ import sys
 from pathlib import Path
 
 # Add the packages to the path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "packages" / "morag-audio" / "src"))
+sys.path.insert(
+    0, str(Path(__file__).parent.parent.parent / "packages" / "morag-audio" / "src")
+)
+
 
 def test_whisper_model_env():
     """Test WHISPER_MODEL_SIZE environment variable."""
@@ -22,7 +25,9 @@ def test_whisper_model_env():
         config = AudioConfig()
 
         print(f"✅ Model size from WHISPER_MODEL_SIZE: {config.model_size}")
-        assert config.model_size == "large-v3", f"Expected 'large-v3', got '{config.model_size}'"
+        assert (
+            config.model_size == "large-v3"
+        ), f"Expected 'large-v3', got '{config.model_size}'"
 
     except Exception as e:
         print(f"❌ Failed to test WHISPER_MODEL_SIZE: {e}")
@@ -33,6 +38,7 @@ def test_whisper_model_env():
             del os.environ["WHISPER_MODEL_SIZE"]
 
     return True
+
 
 def test_morag_whisper_model_env():
     """Test MORAG_WHISPER_MODEL_SIZE environment variable."""
@@ -48,7 +54,9 @@ def test_morag_whisper_model_env():
         config = AudioConfig()
 
         print(f"✅ Model size from MORAG_WHISPER_MODEL_SIZE: {config.model_size}")
-        assert config.model_size == "base", f"Expected 'base', got '{config.model_size}'"
+        assert (
+            config.model_size == "base"
+        ), f"Expected 'base', got '{config.model_size}'"
 
     except Exception as e:
         print(f"❌ Failed to test MORAG_WHISPER_MODEL_SIZE: {e}")
@@ -59,6 +67,7 @@ def test_morag_whisper_model_env():
             del os.environ["MORAG_WHISPER_MODEL_SIZE"]
 
     return True
+
 
 def test_spacy_model_env():
     """Test MORAG_SPACY_MODEL environment variable."""
@@ -72,10 +81,14 @@ def test_spacy_model_env():
         from morag_audio.services import topic_segmentation
 
         # Check if the environment variable was read
-        print(f"✅ SpaCy model environment variable set to: {os.environ.get('MORAG_SPACY_MODEL')}")
+        print(
+            f"✅ SpaCy model environment variable set to: {os.environ.get('MORAG_SPACY_MODEL')}"
+        )
 
     except Exception as e:
-        print(f"⚠️  Could not test spaCy model loading (dependencies may not be available): {e}")
+        print(
+            f"⚠️  Could not test spaCy model loading (dependencies may not be available): {e}"
+        )
         return True  # This is OK, spaCy is optional
     finally:
         # Clean up
@@ -83,6 +96,7 @@ def test_spacy_model_env():
             del os.environ["MORAG_SPACY_MODEL"]
 
     return True
+
 
 def test_audio_features_env():
     """Test audio feature environment variables."""
@@ -105,8 +119,12 @@ def test_audio_features_env():
         print(f"✅ Audio language: {config.language}")
         print(f"✅ Audio device: {config.device}")
 
-        assert config.enable_diarization == False, f"Expected False, got {config.enable_diarization}"
-        assert config.enable_topic_segmentation == True, f"Expected True, got {config.enable_topic_segmentation}"
+        assert (
+            config.enable_diarization == False
+        ), f"Expected False, got {config.enable_diarization}"
+        assert (
+            config.enable_topic_segmentation == True
+        ), f"Expected True, got {config.enable_topic_segmentation}"
         assert config.language == "de", f"Expected 'de', got '{config.language}'"
         assert config.device == "cpu", f"Expected 'cpu', got '{config.device}'"
 
@@ -115,12 +133,17 @@ def test_audio_features_env():
         return False
     finally:
         # Clean up
-        for var in ["MORAG_ENABLE_SPEAKER_DIARIZATION", "MORAG_ENABLE_TOPIC_SEGMENTATION",
-                   "MORAG_AUDIO_LANGUAGE", "MORAG_AUDIO_DEVICE"]:
+        for var in [
+            "MORAG_ENABLE_SPEAKER_DIARIZATION",
+            "MORAG_ENABLE_TOPIC_SEGMENTATION",
+            "MORAG_AUDIO_LANGUAGE",
+            "MORAG_AUDIO_DEVICE",
+        ]:
             if var in os.environ:
                 del os.environ[var]
 
     return True
+
 
 def test_default_behavior():
     """Test that defaults work when no environment variables are set."""
@@ -138,17 +161,24 @@ def test_default_behavior():
         print(f"✅ Default diarization: {config.enable_diarization}")
         print(f"✅ Default topic segmentation: {config.enable_topic_segmentation}")
 
-        assert config.model_size == "medium", f"Expected 'medium', got '{config.model_size}'"
+        assert (
+            config.model_size == "medium"
+        ), f"Expected 'medium', got '{config.model_size}'"
         assert config.language is None, f"Expected None, got '{config.language}'"
         assert config.device == "auto", f"Expected 'auto', got '{config.device}'"
-        assert config.enable_diarization == True, f"Expected True, got {config.enable_diarization}"
-        assert config.enable_topic_segmentation == True, f"Expected True, got {config.enable_topic_segmentation}"
+        assert (
+            config.enable_diarization == True
+        ), f"Expected True, got {config.enable_diarization}"
+        assert (
+            config.enable_topic_segmentation == True
+        ), f"Expected True, got {config.enable_topic_segmentation}"
 
     except Exception as e:
         print(f"❌ Failed to test default behavior: {e}")
         return False
 
     return True
+
 
 def main():
     """Run all tests."""
@@ -178,11 +208,14 @@ def main():
     print(f"📊 Results: {passed}/{total} tests passed")
 
     if passed == total:
-        print("🎉 All tests passed! Environment variable configuration is working correctly.")
+        print(
+            "🎉 All tests passed! Environment variable configuration is working correctly."
+        )
         return 0
     else:
         print("⚠️  Some tests failed. Please check the implementation.")
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

@@ -12,10 +12,10 @@ Usage:
     python create-databases.py --list-existing
 """
 
-import sys
-import os
-import asyncio
 import argparse
+import asyncio
+import os
+import sys
 from pathlib import Path
 from typing import Optional
 
@@ -25,8 +25,10 @@ sys.path.insert(0, str(project_root))
 
 # Load environment variables
 from dotenv import load_dotenv
-env_path = project_root / '.env'
+
+env_path = project_root / ".env"
 load_dotenv(env_path, override=True)
+
 
 def print_header(title: str):
     """Print a formatted header."""
@@ -34,27 +36,30 @@ def print_header(title: str):
     print(f"  {title}")
     print(f"{'='*60}")
 
+
 def print_section(title: str):
     """Print a formatted section header."""
     print(f"\n{'-'*40}")
     print(f"  {title}")
     print(f"{'-'*40}")
 
+
 def print_result(key: str, value: str, indent: int = 0):
     """Print a formatted key-value result."""
     spaces = "  " * indent
     print(f"{spaces}[INFO] {key}: {value}")
 
+
 async def create_neo4j_database(database_name: str) -> bool:
     """Create a Neo4j database."""
     try:
-        from morag_graph.storage.neo4j_storage import Neo4jStorage, Neo4jConfig
+        from morag_graph.storage.neo4j_storage import Neo4jConfig, Neo4jStorage
         from neo4j import AsyncGraphDatabase
 
         # Connect directly to system database without using the storage class connect method
-        uri = os.getenv('NEO4J_URI', 'bolt://localhost:7687')
-        username = os.getenv('NEO4J_USERNAME', 'neo4j')
-        password = os.getenv('NEO4J_PASSWORD', 'password')
+        uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
+        username = os.getenv("NEO4J_USERNAME", "neo4j")
+        password = os.getenv("NEO4J_PASSWORD", "password")
 
         driver = AsyncGraphDatabase.driver(uri, auth=(username, password))
 
@@ -64,7 +69,7 @@ async def create_neo4j_database(database_name: str) -> bool:
                 # Check if database exists
                 result = await session.run(
                     "SHOW DATABASES YIELD name WHERE name = $db_name",
-                    {"db_name": database_name}
+                    {"db_name": database_name},
                 )
                 databases = await result.data()
 
@@ -80,7 +85,9 @@ async def create_neo4j_database(database_name: str) -> bool:
 
         except Exception as e:
             # If we can't create via system database (Community Edition), try direct connection
-            print(f"[WARN] Cannot create database via system database (likely Neo4j Community Edition): {e}")
+            print(
+                f"[WARN] Cannot create database via system database (likely Neo4j Community Edition): {e}"
+            )
             print(f"[INFO] Attempting to verify database '{database_name}' exists...")
 
             try:
@@ -90,14 +97,18 @@ async def create_neo4j_database(database_name: str) -> bool:
                 return True
             except Exception as direct_error:
                 if "DatabaseNotFound" in str(direct_error):
-                    print(f"[FAIL] Database '{database_name}' does not exist and cannot be created automatically.")
+                    print(
+                        f"[FAIL] Database '{database_name}' does not exist and cannot be created automatically."
+                    )
                     print(f"💡 For Neo4j Community Edition, please:")
                     print(f"   1. Use the default 'neo4j' database, or")
                     print(f"   2. Create the database manually, or")
                     print(f"   3. Upgrade to Neo4j Enterprise Edition")
                     return False
                 else:
-                    print(f"[FAIL] Error connecting to database '{database_name}': {direct_error}")
+                    print(
+                        f"[FAIL] Error connecting to database '{database_name}': {direct_error}"
+                    )
                     return False
         finally:
             await driver.close()
@@ -106,15 +117,18 @@ async def create_neo4j_database(database_name: str) -> bool:
         print(f"[FAIL] Error creating Neo4j database: {e}")
         return False
 
-async def create_qdrant_collection(collection_name: str, vector_size: int = 768) -> bool:
+
+async def create_qdrant_collection(
+    collection_name: str, vector_size: int = 768
+) -> bool:
     """Create a Qdrant collection."""
     try:
         from morag_services.storage import QdrantVectorStorage
 
         # Prefer QDRANT_URL if available, otherwise use QDRANT_HOST/PORT
-        qdrant_url = os.getenv('QDRANT_URL')
-        qdrant_api_key = os.getenv('QDRANT_API_KEY')
-        verify_ssl = os.getenv('QDRANT_VERIFY_SSL', 'true').lower() == 'true'
+        qdrant_url = os.getenv("QDRANT_URL")
+        qdrant_api_key = os.getenv("QDRANT_API_KEY")
+        verify_ssl = os.getenv("QDRANT_VERIFY_SSL", "true").lower() == "true"
 
         if qdrant_url:
             # Use URL-based connection (supports HTTPS automatically)
@@ -122,20 +136,22 @@ async def create_qdrant_collection(collection_name: str, vector_size: int = 768)
                 host=qdrant_url,
                 api_key=qdrant_api_key,
                 collection_name=collection_name,
-                verify_ssl=verify_ssl
+                verify_ssl=verify_ssl,
             )
         else:
             # Fall back to host/port connection
             storage = QdrantVectorStorage(
-                host=os.getenv('QDRANT_HOST', 'localhost'),
-                port=int(os.getenv('QDRANT_PORT', '6333')),
+                host=os.getenv("QDRANT_HOST", "localhost"),
+                port=int(os.getenv("QDRANT_PORT", "6333")),
                 api_key=qdrant_api_key,
                 collection_name=collection_name,
-                verify_ssl=verify_ssl
+                verify_ssl=verify_ssl,
             )
 
         await storage.connect()
-        await storage.create_collection(collection_name, vector_size, force_recreate=False)
+        await storage.create_collection(
+            collection_name, vector_size, force_recreate=False
+        )
         await storage.disconnect()
 
         return True
@@ -144,6 +160,7 @@ async def create_qdrant_collection(collection_name: str, vector_size: int = 768)
         print(f"[FAIL] Error creating Qdrant collection: {e}")
         return False
 
+
 async def list_existing_databases() -> None:
     """List existing Neo4j databases and Qdrant collections."""
     print_section("Existing Neo4j Databases")
@@ -151,9 +168,9 @@ async def list_existing_databases() -> None:
     try:
         from neo4j import AsyncGraphDatabase
 
-        uri = os.getenv('NEO4J_URI', 'bolt://localhost:7687')
-        username = os.getenv('NEO4J_USERNAME', 'neo4j')
-        password = os.getenv('NEO4J_PASSWORD', 'password')
+        uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
+        username = os.getenv("NEO4J_USERNAME", "neo4j")
+        password = os.getenv("NEO4J_PASSWORD", "password")
 
         driver = AsyncGraphDatabase.driver(uri, auth=(username, password))
 
@@ -169,7 +186,9 @@ async def list_existing_databases() -> None:
                     print_result("Database", db)
 
         except Exception as e:
-            print(f"[WARN] Cannot list databases via system database (likely Neo4j Community Edition): {e}")
+            print(
+                f"[WARN] Cannot list databases via system database (likely Neo4j Community Edition): {e}"
+            )
             print(f"[INFO] Attempting to connect to default 'neo4j' database...")
 
             try:
@@ -190,28 +209,29 @@ async def list_existing_databases() -> None:
         from qdrant_client import QdrantClient
 
         # Use the same logic as the storage classes for HTTPS support
-        qdrant_url = os.getenv('QDRANT_URL')
-        qdrant_api_key = os.getenv('QDRANT_API_KEY')
+        qdrant_url = os.getenv("QDRANT_URL")
+        qdrant_api_key = os.getenv("QDRANT_API_KEY")
 
         if qdrant_url:
             # Parse URL for connection
             from urllib.parse import urlparse
+
             parsed = urlparse(qdrant_url)
             hostname = parsed.hostname or "localhost"
-            port = parsed.port or (443 if parsed.scheme == 'https' else 6333)
-            use_https = parsed.scheme == 'https'
+            port = parsed.port or (443 if parsed.scheme == "https" else 6333)
+            use_https = parsed.scheme == "https"
 
             client = QdrantClient(
                 host=hostname,
                 port=port,
                 https=use_https,
                 api_key=qdrant_api_key,
-                verify=verify_ssl
+                verify=verify_ssl,
             )
         else:
             # Fall back to host/port
-            qdrant_host = os.getenv('QDRANT_HOST', 'localhost')
-            qdrant_port = int(os.getenv('QDRANT_PORT', '6333'))
+            qdrant_host = os.getenv("QDRANT_HOST", "localhost")
+            qdrant_port = int(os.getenv("QDRANT_PORT", "6333"))
             use_https = qdrant_port == 443
 
             client = QdrantClient(
@@ -219,7 +239,7 @@ async def list_existing_databases() -> None:
                 port=qdrant_port,
                 https=use_https,
                 api_key=qdrant_api_key,
-                verify=verify_ssl
+                verify=verify_ssl,
             )
 
         collections = client.get_collections()
@@ -230,6 +250,7 @@ async def list_existing_databases() -> None:
 
     except Exception as e:
         print(f"[FAIL] Error listing Qdrant collections: {e}")
+
 
 async def main():
     """Main function."""
@@ -257,13 +278,22 @@ Environment Variables:
 Note:
   Neo4j Community Edition only supports the default 'neo4j' database.
   To create custom databases, you need Neo4j Enterprise Edition.
-        """
+        """,
     )
 
-    parser.add_argument('--neo4j-database', help='Neo4j database name to create')
-    parser.add_argument('--qdrant-collection', help='Qdrant collection name to create')
-    parser.add_argument('--vector-size', type=int, default=768, help='Vector size for Qdrant collection (default: 768)')
-    parser.add_argument('--list-existing', action='store_true', help='List existing databases and collections')
+    parser.add_argument("--neo4j-database", help="Neo4j database name to create")
+    parser.add_argument("--qdrant-collection", help="Qdrant collection name to create")
+    parser.add_argument(
+        "--vector-size",
+        type=int,
+        default=768,
+        help="Vector size for Qdrant collection (default: 768)",
+    )
+    parser.add_argument(
+        "--list-existing",
+        action="store_true",
+        help="List existing databases and collections",
+    )
 
     args = parser.parse_args()
 
@@ -290,9 +320,13 @@ Note:
     if args.qdrant_collection:
         print_section(f"Creating Qdrant Collection: {args.qdrant_collection}")
         if await create_qdrant_collection(args.qdrant_collection, args.vector_size):
-            print(f"[OK] Qdrant collection '{args.qdrant_collection}' created successfully!")
+            print(
+                f"[OK] Qdrant collection '{args.qdrant_collection}' created successfully!"
+            )
         else:
-            print(f"[FAIL] Failed to create Qdrant collection '{args.qdrant_collection}'")
+            print(
+                f"[FAIL] Failed to create Qdrant collection '{args.qdrant_collection}'"
+            )
             success = False
 
     if success:
@@ -301,6 +335,7 @@ Note:
     else:
         print("\n[ERROR] Some operations failed!")
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(asyncio.run(main()))

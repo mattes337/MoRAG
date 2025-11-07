@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """System status check script for MoRAG."""
 
-import sys
 import os
+import sys
 from pathlib import Path
 
 # Add the project root to the Python path
@@ -23,7 +23,7 @@ structlog.configure(
         structlog.processors.StackInfoRenderer(),
         structlog.processors.format_exc_info,
         structlog.processors.UnicodeDecoder(),
-        structlog.processors.JSONRenderer()
+        structlog.processors.JSONRenderer(),
     ],
     context_class=dict,
     logger_factory=structlog.stdlib.LoggerFactory(),
@@ -36,9 +36,9 @@ logger = structlog.get_logger(__name__)
 
 def check_project_structure():
     """Check project structure."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("  Project Structure Check")
-    print("="*60)
+    print("=" * 60)
 
     required_dirs = [
         "packages/morag",
@@ -49,7 +49,7 @@ def check_project_structure():
         "packages/morag-graph",
         "tests",
         "cli",
-        "docs"
+        "docs",
     ]
 
     all_good = True
@@ -65,9 +65,9 @@ def check_project_structure():
 
 def check_optional_dependencies():
     """Check optional dependencies status."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("  Optional Dependencies Check")
-    print("="*60)
+    print("=" * 60)
 
     try:
         from morag_core.optional_deps import optional_deps
@@ -96,12 +96,13 @@ def check_optional_dependencies():
 
 def check_graph_processing():
     """Check graph processing availability."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("  Graph Processing Check")
-    print("="*60)
+    print("=" * 60)
 
     try:
-        from morag_graph import BaseExtractor, Entity, Relation, GraphStorage
+        from morag_graph import BaseExtractor, Entity, GraphStorage, Relation
+
         print("✅ Graph processing components available")
 
         # Test basic functionality - BaseExtractor is abstract, so skip instantiation
@@ -109,11 +110,9 @@ def check_graph_processing():
 
         # Test entity creation with UUID format
         import uuid
+
         entity = Entity(
-            id=str(uuid.uuid4()),
-            name="Test Entity",
-            type="test",
-            properties={}
+            id=str(uuid.uuid4()), name="Test Entity", type="test", properties={}
         )
         print("✅ Entity model working")
 
@@ -122,7 +121,7 @@ def check_graph_processing():
             source_id=str(uuid.uuid4()),
             target_id=str(uuid.uuid4()),
             type="test_relation",
-            properties={}
+            properties={},
         )
         print("✅ Relation model working")
 
@@ -135,9 +134,9 @@ def check_graph_processing():
 
 def check_core_imports():
     """Check core package imports."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("  Core Package Imports Check")
-    print("="*60)
+    print("=" * 60)
 
     imports_to_test = [
         ("morag_core.config", "Settings"),
@@ -162,12 +161,13 @@ def check_core_imports():
 
 def check_configuration():
     """Check configuration loading."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("  Configuration Check")
-    print("="*60)
+    print("=" * 60)
 
     try:
         from morag_core.config import Settings
+
         settings = Settings()
 
         print(f"✅ Configuration loaded successfully")
@@ -187,12 +187,12 @@ def check_configuration():
 
 def check_performance_optimizations():
     """Check performance optimization features."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("  Performance Optimizations Check")
-    print("="*60)
+    print("=" * 60)
 
     try:
-        from morag_core.optimization import ProcessingOptimizer, PerformanceTracker
+        from morag_core.optimization import PerformanceTracker, ProcessingOptimizer
         from morag_core.performance import PerformanceMonitor
 
         print("✅ Performance optimization modules available")
@@ -217,19 +217,21 @@ def check_performance_optimizations():
 
 def run_basic_functionality_test():
     """Run a basic functionality test."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("  Basic Functionality Test")
-    print("="*60)
+    print("=" * 60)
 
     try:
         # Test document processor initialization
         from morag_document.processor import DocumentProcessor
+
         processor = DocumentProcessor()
         print("✅ Document processor initialized")
 
         # Test embedding service initialization
-        from morag_services.embedding import GeminiEmbeddingService
         from morag_core.config import Settings
+        from morag_services.embedding import GeminiEmbeddingService
+
         settings = Settings()
         embedding_service = GeminiEmbeddingService(api_key=settings.gemini_api_key)
         print("✅ Embedding service initialized")
@@ -245,7 +247,7 @@ def run_basic_functionality_test():
 def main():
     """Main function to run all checks."""
     print("🔍 MoRAG System Status Check")
-    print("="*60)
+    print("=" * 60)
 
     checks = [
         ("Project Structure", check_project_structure),
@@ -266,9 +268,9 @@ def main():
             results[check_name] = False
 
     # Summary
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("  Summary")
-    print("="*60)
+    print("=" * 60)
 
     passed = sum(1 for result in results.values() if result)
     total = len(results)

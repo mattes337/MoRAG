@@ -6,31 +6,37 @@ from typing import Any, Dict, List, Optional, Union
 
 import google.generativeai as genai
 import numpy as np
+import structlog
 from tenacity import (
+    RetryError,
     retry,
+    retry_if_exception_type,
     stop_after_attempt,
     stop_never,
     wait_exponential,
-    retry_if_exception_type,
-    RetryError,
 )
-import structlog
 
 # Import agents framework - required
 try:
     from agents import get_agent
 except ImportError:
-    raise ImportError("Agents framework is required. Please install the agents package.")
+    raise ImportError(
+        "Agents framework is required. Please install the agents package."
+    )
 
 from morag_core.config import settings
 from morag_core.exceptions import (
     ExternalServiceError,
+    QuotaExceededError,
     RateLimitError,
     TimeoutError,
-    QuotaExceededError,
 )
-from morag_core.models.embedding import EmbeddingResult, BatchEmbeddingResult, SummaryResult
 from morag_core.interfaces.service import BaseService, CircuitBreaker
+from morag_core.models.embedding import (
+    BatchEmbeddingResult,
+    EmbeddingResult,
+    SummaryResult,
+)
 
 logger = structlog.get_logger(__name__)
 
@@ -47,14 +53,16 @@ def get_retry_decorator_for_rate_limits():
             wait=wait_exponential(
                 multiplier=settings.retry_base_delay,
                 max=settings.retry_max_delay,
-                exp_base=settings.retry_exponential_base
+                exp_base=settings.retry_exponential_base,
             ),
             reraise=True,
         )
     else:
         # Limited retries (legacy behavior)
         return retry(
-            retry=retry_if_exception_type((ExternalServiceError, TimeoutError, RateLimitError)),
+            retry=retry_if_exception_type(
+                (ExternalServiceError, TimeoutError, RateLimitError)
+            ),
             stop=stop_after_attempt(3),
             wait=wait_exponential(multiplier=1, min=1, max=10),
             reraise=True,
@@ -103,8 +111,14 @@ class GeminiEmbeddingService(BaseService):
         self._initialized = False
 
         # Batch embedding configuration
-        self.batch_size = max(1, min(batch_size or settings.embedding_batch_size, 100))  # Clamp between 1 and 100
-        self.enable_batch_embedding = enable_batch_embedding if enable_batch_embedding is not None else settings.enable_batch_embedding
+        self.batch_size = max(
+            1, min(batch_size or settings.embedding_batch_size, 100)
+        )  # Clamp between 1 and 100
+        self.enable_batch_embedding = (
+            enable_batch_embedding
+            if enable_batch_embedding is not None
+            else settings.enable_batch_embedding
+        )
 
     async def initialize(self) -> bool:
         """Initialize the Gemini service.
@@ -119,7 +133,7 @@ class GeminiEmbeddingService(BaseService):
             # Test the API with a simple embedding request
             # Ensure model name has proper prefix for new SDK
             model_name = self.embedding_model
-            if not model_name.startswith(('models/', 'tunedModels/')):
+            if not model_name.startswith(("models/", "tunedModels/")):
                 model_name = f"models/{model_name}"
             _ = genai.embed_content(model=model_name, content="Test")
 
@@ -175,8 +189,7 @@ class GeminiEmbeddingService(BaseService):
         new_tokens = time_elapsed * self.rate_limit_refill_rate
 
         self.rate_limit_tokens = min(
-            self.rate_limit_per_minute,
-            self.rate_limit_tokens + new_tokens
+            self.rate_limit_per_minute, self.rate_limit_tokens + new_tokens
         )
         self.rate_limit_last_refill = current_time
 
@@ -226,7 +239,7 @@ class GeminiEmbeddingService(BaseService):
                 # Call Gemini API to generate embedding
                 # Ensure model name has proper prefix for new SDK
                 model_name = self.embedding_model
-                if not model_name.startswith(('models/', 'tunedModels/')):
+                if not model_name.startswith(("models/", "tunedModels/")):
                     model_name = f"models/{model_name}"
                 result = genai.embed_content(model=model_name, content=text)
 
@@ -247,17 +260,25 @@ class GeminiEmbeddingService(BaseService):
 
                 # Map exception to appropriate error type
                 error_str = str(e)
-                if ("429" in error_str or "RESOURCE_EXHAUSTED" in error_str or
-                    "rate limit" in error_str.lower() or "quota" in error_str.lower()):
+                if (
+                    "429" in error_str
+                    or "RESOURCE_EXHAUSTED" in error_str
+                    or "rate limit" in error_str.lower()
+                    or "quota" in error_str.lower()
+                ):
                     raise RateLimitError(f"Gemini API rate limit exceeded: {error_str}")
                 elif "timeout" in error_str.lower():
                     raise TimeoutError(f"Gemini API timeout: {error_str}")
                 else:
-                    raise ExternalServiceError(f"Gemini API error: {error_str}", "gemini")
+                    raise ExternalServiceError(
+                        f"Gemini API error: {error_str}", "gemini"
+                    )
 
         return await _generate_with_retry()
 
-    async def _generate_batch_embeddings_native(self, texts: List[str]) -> BatchEmbeddingResult:
+    async def _generate_batch_embeddings_native(
+        self, texts: List[str]
+    ) -> BatchEmbeddingResult:
         """Generate embeddings using Gemini's native batch API.
 
         Args:
@@ -271,7 +292,9 @@ class GeminiEmbeddingService(BaseService):
             ExternalServiceError: If Gemini API call fails
         """
         if not texts:
-            return BatchEmbeddingResult(texts=[], embeddings=[], model=self.embedding_model)
+            return BatchEmbeddingResult(
+                texts=[], embeddings=[], model=self.embedding_model
+            )
 
         if not self._initialized:
             await self.initialize()
@@ -291,11 +314,10 @@ class GeminiEmbeddingService(BaseService):
                 # Call Gemini API with multiple contents for batch embedding
                 # Ensure model name has proper prefix for new SDK
                 model_name = self.embedding_model
-                if not model_name.startswith(('models/', 'tunedModels/')):
+                if not model_name.startswith(("models/", "tunedModels/")):
                     model_name = f"models/{model_name}"
                 result = genai.embed_content(
-                    model=model_name,
-                    content=texts  # Pass list of texts directly
+                    model=model_name, content=texts  # Pass list of texts directly
                 )
 
                 # Record success for circuit breaker
@@ -303,21 +325,23 @@ class GeminiEmbeddingService(BaseService):
 
                 # Extract embeddings from batch result
                 embeddings = []
-                if hasattr(result, 'embedding') and isinstance(result.embedding, list):
+                if hasattr(result, "embedding") and isinstance(result.embedding, list):
                     # Single embedding returned (shouldn't happen with multiple texts)
                     embeddings = [result.embedding] * len(texts)
-                elif hasattr(result, 'embeddings') and isinstance(result.embeddings, list):
+                elif hasattr(result, "embeddings") and isinstance(
+                    result.embeddings, list
+                ):
                     # Multiple embeddings returned
                     embeddings = result.embeddings
                 elif isinstance(result, dict):
                     # Handle dict response format
-                    if 'embeddings' in result:
-                        embeddings = result['embeddings']
-                    elif 'embedding' in result:
-                        embeddings = [result['embedding']] * len(texts)
+                    if "embeddings" in result:
+                        embeddings = result["embeddings"]
+                    elif "embedding" in result:
+                        embeddings = [result["embedding"]] * len(texts)
                 else:
                     # Fallback: try to extract from result structure
-                    embeddings = [getattr(result, 'embedding', [])] * len(texts)
+                    embeddings = [getattr(result, "embedding", [])] * len(texts)
 
                 # Ensure we have the right number of embeddings
                 if len(embeddings) != len(texts):
@@ -325,23 +349,27 @@ class GeminiEmbeddingService(BaseService):
                         "Batch embedding count mismatch",
                         expected=len(texts),
                         received=len(embeddings),
-                        texts_sample=texts[:3] if len(texts) > 3 else texts
+                        texts_sample=texts[:3] if len(texts) > 3 else texts,
                     )
                     # Pad or truncate as needed
                     if len(embeddings) < len(texts):
                         # Pad with zeros if we got fewer embeddings
-                        zero_embedding = [0.0] * (len(embeddings[0]) if embeddings else 768)
-                        embeddings.extend([zero_embedding] * (len(texts) - len(embeddings)))
+                        zero_embedding = [0.0] * (
+                            len(embeddings[0]) if embeddings else 768
+                        )
+                        embeddings.extend(
+                            [zero_embedding] * (len(texts) - len(embeddings))
+                        )
                     else:
                         # Truncate if we got more embeddings
-                        embeddings = embeddings[:len(texts)]
+                        embeddings = embeddings[: len(texts)]
 
                 # Create and return batch result
                 return BatchEmbeddingResult(
                     texts=texts,
                     embeddings=embeddings,
                     model=self.embedding_model,
-                    metadata={"batch_size": len(texts), "method": "native_batch"}
+                    metadata={"batch_size": len(texts), "method": "native_batch"},
                 )
 
             except Exception as e:
@@ -350,13 +378,19 @@ class GeminiEmbeddingService(BaseService):
 
                 # Map exception to appropriate error type
                 error_str = str(e)
-                if ("429" in error_str or "RESOURCE_EXHAUSTED" in error_str or
-                    "rate limit" in error_str.lower() or "quota" in error_str.lower()):
+                if (
+                    "429" in error_str
+                    or "RESOURCE_EXHAUSTED" in error_str
+                    or "rate limit" in error_str.lower()
+                    or "quota" in error_str.lower()
+                ):
                     raise RateLimitError(f"Gemini API rate limit exceeded: {error_str}")
                 elif "timeout" in error_str.lower():
                     raise TimeoutError(f"Gemini API timeout: {error_str}")
                 else:
-                    raise ExternalServiceError(f"Gemini API error: {error_str}", "gemini")
+                    raise ExternalServiceError(
+                        f"Gemini API error: {error_str}", "gemini"
+                    )
 
         return await _generate_batch_with_retry()
 
@@ -374,7 +408,9 @@ class GeminiEmbeddingService(BaseService):
             ExternalServiceError: If Gemini API calls fail
         """
         if not texts:
-            return BatchEmbeddingResult(texts=[], embeddings=[], model=self.embedding_model)
+            return BatchEmbeddingResult(
+                texts=[], embeddings=[], model=self.embedding_model
+            )
 
         # Use batch embedding if enabled and supported
         if self.enable_batch_embedding:
@@ -384,7 +420,7 @@ class GeminiEmbeddingService(BaseService):
                 logger.warning(
                     "Batch embedding failed, falling back to sequential processing",
                     error=str(e),
-                    error_type=e.__class__.__name__
+                    error_type=e.__class__.__name__,
                 )
                 # Fall back to sequential processing
                 return await self._generate_batch_embeddings_sequential(texts)
@@ -392,7 +428,9 @@ class GeminiEmbeddingService(BaseService):
             # Use sequential processing
             return await self._generate_batch_embeddings_sequential(texts)
 
-    async def _generate_batch_embeddings_optimized(self, texts: List[str]) -> BatchEmbeddingResult:
+    async def _generate_batch_embeddings_optimized(
+        self, texts: List[str]
+    ) -> BatchEmbeddingResult:
         """Generate embeddings using optimized batch processing.
 
         Args:
@@ -407,7 +445,7 @@ class GeminiEmbeddingService(BaseService):
 
         # Process texts in batches using the configured batch size
         for i in range(0, len(texts), self.batch_size):
-            batch_texts = texts[i:i + self.batch_size]
+            batch_texts = texts[i : i + self.batch_size]
 
             try:
                 # Use native batch API for this chunk
@@ -424,7 +462,7 @@ class GeminiEmbeddingService(BaseService):
                     "Processed batch successfully",
                     batch_size=len(batch_texts),
                     total_processed=len(processed_texts),
-                    total_texts=len(texts)
+                    total_texts=len(texts),
                 )
 
                 # Small delay between batches to be respectful to the API
@@ -436,7 +474,7 @@ class GeminiEmbeddingService(BaseService):
                     "Batch processing failed for chunk",
                     batch_start=i,
                     batch_size=len(batch_texts),
-                    error=str(e)
+                    error=str(e),
                 )
                 # Add error for each text in the failed batch
                 for text in batch_texts:
@@ -447,7 +485,9 @@ class GeminiEmbeddingService(BaseService):
 
         # If all requests failed, raise an exception
         if len(all_errors) == len(texts):
-            raise ExternalServiceError(f"All batch embedding requests failed: {all_errors[0]}", "gemini")
+            raise ExternalServiceError(
+                f"All batch embedding requests failed: {all_errors[0]}", "gemini"
+            )
 
         # Create and return batch result
         return BatchEmbeddingResult(
@@ -458,11 +498,13 @@ class GeminiEmbeddingService(BaseService):
                 "errors": all_errors if all_errors else [],
                 "method": "optimized_batch",
                 "batch_size": self.batch_size,
-                "total_batches": (len(texts) + self.batch_size - 1) // self.batch_size
-            }
+                "total_batches": (len(texts) + self.batch_size - 1) // self.batch_size,
+            },
         )
 
-    async def _generate_batch_embeddings_sequential(self, texts: List[str]) -> BatchEmbeddingResult:
+    async def _generate_batch_embeddings_sequential(
+        self, texts: List[str]
+    ) -> BatchEmbeddingResult:
         """Generate embeddings using sequential processing (fallback method).
 
         Args:
@@ -477,7 +519,7 @@ class GeminiEmbeddingService(BaseService):
         # Process in smaller batches to avoid overwhelming the API
         fallback_batch_size = 5  # Smaller batch size for sequential processing
         for i in range(0, len(texts), fallback_batch_size):
-            batch = texts[i:i+fallback_batch_size]
+            batch = texts[i : i + fallback_batch_size]
 
             # Process batch sequentially with delays to avoid rate limits
             for text in batch:
@@ -487,7 +529,9 @@ class GeminiEmbeddingService(BaseService):
                 except Exception as e:
                     errors.append(str(e))
                     # Add a placeholder embedding (zeros)
-                    embeddings.append([0.0] * 768)  # Assuming 768-dimensional embeddings
+                    embeddings.append(
+                        [0.0] * 768
+                    )  # Assuming 768-dimensional embeddings
 
                 # Small delay between requests to avoid rate limits
                 await asyncio.sleep(0.2)  # 200ms delay between requests
@@ -498,7 +542,9 @@ class GeminiEmbeddingService(BaseService):
 
         # If all requests failed, raise an exception
         if len(errors) == len(texts):
-            raise ExternalServiceError(f"All sequential embedding requests failed: {errors[0]}", "gemini")
+            raise ExternalServiceError(
+                f"All sequential embedding requests failed: {errors[0]}", "gemini"
+            )
 
         # Create and return batch result
         return BatchEmbeddingResult(
@@ -507,11 +553,13 @@ class GeminiEmbeddingService(BaseService):
             model=self.embedding_model,
             metadata={
                 "errors": errors if errors else [],
-                "method": "sequential_fallback"
-            }
+                "method": "sequential_fallback",
+            },
         )
 
-    async def generate_summary(self, text: str, max_length: int = 200, language: Optional[str] = None) -> SummaryResult:
+    async def generate_summary(
+        self, text: str, max_length: int = 200, language: Optional[str] = None
+    ) -> SummaryResult:
         """Generate summary for text.
 
         Args:
@@ -548,17 +596,17 @@ class GeminiEmbeddingService(BaseService):
                 language_instruction = ""
                 if language:
                     language_names = {
-                        'en': 'English',
-                        'de': 'German',
-                        'fr': 'French',
-                        'es': 'Spanish',
-                        'it': 'Italian',
-                        'pt': 'Portuguese',
-                        'nl': 'Dutch',
-                        'ru': 'Russian',
-                        'zh': 'Chinese',
-                        'ja': 'Japanese',
-                        'ko': 'Korean'
+                        "en": "English",
+                        "de": "German",
+                        "fr": "French",
+                        "es": "Spanish",
+                        "it": "Italian",
+                        "pt": "Portuguese",
+                        "nl": "Dutch",
+                        "ru": "Russian",
+                        "zh": "Chinese",
+                        "ja": "Japanese",
+                        "ko": "Korean",
                     }
                     language_name = language_names.get(language, language)
                     language_instruction = f"CRITICAL: You MUST write the summary ONLY in {language_name}. Do NOT use any other language. The summary language MUST match the specified language ({language_name}). "
@@ -568,14 +616,12 @@ class GeminiEmbeddingService(BaseService):
                 summary_agent.update_config(
                     agent_config={
                         "max_summary_length": max_length,
-                        "target_language": language
+                        "target_language": language,
                     }
                 )
 
                 result = await summary_agent.execute(
-                    text,
-                    target_length=max_length,
-                    language=language
+                    text, target_length=max_length, language=language
                 )
                 summary_text = result.summary
 
@@ -594,12 +640,18 @@ class GeminiEmbeddingService(BaseService):
 
                 # Map exception to appropriate error type
                 error_str = str(e)
-                if ("429" in error_str or "RESOURCE_EXHAUSTED" in error_str or
-                    "rate limit" in error_str.lower() or "quota" in error_str.lower()):
+                if (
+                    "429" in error_str
+                    or "RESOURCE_EXHAUSTED" in error_str
+                    or "rate limit" in error_str.lower()
+                    or "quota" in error_str.lower()
+                ):
                     raise RateLimitError(f"Gemini API rate limit exceeded: {error_str}")
                 elif "timeout" in error_str.lower():
                     raise TimeoutError(f"Gemini API timeout: {error_str}")
                 else:
-                    raise ExternalServiceError(f"Gemini API error: {error_str}", "gemini")
+                    raise ExternalServiceError(
+                        f"Gemini API error: {error_str}", "gemini"
+                    )
 
         return await _generate_summary_with_retry()

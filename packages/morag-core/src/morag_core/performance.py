@@ -1,10 +1,11 @@
 """Performance monitoring and optimization utilities for MoRAG."""
 
-import time
 import asyncio
-from typing import Dict, List, Optional, Any, Callable
-from dataclasses import dataclass, field
+import time
 from contextlib import asynccontextmanager
+from dataclasses import dataclass, field
+from typing import Any, Callable, Dict, List, Optional
+
 import structlog
 
 logger = structlog.get_logger(__name__)
@@ -13,6 +14,7 @@ logger = structlog.get_logger(__name__)
 @dataclass
 class PerformanceMetrics:
     """Performance metrics for operations."""
+
     operation_name: str
     start_time: float
     end_time: Optional[float] = None
@@ -33,12 +35,14 @@ class PerformanceMonitor:
         self.metrics: List[PerformanceMetrics] = []
         self.active_operations: Dict[str, PerformanceMetrics] = {}
 
-    def start_operation(self, operation_name: str, metadata: Optional[Dict[str, Any]] = None) -> PerformanceMetrics:
+    def start_operation(
+        self, operation_name: str, metadata: Optional[Dict[str, Any]] = None
+    ) -> PerformanceMetrics:
         """Start tracking an operation."""
         metric = PerformanceMetrics(
             operation_name=operation_name,
             start_time=time.time(),
-            metadata=metadata or {}
+            metadata=metadata or {},
         )
         self.active_operations[operation_name] = metric
         return metric
@@ -54,13 +58,15 @@ class PerformanceMonitor:
                 "Operation completed",
                 operation=operation_name,
                 duration=duration,
-                metadata=metric.metadata
+                metadata=metric.metadata,
             )
             return duration
         return None
 
     @asynccontextmanager
-    async def track_operation(self, operation_name: str, metadata: Optional[Dict[str, Any]] = None):
+    async def track_operation(
+        self, operation_name: str, metadata: Optional[Dict[str, Any]] = None
+    ):
         """Context manager for tracking operations."""
         metric = self.start_operation(operation_name, metadata)
         try:
@@ -86,7 +92,7 @@ class PerformanceMonitor:
                 "total_time": sum(durations),
                 "avg_time": sum(durations) / len(durations),
                 "min_time": min(durations),
-                "max_time": max(durations)
+                "max_time": max(durations),
             }
 
         return summary
@@ -105,7 +111,7 @@ class PerformanceOptimizer:
         processing_time: float,
         target_time: float = 2.0,
         min_batch_size: int = 10,
-        max_batch_size: int = 200
+        max_batch_size: int = 200,
     ) -> int:
         """Optimize batch size based on processing time."""
         if processing_time > target_time * 1.5:
@@ -124,16 +130,14 @@ class PerformanceOptimizer:
                 old_size=current_batch_size,
                 new_size=new_size,
                 processing_time=processing_time,
-                target_time=target_time
+                target_time=target_time,
             )
 
         return new_size
 
     @staticmethod
     def calculate_optimal_delay(
-        batch_size: int,
-        rate_limit_per_minute: int,
-        safety_factor: float = 0.8
+        batch_size: int, rate_limit_per_minute: int, safety_factor: float = 0.8
     ) -> float:
         """Calculate optimal delay between batches."""
         # Calculate requests per second with safety factor
@@ -146,7 +150,7 @@ class PerformanceOptimizer:
             "Calculated optimal delay",
             batch_size=batch_size,
             rate_limit_per_minute=rate_limit_per_minute,
-            delay=delay
+            delay=delay,
         )
 
         return delay
@@ -157,7 +161,7 @@ async def optimize_async_processing(
     process_func: Callable,
     batch_size: int = 50,
     max_concurrent: int = 5,
-    delay_between_batches: float = 0.05
+    delay_between_batches: float = 0.05,
 ) -> List[Any]:
     """Optimize async processing with batching and concurrency control."""
 
@@ -167,7 +171,7 @@ async def optimize_async_processing(
         return await asyncio.gather(*tasks, return_exceptions=True)
 
     # Split items into batches
-    batches = [items[i:i + batch_size] for i in range(0, len(items), batch_size)]
+    batches = [items[i : i + batch_size] for i in range(0, len(items), batch_size)]
 
     # Process batches with concurrency control
     semaphore = asyncio.Semaphore(max_concurrent)
@@ -204,7 +208,7 @@ def profile_function(func: Callable) -> Callable:
                 function=func.__name__,
                 duration=duration,
                 args_count=len(args),
-                kwargs_count=len(kwargs)
+                kwargs_count=len(kwargs),
             )
 
     async def async_wrapper(*args, **kwargs):
@@ -219,7 +223,7 @@ def profile_function(func: Callable) -> Callable:
                 function=func.__name__,
                 duration=duration,
                 args_count=len(args),
-                kwargs_count=len(kwargs)
+                kwargs_count=len(kwargs),
             )
 
     return async_wrapper if asyncio.iscoroutinefunction(func) else wrapper

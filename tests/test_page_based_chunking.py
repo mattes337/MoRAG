@@ -1,10 +1,10 @@
-import pytest
 import tempfile
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
-from morag_document import DocumentProcessor, DocumentChunk, DocumentParseResult
+import pytest
 from morag_core.config import settings
+from morag_document import DocumentChunk, DocumentParseResult, DocumentProcessor
 
 
 @pytest.fixture
@@ -22,36 +22,36 @@ def sample_chunks():
             chunk_type="text",
             page_number=1,
             element_id="chunk_1",
-            metadata={"element_type": "Text"}
+            metadata={"element_type": "Text"},
         ),
         DocumentChunk(
             text="This is the second paragraph on page 1.",
             chunk_type="text",
             page_number=1,
             element_id="chunk_2",
-            metadata={"element_type": "Text"}
+            metadata={"element_type": "Text"},
         ),
         DocumentChunk(
             text="This is a title on page 2.",
             chunk_type="title",
             page_number=2,
             element_id="chunk_3",
-            metadata={"element_type": "Title"}
+            metadata={"element_type": "Title"},
         ),
         DocumentChunk(
             text="This is content on page 2.",
             chunk_type="text",
             page_number=2,
             element_id="chunk_4",
-            metadata={"element_type": "Text"}
+            metadata={"element_type": "Text"},
         ),
         DocumentChunk(
             text="This is the only content on page 3.",
             chunk_type="text",
             page_number=3,
             element_id="chunk_5",
-            metadata={"element_type": "Text"}
-        )
+            metadata={"element_type": "Text"},
+        ),
     ]
 
 
@@ -63,11 +63,11 @@ def sample_parse_result(sample_chunks):
         metadata={
             "parser": "test",
             "file_name": "test.pdf",
-            "total_chunks": len(sample_chunks)
+            "total_chunks": len(sample_chunks),
         },
         images=[],
         total_pages=3,
-        word_count=50
+        word_count=50,
     )
 
 
@@ -75,10 +75,14 @@ class TestPageBasedChunking:
     """Test page-based chunking functionality."""
 
     @pytest.mark.asyncio
-    async def test_apply_page_based_chunking_basic(self, document_processor, sample_parse_result):
+    async def test_apply_page_based_chunking_basic(
+        self, document_processor, sample_parse_result
+    ):
         """Test basic page-based chunking functionality."""
         # Apply page-based chunking
-        result = await document_processor._apply_page_based_chunking(sample_parse_result)
+        result = await document_processor._apply_page_based_chunking(
+            sample_parse_result
+        )
 
         # Should have 3 chunks (one per page)
         assert len(result.chunks) == 3
@@ -121,7 +125,7 @@ class TestPageBasedChunking:
                 chunk_type="text",
                 page_number=1,
                 element_id="large_chunk",
-                metadata={"element_type": "Text"}
+                metadata={"element_type": "Text"},
             )
         ]
 
@@ -130,11 +134,11 @@ class TestPageBasedChunking:
             metadata={"parser": "test"},
             images=[],
             total_pages=1,
-            word_count=1000
+            word_count=1000,
         )
 
         # Mock settings to use a smaller max size for testing
-        with patch.object(settings, 'max_page_chunk_size', 1000):
+        with patch.object(settings, "max_page_chunk_size", 1000):
             result = await document_processor._apply_page_based_chunking(parse_result)
 
         # Should split into multiple chunks
@@ -154,7 +158,7 @@ class TestPageBasedChunking:
             metadata={"parser": "test"},
             images=[],
             total_pages=0,
-            word_count=0
+            word_count=0,
         )
 
         result = await document_processor._apply_page_based_chunking(empty_parse_result)
@@ -167,7 +171,7 @@ class TestPageBasedChunking:
     async def test_parse_document_with_page_chunking(self, document_processor):
         """Test document parsing with page-based chunking enabled."""
         # Create a temporary PDF file for testing
-        with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp_file:
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp_file:
             tmp_path = Path(tmp_file.name)
             tmp_file.write(b"dummy pdf content")
 
@@ -178,14 +182,14 @@ class TestPageBasedChunking:
                     text="Page 1 content",
                     chunk_type="text",
                     page_number=1,
-                    element_id="p1_chunk1"
+                    element_id="p1_chunk1",
                 ),
                 DocumentChunk(
                     text="More page 1 content",
                     chunk_type="text",
                     page_number=1,
-                    element_id="p1_chunk2"
-                )
+                    element_id="p1_chunk2",
+                ),
             ]
 
             mock_result = DocumentParseResult(
@@ -193,16 +197,16 @@ class TestPageBasedChunking:
                 metadata={"parser": "mock"},
                 images=[],
                 total_pages=1,
-                word_count=10
+                word_count=10,
             )
 
-            with patch.object(document_processor, '_parse_with_unstructured', return_value=mock_result):
-                with patch.object(settings, 'default_chunking_strategy', 'page'):
-                    with patch.object(settings, 'enable_page_based_chunking', True):
+            with patch.object(
+                document_processor, "_parse_with_unstructured", return_value=mock_result
+            ):
+                with patch.object(settings, "default_chunking_strategy", "page"):
+                    with patch.object(settings, "enable_page_based_chunking", True):
                         result = await document_processor.parse_document(
-                            tmp_path,
-                            use_docling=False,
-                            chunking_strategy="page"
+                            tmp_path, use_docling=False, chunking_strategy="page"
                         )
 
             # Should have applied page-based chunking
@@ -220,16 +224,17 @@ class TestPageBasedChunking:
     def test_chunking_strategy_configuration(self):
         """Test that chunking strategy configuration is properly set."""
         # Test default values
-        assert hasattr(settings, 'default_chunking_strategy')
-        assert hasattr(settings, 'enable_page_based_chunking')
-        assert hasattr(settings, 'max_page_chunk_size')
+        assert hasattr(settings, "default_chunking_strategy")
+        assert hasattr(settings, "enable_page_based_chunking")
+        assert hasattr(settings, "max_page_chunk_size")
 
         # Test that page strategy is available
         from morag_services.processing import SemanticChunker
+
         chunker = SemanticChunker()
 
         # This should not raise an exception
-        assert hasattr(chunker, '_page_chunking')
+        assert hasattr(chunker, "_page_chunking")
 
 
 if __name__ == "__main__":

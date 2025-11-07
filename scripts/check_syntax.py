@@ -21,12 +21,12 @@ Options:
 
 import argparse
 import ast
+import importlib.util
 import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import List, Tuple, Dict, Any
-import importlib.util
+from typing import Any, Dict, List, Tuple
 
 
 class SyntaxChecker:
@@ -47,14 +47,23 @@ class SyntaxChecker:
         python_files = []
 
         # If path is a specific file, return it directly
-        if path and path.is_file() and str(path).endswith('.py'):
+        if path and path.is_file() and str(path).endswith(".py"):
             return [path]
 
         # Skip certain directories
         skip_dirs = {
-            '__pycache__', '.git', 'venv', 'env', '.venv',
-            'node_modules', '.pytest_cache', 'htmlcov',
-            '.mypy_cache', '.coverage', 'dist', 'build'
+            "__pycache__",
+            ".git",
+            "venv",
+            "env",
+            ".venv",
+            "node_modules",
+            ".pytest_cache",
+            "htmlcov",
+            ".mypy_cache",
+            ".coverage",
+            "dist",
+            "build",
         }
 
         for root, dirs, files in os.walk(search_path):
@@ -62,7 +71,7 @@ class SyntaxChecker:
             dirs[:] = [d for d in dirs if d not in skip_dirs]
 
             for file in files:
-                if file.endswith('.py'):
+                if file.endswith(".py"):
                     python_files.append(Path(root) / file)
 
         return sorted(python_files)
@@ -70,7 +79,7 @@ class SyntaxChecker:
     def check_syntax(self, file_path: Path) -> bool:
         """Check Python syntax by attempting to compile the file."""
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, "r", encoding="utf-8") as f:
                 source = f.read()
 
             # Try to parse the AST
@@ -129,20 +138,32 @@ class SyntaxChecker:
                     error_str = str(e).lower()
 
                     # Filter out phantom temp_module errors and other false positives
-                    if ('temp_module' in error_str or
-                        module_name in error_str or
-                        'syntax_check_' in error_str):
+                    if (
+                        "temp_module" in error_str
+                        or module_name in error_str
+                        or "syntax_check_" in error_str
+                    ):
                         # This is likely a phantom error from our syntax checking process
                         # Don't log these as they're not real issues
                         return True
-                    elif any(keyword in error_str for keyword in ['no module named', 'cannot import', 'importerror', 'modulenotfounderror']):
+                    elif any(
+                        keyword in error_str
+                        for keyword in [
+                            "no module named",
+                            "cannot import",
+                            "importerror",
+                            "modulenotfounderror",
+                        ]
+                    ):
                         warning_msg = f"Import Error in {file_path}: {e}"
                         self.warnings.append(warning_msg)
                         self.log(warning_msg, "WARNING")
                         return False
                     else:
                         # Runtime error, but imports are probably OK
-                        self.log(f"Runtime error in {file_path} (imports OK): {e}", "WARNING")
+                        self.log(
+                            f"Runtime error in {file_path} (imports OK): {e}", "WARNING"
+                        )
                         return True
             else:
                 warning_msg = f"Could not create module spec for {file_path}"
@@ -176,7 +197,9 @@ class SyntaxChecker:
             flake8_cmd = None
             for path in flake8_paths:
                 try:
-                    result = subprocess.run([path, "--version"], capture_output=True, text=True)
+                    result = subprocess.run(
+                        [path, "--version"], capture_output=True, text=True
+                    )
                     if result.returncode == 0:
                         flake8_cmd = path
                         break
@@ -190,7 +213,9 @@ class SyntaxChecker:
                 return True
 
             cmd = [flake8_cmd] + [str(f) for f in files]
-            result = subprocess.run(cmd, capture_output=True, text=True, cwd=self.project_root)
+            result = subprocess.run(
+                cmd, capture_output=True, text=True, cwd=self.project_root
+            )
 
             if result.returncode == 0:
                 self.log("✓ Flake8 checks passed")
@@ -220,7 +245,9 @@ class SyntaxChecker:
             mypy_cmd = None
             for path in mypy_paths:
                 try:
-                    result = subprocess.run([path, "--version"], capture_output=True, text=True)
+                    result = subprocess.run(
+                        [path, "--version"], capture_output=True, text=True
+                    )
                     if result.returncode == 0:
                         mypy_cmd = path
                         break
@@ -234,7 +261,9 @@ class SyntaxChecker:
                 return True
 
             cmd = [mypy_cmd] + [str(f) for f in files]
-            result = subprocess.run(cmd, capture_output=True, text=True, cwd=self.project_root)
+            result = subprocess.run(
+                cmd, capture_output=True, text=True, cwd=self.project_root
+            )
 
             if result.returncode == 0:
                 self.log("✓ MyPy type checks passed")
@@ -264,7 +293,9 @@ class SyntaxChecker:
             isort_cmd = None
             for path in isort_paths:
                 try:
-                    result = subprocess.run([path, "--version"], capture_output=True, text=True)
+                    result = subprocess.run(
+                        [path, "--version"], capture_output=True, text=True
+                    )
                     if result.returncode == 0:
                         isort_cmd = path
                         break
@@ -282,7 +313,9 @@ class SyntaxChecker:
                 cmd.append("--check-only")
             cmd.extend([str(f) for f in files])
 
-            result = subprocess.run(cmd, capture_output=True, text=True, cwd=self.project_root)
+            result = subprocess.run(
+                cmd, capture_output=True, text=True, cwd=self.project_root
+            )
 
             if result.returncode == 0:
                 self.log("✓ Import sorting OK")
@@ -328,16 +361,18 @@ class SyntaxChecker:
         # 3. Run code quality tools in batches to avoid command line length limits
         batch_size = 50  # Process files in batches to avoid command line length issues
         for i in range(0, len(files), batch_size):
-            batch = files[i:i + batch_size]
-            self.log(f"Running code quality checks on batch {i//batch_size + 1}/{(len(files) + batch_size - 1)//batch_size}")
+            batch = files[i : i + batch_size]
+            self.log(
+                f"Running code quality checks on batch {i//batch_size + 1}/{(len(files) + batch_size - 1)//batch_size}"
+            )
             self.run_flake8(batch)
             self.run_mypy(batch)
             self.run_isort_check(batch, fix=fix)
 
         # Summary
-        self.log("\n" + "="*50)
+        self.log("\n" + "=" * 50)
         self.log("SYNTAX CHECK SUMMARY")
-        self.log("="*50)
+        self.log("=" * 50)
 
         if self.errors:
             self.log(f"❌ {len(self.errors)} ERRORS found:", "ERROR")
@@ -355,10 +390,18 @@ class SyntaxChecker:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Check Python syntax for MoRAG project")
-    parser.add_argument("--fix", action="store_true", help="Automatically fix issues where possible")
-    parser.add_argument("--verbose", "-v", action="store_true", help="Show detailed output")
-    parser.add_argument("--path", type=str, help="Check specific path instead of entire project")
+    parser = argparse.ArgumentParser(
+        description="Check Python syntax for MoRAG project"
+    )
+    parser.add_argument(
+        "--fix", action="store_true", help="Automatically fix issues where possible"
+    )
+    parser.add_argument(
+        "--verbose", "-v", action="store_true", help="Show detailed output"
+    )
+    parser.add_argument(
+        "--path", type=str, help="Check specific path instead of entire project"
+    )
 
     args = parser.parse_args()
 

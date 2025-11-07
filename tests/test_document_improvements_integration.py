@@ -1,15 +1,22 @@
 """Integration tests for Document Processing Improvements."""
 
-import sys
 import os
 import re
+import sys
 from pathlib import Path
 
 # Add the packages to the Python path
 sys.path.insert(0, str(Path(__file__).parent.parent / "packages" / "morag" / "src"))
-sys.path.insert(0, str(Path(__file__).parent.parent / "packages" / "morag-services" / "src"))
-sys.path.insert(0, str(Path(__file__).parent.parent / "packages" / "morag-document" / "src"))
-sys.path.insert(0, str(Path(__file__).parent.parent / "packages" / "morag-core" / "src"))
+sys.path.insert(
+    0, str(Path(__file__).parent.parent / "packages" / "morag-services" / "src")
+)
+sys.path.insert(
+    0, str(Path(__file__).parent.parent / "packages" / "morag-document" / "src")
+)
+sys.path.insert(
+    0, str(Path(__file__).parent.parent / "packages" / "morag-core" / "src")
+)
+
 
 def test_document_id_generation():
     """Test document ID generation function."""
@@ -29,11 +36,12 @@ def test_document_id_generation():
     assert file_with_content_id.startswith("test_txt_")
     assert len(file_with_content_id) > len("test_txt_")
 
+
 def test_document_id_validation():
     """Test document ID validation pattern."""
     # Valid IDs
     valid_ids = ["test_doc", "test-doc", "TestDoc123", "doc_123-abc"]
-    pattern = r'^[a-zA-Z0-9_-]+$'
+    pattern = r"^[a-zA-Z0-9_-]+$"
 
     for doc_id in valid_ids:
         assert re.match(pattern, doc_id), f"Valid ID {doc_id} should match pattern"
@@ -42,7 +50,10 @@ def test_document_id_validation():
     invalid_ids = ["test doc", "test.doc", "test@doc", "test/doc", ""]
 
     for doc_id in invalid_ids:
-        assert not re.match(pattern, doc_id), f"Invalid ID {doc_id} should not match pattern"
+        assert not re.match(
+            pattern, doc_id
+        ), f"Invalid ID {doc_id} should not match pattern"
+
 
 def test_search_response_deduplication():
     """Test that search response formatting eliminates text duplication."""
@@ -54,13 +65,15 @@ def test_search_response_deduplication():
             "text": "This is test content",
             "content_type": "document",
             "source": "test.txt",
-            "chunk_index": 0
-        }
+            "chunk_index": 0,
+        },
     }
 
     # Simulate the formatting logic from search_similar
     text_content = mock_result.get("metadata", {}).get("text", "")
-    clean_metadata = {k: v for k, v in mock_result.get("metadata", {}).items() if k != "text"}
+    clean_metadata = {
+        k: v for k, v in mock_result.get("metadata", {}).items() if k != "text"
+    }
 
     formatted_result = {
         "id": mock_result.get("id"),
@@ -68,7 +81,7 @@ def test_search_response_deduplication():
         "content": text_content,
         "metadata": clean_metadata,
         "content_type": mock_result.get("metadata", {}).get("content_type"),
-        "source": mock_result.get("metadata", {}).get("source")
+        "source": mock_result.get("metadata", {}).get("source"),
     }
 
     # Verify no text duplication
@@ -78,6 +91,7 @@ def test_search_response_deduplication():
     assert "source" in formatted_result["metadata"]
 
     print("✅ Search response deduplication test passed")
+
 
 def test_word_boundary_logic():
     """Test word boundary detection logic."""
@@ -105,9 +119,10 @@ def test_word_boundary_logic():
         # Should be at a word boundary
         assert boundary <= position
         if boundary > 0:
-            assert text[boundary-1] in ' .!?;:,-()[]{}"\''
+            assert text[boundary - 1] in " .!?;:,-()[]{}\"'"
 
     print("✅ Word boundary detection test passed")
+
 
 def test_sentence_boundary_logic():
     """Test sentence boundary detection logic."""
@@ -116,14 +131,14 @@ def test_sentence_boundary_logic():
     text = "Dr. Smith went to the U.S.A. He bought 3.14 pounds of apples. What a day!"
 
     # Enhanced sentence boundary detection pattern
-    sentence_pattern = r'''
+    sentence_pattern = r"""
         (?<!\w\.\w.)           # Not preceded by word.word.
         (?<![A-Z][a-z]\.)      # Not preceded by abbreviation like Mr.
         (?<!\d\.\d)            # Not preceded by decimal number
         (?<=\.|\!|\?)          # Preceded by sentence ending punctuation
         \s+                    # Followed by whitespace
         (?=[A-Z])              # Followed by capital letter
-    '''
+    """
 
     boundaries = [0]  # Start of text
     for match in re.finditer(sentence_pattern, text, re.VERBOSE):
@@ -147,6 +162,7 @@ def test_sentence_boundary_logic():
         assert boundary != decimal_pos + 4  # After "3.14"
 
     print("✅ Sentence boundary detection test passed")
+
 
 def test_chunk_size_validation():
     """Test chunk size validation logic."""
@@ -175,6 +191,7 @@ def test_chunk_size_validation():
         assert not (0 <= overlap <= 1000), f"Overlap {overlap} should be invalid"
 
     print("✅ Chunk size validation test passed")
+
 
 def test_enhanced_chunking_logic():
     """Test enhanced chunking logic without requiring full imports."""
@@ -230,9 +247,10 @@ def test_enhanced_chunking_logic():
         words_in_chunk = chunk.split()
         # Each word should be complete (no partial words)
         for word in words_in_chunk:
-            assert not word.startswith(' ') and not word.endswith(' ')
+            assert not word.startswith(" ") and not word.endswith(" ")
 
     print("✅ Enhanced chunking logic test passed")
+
 
 if __name__ == "__main__":
     print("Running Document Processing Improvements Integration Tests...")

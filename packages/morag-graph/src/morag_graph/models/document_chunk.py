@@ -6,12 +6,12 @@ and are linked to both their parent Document and the entities mentioned within t
 """
 
 import json
-from typing import Dict, Optional, Any, ClassVar
+from typing import Any, ClassVar, Dict, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
+from ..utils.id_generation import IDValidator, UnifiedIDGenerator
 from .types import EntityId
-from ..utils.id_generation import UnifiedIDGenerator, IDValidator
 
 
 class DocumentChunk(BaseModel):
@@ -48,14 +48,13 @@ class DocumentChunk(BaseModel):
     def __init__(self, **data):
         """Initialize document chunk with unified ID generation."""
         # Generate unified chunk ID if not provided
-        if 'id' not in data or not data['id']:
-            data['id'] = UnifiedIDGenerator.generate_chunk_id(
-                document_id=data['document_id'],
-                chunk_index=data['chunk_index']
+        if "id" not in data or not data["id"]:
+            data["id"] = UnifiedIDGenerator.generate_chunk_id(
+                document_id=data["document_id"], chunk_index=data["chunk_index"]
             )
         super().__init__(**data)
 
-    @field_validator('id')
+    @field_validator("id")
     @classmethod
     def validate_id_format(cls, v):
         """Validate chunk ID format."""
@@ -75,7 +74,7 @@ class DocumentChunk(BaseModel):
         """Extract chunk index from chunk ID."""
         return UnifiedIDGenerator.extract_chunk_index_from_chunk(self.id)
 
-    @field_validator('chunk_index')
+    @field_validator("chunk_index")
     @classmethod
     def validate_chunk_index(cls, v: int) -> int:
         """Validate that chunk_index is non-negative."""
@@ -83,7 +82,7 @@ class DocumentChunk(BaseModel):
             raise ValueError(f"Chunk index must be non-negative, got {v}")
         return v
 
-    @field_validator('text')
+    @field_validator("text")
     @classmethod
     def validate_text(cls, v: str) -> str:
         """Validate that text is not empty."""
@@ -91,7 +90,7 @@ class DocumentChunk(BaseModel):
             raise ValueError("Text content cannot be empty")
         return v
 
-    @field_validator('document_id')
+    @field_validator("document_id")
     @classmethod
     def validate_document_id(cls, v: EntityId) -> EntityId:
         """Validate that document_id is not empty."""
@@ -118,26 +117,26 @@ class DocumentChunk(BaseModel):
         properties = self.model_dump()
 
         # Serialize metadata to JSON string for Neo4J storage
-        if 'metadata' in properties:
-            properties['metadata'] = json.dumps(properties['metadata'])
+        if "metadata" in properties:
+            properties["metadata"] = json.dumps(properties["metadata"])
 
         # Add label for Neo4J
-        properties['_labels'] = [self._neo4j_label]
+        properties["_labels"] = [self._neo4j_label]
 
         return properties
 
     @classmethod
-    def from_neo4j_node(cls, node: Dict[str, Any]) -> 'DocumentChunk':
+    def from_neo4j_node(cls, node: Dict[str, Any]) -> "DocumentChunk":
         """Create document chunk from Neo4J node properties."""
         # Make a copy to avoid modifying the original
         node = node.copy()
 
         # Deserialize metadata from JSON string
-        if 'metadata' in node and isinstance(node['metadata'], str):
-            node['metadata'] = json.loads(node['metadata'])
+        if "metadata" in node and isinstance(node["metadata"], str):
+            node["metadata"] = json.loads(node["metadata"])
 
         # Remove Neo4J specific properties
-        if '_labels' in node:
-            node.pop('_labels')
+        if "_labels" in node:
+            node.pop("_labels")
 
         return cls(**node)

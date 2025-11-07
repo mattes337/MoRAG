@@ -2,8 +2,8 @@
 
 import json
 import logging
-from typing import Dict, List, Optional, Any
 from datetime import datetime
+from typing import Any, Dict, List, Optional
 
 from ...models import Document, DocumentChunk
 from .base_operations import BaseOperations
@@ -51,14 +51,18 @@ class DocumentOperations(BaseOperations):
                 "checksum": document.checksum,
                 "mime_type": document.mime_type,
                 "ingestion_timestamp": document.ingestion_timestamp.isoformat(),
-                "last_modified": document.last_modified.isoformat() if document.last_modified else None,
+                "last_modified": document.last_modified.isoformat()
+                if document.last_modified
+                else None,
                 "model": document.model,
                 "summary": document.summary,
-                "metadata": json.dumps(document.metadata) if document.metadata else "{}"
-            }
+                "metadata": json.dumps(document.metadata)
+                if document.metadata
+                else "{}",
+            },
         )
 
-        return result[0]['document_id']
+        return result[0]["document_id"]
 
     async def store_chunk_with_unified_id(self, chunk: DocumentChunk) -> str:
         """Store document chunk with unified ID format.
@@ -92,11 +96,11 @@ class DocumentOperations(BaseOperations):
                 "start_position": chunk.start_position,
                 "end_position": chunk.end_position,
                 "chunk_type": chunk.chunk_type,
-                "metadata": json.dumps(chunk.metadata) if chunk.metadata else "{}"
-            }
+                "metadata": json.dumps(chunk.metadata) if chunk.metadata else "{}",
+            },
         )
 
-        return result[0]['chunk_id']
+        return result[0]["chunk_id"]
 
     async def get_document_by_unified_id(self, document_id: str) -> Optional[Document]:
         """Retrieve document by unified ID.
@@ -117,16 +121,16 @@ class DocumentOperations(BaseOperations):
         if not result:
             return None
 
-        doc_data = result[0]['d']
+        doc_data = result[0]["d"]
         return Document(
-            id=doc_data['id'],
-            title=doc_data['title'],
-            content=doc_data['content'],
-            source_type=doc_data['source_type'],
-            source_path=doc_data['source_path'],
-            checksum=doc_data['checksum'],
-            ingestion_timestamp=datetime.fromisoformat(doc_data['ingestion_timestamp']),
-            metadata=doc_data['metadata']
+            id=doc_data["id"],
+            title=doc_data["title"],
+            content=doc_data["content"],
+            source_type=doc_data["source_type"],
+            source_path=doc_data["source_path"],
+            checksum=doc_data["checksum"],
+            ingestion_timestamp=datetime.fromisoformat(doc_data["ingestion_timestamp"]),
+            metadata=doc_data["metadata"],
         )
 
     async def get_chunks_by_document_id(self, document_id: str) -> List[DocumentChunk]:
@@ -148,14 +152,16 @@ class DocumentOperations(BaseOperations):
 
         chunks = []
         for record in result:
-            chunk_data = record['c']
-            chunks.append(DocumentChunk(
-                id=chunk_data['id'],
-                document_id=chunk_data['document_id'],
-                chunk_index=chunk_data['chunk_index'],
-                text=chunk_data['text'],
-                metadata=chunk_data['metadata']
-            ))
+            chunk_data = record["c"]
+            chunks.append(
+                DocumentChunk(
+                    id=chunk_data["id"],
+                    document_id=chunk_data["document_id"],
+                    chunk_index=chunk_data["chunk_index"],
+                    text=chunk_data["text"],
+                    metadata=chunk_data["metadata"],
+                )
+            )
 
         return chunks
 
@@ -193,10 +199,12 @@ class DocumentOperations(BaseOperations):
             "checksum": document.checksum,
             "mime_type": document.mime_type,
             "ingestion_timestamp": document.ingestion_timestamp.isoformat(),
-            "last_modified": document.last_modified.isoformat() if document.last_modified else None,
+            "last_modified": document.last_modified.isoformat()
+            if document.last_modified
+            else None,
             "model": document.model,
             "summary": document.summary,
-            "metadata": json.dumps(document.metadata) if document.metadata else "{}"
+            "metadata": json.dumps(document.metadata) if document.metadata else "{}",
         }
 
         result = await self._execute_query(query, parameters)
@@ -231,7 +239,7 @@ class DocumentOperations(BaseOperations):
             "start_position": chunk.start_position,
             "end_position": chunk.end_position,
             "chunk_type": chunk.chunk_type,
-            "metadata": json.dumps(chunk.metadata) if chunk.metadata else "{}"
+            "metadata": json.dumps(chunk.metadata) if chunk.metadata else "{}",
         }
 
         result = await self._execute_query(query, parameters)
@@ -267,7 +275,9 @@ class DocumentOperations(BaseOperations):
         # Use individual store_document_chunk calls for proper MERGE logic
         return [await self.store_document_chunk(chunk) for chunk in chunks]
 
-    async def create_document_contains_chunk_relation(self, document_id: str, chunk_id: str) -> None:
+    async def create_document_contains_chunk_relation(
+        self, document_id: str, chunk_id: str
+    ) -> None:
         """Create a CONTAINS relationship between a document and a chunk.
 
         Args:
@@ -278,10 +288,9 @@ class DocumentOperations(BaseOperations):
         MATCH (d:Document {id: $document_id}), (c:DocumentChunk {id: $chunk_id})
         MERGE (d)-[:CONTAINS]->(c)
         """
-        await self._execute_query(query, {
-            "document_id": document_id,
-            "chunk_id": chunk_id
-        })
+        await self._execute_query(
+            query, {"document_id": document_id, "chunk_id": chunk_id}
+        )
 
     async def get_document_checksum(self, document_id: str) -> Optional[str]:
         """Get stored checksum for a document.
@@ -311,10 +320,9 @@ class DocumentOperations(BaseOperations):
         MATCH (d:Document {id: $document_id})
         SET d.checksum = $checksum, d.checksum_updated = datetime()
         """
-        await self._execute_query(query, {
-            "document_id": document_id,
-            "checksum": checksum
-        })
+        await self._execute_query(
+            query, {"document_id": document_id, "checksum": checksum}
+        )
 
     async def delete_document_checksum(self, document_id: str) -> None:
         """Remove stored checksum for a document.
@@ -357,11 +365,11 @@ class DocumentOperations(BaseOperations):
 
         return {
             "duplicate_documents": {
-                "count": duplicate_result[0]['duplicate_documents'],
-                "sample_ids": duplicate_result[0]['sample_ids']
+                "count": duplicate_result[0]["duplicate_documents"],
+                "sample_ids": duplicate_result[0]["sample_ids"],
             },
             "orphaned_chunks": {
-                "count": orphan_result[0]['orphaned_chunks'],
-                "sample_ids": orphan_result[0]['sample_ids']
-            }
+                "count": orphan_result[0]["orphaned_chunks"],
+                "sample_ids": orphan_result[0]["sample_ids"],
+            },
         }

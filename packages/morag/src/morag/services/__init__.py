@@ -2,10 +2,10 @@
 
 from .cleanup_service import (
     PeriodicCleanupService,
+    force_cleanup,
     get_cleanup_service,
     start_cleanup_service,
     stop_cleanup_service,
-    force_cleanup
 )
 
 __all__ = [
@@ -13,5 +13,5 @@ __all__ = [
     "get_cleanup_service",
     "start_cleanup_service",
     "stop_cleanup_service",
-    "force_cleanup"
+    "force_cleanup",
 ]

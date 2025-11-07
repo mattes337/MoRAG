@@ -3,13 +3,23 @@
 This package provides audio processing capabilities for the MoRAG (Modular Retrieval Augmented Generation) system.
 """
 
-from morag_audio.processor import AudioProcessor, AudioConfig, AudioProcessingError, AudioProcessingResult
-from morag_audio.service import AudioService
-from morag_audio.converters import AudioConverter, AudioConversionOptions
+from morag_audio.converters import AudioConversionOptions, AudioConverter
 from morag_audio.models import AudioSegment
+from morag_audio.processor import (
+    AudioConfig,
+    AudioProcessingError,
+    AudioProcessingResult,
+    AudioProcessor,
+)
+from morag_audio.service import AudioService
 from morag_audio.services import (
-    SpeakerDiarizationService, SpeakerSegment, SpeakerInfo, DiarizationResult,
-    TopicSegmentationService, TopicSegment, TopicSegmentationResult
+    DiarizationResult,
+    SpeakerDiarizationService,
+    SpeakerInfo,
+    SpeakerSegment,
+    TopicSegment,
+    TopicSegmentationResult,
+    TopicSegmentationService,
 )
 
 # Alias for backward compatibility

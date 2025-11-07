@@ -1,15 +1,16 @@
 """Unit tests for vector storage implementation."""
 
-import pytest
+from typing import Any, Dict, List
 from unittest.mock import AsyncMock, MagicMock, patch
-from typing import List, Dict, Any
 
-from morag_services.storage import QdrantService
+import pytest
 from morag_core.exceptions import StorageError
+from morag_services.storage import QdrantService
 
 
 class MockEmbeddingResult:
     """Mock embedding result for testing."""
+
     def __init__(self, embedding: List[float]):
         self.embedding = embedding
         self.token_count = 100
@@ -38,19 +39,23 @@ class TestVectorStorage:
         return client
 
     @pytest.mark.asyncio
-    async def test_store_embedding_with_embedding_result(self, qdrant_service, mock_client):
+    async def test_store_embedding_with_embedding_result(
+        self, qdrant_service, mock_client
+    ):
         """Test storing embedding with EmbeddingResult object."""
         qdrant_service.client = mock_client
 
         # Mock collection check
-        with patch('asyncio.to_thread', new_callable=AsyncMock) as mock_to_thread:
+        with patch("asyncio.to_thread", new_callable=AsyncMock) as mock_to_thread:
             mock_to_thread.side_effect = [
                 MagicMock(collections=[]),  # get_collections
                 None,  # create_collection
-                None   # upsert
+                None,  # upsert
             ]
 
-            embedding_result = MockEmbeddingResult([0.1, 0.2, 0.3] * 256)  # 768 dimensions
+            embedding_result = MockEmbeddingResult(
+                [0.1, 0.2, 0.3] * 256
+            )  # 768 dimensions
             text = "Test document content"
             metadata = {"source": "test", "type": "document"}
 
@@ -58,7 +63,7 @@ class TestVectorStorage:
                 embedding=embedding_result,
                 text=text,
                 metadata=metadata,
-                collection_name="test_collection"
+                collection_name="test_collection",
             )
 
             assert point_id is not None
@@ -72,11 +77,11 @@ class TestVectorStorage:
         """Test storing embedding with raw float list."""
         qdrant_service.client = mock_client
 
-        with patch('asyncio.to_thread', new_callable=AsyncMock) as mock_to_thread:
+        with patch("asyncio.to_thread", new_callable=AsyncMock) as mock_to_thread:
             mock_to_thread.side_effect = [
                 MagicMock(collections=[]),  # get_collections
                 None,  # create_collection
-                None   # upsert
+                None,  # upsert
             ]
 
             embedding_vector = [0.1, 0.2, 0.3] * 256  # 768 dimensions
@@ -84,9 +89,7 @@ class TestVectorStorage:
             metadata = {"source": "test", "type": "document"}
 
             point_id = await qdrant_service.store_embedding(
-                embedding=embedding_vector,
-                text=text,
-                metadata=metadata
+                embedding=embedding_vector, text=text, metadata=metadata
             )
 
             assert point_id is not None
@@ -97,11 +100,11 @@ class TestVectorStorage:
         """Test storing text chunk with embedding."""
         qdrant_service.client = mock_client
 
-        with patch('asyncio.to_thread', new_callable=AsyncMock) as mock_to_thread:
+        with patch("asyncio.to_thread", new_callable=AsyncMock) as mock_to_thread:
             mock_to_thread.side_effect = [
                 MagicMock(collections=[]),  # get_collections
                 None,  # create_collection
-                None   # upsert
+                None,  # upsert
             ]
 
             chunk_id = "test_chunk_001"
@@ -115,21 +118,23 @@ class TestVectorStorage:
                 text=text,
                 summary=summary,
                 embedding=embedding,
-                metadata=metadata
+                metadata=metadata,
             )
 
             assert result_id == chunk_id
 
     @pytest.mark.asyncio
-    async def test_create_collection_if_not_exists_new(self, qdrant_service, mock_client):
+    async def test_create_collection_if_not_exists_new(
+        self, qdrant_service, mock_client
+    ):
         """Test creating new collection."""
         qdrant_service.client = mock_client
 
-        with patch('asyncio.to_thread', new_callable=AsyncMock) as mock_to_thread:
+        with patch("asyncio.to_thread", new_callable=AsyncMock) as mock_to_thread:
             # Mock empty collections list
             mock_to_thread.side_effect = [
                 MagicMock(collections=[]),  # get_collections
-                None  # create_collection
+                None,  # create_collection
             ]
 
             await qdrant_service.create_collection_if_not_exists("new_collection", 768)
@@ -137,17 +142,21 @@ class TestVectorStorage:
             assert mock_to_thread.call_count == 2
 
     @pytest.mark.asyncio
-    async def test_create_collection_if_not_exists_existing(self, qdrant_service, mock_client):
+    async def test_create_collection_if_not_exists_existing(
+        self, qdrant_service, mock_client
+    ):
         """Test with existing collection."""
         qdrant_service.client = mock_client
 
-        with patch('asyncio.to_thread', new_callable=AsyncMock) as mock_to_thread:
+        with patch("asyncio.to_thread", new_callable=AsyncMock) as mock_to_thread:
             # Mock existing collection
             existing_collection = MagicMock()
             existing_collection.name = "existing_collection"
             mock_to_thread.return_value = MagicMock(collections=[existing_collection])
 
-            await qdrant_service.create_collection_if_not_exists("existing_collection", 768)
+            await qdrant_service.create_collection_if_not_exists(
+                "existing_collection", 768
+            )
 
             # Should only call get_collections, not create_collection
             assert mock_to_thread.call_count == 1
@@ -157,14 +166,14 @@ class TestVectorStorage:
         """Test metadata-only search."""
         qdrant_service.client = mock_client
 
-        with patch('asyncio.to_thread', new_callable=AsyncMock) as mock_to_thread:
+        with patch("asyncio.to_thread", new_callable=AsyncMock) as mock_to_thread:
             # Mock search results
             mock_point = MagicMock()
             mock_point.id = "test_id"
             mock_point.payload = {
                 "text": "Test content",
                 "summary": "Test summary",
-                "metadata": {"source": "test"}
+                "metadata": {"source": "test"},
             }
 
             mock_to_thread.return_value = ([mock_point], None)
@@ -181,30 +190,29 @@ class TestVectorStorage:
         """Test batch storage of embeddings."""
         qdrant_service.client = mock_client
 
-        with patch('asyncio.to_thread', new_callable=AsyncMock) as mock_to_thread:
+        with patch("asyncio.to_thread", new_callable=AsyncMock) as mock_to_thread:
             mock_to_thread.side_effect = [
                 MagicMock(collections=[]),  # get_collections
                 None,  # create_collection
                 None,  # upsert batch 1
-                None   # upsert batch 2 (if needed)
+                None,  # upsert batch 2 (if needed)
             ]
 
             embeddings_data = [
                 {
                     "embedding": [0.1, 0.2, 0.3] * 256,
                     "text": "First document",
-                    "metadata": {"source": "doc1"}
+                    "metadata": {"source": "doc1"},
                 },
                 {
                     "embedding": [0.4, 0.5, 0.6] * 256,
                     "text": "Second document",
-                    "metadata": {"source": "doc2"}
-                }
+                    "metadata": {"source": "doc2"},
+                },
             ]
 
             point_ids = await qdrant_service.batch_store_embeddings(
-                embeddings_data,
-                batch_size=2
+                embeddings_data, batch_size=2
             )
 
             assert len(point_ids) == 2
@@ -215,7 +223,7 @@ class TestVectorStorage:
         """Test listing all collections."""
         qdrant_service.client = mock_client
 
-        with patch('asyncio.to_thread', new_callable=AsyncMock) as mock_to_thread:
+        with patch("asyncio.to_thread", new_callable=AsyncMock) as mock_to_thread:
             # Mock collections
             mock_collection = MagicMock()
             mock_collection.name = "test_collection"
@@ -229,7 +237,7 @@ class TestVectorStorage:
 
             mock_to_thread.side_effect = [
                 MagicMock(collections=[mock_collection]),  # get_collections
-                mock_info  # get_collection
+                mock_info,  # get_collection
             ]
 
             collections = await qdrant_service.list_collections()
@@ -243,14 +251,12 @@ class TestVectorStorage:
         """Test error handling in storage operations."""
         qdrant_service.client = mock_client
 
-        with patch('asyncio.to_thread', new_callable=AsyncMock) as mock_to_thread:
+        with patch("asyncio.to_thread", new_callable=AsyncMock) as mock_to_thread:
             mock_to_thread.side_effect = Exception("Connection failed")
 
             with pytest.raises(StorageError):
                 await qdrant_service.store_embedding(
-                    embedding=[0.1] * 768,
-                    text="test",
-                    metadata={}
+                    embedding=[0.1] * 768, text="test", metadata={}
                 )
 
     @pytest.mark.asyncio
@@ -262,18 +268,18 @@ class TestVectorStorage:
         async def mock_connect():
             qdrant_service.client = mock_client
 
-        with patch.object(qdrant_service, 'connect', side_effect=mock_connect) as mock_connect:
-            with patch('asyncio.to_thread', new_callable=AsyncMock) as mock_to_thread:
+        with patch.object(
+            qdrant_service, "connect", side_effect=mock_connect
+        ) as mock_connect:
+            with patch("asyncio.to_thread", new_callable=AsyncMock) as mock_to_thread:
                 mock_to_thread.side_effect = [
                     MagicMock(collections=[]),  # get_collections
                     None,  # create_collection
-                    None   # upsert
+                    None,  # upsert
                 ]
 
                 await qdrant_service.store_embedding(
-                    embedding=[0.1] * 768,
-                    text="test",
-                    metadata={}
+                    embedding=[0.1] * 768, text="test", metadata={}
                 )
 
                 mock_connect.assert_called_once()

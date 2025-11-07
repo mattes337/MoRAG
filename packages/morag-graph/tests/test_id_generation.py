@@ -1,13 +1,14 @@
 """Unit tests for unified ID generation system."""
 
-import pytest
 from unittest.mock import patch
+
+import pytest
 from morag_graph.utils.id_generation import (
-    UnifiedIDGenerator,
-    IDValidator,
     IDCollisionDetector,
+    IDCollisionError,
     IDValidationError,
-    IDCollisionError
+    IDValidator,
+    UnifiedIDGenerator,
 )
 
 
@@ -17,8 +18,7 @@ class TestUnifiedIDGenerator:
     def test_generate_document_id_with_checksum(self):
         """Test document ID generation with checksum."""
         doc_id = UnifiedIDGenerator.generate_document_id(
-            source_file="test.pdf",
-            checksum="abc123"
+            source_file="test.pdf", checksum="abc123"
         )
         assert doc_id.startswith("doc_")
         assert "test.pdf" in doc_id
@@ -27,10 +27,8 @@ class TestUnifiedIDGenerator:
 
     def test_generate_document_id_without_checksum(self):
         """Test document ID generation without checksum."""
-        with patch('time.time', return_value=1234567890):
-            doc_id = UnifiedIDGenerator.generate_document_id(
-                source_file="test.pdf"
-            )
+        with patch("time.time", return_value=1234567890):
+            doc_id = UnifiedIDGenerator.generate_document_id(source_file="test.pdf")
         assert doc_id.startswith("doc_")
         assert "test.pdf" in doc_id
         assert "1234567890" in doc_id
@@ -38,8 +36,7 @@ class TestUnifiedIDGenerator:
     def test_generate_chunk_id(self):
         """Test chunk ID generation."""
         chunk_id = UnifiedIDGenerator.generate_chunk_id(
-            document_id="doc_test.pdf_abc123",
-            chunk_index=5
+            document_id="doc_test.pdf_abc123", chunk_index=5
         )
         expected = "doc_test.pdf_abc123:chunk:5"
         assert chunk_id == expected
@@ -47,9 +44,7 @@ class TestUnifiedIDGenerator:
     def test_generate_entity_id(self):
         """Test entity ID generation."""
         entity_id = UnifiedIDGenerator.generate_entity_id(
-            name="John Doe",
-            entity_type="PERSON",
-            source_doc_id="doc_test.pdf_abc123"
+            name="John Doe", entity_type="PERSON", source_doc_id="doc_test.pdf_abc123"
         )
         assert entity_id.startswith("ent_")
         assert "john_doe" in entity_id.lower()
@@ -60,7 +55,7 @@ class TestUnifiedIDGenerator:
         relation_id = UnifiedIDGenerator.generate_relation_id(
             source_entity_id="ent_john_doe_person_abc123",
             target_entity_id="ent_company_org_abc123",
-            relation_type="WORKS_FOR"
+            relation_type="WORKS_FOR",
         )
         assert relation_id.startswith("rel_")
         assert "works_for" in relation_id.lower()
@@ -68,8 +63,12 @@ class TestUnifiedIDGenerator:
     def test_parse_id_type(self):
         """Test ID type parsing."""
         assert UnifiedIDGenerator.parse_id_type("doc_test.pdf_abc123") == "document"
-        assert UnifiedIDGenerator.parse_id_type("doc_test.pdf_abc123:chunk:5") == "chunk"
-        assert UnifiedIDGenerator.parse_id_type("ent_john_doe_person_abc123") == "entity"
+        assert (
+            UnifiedIDGenerator.parse_id_type("doc_test.pdf_abc123:chunk:5") == "chunk"
+        )
+        assert (
+            UnifiedIDGenerator.parse_id_type("ent_john_doe_person_abc123") == "entity"
+        )
         assert UnifiedIDGenerator.parse_id_type("rel_works_for_abc123") == "relation"
         assert UnifiedIDGenerator.parse_id_type("invalid_id") == "unknown"
 
@@ -189,8 +188,8 @@ class TestIDCollisionDetector:
         existing_ids = ["doc_other.pdf_ghi789"]
 
         report = detector.get_collision_report(new_ids, existing_ids)
-        assert report['has_collisions'] is False
-        assert len(report['collisions']) == 0
+        assert report["has_collisions"] is False
+        assert len(report["collisions"]) == 0
 
     def test_get_collision_report_with_collisions(self):
         """Test collision report with collisions."""
@@ -199,9 +198,9 @@ class TestIDCollisionDetector:
         existing_ids = ["doc_test1.pdf_abc123", "doc_other.pdf_ghi789"]
 
         report = detector.get_collision_report(new_ids, existing_ids)
-        assert report['has_collisions'] is True
-        assert len(report['collisions']) == 1
-        assert "doc_test1.pdf_abc123" in report['collisions']
+        assert report["has_collisions"] is True
+        assert len(report["collisions"]) == 1
+        assert "doc_test1.pdf_abc123" in report["collisions"]
 
 
 class TestIDGenerationIntegration:
@@ -210,13 +209,11 @@ class TestIDGenerationIntegration:
     def test_document_chunk_id_consistency(self):
         """Test that chunk IDs are consistent with document IDs."""
         doc_id = UnifiedIDGenerator.generate_document_id(
-            source_file="test.pdf",
-            checksum="abc123"
+            source_file="test.pdf", checksum="abc123"
         )
 
         chunk_id = UnifiedIDGenerator.generate_chunk_id(
-            document_id=doc_id,
-            chunk_index=0
+            document_id=doc_id, chunk_index=0
         )
 
         extracted_doc_id = UnifiedIDGenerator.extract_document_id_from_chunk(chunk_id)
@@ -225,21 +222,19 @@ class TestIDGenerationIntegration:
     def test_entity_relation_id_consistency(self):
         """Test that relation IDs are consistent with entity IDs."""
         source_entity_id = UnifiedIDGenerator.generate_entity_id(
-            name="John Doe",
-            entity_type="PERSON",
-            source_doc_id="doc_test.pdf_abc123"
+            name="John Doe", entity_type="PERSON", source_doc_id="doc_test.pdf_abc123"
         )
 
         target_entity_id = UnifiedIDGenerator.generate_entity_id(
             name="Acme Corp",
             entity_type="ORGANIZATION",
-            source_doc_id="doc_test.pdf_abc123"
+            source_doc_id="doc_test.pdf_abc123",
         )
 
         relation_id = UnifiedIDGenerator.generate_relation_id(
             source_entity_id=source_entity_id,
             target_entity_id=target_entity_id,
-            relation_type="WORKS_FOR"
+            relation_type="WORKS_FOR",
         )
 
         # Validate all IDs
@@ -251,48 +246,36 @@ class TestIDGenerationIntegration:
         """Test that ID generation is deterministic."""
         # Generate same document ID multiple times
         doc_id_1 = UnifiedIDGenerator.generate_document_id(
-            source_file="test.pdf",
-            checksum="abc123"
+            source_file="test.pdf", checksum="abc123"
         )
         doc_id_2 = UnifiedIDGenerator.generate_document_id(
-            source_file="test.pdf",
-            checksum="abc123"
+            source_file="test.pdf", checksum="abc123"
         )
         assert doc_id_1 == doc_id_2
 
         # Generate same entity ID multiple times
         entity_id_1 = UnifiedIDGenerator.generate_entity_id(
-            name="John Doe",
-            entity_type="PERSON",
-            source_doc_id="doc_test.pdf_abc123"
+            name="John Doe", entity_type="PERSON", source_doc_id="doc_test.pdf_abc123"
         )
         entity_id_2 = UnifiedIDGenerator.generate_entity_id(
-            name="John Doe",
-            entity_type="PERSON",
-            source_doc_id="doc_test.pdf_abc123"
+            name="John Doe", entity_type="PERSON", source_doc_id="doc_test.pdf_abc123"
         )
         assert entity_id_1 == entity_id_2
 
     def test_id_uniqueness(self):
         """Test that different inputs generate unique IDs."""
         doc_id_1 = UnifiedIDGenerator.generate_document_id(
-            source_file="test1.pdf",
-            checksum="abc123"
+            source_file="test1.pdf", checksum="abc123"
         )
         doc_id_2 = UnifiedIDGenerator.generate_document_id(
-            source_file="test2.pdf",
-            checksum="def456"
+            source_file="test2.pdf", checksum="def456"
         )
         assert doc_id_1 != doc_id_2
 
         entity_id_1 = UnifiedIDGenerator.generate_entity_id(
-            name="John Doe",
-            entity_type="PERSON",
-            source_doc_id="doc_test.pdf_abc123"
+            name="John Doe", entity_type="PERSON", source_doc_id="doc_test.pdf_abc123"
         )
         entity_id_2 = UnifiedIDGenerator.generate_entity_id(
-            name="Jane Smith",
-            entity_type="PERSON",
-            source_doc_id="doc_test.pdf_abc123"
+            name="Jane Smith", entity_type="PERSON", source_doc_id="doc_test.pdf_abc123"
         )
         assert entity_id_1 != entity_id_2

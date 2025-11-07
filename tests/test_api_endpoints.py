@@ -63,7 +63,7 @@ async def test_content_type_routing():
         ContentType.VIDEO,
         ContentType.IMAGE,
         ContentType.WEB,
-        ContentType.YOUTUBE
+        ContentType.YOUTUBE,
     ]
 
     for content_type in supported_types:
@@ -129,8 +129,8 @@ async def test_audio_configuration():
     print("=" * 50)
 
     try:
-        from morag_audio.processor import AudioConfig
         from morag_audio.converters.audio_converter import AudioConverter
+        from morag_audio.processor import AudioConfig
 
         # Test default configuration
         config = AudioConfig()
@@ -139,7 +139,7 @@ async def test_audio_configuration():
 
         # Test converter has JSON method
         converter = AudioConverter()
-        if hasattr(converter, 'convert_to_json'):
+        if hasattr(converter, "convert_to_json"):
             print("✅ Audio converter has convert_to_json method")
         else:
             print("❌ Audio converter missing convert_to_json method")
@@ -158,7 +158,7 @@ async def test_video_json_support():
 
         # Test that video service has JSON conversion method
         service = VideoService()
-        if hasattr(service, '_convert_to_json'):
+        if hasattr(service, "_convert_to_json"):
             print("✅ Video service has _convert_to_json method")
         else:
             print("❌ Video service missing _convert_to_json method")
@@ -194,6 +194,7 @@ async def main():
     except Exception as e:
         print(f"\n❌ Test suite failed: {e}")
         import traceback
+
         traceback.print_exc()
 
 

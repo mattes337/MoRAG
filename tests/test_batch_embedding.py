@@ -8,8 +8,13 @@ import time
 from typing import List
 
 # Add the packages to the path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'packages', 'morag-core', 'src'))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'packages', 'morag-embedding', 'src'))
+sys.path.insert(
+    0, os.path.join(os.path.dirname(__file__), "..", "packages", "morag-core", "src")
+)
+sys.path.insert(
+    0,
+    os.path.join(os.path.dirname(__file__), "..", "packages", "morag-embedding", "src"),
+)
 
 from morag_core.config import settings
 from morag_embedding.service import GeminiEmbeddingService
@@ -21,7 +26,9 @@ async def test_batch_embedding():
     # Check if API key is available
     if not settings.gemini_api_key:
         print("❌ GEMINI_API_KEY not found in environment")
-        print("Please set your Gemini API key in the .env file or environment variables")
+        print(
+            "Please set your Gemini API key in the .env file or environment variables"
+        )
         return False
 
     print("🚀 Testing Gemini Batch Embedding Functionality")
@@ -38,7 +45,7 @@ async def test_batch_embedding():
         "The human brain contains approximately 86 billion neurons.",
         "Climate change is caused by greenhouse gas emissions.",
         "DNA contains the genetic instructions for life.",
-        "The speed of light in vacuum is approximately 299,792,458 meters per second."
+        "The speed of light in vacuum is approximately 299,792,458 meters per second.",
     ]
 
     print(f"📝 Test texts: {len(test_texts)} items")
@@ -47,8 +54,7 @@ async def test_batch_embedding():
         # Test with batch embedding enabled
         print("\n🔄 Testing with batch embedding ENABLED...")
         service_batch = GeminiEmbeddingService(
-            batch_size=5,
-            enable_batch_embedding=True
+            batch_size=5, enable_batch_embedding=True
         )
 
         start_time = time.time()
@@ -68,12 +74,13 @@ async def test_batch_embedding():
         # Test with batch embedding disabled (sequential)
         print("\n🔄 Testing with batch embedding DISABLED (sequential)...")
         service_sequential = GeminiEmbeddingService(
-            batch_size=5,
-            enable_batch_embedding=False
+            batch_size=5, enable_batch_embedding=False
         )
 
         start_time = time.time()
-        result_sequential = await service_sequential.generate_batch_embeddings(test_texts)
+        result_sequential = await service_sequential.generate_batch_embeddings(
+            test_texts
+        )
         sequential_time = time.time() - start_time
 
         print(f"✅ Sequential embedding completed in {sequential_time:.2f} seconds")
@@ -105,6 +112,7 @@ async def test_batch_embedding():
         print(f"❌ Test failed with error: {str(e)}")
         print(f"Error type: {type(e).__name__}")
         import traceback
+
         traceback.print_exc()
         return False
 
@@ -120,7 +128,10 @@ async def test_different_batch_sizes():
     print("=" * 40)
 
     # Test texts
-    test_texts = [f"This is test text number {i+1} for batch size optimization." for i in range(20)]
+    test_texts = [
+        f"This is test text number {i+1} for batch size optimization."
+        for i in range(20)
+    ]
 
     batch_sizes = [1, 5, 10, 15, 20]
 
@@ -129,8 +140,7 @@ async def test_different_batch_sizes():
             print(f"\n📊 Testing batch size: {batch_size}")
 
             service = GeminiEmbeddingService(
-                batch_size=batch_size,
-                enable_batch_embedding=True
+                batch_size=batch_size, enable_batch_embedding=True
             )
 
             start_time = time.time()
@@ -141,7 +151,7 @@ async def test_different_batch_sizes():
             print(f"📈 Embeddings: {len(result.embeddings)}")
             print(f"🔧 Method: {result.metadata.get('method', 'unknown')}")
 
-            if 'total_batches' in result.metadata:
+            if "total_batches" in result.metadata:
                 print(f"📦 Total batches: {result.metadata['total_batches']}")
 
         except Exception as e:
@@ -151,6 +161,7 @@ async def test_different_batch_sizes():
 
 
 if __name__ == "__main__":
+
     async def main():
         success1 = await test_batch_embedding()
         success2 = await test_different_batch_sizes()

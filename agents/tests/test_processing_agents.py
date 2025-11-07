@@ -1,24 +1,25 @@
 """Tests for processing agents."""
 
-import pytest
 import asyncio
 import os
-from unittest.mock import Mock, AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
+
+import pytest
 
 # Set up test environment
 os.environ["GEMINI_API_KEY"] = "test-key"
 
+from agents.base.config import AgentConfig
 from agents.processing.chunking import ChunkingAgent
 from agents.processing.classification import ClassificationAgent
-from agents.processing.validation import ValidationAgent
 from agents.processing.filtering import FilteringAgent
 from agents.processing.models import (
     ChunkingResult,
     ClassificationResult,
+    FilteringResult,
     ValidationResult,
-    FilteringResult
 )
-from agents.base.config import AgentConfig
+from agents.processing.validation import ValidationAgent
 
 
 class TestChunkingAgent:
@@ -52,7 +53,7 @@ class TestChunkingAgent:
         Machine learning is used in image recognition, natural language processing, and recommendation systems.
         """
 
-        with patch.object(chunking_agent, '_call_model') as mock_llm:
+        with patch.object(chunking_agent, "_call_model") as mock_llm:
             mock_llm.return_value = {
                 "chunks": [
                     {
@@ -61,7 +62,7 @@ class TestChunkingAgent:
                         "start_pos": 0,
                         "end_pos": 150,
                         "topic": "ML definition",
-                        "importance": 0.9
+                        "importance": 0.9,
                     },
                     {
                         "content": "Types of Machine Learning\n\nThere are three main types: supervised learning, unsupervised learning, and reinforcement learning.",
@@ -69,7 +70,7 @@ class TestChunkingAgent:
                         "start_pos": 151,
                         "end_pos": 280,
                         "topic": "ML types",
-                        "importance": 0.85
+                        "importance": 0.85,
                     },
                     {
                         "content": "Applications\n\nMachine learning is used in image recognition, natural language processing, and recommendation systems.",
@@ -77,12 +78,12 @@ class TestChunkingAgent:
                         "start_pos": 281,
                         "end_pos": 400,
                         "topic": "ML applications",
-                        "importance": 0.8
-                    }
+                        "importance": 0.8,
+                    },
                 ],
                 "chunking_method": "semantic",
                 "total_chunks": 3,
-                "confidence": "high"
+                "confidence": "high",
             }
 
             result = await chunking_agent.chunk_text(text, strategy="semantic")
@@ -96,9 +97,12 @@ class TestChunkingAgent:
     @pytest.mark.asyncio
     async def test_fixed_size_chunking(self, chunking_agent):
         """Test fixed size chunking."""
-        text = "This is a long text that needs to be split into fixed-size chunks for processing. " * 10
+        text = (
+            "This is a long text that needs to be split into fixed-size chunks for processing. "
+            * 10
+        )
 
-        with patch.object(chunking_agent, '_call_model') as mock_llm:
+        with patch.object(chunking_agent, "_call_model") as mock_llm:
             mock_llm.return_value = {
                 "chunks": [
                     {
@@ -107,7 +111,7 @@ class TestChunkingAgent:
                         "start_pos": 0,
                         "end_pos": 200,
                         "topic": "general",
-                        "importance": 0.7
+                        "importance": 0.7,
                     },
                     {
                         "content": text[200:400],
@@ -115,15 +119,17 @@ class TestChunkingAgent:
                         "start_pos": 200,
                         "end_pos": 400,
                         "topic": "general",
-                        "importance": 0.7
-                    }
+                        "importance": 0.7,
+                    },
                 ],
                 "chunking_method": "fixed_size",
                 "total_chunks": 2,
-                "confidence": "high"
+                "confidence": "high",
             }
 
-            result = await chunking_agent.chunk_text(text, strategy="fixed_size", chunk_size=200)
+            result = await chunking_agent.chunk_text(
+                text, strategy="fixed_size", chunk_size=200
+            )
 
             assert result.chunking_method == "fixed_size"
             assert len(result.chunks) == 2
@@ -149,7 +155,7 @@ class TestClassificationAgent:
         Diagnosis: Acute myocardial infarction.
         """
 
-        with patch.object(classification_agent, '_call_model') as mock_llm:
+        with patch.object(classification_agent, "_call_model") as mock_llm:
             mock_llm.return_value = {
                 "primary_category": "medical_record",
                 "subcategories": ["cardiology", "emergency_medicine"],
@@ -160,10 +166,10 @@ class TestClassificationAgent:
                         "patient_demographics",
                         "clinical_symptoms",
                         "diagnostic_tests",
-                        "medical_diagnosis"
+                        "medical_diagnosis",
                     ],
-                    "domain_specificity": 0.9
-                }
+                    "domain_specificity": 0.9,
+                },
             }
 
             result = await classification_agent.classify_content(text)
@@ -172,7 +178,9 @@ class TestClassificationAgent:
             assert result.primary_category == "medical_record"
             assert "cardiology" in result.subcategories
             assert result.confidence == "high"
-            assert "diagnostic_tests" in result.metadata.get("classification_features", [])
+            assert "diagnostic_tests" in result.metadata.get(
+                "classification_features", []
+            )
 
     @pytest.mark.asyncio
     async def test_research_paper_classification(self, classification_agent):
@@ -185,7 +193,7 @@ class TestClassificationAgent:
         Keywords: transformers, BERT, natural language processing, GLUE
         """
 
-        with patch.object(classification_agent, '_call_model') as mock_llm:
+        with patch.object(classification_agent, "_call_model") as mock_llm:
             mock_llm.return_value = {
                 "primary_category": "research_paper",
                 "subcategories": ["computer_science", "natural_language_processing"],
@@ -195,10 +203,10 @@ class TestClassificationAgent:
                         "abstract_section",
                         "keywords_section",
                         "technical_terminology",
-                        "benchmark_evaluation"
+                        "benchmark_evaluation",
                     ],
-                    "domain_specificity": 0.95
-                }
+                    "domain_specificity": 0.95,
+                },
             }
 
             result = await classification_agent.classify_content(text)
@@ -225,10 +233,10 @@ class TestValidationAgent:
             "object": "heart attack prevention",
             "approach": "daily low-dose administration",
             "solution": "reduced cardiovascular events",
-            "confidence": 0.9
+            "confidence": 0.9,
         }
 
-        with patch.object(validation_agent, '_call_model') as mock_llm:
+        with patch.object(validation_agent, "_call_model") as mock_llm:
             mock_llm.return_value = {
                 "validation_status": "valid",
                 "validation_errors": [],
@@ -238,10 +246,10 @@ class TestValidationAgent:
                     "validation_checks": [
                         {"check": "completeness", "passed": True, "score": 0.95},
                         {"check": "consistency", "passed": True, "score": 0.9},
-                        {"check": "plausibility", "passed": True, "score": 0.85}
+                        {"check": "plausibility", "passed": True, "score": 0.85},
                     ],
-                    "suggestions": ["Consider adding dosage information"]
-                }
+                    "suggestions": ["Consider adding dosage information"],
+                },
             }
 
             result = await validation_agent.validate_fact(fact)
@@ -251,7 +259,10 @@ class TestValidationAgent:
             assert result.is_valid == True
             assert result.confidence == "high"
             assert len(result.metadata.get("validation_checks", [])) == 3
-            assert all(check["passed"] for check in result.metadata.get("validation_checks", []))
+            assert all(
+                check["passed"]
+                for check in result.metadata.get("validation_checks", [])
+            )
 
     @pytest.mark.asyncio
     async def test_invalid_fact_validation(self, validation_agent):
@@ -261,30 +272,30 @@ class TestValidationAgent:
             "object": "cancer cure",
             "approach": "drinking large amounts",
             "solution": "complete cancer elimination",
-            "confidence": 0.3
+            "confidence": 0.3,
         }
 
-        with patch.object(validation_agent, '_call_model') as mock_llm:
+        with patch.object(validation_agent, "_call_model") as mock_llm:
             mock_llm.return_value = {
                 "validation_status": "invalid",
                 "validation_errors": [
                     "Implausible medical claim",
-                    "Lacks scientific evidence"
+                    "Lacks scientific evidence",
                 ],
                 "issues_found": [
                     "Implausible medical claim",
                     "Lacks scientific evidence",
-                    "Potentially harmful misinformation"
+                    "Potentially harmful misinformation",
                 ],
                 "confidence": "high",
                 "metadata": {
                     "validation_checks": [
                         {"check": "completeness", "passed": True, "score": 0.8},
                         {"check": "consistency", "passed": False, "score": 0.2},
-                        {"check": "plausibility", "passed": False, "score": 0.1}
+                        {"check": "plausibility", "passed": False, "score": 0.1},
                     ],
-                    "suggestions": ["Remove or correct this claim"]
-                }
+                    "suggestions": ["Remove or correct this claim"],
+                },
             }
 
             result = await validation_agent.validate_fact(fact)
@@ -309,32 +320,53 @@ class TestFilteringAgent:
         """Test relevance-based filtering."""
         query = "diabetes treatment"
         candidates = [
-            {"text": "Metformin is first-line treatment for type 2 diabetes", "score": 0.9},
+            {
+                "text": "Metformin is first-line treatment for type 2 diabetes",
+                "score": 0.9,
+            },
             {"text": "Insulin therapy for type 1 diabetes management", "score": 0.85},
             {"text": "Weather forecast for tomorrow", "score": 0.1},
-            {"text": "Dietary recommendations for diabetic patients", "score": 0.8}
+            {"text": "Dietary recommendations for diabetic patients", "score": 0.8},
         ]
 
-        with patch.object(filtering_agent, '_call_model') as mock_llm:
+        with patch.object(filtering_agent, "_call_model") as mock_llm:
             mock_llm.return_value = {
                 "filtered_items": [
-                    {"text": "Metformin is first-line treatment for type 2 diabetes", "relevance": 0.95, "keep": True},
-                    {"text": "Insulin therapy for type 1 diabetes management", "relevance": 0.9, "keep": True},
-                    {"text": "Dietary recommendations for diabetic patients", "relevance": 0.85, "keep": True}
+                    {
+                        "text": "Metformin is first-line treatment for type 2 diabetes",
+                        "relevance": 0.95,
+                        "keep": True,
+                    },
+                    {
+                        "text": "Insulin therapy for type 1 diabetes management",
+                        "relevance": 0.9,
+                        "keep": True,
+                    },
+                    {
+                        "text": "Dietary recommendations for diabetic patients",
+                        "relevance": 0.85,
+                        "keep": True,
+                    },
                 ],
                 "rejected_items": [
-                    {"text": "General health information", "relevance": 0.3, "keep": False}
+                    {
+                        "text": "General health information",
+                        "relevance": 0.3,
+                        "keep": False,
+                    }
                 ],
                 "filter_criteria": {"query": query, "threshold": 0.7},
                 "confidence": "high",
                 "metadata": {
                     "threshold_applied": 0.7,
                     "items_kept": 3,
-                    "items_filtered": 1
-                }
+                    "items_filtered": 1,
+                },
             }
 
-            result = await filtering_agent.filter_content(candidates, criteria={"query": query}, filter_type="relevance")
+            result = await filtering_agent.filter_content(
+                candidates, criteria={"query": query}, filter_type="relevance"
+            )
 
             assert isinstance(result, FilteringResult)
             assert len(result.filtered_items) == 3
@@ -349,29 +381,47 @@ class TestFilteringAgent:
             {"text": "Well-researched medical article with citations", "quality": 0.9},
             {"text": "Blog post with personal opinions only", "quality": 0.3},
             {"text": "Peer-reviewed research study", "quality": 0.95},
-            {"text": "Social media post with unverified claims", "quality": 0.2}
+            {"text": "Social media post with unverified claims", "quality": 0.2},
         ]
 
-        with patch.object(filtering_agent, '_call_model') as mock_llm:
+        with patch.object(filtering_agent, "_call_model") as mock_llm:
             mock_llm.return_value = {
                 "filtered_items": [
-                    {"text": "Peer-reviewed research study", "quality": 0.95, "keep": True},
-                    {"text": "Well-researched medical article with citations", "quality": 0.9, "keep": True}
+                    {
+                        "text": "Peer-reviewed research study",
+                        "quality": 0.95,
+                        "keep": True,
+                    },
+                    {
+                        "text": "Well-researched medical article with citations",
+                        "quality": 0.9,
+                        "keep": True,
+                    },
                 ],
                 "rejected_items": [
-                    {"text": "Blog post with personal opinions only", "quality": 0.3, "keep": False},
-                    {"text": "Social media post with unverified claims", "quality": 0.2, "keep": False}
+                    {
+                        "text": "Blog post with personal opinions only",
+                        "quality": 0.3,
+                        "keep": False,
+                    },
+                    {
+                        "text": "Social media post with unverified claims",
+                        "quality": 0.2,
+                        "keep": False,
+                    },
                 ],
                 "filter_criteria": {"threshold": 0.8},
                 "confidence": "high",
                 "metadata": {
                     "threshold_applied": 0.8,
                     "items_kept": 2,
-                    "items_filtered": 2
-                }
+                    "items_filtered": 2,
+                },
             }
 
-            result = await filtering_agent.filter_content(candidates, criteria={"threshold": 0.8}, filter_type="quality")
+            result = await filtering_agent.filter_content(
+                candidates, criteria={"threshold": 0.8}, filter_type="quality"
+            )
 
             assert len(result.filtered_items) == 2
             assert result.metadata.get("threshold_applied") == 0.8
@@ -412,10 +462,11 @@ class TestProcessingAgentsIntegration:
         filtering_agent = FilteringAgent(filtering_config)
 
         # Mock responses
-        with patch.object(chunking_agent, '_call_model') as mock_chunking, \
-             patch.object(classification_agent, '_call_model') as mock_classification, \
-             patch.object(filtering_agent, '_call_model') as mock_filtering:
-
+        with patch.object(chunking_agent, "_call_model") as mock_chunking, patch.object(
+            classification_agent, "_call_model"
+        ) as mock_classification, patch.object(
+            filtering_agent, "_call_model"
+        ) as mock_filtering:
             mock_chunking.return_value = {
                 "chunks": [
                     {
@@ -424,7 +475,7 @@ class TestProcessingAgentsIntegration:
                         "start_pos": 0,
                         "end_pos": 200,
                         "topic": "diabetes_overview",
-                        "importance": 0.9
+                        "importance": 0.9,
                     },
                     {
                         "content": "Recent Studies\n\nNew research shows promising results with GLP-1 agonists...",
@@ -432,12 +483,12 @@ class TestProcessingAgentsIntegration:
                         "start_pos": 201,
                         "end_pos": 400,
                         "topic": "new_treatments",
-                        "importance": 0.85
-                    }
+                        "importance": 0.85,
+                    },
                 ],
                 "chunking_method": "semantic",
                 "total_chunks": 2,
-                "confidence": "high"
+                "confidence": "high",
             }
 
             mock_classification.return_value = {
@@ -445,15 +496,18 @@ class TestProcessingAgentsIntegration:
                 "subcategories": ["endocrinology", "diabetes"],
                 "confidence": "high",
                 "metadata": {
-                    "classification_features": ["medical_terminology", "research_content"],
-                    "domain_specificity": 0.95
-                }
+                    "classification_features": [
+                        "medical_terminology",
+                        "research_content",
+                    ],
+                    "domain_specificity": 0.95,
+                },
             }
 
             mock_filtering.return_value = {
                 "filtered_items": [
                     {"content": "chunk1", "relevance": 0.9, "keep": True},
-                    {"content": "chunk2", "relevance": 0.85, "keep": True}
+                    {"content": "chunk2", "relevance": 0.85, "keep": True},
                 ],
                 "rejected_items": [],
                 "filter_criteria": {"query": "diabetes treatment"},
@@ -461,16 +515,18 @@ class TestProcessingAgentsIntegration:
                 "metadata": {
                     "threshold_applied": 0.7,
                     "items_kept": 2,
-                    "items_filtered": 0
-                }
+                    "items_filtered": 0,
+                },
             }
 
             # Run processing pipeline
             chunking_result = await chunking_agent.chunk_text(raw_text)
-            classification_result = await classification_agent.classify_content(raw_text)
+            classification_result = await classification_agent.classify_content(
+                raw_text
+            )
             filtering_result = await filtering_agent.filter_content(
                 [{"text": chunk["content"]} for chunk in chunking_result.chunks],
-                criteria={"query": "diabetes treatment"}
+                criteria={"query": "diabetes treatment"},
             )
 
             # Verify results

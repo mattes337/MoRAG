@@ -3,11 +3,17 @@
 This module contains tests for the Pipeline class.
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from morag_services.services import MoRAGServices, ProcessingResult, ContentType
-from morag_services.pipeline import Pipeline, PipelineStep, PipelineContext, PipelineStepType
+import pytest
+from morag_services.pipeline import (
+    Pipeline,
+    PipelineContext,
+    PipelineStep,
+    PipelineStepType,
+)
+from morag_services.services import ContentType, MoRAGServices, ProcessingResult
+
 
 @pytest.fixture
 def services():
@@ -31,10 +37,12 @@ def services():
 
     return services
 
+
 @pytest.fixture
 def pipeline(services):
     """Create a Pipeline instance for testing."""
     return Pipeline(services, name="test_pipeline")
+
 
 class TestPipelineStep:
     """Tests for PipelineStep."""
@@ -42,15 +50,14 @@ class TestPipelineStep:
     @pytest.mark.asyncio
     async def test_execute_success(self):
         """Test successful step execution."""
+
         # Create mock function
         async def mock_fn(data, context):
             return data.upper()
 
         # Create step
         step = PipelineStep(
-            name="test_step",
-            step_type=PipelineStepType.TRANSFORM,
-            process_fn=mock_fn
+            name="test_step", step_type=PipelineStepType.TRANSFORM, process_fn=mock_fn
         )
 
         # Execute step
@@ -64,15 +71,14 @@ class TestPipelineStep:
     @pytest.mark.asyncio
     async def test_execute_error(self):
         """Test step execution with error."""
+
         # Create mock function that raises exception
         async def mock_fn(data, context):
             raise ValueError("Test error")
 
         # Create step
         step = PipelineStep(
-            name="test_step",
-            step_type=PipelineStepType.TRANSFORM,
-            process_fn=mock_fn
+            name="test_step", step_type=PipelineStepType.TRANSFORM, process_fn=mock_fn
         )
 
         # Execute step
@@ -87,19 +93,19 @@ class TestPipelineStep:
         assert "test" in context.errors
         assert "Test error" in context.errors["test"]
 
+
 class TestPipeline:
     """Tests for Pipeline."""
 
     def test_add_step(self, pipeline):
         """Test adding steps to pipeline."""
+
         # Create mock step
         async def mock_fn(data, context):
             return data
 
         step = PipelineStep(
-            name="test_step",
-            step_type=PipelineStepType.TRANSFORM,
-            process_fn=mock_fn
+            name="test_step", step_type=PipelineStepType.TRANSFORM, process_fn=mock_fn
         )
 
         # Add step
@@ -172,6 +178,7 @@ class TestPipeline:
 
     def test_custom_step(self, pipeline):
         """Test adding custom step."""
+
         # Create mock function
         async def mock_fn(data, context):
             return data
@@ -182,7 +189,7 @@ class TestPipeline:
             process_fn=mock_fn,
             input_key="input",
             output_key="output",
-            config={"key": "value"}
+            config={"key": "value"},
         )
 
         # Verify step is added
@@ -216,28 +223,24 @@ class TestPipeline:
             content_type=ContentType.DOCUMENT,
             content_path="test.pdf",
             text_content="Document text",
-            success=True
+            success=True,
         )
 
         mock_result2 = ProcessingResult(
             content_type=ContentType.WEB,
             content_url="https://example.com",
             text_content="Web content",
-            success=True
+            success=True,
         )
 
-        services.process_content.side_effect = [
-            mock_result1,
-            mock_result2
-        ]
+        services.process_content.side_effect = [mock_result1, mock_result2]
 
         # Add process step
         pipeline.process_content()
 
         # Execute pipeline
         context = await pipeline.execute(
-            input_paths=["test.pdf"],
-            input_urls=["https://example.com"]
+            input_paths=["test.pdf"], input_urls=["https://example.com"]
         )
 
         # Verify context
@@ -254,15 +257,11 @@ class TestPipeline:
         # Add results to context
         results = {
             "item1": ProcessingResult(
-                content_type=ContentType.DOCUMENT,
-                text_content="Text 1",
-                success=True
+                content_type=ContentType.DOCUMENT, text_content="Text 1", success=True
             ),
             "item2": ProcessingResult(
-                content_type=ContentType.WEB,
-                text_content="Text 2",
-                success=True
-            )
+                content_type=ContentType.WEB, text_content="Text 2", success=True
+            ),
         }
 
         # Create custom step
@@ -276,7 +275,7 @@ class TestPipeline:
             name="extract_text",
             process_fn=extract_text,
             input_key="results",
-            output_key="texts"
+            output_key="texts",
         )
 
         # Create context with results
@@ -285,7 +284,9 @@ class TestPipeline:
 
         # Execute pipeline
         result_context = await pipeline.execute()
-        result_context.results = results  # Manually set results since we're not using process_content step
+        result_context.results = (
+            results  # Manually set results since we're not using process_content step
+        )
 
         # Execute step directly
         await pipeline.steps[0].execute(results, result_context)
@@ -301,16 +302,10 @@ class TestPipeline:
     async def test_execute_embedding_step(self, pipeline, services):
         """Test executing pipeline with embedding step."""
         # Mock embedding service
-        services.generate_embeddings.return_value = [
-            [0.1, 0.2, 0.3],
-            [0.4, 0.5, 0.6]
-        ]
+        services.generate_embeddings.return_value = [[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]]
 
         # Add texts to context
-        texts = {
-            "item1": "Text 1",
-            "item2": "Text 2"
-        }
+        texts = {"item1": "Text 1", "item2": "Text 2"}
 
         # Add embedding step
         pipeline.generate_embeddings()
@@ -336,7 +331,7 @@ class TestPipeline:
             content_path="test.pdf",
             text_content="Document text",
             metadata={"pages": 5},
-            success=True
+            success=True,
         )
 
         services.process_content.return_value = mock_result
@@ -368,20 +363,17 @@ class TestPipeline:
             content_type=ContentType.DOCUMENT,
             content_path="test.pdf",
             text_content="Document text",
-            success=True
+            success=True,
         )
 
         mock_result2 = ProcessingResult(
             content_type=ContentType.WEB,
             content_url="https://example.com",
             text_content="Web content",
-            success=True
+            success=True,
         )
 
-        services.process_content.side_effect = [
-            mock_result1,
-            mock_result2
-        ]
+        services.process_content.side_effect = [mock_result1, mock_result2]
 
         # Add process step
         pipeline.process_content()

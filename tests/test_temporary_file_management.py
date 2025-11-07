@@ -1,12 +1,12 @@
 """Tests for temporary file management system."""
 
-import pytest
-import tempfile
 import asyncio
+import tempfile
 from pathlib import Path
-from fastapi.testclient import TestClient
-from unittest.mock import patch, Mock, AsyncMock
+from unittest.mock import AsyncMock, Mock, patch
 
+import pytest
+from fastapi.testclient import TestClient
 from morag.server import create_app
 from morag.services.temporary_file_service import TemporaryFileService
 
@@ -32,7 +32,7 @@ def temp_service(temp_dir):
         base_dir=str(temp_dir),
         retention_hours=1,  # Short retention for testing
         max_session_size_mb=10,  # Small limit for testing
-        cleanup_interval_minutes=1  # Fast cleanup for testing
+        cleanup_interval_minutes=1,  # Fast cleanup for testing
     )
 
 
@@ -60,7 +60,9 @@ class TestTemporaryFileService:
         content = b"Hello, world!"
 
         # Store file
-        metadata = await temp_service.store_file(session_id, filename, content, "text/plain")
+        metadata = await temp_service.store_file(
+            session_id, filename, content, "text/plain"
+        )
 
         assert metadata["filename"] == filename
         assert metadata["size_bytes"] == len(content)
@@ -68,7 +70,9 @@ class TestTemporaryFileService:
         assert metadata["session_id"] == session_id
 
         # Retrieve file
-        retrieved_content, retrieved_metadata = await temp_service.get_file(session_id, filename)
+        retrieved_content, retrieved_metadata = await temp_service.get_file(
+            session_id, filename
+        )
 
         assert retrieved_content == content
         assert retrieved_metadata["filename"] == filename
@@ -85,11 +89,11 @@ class TestTemporaryFileService:
 
         assert metadata["filename"] == filename
         assert metadata["content_type"] == "text/markdown"
-        assert metadata["size_bytes"] == len(content.encode('utf-8'))
+        assert metadata["size_bytes"] == len(content.encode("utf-8"))
 
         # Retrieve and verify
         retrieved_content, _ = await temp_service.get_file(session_id, filename)
-        assert retrieved_content.decode('utf-8') == content
+        assert retrieved_content.decode("utf-8") == content
 
     @pytest.mark.asyncio
     async def test_list_session_files(self, temp_service):
@@ -97,8 +101,12 @@ class TestTemporaryFileService:
         session_id = "test-session-list"
 
         # Store multiple files
-        await temp_service.store_file(session_id, "file1.txt", b"Content 1", "text/plain")
-        await temp_service.store_file(session_id, "file2.json", b'{"key": "value"}', "application/json")
+        await temp_service.store_file(
+            session_id, "file1.txt", b"Content 1", "text/plain"
+        )
+        await temp_service.store_file(
+            session_id, "file2.json", b'{"key": "value"}', "application/json"
+        )
 
         # List files
         session_info = await temp_service.list_session_files(session_id)
@@ -179,7 +187,7 @@ class TestTemporaryFileService:
 class TestTemporaryFileEndpoints:
     """Test cases for temporary file REST endpoints."""
 
-    @patch('morag.api_models.endpoints.temp_files.get_temp_file_service')
+    @patch("morag.api_models.endpoints.temp_files.get_temp_file_service")
     def test_list_session_files_endpoint(self, mock_get_service, client):
         """Test listing session files via REST API."""
         mock_service = AsyncMock()
@@ -190,11 +198,11 @@ class TestTemporaryFileEndpoints:
                     "filename": "test.txt",
                     "size_bytes": 100,
                     "content_type": "text/plain",
-                    "created_at": "2024-01-01T12:00:00Z"
+                    "created_at": "2024-01-01T12:00:00Z",
                 }
             ],
             "total_size_bytes": 100,
-            "expires_at": "2024-01-02T12:00:00Z"
+            "expires_at": "2024-01-02T12:00:00Z",
         }
         mock_get_service.return_value = mock_service
 
@@ -213,7 +221,7 @@ class TestTemporaryFileEndpoints:
         assert response.status_code == 400
         assert "Invalid session ID" in response.json()["detail"]
 
-    @patch('morag.api_models.endpoints.temp_files.get_temp_file_service')
+    @patch("morag.api_models.endpoints.temp_files.get_temp_file_service")
     def test_delete_session_endpoint(self, mock_get_service, client):
         """Test session deletion via REST API."""
         mock_service = AsyncMock()
@@ -227,7 +235,7 @@ class TestTemporaryFileEndpoints:
         assert data["success"] is True
         assert "deleted successfully" in data["message"]
 
-    @patch('morag.api_models.endpoints.temp_files.get_temp_file_service')
+    @patch("morag.api_models.endpoints.temp_files.get_temp_file_service")
     def test_manual_cleanup_endpoint(self, mock_get_service, client):
         """Test manual cleanup via REST API."""
         mock_service = AsyncMock()
@@ -241,7 +249,7 @@ class TestTemporaryFileEndpoints:
         assert data["success"] is True
         assert data["cleaned_sessions"] == 3
 
-    @patch('morag.api_models.endpoints.temp_files.get_temp_file_service')
+    @patch("morag.api_models.endpoints.temp_files.get_temp_file_service")
     def test_get_file_info_endpoint(self, mock_get_service, client):
         """Test getting file info via REST API."""
         mock_service = AsyncMock()
@@ -251,8 +259,8 @@ class TestTemporaryFileEndpoints:
                 "filename": "test.txt",
                 "size_bytes": 7,
                 "content_type": "text/plain",
-                "created_at": "2024-01-01T12:00:00Z"
-            }
+                "created_at": "2024-01-01T12:00:00Z",
+            },
         )
         mock_get_service.return_value = mock_service
 
@@ -264,7 +272,7 @@ class TestTemporaryFileEndpoints:
         assert data["size_bytes"] == 7
         assert data["content_type"] == "text/plain"
 
-    @patch('morag.api_models.endpoints.temp_files.get_temp_file_service')
+    @patch("morag.api_models.endpoints.temp_files.get_temp_file_service")
     def test_file_not_found_endpoint(self, mock_get_service, client):
         """Test file not found handling in endpoints."""
         mock_service = AsyncMock()

@@ -2,7 +2,7 @@
 
 import json
 import logging
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
 
 from ...models import Relation
 from ...models.types import EntityId, RelationId
@@ -29,16 +29,24 @@ class RelationOperations(BaseOperations):
         source_exists_query = "MATCH (e {id: $entity_id}) RETURN count(e) as count"
         target_exists_query = "MATCH (e {id: $entity_id}) RETURN count(e) as count"
 
-        source_result = await self._execute_query(source_exists_query, {"entity_id": relation.source_entity_id})
-        target_result = await self._execute_query(target_exists_query, {"entity_id": relation.target_entity_id})
+        source_result = await self._execute_query(
+            source_exists_query, {"entity_id": relation.source_entity_id}
+        )
+        target_result = await self._execute_query(
+            target_exists_query, {"entity_id": relation.target_entity_id}
+        )
 
         # Check if entities exist, but don't create useless placeholder entities
         if source_result[0]["count"] == 0:
-            logger.warning(f"Source entity {relation.source_entity_id} not found, skipping relation")
+            logger.warning(
+                f"Source entity {relation.source_entity_id} not found, skipping relation"
+            )
             return None  # Skip this relation instead of creating useless entities
 
         if target_result[0]["count"] == 0:
-            logger.warning(f"Target entity {relation.target_entity_id} not found, skipping relation")
+            logger.warning(
+                f"Target entity {relation.target_entity_id} not found, skipping relation"
+            )
             return None  # Skip this relation instead of creating useless entities
 
         # Get the normalized Neo4j relationship type
@@ -61,14 +69,17 @@ class RelationOperations(BaseOperations):
 
         properties = relation.attributes.copy() if relation.attributes else {}
 
-        result = await self._execute_query(query, {
-            "source_id": relation.source_entity_id,
-            "target_id": relation.target_entity_id,
-            "relation_id": relation.id,
-            "relation_type": relation.type,
-            "confidence": relation.confidence,
-            "metadata": json.dumps(properties) if properties else "{}"
-        })
+        result = await self._execute_query(
+            query,
+            {
+                "source_id": relation.source_entity_id,
+                "target_id": relation.target_entity_id,
+                "relation_id": relation.id,
+                "relation_type": relation.type,
+                "confidence": relation.confidence,
+                "metadata": json.dumps(properties) if properties else "{}",
+            },
+        )
 
         if result:
             return result[0]["id"]
@@ -86,9 +97,10 @@ class RelationOperations(BaseOperations):
         Returns:
             Entity ID (properly formatted)
         """
-        from ...models import Entity
-        from ...utils.id_generation import UnifiedIDGenerator, IDValidator
         from datetime import datetime
+
+        from ...models import Entity
+        from ...utils.id_generation import IDValidator, UnifiedIDGenerator
 
         # Check if the provided entity_id is in valid format
         try:
@@ -97,11 +109,13 @@ class RelationOperations(BaseOperations):
             valid_entity_id = entity_id
         except:
             # If invalid, generate a proper unified ID
-            logger.warning(f"Invalid entity ID format: {entity_id}, generating new unified ID")
+            logger.warning(
+                f"Invalid entity ID format: {entity_id}, generating new unified ID"
+            )
             valid_entity_id = UnifiedIDGenerator.generate_entity_id(
                 name=entity_name,
                 entity_type="CUSTOM",  # Default type for auto-created entities
-                source_doc_id=""  # No specific source document
+                source_doc_id="",  # No specific source document
             )
             logger.info(f"Generated new unified entity ID: {valid_entity_id}")
 
@@ -117,11 +131,12 @@ class RelationOperations(BaseOperations):
             name=entity_name,
             type=entity_type,
             confidence=0.1,  # Low confidence for auto-created entities
-            attributes={"auto_created": True, "created_at": datetime.now().isoformat()}
+            attributes={"auto_created": True, "created_at": datetime.now().isoformat()},
         )
 
         # Store the entity using proper entity operations
         from .entity_operations import EntityOperations
+
         entity_ops = EntityOperations(self.driver, self.database)
         await entity_ops.store_entity(entity)
 
@@ -164,7 +179,11 @@ class RelationOperations(BaseOperations):
             # Parse metadata JSON string back to dict for attributes
             metadata_str = rel_data.get("metadata", "{}")
             try:
-                attributes = json.loads(metadata_str) if isinstance(metadata_str, str) else metadata_str
+                attributes = (
+                    json.loads(metadata_str)
+                    if isinstance(metadata_str, str)
+                    else metadata_str
+                )
             except (json.JSONDecodeError, TypeError):
                 attributes = {}
 
@@ -174,7 +193,7 @@ class RelationOperations(BaseOperations):
                 source_entity_id=result[0]["source_id"],
                 target_entity_id=result[0]["target_id"],
                 confidence=rel_data.get("confidence", 1.0),
-                attributes=attributes
+                attributes=attributes,
             )
 
         return None
@@ -206,18 +225,24 @@ class RelationOperations(BaseOperations):
                 # Parse metadata JSON string back to dict for attributes
                 metadata_str = rel_data.get("metadata", "{}")
                 try:
-                    attributes = json.loads(metadata_str) if isinstance(metadata_str, str) else metadata_str
+                    attributes = (
+                        json.loads(metadata_str)
+                        if isinstance(metadata_str, str)
+                        else metadata_str
+                    )
                 except (json.JSONDecodeError, TypeError):
                     attributes = {}
 
-                relations.append(Relation(
-                    id=rel_data["id"],
-                    type=rel_data["type"],
-                    source_entity_id=record["source_id"],
-                    target_entity_id=record["target_id"],
-                    confidence=rel_data.get("confidence", 1.0),
-                    attributes=attributes
-                ))
+                relations.append(
+                    Relation(
+                        id=rel_data["id"],
+                        type=rel_data["type"],
+                        source_entity_id=record["source_id"],
+                        target_entity_id=record["target_id"],
+                        confidence=rel_data.get("confidence", 1.0),
+                        attributes=attributes,
+                    )
+                )
             except Exception as e:
                 logger.warning(f"Failed to parse relation from Neo4J: {e}")
 
@@ -227,7 +252,7 @@ class RelationOperations(BaseOperations):
         self,
         entity_id: EntityId,
         relation_type: Optional[str] = None,
-        direction: str = "both"
+        direction: str = "both",
     ) -> List[Relation]:
         """Get all relations for an entity.
 
@@ -276,18 +301,24 @@ class RelationOperations(BaseOperations):
                 # Parse metadata JSON string back to dict for attributes
                 metadata_str = rel_data.get("metadata", "{}")
                 try:
-                    attributes = json.loads(metadata_str) if isinstance(metadata_str, str) else metadata_str
+                    attributes = (
+                        json.loads(metadata_str)
+                        if isinstance(metadata_str, str)
+                        else metadata_str
+                    )
                 except (json.JSONDecodeError, TypeError):
                     attributes = {}
 
-                relations.append(Relation(
-                    id=rel_data["id"],
-                    type=rel_data["type"],
-                    source_entity_id=record["source_id"],
-                    target_entity_id=record["target_id"],
-                    confidence=rel_data.get("confidence", 1.0),
-                    attributes=attributes
-                ))
+                relations.append(
+                    Relation(
+                        id=rel_data["id"],
+                        type=rel_data["type"],
+                        source_entity_id=record["source_id"],
+                        target_entity_id=record["target_id"],
+                        confidence=rel_data.get("confidence", 1.0),
+                        attributes=attributes,
+                    )
+                )
             except Exception as e:
                 logger.warning(f"Failed to parse relation: {e}")
 
@@ -313,18 +344,24 @@ class RelationOperations(BaseOperations):
                 # Parse metadata JSON string back to dict for attributes
                 metadata_str = rel_data.get("metadata", "{}")
                 try:
-                    attributes = json.loads(metadata_str) if isinstance(metadata_str, str) else metadata_str
+                    attributes = (
+                        json.loads(metadata_str)
+                        if isinstance(metadata_str, str)
+                        else metadata_str
+                    )
                 except (json.JSONDecodeError, TypeError):
                     attributes = {}
 
-                relations.append(Relation(
-                    id=rel_data["id"],
-                    type=rel_data["type"],
-                    source_entity_id=record["source_id"],
-                    target_entity_id=record["target_id"],
-                    confidence=rel_data.get("confidence", 1.0),
-                    attributes=attributes
-                ))
+                relations.append(
+                    Relation(
+                        id=rel_data["id"],
+                        type=rel_data["type"],
+                        source_entity_id=record["source_id"],
+                        target_entity_id=record["target_id"],
+                        confidence=rel_data.get("confidence", 1.0),
+                        attributes=attributes,
+                    )
+                )
             except Exception as e:
                 logger.warning(f"Failed to parse relation: {e}")
 
@@ -350,12 +387,15 @@ class RelationOperations(BaseOperations):
         RETURN r
         """
 
-        result = await self._execute_query(query, {
-            "relation_id": relation.id,
-            "type": relation.type,
-            "confidence": relation.confidence,
-            "metadata": json.dumps(properties) if properties else "{}"
-        })
+        result = await self._execute_query(
+            query,
+            {
+                "relation_id": relation.id,
+                "type": relation.type,
+                "confidence": relation.confidence,
+                "metadata": json.dumps(properties) if properties else "{}",
+            },
+        )
 
         return len(result) > 0
 

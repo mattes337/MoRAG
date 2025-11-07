@@ -5,9 +5,10 @@ This script helps verify that the build optimization is working correctly.
 """
 
 import subprocess
-import time
 import sys
+import time
 from pathlib import Path
+
 
 def run_command(cmd, description):
     """Run a command and measure execution time."""
@@ -18,7 +19,9 @@ def run_command(cmd, description):
 
     start_time = time.time()
     try:
-        result = subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)
+        result = subprocess.run(
+            cmd, shell=True, check=True, capture_output=True, text=True
+        )
         end_time = time.time()
         duration = end_time - start_time
 
@@ -36,6 +39,7 @@ def run_command(cmd, description):
             print("STDOUT:", e.stdout)
         return duration, False
 
+
 def test_build_optimization():
     """Test the optimized Docker build process."""
 
@@ -47,20 +51,20 @@ def test_build_optimization():
     tests = [
         {
             "cmd": "docker build --target dependencies -t morag:deps .",
-            "description": "Build dependencies layer (should be fast on rebuild)"
+            "description": "Build dependencies layer (should be fast on rebuild)",
         },
         {
             "cmd": "docker build --target development -t morag:dev .",
-            "description": "Build development image"
+            "description": "Build development image",
         },
         {
             "cmd": "docker build --target production -t morag:prod .",
-            "description": "Build production image"
+            "description": "Build production image",
         },
         {
             "cmd": "docker build -f Dockerfile.worker --target production -t morag:worker .",
-            "description": "Build worker image"
-        }
+            "description": "Build worker image",
+        },
     ]
 
     results = []
@@ -70,15 +74,14 @@ def test_build_optimization():
 
     # Change to repo root for Docker commands
     import os
+
     os.chdir(repo_root)
 
     for test in tests:
         duration, success = run_command(test["cmd"], test["description"])
-        results.append({
-            "test": test["description"],
-            "duration": duration,
-            "success": success
-        })
+        results.append(
+            {"test": test["description"], "duration": duration, "success": success}
+        )
 
     # Print summary
     print(f"\n{'='*60}")
@@ -110,6 +113,7 @@ def test_build_optimization():
 
     return True
 
+
 def test_rebuild_optimization():
     """Test that rebuilds are faster by making a small change."""
     print("\n🔄 Testing rebuild optimization...")
@@ -122,13 +126,15 @@ def test_rebuild_optimization():
         # Test rebuild
         duration, success = run_command(
             "docker build --target development -t morag:dev-test .",
-            "Rebuild after small change (should be fast)"
+            "Rebuild after small change (should be fast)",
         )
 
         if success and duration < 60:  # Should be much faster than initial build
             print(f"✅ Rebuild optimization working! Build took only {duration:.2f}s")
         elif success:
-            print(f"⚠️  Rebuild completed but took {duration:.2f}s (may not be optimized)")
+            print(
+                f"⚠️  Rebuild completed but took {duration:.2f}s (may not be optimized)"
+            )
         else:
             print("❌ Rebuild failed")
 
@@ -136,6 +142,7 @@ def test_rebuild_optimization():
         # Clean up test file
         if test_file.exists():
             test_file.unlink()
+
 
 if __name__ == "__main__":
     print("Docker Build Optimization Test")

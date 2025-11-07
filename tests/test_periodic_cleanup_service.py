@@ -11,10 +11,10 @@ import tempfile
 import time
 from pathlib import Path
 from unittest.mock import Mock, patch
-import pytest
 
+import pytest
 from morag.services.cleanup_service import PeriodicCleanupService
-from morag.utils.file_upload import FileUploadHandler, FileUploadConfig
+from morag.utils.file_upload import FileUploadConfig, FileUploadHandler
 
 
 class TestPeriodicCleanupService:
@@ -23,9 +23,7 @@ class TestPeriodicCleanupService:
     def test_cleanup_service_initialization(self):
         """Test that cleanup service initializes correctly."""
         service = PeriodicCleanupService(
-            cleanup_interval_hours=2,
-            max_file_age_hours=48,
-            max_disk_usage_mb=500
+            cleanup_interval_hours=2, max_file_age_hours=48, max_disk_usage_mb=500
         )
 
         assert service.cleanup_interval_hours == 2
@@ -35,7 +33,9 @@ class TestPeriodicCleanupService:
 
     def test_cleanup_service_start_stop(self):
         """Test starting and stopping the cleanup service."""
-        service = PeriodicCleanupService(cleanup_interval_hours=24)  # Long interval for testing
+        service = PeriodicCleanupService(
+            cleanup_interval_hours=24
+        )  # Long interval for testing
 
         # Start service
         service.start()
@@ -63,7 +63,9 @@ class TestPeriodicCleanupService:
             os.utime(old_file, (old_time, old_time))
 
             # Run cleanup with 24 hour max age
-            deleted_count = handler.cleanup_old_files(max_age_hours=24, max_disk_usage_mb=1000)
+            deleted_count = handler.cleanup_old_files(
+                max_age_hours=24, max_disk_usage_mb=1000
+            )
 
             # Old file should be deleted, new file should remain
             assert deleted_count == 1
@@ -91,7 +93,9 @@ class TestPeriodicCleanupService:
                 files.append(file_path)
 
             # Run cleanup with very low disk usage limit (should trigger cleanup)
-            deleted_count = handler.cleanup_old_files(max_age_hours=48, max_disk_usage_mb=0.001)  # 1KB limit
+            deleted_count = handler.cleanup_old_files(
+                max_age_hours=48, max_disk_usage_mb=0.001
+            )  # 1KB limit
 
             # Should delete some files due to disk usage limit
             assert deleted_count > 0
@@ -114,7 +118,9 @@ class TestPeriodicCleanupService:
             recent_file.write_text("small content")
 
             # Run cleanup with generous limits
-            deleted_count = handler.cleanup_old_files(max_age_hours=24, max_disk_usage_mb=1000)
+            deleted_count = handler.cleanup_old_files(
+                max_age_hours=24, max_disk_usage_mb=1000
+            )
 
             # No files should be deleted
             assert deleted_count == 0
@@ -128,7 +134,9 @@ class TestPeriodicCleanupService:
         service = PeriodicCleanupService()
 
         # Mock the upload handler
-        with patch('morag.services.cleanup_service.get_upload_handler') as mock_get_handler:
+        with patch(
+            "morag.services.cleanup_service.get_upload_handler"
+        ) as mock_get_handler:
             mock_handler = Mock()
             mock_handler.cleanup_old_files.return_value = 5
             mock_get_handler.return_value = mock_handler
@@ -147,6 +155,7 @@ class TestPeriodicCleanupService:
 
         # Remove temp directory
         import shutil
+
         shutil.rmtree(handler.temp_dir, ignore_errors=True)
 
         # Cleanup should handle missing directory gracefully
@@ -182,7 +191,7 @@ class TestPeriodicCleanupService:
         finally:
             handler.cleanup_temp_dir()
 
-    @patch('morag.utils.file_upload.logger')
+    @patch("morag.utils.file_upload.logger")
     def test_cleanup_logging(self, mock_logger):
         """Test that cleanup operations are properly logged."""
         config = FileUploadConfig()
@@ -204,8 +213,11 @@ class TestPeriodicCleanupService:
             assert deleted_count > 0
 
             # Verify debug logging was called
-            debug_calls = [call for call in mock_logger.debug.call_args_list
-                          if 'Cleanup scan results' in str(call)]
+            debug_calls = [
+                call
+                for call in mock_logger.debug.call_args_list
+                if "Cleanup scan results" in str(call)
+            ]
             assert len(debug_calls) > 0
 
         finally:

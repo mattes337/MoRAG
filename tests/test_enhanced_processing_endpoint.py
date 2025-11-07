@@ -1,12 +1,12 @@
 """Tests for enhanced processing endpoint with webhooks."""
 
-import pytest
-import tempfile
 import json
+import tempfile
 from pathlib import Path
-from fastapi.testclient import TestClient
-from unittest.mock import AsyncMock, patch, Mock
+from unittest.mock import AsyncMock, Mock, patch
 
+import pytest
+from fastapi.testclient import TestClient
 from morag.server import create_app
 
 
@@ -20,7 +20,7 @@ def client():
 @pytest.fixture
 def sample_text_file():
     """Create a sample text file for testing."""
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
         f.write("# Test Document\n\nThis is a test document for enhanced processing.")
         temp_path = Path(f.name)
 
@@ -40,13 +40,15 @@ def mock_webhook_server():
 class TestEnhancedProcessingEndpoint:
     """Test cases for enhanced processing endpoint with webhooks."""
 
-    @patch('morag.tasks.enhanced_processing_task.enhanced_process_ingest_task.delay')
-    def test_process_with_ingestion_success(self, mock_task, client, sample_text_file, mock_webhook_server):
+    @patch("morag.tasks.enhanced_processing_task.enhanced_process_ingest_task.delay")
+    def test_process_with_ingestion_success(
+        self, mock_task, client, sample_text_file, mock_webhook_server
+    ):
         """Test successful submission of enhanced processing task."""
         # Mock the Celery task
         mock_task.return_value = Mock(id="test-task-123")
 
-        with open(sample_text_file, 'rb') as f:
+        with open(sample_text_file, "rb") as f:
             response = client.post(
                 "/api/convert/process-ingest",
                 files={"file": ("test.txt", f, "text/plain")},
@@ -54,8 +56,8 @@ class TestEnhancedProcessingEndpoint:
                     "webhook_url": mock_webhook_server,
                     "document_id": "test-doc-123",
                     "collection_name": "test_collection",
-                    "language": "en"
-                }
+                    "language": "en",
+                },
             )
 
         assert response.status_code == 200
@@ -78,16 +80,18 @@ class TestEnhancedProcessingEndpoint:
         assert options["collection_name"] == "test_collection"
         assert options["language"] == "en"
 
-    @patch('morag.tasks.enhanced_processing_task.enhanced_process_ingest_task.delay')
-    def test_process_with_auto_generated_document_id(self, mock_task, client, sample_text_file, mock_webhook_server):
+    @patch("morag.tasks.enhanced_processing_task.enhanced_process_ingest_task.delay")
+    def test_process_with_auto_generated_document_id(
+        self, mock_task, client, sample_text_file, mock_webhook_server
+    ):
         """Test processing with auto-generated document ID."""
         mock_task.return_value = Mock(id="test-task-456")
 
-        with open(sample_text_file, 'rb') as f:
+        with open(sample_text_file, "rb") as f:
             response = client.post(
                 "/api/convert/process-ingest",
                 files={"file": ("test.txt", f, "text/plain")},
-                data={"webhook_url": mock_webhook_server}
+                data={"webhook_url": mock_webhook_server},
             )
 
         assert response.status_code == 200
@@ -102,18 +106,20 @@ class TestEnhancedProcessingEndpoint:
         file_path, options = call_args[0]
         assert options["document_id"] == data["document_id"]
 
-    @patch('morag.tasks.enhanced_processing_task.enhanced_process_ingest_task.delay')
-    def test_process_with_metadata(self, mock_task, client, sample_text_file, mock_webhook_server):
+    @patch("morag.tasks.enhanced_processing_task.enhanced_process_ingest_task.delay")
+    def test_process_with_metadata(
+        self, mock_task, client, sample_text_file, mock_webhook_server
+    ):
         """Test processing with additional metadata."""
         mock_task.return_value = Mock(id="test-task-789")
 
         metadata = {
             "source": "test",
             "category": "documentation",
-            "tags": ["test", "sample"]
+            "tags": ["test", "sample"],
         }
 
-        with open(sample_text_file, 'rb') as f:
+        with open(sample_text_file, "rb") as f:
             response = client.post(
                 "/api/convert/process-ingest",
                 files={"file": ("test.txt", f, "text/plain")},
@@ -121,8 +127,8 @@ class TestEnhancedProcessingEndpoint:
                     "webhook_url": mock_webhook_server,
                     "metadata": json.dumps(metadata),
                     "chunk_size": "1000",
-                    "chunk_overlap": "100"
-                }
+                    "chunk_overlap": "100",
+                },
             )
 
         assert response.status_code == 200
@@ -142,28 +148,30 @@ class TestEnhancedProcessingEndpoint:
 
     def test_process_missing_webhook_url(self, client, sample_text_file):
         """Test processing fails without webhook URL."""
-        with open(sample_text_file, 'rb') as f:
+        with open(sample_text_file, "rb") as f:
             response = client.post(
                 "/api/convert/process-ingest",
                 files={"file": ("test.txt", f, "text/plain")},
-                data={"document_id": "test-doc"}
+                data={"document_id": "test-doc"},
             )
 
         assert response.status_code == 422  # Validation error
 
-    @patch('morag.tasks.enhanced_processing_task.enhanced_process_ingest_task.delay')
-    def test_process_with_auth_token(self, mock_task, client, sample_text_file, mock_webhook_server):
+    @patch("morag.tasks.enhanced_processing_task.enhanced_process_ingest_task.delay")
+    def test_process_with_auth_token(
+        self, mock_task, client, sample_text_file, mock_webhook_server
+    ):
         """Test processing with webhook authentication token."""
         mock_task.return_value = Mock(id="test-task-auth")
 
-        with open(sample_text_file, 'rb') as f:
+        with open(sample_text_file, "rb") as f:
             response = client.post(
                 "/api/convert/process-ingest",
                 files={"file": ("test.txt", f, "text/plain")},
                 data={
                     "webhook_url": mock_webhook_server,
-                    "webhook_auth_token": "secret-token-123"
-                }
+                    "webhook_auth_token": "secret-token-123",
+                },
             )
 
         assert response.status_code == 200
@@ -176,39 +184,41 @@ class TestEnhancedProcessingEndpoint:
         file_path, options = call_args[0]
         assert options["webhook_auth_token"] == "secret-token-123"
 
-    def test_process_invalid_metadata_json(self, client, sample_text_file, mock_webhook_server):
+    def test_process_invalid_metadata_json(
+        self, client, sample_text_file, mock_webhook_server
+    ):
         """Test processing with invalid metadata JSON."""
-        with open(sample_text_file, 'rb') as f:
+        with open(sample_text_file, "rb") as f:
             response = client.post(
                 "/api/convert/process-ingest",
                 files={"file": ("test.txt", f, "text/plain")},
                 data={
                     "webhook_url": mock_webhook_server,
-                    "metadata": "invalid-json-{{"
-                }
+                    "metadata": "invalid-json-{{",
+                },
             )
 
         # Should still succeed but with empty metadata
         assert response.status_code == 200
 
-    @patch('morag.tasks.enhanced_processing_task.enhanced_process_ingest_task.delay')
+    @patch("morag.tasks.enhanced_processing_task.enhanced_process_ingest_task.delay")
     def test_estimated_time_calculation(self, mock_task, client, mock_webhook_server):
         """Test that estimated time is calculated based on file size."""
         mock_task.return_value = Mock(id="test-task-time")
 
         # Create a larger file
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
             # Write about 1MB of content
             content = "This is test content. " * 50000
             f.write(content)
             large_file = Path(f.name)
 
         try:
-            with open(large_file, 'rb') as f:
+            with open(large_file, "rb") as f:
                 response = client.post(
                     "/api/convert/process-ingest",
                     files={"file": ("large.txt", f, "text/plain")},
-                    data={"webhook_url": mock_webhook_server}
+                    data={"webhook_url": mock_webhook_server},
                 )
 
             assert response.status_code == 200
@@ -232,7 +242,9 @@ class TestWebhookService:
         service = EnhancedWebhookService()
 
         assert service.validate_webhook_url("https://example.com/webhook") is True
-        assert service.validate_webhook_url("http://api.example.com/notifications") is True
+        assert (
+            service.validate_webhook_url("http://api.example.com/notifications") is True
+        )
 
     def test_validate_webhook_url_localhost_blocked(self):
         """Test webhook URL validation blocks localhost by default."""
@@ -250,8 +262,18 @@ class TestWebhookService:
 
         service = EnhancedWebhookService()
 
-        assert service.validate_webhook_url("http://localhost:8080/webhook", allow_localhost=True) is True
-        assert service.validate_webhook_url("http://127.0.0.1:3000/webhook", allow_localhost=True) is True
+        assert (
+            service.validate_webhook_url(
+                "http://localhost:8080/webhook", allow_localhost=True
+            )
+            is True
+        )
+        assert (
+            service.validate_webhook_url(
+                "http://127.0.0.1:3000/webhook", allow_localhost=True
+            )
+            is True
+        )
 
     def test_validate_webhook_url_invalid_scheme(self):
         """Test webhook URL validation rejects invalid schemes."""

@@ -1,22 +1,25 @@
 """Recursive fact retrieval service implementing the graph-based RAG system."""
 
 import uuid
-import structlog
-from datetime import datetime
 from collections import deque
+from datetime import datetime
 from typing import List, Optional, Tuple
 
-from morag_reasoning.llm import LLMClient
-from morag_reasoning.recursive_fact_models import (
-    RecursiveFactRetrievalRequest, RecursiveFactRetrievalResponse,
-    RawFact, FinalFact, TraversalStep
-)
-from morag_reasoning.graph_traversal_agent import GraphTraversalAgent
-from morag_reasoning.fact_critic_agent import FactCriticAgent
-from morag_reasoning.entity_identification import EntityIdentificationService
-from morag_reasoning.enhanced_fact_extraction import EnhancedFactExtractionService
+import structlog
 from morag_graph.storage.neo4j_storage import Neo4jStorage
 from morag_graph.storage.qdrant_storage import QdrantStorage
+from morag_reasoning.enhanced_fact_extraction import EnhancedFactExtractionService
+from morag_reasoning.entity_identification import EntityIdentificationService
+from morag_reasoning.fact_critic_agent import FactCriticAgent
+from morag_reasoning.graph_traversal_agent import GraphTraversalAgent
+from morag_reasoning.llm import LLMClient
+from morag_reasoning.recursive_fact_models import (
+    FinalFact,
+    RawFact,
+    RecursiveFactRetrievalRequest,
+    RecursiveFactRetrievalResponse,
+    TraversalStep,
+)
 from morag_services.embedding import GeminiEmbeddingService
 
 
@@ -29,7 +32,7 @@ class RecursiveFactRetrievalService:
         neo4j_storage: Neo4jStorage,
         qdrant_storage: QdrantStorage,
         embedding_service: Optional[GeminiEmbeddingService] = None,
-        stronger_llm_client: Optional[LLMClient] = None
+        stronger_llm_client: Optional[LLMClient] = None,
     ):
         """Initialize the recursive fact retrieval service.
 
@@ -55,8 +58,7 @@ class RecursiveFactRetrievalService:
         self.fact_critic_agent = FactCriticAgent(llm_client=llm_client)
 
     async def retrieve_facts_recursively(
-        self,
-        request: RecursiveFactRetrievalRequest
+        self, request: RecursiveFactRetrievalRequest
     ) -> RecursiveFactRetrievalResponse:
         """Perform recursive fact retrieval using the graph-based RAG system.
 
@@ -78,7 +80,7 @@ class RecursiveFactRetrievalService:
             "Starting recursive fact retrieval",
             query_id=query_id,
             query=request.user_query,
-            max_depth=request.max_depth
+            max_depth=request.max_depth,
         )
 
         try:
@@ -89,7 +91,7 @@ class RecursiveFactRetrievalService:
                 embedding_service=self.embedding_service,
                 min_confidence=0.2,
                 max_entities=20,
-                language=request.language
+                language=request.language,
             )
 
             self.graph_traversal_agent = GraphTraversalAgent(
@@ -97,43 +99,53 @@ class RecursiveFactRetrievalService:
                 neo4j_storage=self.neo4j_storage,
                 qdrant_storage=self.qdrant_storage,
                 embedding_service=self.embedding_service,
-                max_facts_per_node=request.max_facts_per_node
+                max_facts_per_node=request.max_facts_per_node,
             )
 
             # Initialize enhanced fact extraction service
             self.enhanced_fact_service = EnhancedFactExtractionService(
                 llm_client=self.llm_client,
                 neo4j_storage=self.neo4j_storage,
-                embedding_service=self.embedding_service
+                embedding_service=self.embedding_service,
             )
 
             # Step 1: Extract initial entities from user query
-            self.logger.info("Step 1: Extracting initial entities", language=request.language)
+            self.logger.info(
+                "Step 1: Extracting initial entities", language=request.language
+            )
             initial_entities = await self._extract_initial_entities(request.user_query)
 
             if not initial_entities:
                 return self._create_error_response(
-                    query_id, request, start_time,
-                    "Could not identify key entities in your query to start graph traversal."
+                    query_id,
+                    request,
+                    start_time,
+                    "Could not identify key entities in your query to start graph traversal.",
                 )
 
             # Step 2: Perform graph traversal and fact extraction using entities directly
             self.logger.info("Step 2: Performing graph traversal with entities")
-            all_raw_facts, traversal_steps, max_depth_reached = await self._perform_graph_traversal(
-                request, initial_entities
-            )
+            (
+                all_raw_facts,
+                traversal_steps,
+                max_depth_reached,
+            ) = await self._perform_graph_traversal(request, initial_entities)
             gta_llm_calls = len(traversal_steps)  # One LLM call per traversal step
 
             if not all_raw_facts:
                 return self._create_error_response(
-                    query_id, request, start_time,
-                    "No relevant facts could be extracted from the knowledge graph."
+                    query_id,
+                    request,
+                    start_time,
+                    "No relevant facts could be extracted from the knowledge graph.",
                 )
 
             # Step 4: Evaluate and score facts (unless skip_fact_evaluation is true)
             scored_facts = []  # Initialize scored_facts for both code paths
             if request.skip_fact_evaluation:
-                self.logger.info("Step 4: Skipping fact evaluation (skip_fact_evaluation=True)")
+                self.logger.info(
+                    "Step 4: Skipping fact evaluation (skip_fact_evaluation=True)"
+                )
                 # Convert raw facts directly to final facts without scoring
                 final_facts = []
                 for raw_fact in all_raw_facts:
@@ -146,12 +158,12 @@ class RecursiveFactRetrievalService:
                         extracted_from_depth=raw_fact.extracted_from_depth,
                         score=1.0,  # Default score since evaluation is skipped
                         source_description=f"Node: {raw_fact.source_node_id}",  # Basic source description
-                        final_decayed_score=1.0  # No decay applied
+                        final_decayed_score=1.0,  # No decay applied
                     )
                     final_facts.append(final_fact)
 
                 # Limit total facts (no score filtering since evaluation is skipped)
-                final_facts = final_facts[:request.max_total_facts]
+                final_facts = final_facts[: request.max_total_facts]
                 fca_llm_calls = 0  # No LLM calls for fact evaluation
             else:
                 self.logger.info("Step 4: Evaluating and scoring facts")
@@ -168,12 +180,13 @@ class RecursiveFactRetrievalService:
 
                 # Filter facts by minimum score
                 final_facts = [
-                    fact for fact in final_facts
+                    fact
+                    for fact in final_facts
                     if fact.final_decayed_score >= request.min_fact_score
                 ]
 
                 # Limit total facts
-                final_facts = final_facts[:request.max_total_facts]
+                final_facts = final_facts[: request.max_total_facts]
 
             # Step 6: Generate final answer (unless facts_only is requested)
             final_answer = None
@@ -185,10 +198,14 @@ class RecursiveFactRetrievalService:
                 )
                 final_llm_calls = 1
             else:
-                self.logger.info("Step 6: Skipping final answer generation (facts_only=True)")
+                self.logger.info(
+                    "Step 6: Skipping final answer generation (facts_only=True)"
+                )
                 # Calculate confidence based on fact scores
                 if final_facts:
-                    avg_score = sum(fact.final_decayed_score for fact in final_facts) / len(final_facts)
+                    avg_score = sum(
+                        fact.final_decayed_score for fact in final_facts
+                    ) / len(final_facts)
                     confidence_score = min(1.0, avg_score * (len(final_facts) / 10))
                 final_llm_calls = 0
 
@@ -212,34 +229,40 @@ class RecursiveFactRetrievalService:
                 fca_llm_calls=fca_llm_calls,
                 final_llm_calls=final_llm_calls,
                 final_answer=final_answer,
-                confidence_score=confidence_score
+                confidence_score=confidence_score,
             )
 
             self.logger.info(
                 "Recursive fact retrieval completed",
                 query_id=query_id,
                 total_facts=len(final_facts),
-                processing_time_ms=processing_time_ms
+                processing_time_ms=processing_time_ms,
             )
 
             return response
 
         except Exception as e:
             self.logger.error(
-                "Error in recursive fact retrieval",
-                query_id=query_id,
-                error=str(e)
+                "Error in recursive fact retrieval", query_id=query_id, error=str(e)
             )
             return self._create_error_response(
-                query_id, request, start_time,
-                f"An error occurred during fact retrieval: {str(e)}"
+                query_id,
+                request,
+                start_time,
+                f"An error occurred during fact retrieval: {str(e)}",
             )
 
     async def _extract_initial_entities(self, user_query: str) -> List[str]:
         """Extract initial entities from the user query."""
         try:
-            identified_entities = await self.entity_service.identify_entities(user_query)
-            return [entity.name for entity in identified_entities if entity.confidence >= 0.3]
+            identified_entities = await self.entity_service.identify_entities(
+                user_query
+            )
+            return [
+                entity.name
+                for entity in identified_entities
+                if entity.confidence >= 0.3
+            ]
         except Exception as e:
             self.logger.error("Failed to extract initial entities", error=str(e))
             return []
@@ -255,14 +278,14 @@ class RecursiveFactRetrievalService:
                     if node.id not in node_ids:
                         node_ids.append(node.id)
             except Exception as e:
-                self.logger.warning("Failed to map entity to node", entity=entity, error=str(e))
+                self.logger.warning(
+                    "Failed to map entity to node", entity=entity, error=str(e)
+                )
 
         return node_ids
 
     async def _perform_graph_traversal(
-        self,
-        request: RecursiveFactRetrievalRequest,
-        initial_entities: List[str]
+        self, request: RecursiveFactRetrievalRequest, initial_entities: List[str]
     ) -> Tuple[List[RawFact], List[TraversalStep], int]:
         """Perform graph traversal and fact extraction using entity-based approach."""
         all_raw_facts = []
@@ -273,7 +296,9 @@ class RecursiveFactRetrievalService:
         # Initialize queue with initial entities at depth 0
         entities_to_explore_queue = deque([(initial_entities, 0)])
 
-        while entities_to_explore_queue and len(all_raw_facts) < request.max_total_facts:
+        while (
+            entities_to_explore_queue and len(all_raw_facts) < request.max_total_facts
+        ):
             current_entities, current_depth = entities_to_explore_queue.popleft()
 
             # Skip if depth exceeded
@@ -290,19 +315,23 @@ class RecursiveFactRetrievalService:
 
             try:
                 # Extract facts using enhanced fact extraction (combines graph + vector search)
-                enhanced_facts = await self.enhanced_fact_service.extract_facts_for_query(
-                    user_query=request.user_query,
-                    entity_names=new_entities,
-                    max_facts=request.max_facts_per_node,
-                    language=request.language
+                enhanced_facts = (
+                    await self.enhanced_fact_service.extract_facts_for_query(
+                        user_query=request.user_query,
+                        entity_names=new_entities,
+                        max_facts=request.max_facts_per_node,
+                        language=request.language,
+                    )
                 )
 
                 # Also extract facts from DocumentChunks (existing approach) for comparison
-                gta_response = await self.graph_traversal_agent.extract_facts_from_entity_chunks(
-                    user_query=request.user_query,
-                    entity_names=new_entities,
-                    traversal_depth=current_depth,
-                    language=request.language
+                gta_response = (
+                    await self.graph_traversal_agent.extract_facts_from_entity_chunks(
+                        user_query=request.user_query,
+                        entity_names=new_entities,
+                        traversal_depth=current_depth,
+                        language=request.language,
+                    )
                 )
 
                 # Combine enhanced facts with GTA facts
@@ -315,7 +344,7 @@ class RecursiveFactRetrievalService:
                     depth=current_depth,
                     facts_extracted=len(combined_facts),
                     next_nodes_decision=gta_response.next_nodes_to_explore,
-                    reasoning=f"Enhanced extraction: {len(enhanced_facts)} facts, GTA: {len(gta_response.extracted_facts)} facts. {gta_response.reasoning}"
+                    reasoning=f"Enhanced extraction: {len(enhanced_facts)} facts, GTA: {len(gta_response.extracted_facts)} facts. {gta_response.reasoning}",
                 )
                 traversal_steps.append(step)
 
@@ -324,16 +353,20 @@ class RecursiveFactRetrievalService:
 
                 # Plan next traversal - parse entity names from response
                 if gta_response.next_nodes_to_explore not in ["STOP_TRAVERSAL", "NONE"]:
-                    next_entity_names = self._parse_entity_names(gta_response.next_nodes_to_explore)
+                    next_entity_names = self._parse_entity_names(
+                        gta_response.next_nodes_to_explore
+                    )
                     if next_entity_names:
-                        entities_to_explore_queue.append((next_entity_names, current_depth + 1))
+                        entities_to_explore_queue.append(
+                            (next_entity_names, current_depth + 1)
+                        )
 
             except Exception as e:
                 self.logger.warning(
                     "Error in traversal step",
                     entities=new_entities,
                     depth=current_depth,
-                    error=str(e)
+                    error=str(e),
                 )
 
         return all_raw_facts, traversal_steps, max_depth_reached
@@ -355,33 +388,47 @@ class RecursiveFactRetrievalService:
 
         # Split by comma and clean up
         entities = [entity.strip() for entity in entity_names_str.split(",")]
-        return [entity for entity in entities if entity and entity not in ["STOP_TRAVERSAL", "NONE"]]
+        return [
+            entity
+            for entity in entities
+            if entity and entity not in ["STOP_TRAVERSAL", "NONE"]
+        ]
 
     def _parse_next_nodes(self, next_nodes_str: str) -> List[str]:
         """Parse next nodes string into list of node IDs."""
         try:
             # Handle format: "(node_id1, rel_type1), (node_id2, rel_type2)"
-            if next_nodes_str.strip().startswith('('):
+            if next_nodes_str.strip().startswith("("):
                 # Extract node IDs from tuples
                 import re
-                matches = re.findall(r'\(([^,]+),', next_nodes_str)
+
+                matches = re.findall(r"\(([^,]+),", next_nodes_str)
                 return [match.strip() for match in matches]
             else:
                 # Handle comma-separated node IDs
-                return [node.strip() for node in next_nodes_str.split(',') if node.strip()]
+                return [
+                    node.strip() for node in next_nodes_str.split(",") if node.strip()
+                ]
         except Exception as e:
-            self.logger.warning("Failed to parse next nodes", next_nodes_str=next_nodes_str, error=str(e))
+            self.logger.warning(
+                "Failed to parse next nodes",
+                next_nodes_str=next_nodes_str,
+                error=str(e),
+            )
             return []
 
     async def _generate_final_answer(
         self,
         user_query: str,
         final_facts: List[FinalFact],
-        language: Optional[str] = None
+        language: Optional[str] = None,
     ) -> Tuple[str, float]:
         """Generate the final answer using the stronger LLM."""
         if not final_facts:
-            return "I could not find enough relevant information to answer your query.", 0.0
+            return (
+                "I could not find enough relevant information to answer your query.",
+                0.0,
+            )
 
         # First pass: collect unique documents and assign reference numbers
         document_to_ref_num = {}
@@ -414,11 +461,17 @@ class RecursiveFactRetrievalService:
                 else:
                     # For non-video/audio content, include page, section, and chapter info
                     if fact.source_metadata.page_number:
-                        metadata_parts.append(f"page {fact.source_metadata.page_number}")
+                        metadata_parts.append(
+                            f"page {fact.source_metadata.page_number}"
+                        )
                     if fact.source_metadata.section:
-                        metadata_parts.append(f"section '{fact.source_metadata.section}'")
+                        metadata_parts.append(
+                            f"section '{fact.source_metadata.section}'"
+                        )
                     if fact.source_metadata.additional_metadata.get("chapter"):
-                        metadata_parts.append(f"chapter {fact.source_metadata.additional_metadata['chapter']}")
+                        metadata_parts.append(
+                            f"chapter {fact.source_metadata.additional_metadata['chapter']}"
+                        )
 
                 if metadata_parts:
                     source_parts.append(f", {', '.join(metadata_parts)}]")
@@ -439,27 +492,31 @@ class RecursiveFactRetrievalService:
         language_instruction = ""
         if language:
             language_names = {
-                'en': 'English',
-                'de': 'German',
-                'fr': 'French',
-                'es': 'Spanish',
-                'it': 'Italian',
-                'pt': 'Portuguese',
-                'nl': 'Dutch',
-                'ru': 'Russian',
-                'zh': 'Chinese',
-                'ja': 'Japanese',
-                'ko': 'Korean'
+                "en": "English",
+                "de": "German",
+                "fr": "French",
+                "es": "Spanish",
+                "it": "Italian",
+                "pt": "Portuguese",
+                "nl": "Dutch",
+                "ru": "Russian",
+                "zh": "Chinese",
+                "ja": "Japanese",
+                "ko": "Korean",
             }
             language_name = language_names.get(language, language)
             language_instruction = f"\n\nIMPORTANT: Please respond in {language_name} ({language}). The entire response must be in {language_name}."
 
         # Create references list from the already collected documents
         references = []
-        for doc_name, ref_num in sorted(document_to_ref_num.items(), key=lambda x: x[1]):
+        for doc_name, ref_num in sorted(
+            document_to_ref_num.items(), key=lambda x: x[1]
+        ):
             references.append(f"[{ref_num}] {doc_name}")
 
-        references_section = "\n\n**References:**\n" + "\n".join(references) if references else ""
+        references_section = (
+            "\n\n**References:**\n" + "\n".join(references) if references else ""
+        )
 
         prompt = f"""Based on the following facts extracted from a knowledge graph, please provide a comprehensive answer to the user's question.
 
@@ -487,11 +544,17 @@ MANDATORY: Your response must end with exactly this references section:
             response = await self.stronger_llm_client.generate(prompt)
 
             # Verify that all references are used in the response
-            response = self._ensure_all_references_used(response, document_to_ref_num, final_facts, user_query, language)
+            response = self._ensure_all_references_used(
+                response, document_to_ref_num, final_facts, user_query, language
+            )
 
             # Calculate confidence based on fact scores and coverage
-            avg_score = sum(fact.final_decayed_score for fact in final_facts) / len(final_facts)
-            confidence_score = min(1.0, avg_score * (len(final_facts) / 10))  # Boost confidence with more facts
+            avg_score = sum(fact.final_decayed_score for fact in final_facts) / len(
+                final_facts
+            )
+            confidence_score = min(
+                1.0, avg_score * (len(final_facts) / 10)
+            )  # Boost confidence with more facts
 
             return response, confidence_score
 
@@ -505,7 +568,7 @@ MANDATORY: Your response must end with exactly this references section:
         document_to_ref_num: dict,
         final_facts: List[FinalFact],
         user_query: str,
-        language: Optional[str] = None
+        language: Optional[str] = None,
     ) -> str:
         """Ensure all references are used in the response text."""
         import re
@@ -514,7 +577,7 @@ MANDATORY: Your response must end with exactly this references section:
         used_refs = set()
         for ref_num in document_to_ref_num.values():
             # Look for reference patterns like [1], [1, page 5], [1, 2:30], etc.
-            pattern = rf'\[{ref_num}(?:[^\]]*)\]'
+            pattern = rf"\[{ref_num}(?:[^\]]*)\]"
             if re.search(pattern, response):
                 used_refs.add(ref_num)
 
@@ -552,11 +615,20 @@ MANDATORY: Your response must end with exactly this references section:
                     source_parts = [str(ref_num)]
 
                     # Add metadata to the citation
-                    if hasattr(fact.source_metadata, 'page_number') and fact.source_metadata.page_number:
+                    if (
+                        hasattr(fact.source_metadata, "page_number")
+                        and fact.source_metadata.page_number
+                    ):
                         source_parts.append(f"page {fact.source_metadata.page_number}")
-                    if hasattr(fact.source_metadata, 'chapter') and fact.source_metadata.chapter:
+                    if (
+                        hasattr(fact.source_metadata, "chapter")
+                        and fact.source_metadata.chapter
+                    ):
                         source_parts.append(f"chapter {fact.source_metadata.chapter}")
-                    if hasattr(fact.source_metadata, 'timestamp') and fact.source_metadata.timestamp:
+                    if (
+                        hasattr(fact.source_metadata, "timestamp")
+                        and fact.source_metadata.timestamp
+                    ):
                         source_parts.append(str(fact.source_metadata.timestamp))
 
                     citation = f"[{', '.join(source_parts)}]"
@@ -567,11 +639,22 @@ MANDATORY: Your response must end with exactly this references section:
                 # Insert before references
                 parts = response.split("**References:**")
                 if len(parts) == 2:
-                    additional_section = "\n\nAdditional relevant information:\n" + "\n".join(f"- {info}" for info in additional_info)
-                    response = parts[0].rstrip() + additional_section + "\n\n**References:**" + parts[1]
+                    additional_section = (
+                        "\n\nAdditional relevant information:\n"
+                        + "\n".join(f"- {info}" for info in additional_info)
+                    )
+                    response = (
+                        parts[0].rstrip()
+                        + additional_section
+                        + "\n\n**References:**"
+                        + parts[1]
+                    )
             else:
                 # Append at the end
-                additional_section = "\n\nAdditional relevant information:\n" + "\n".join(f"- {info}" for info in additional_info)
+                additional_section = (
+                    "\n\nAdditional relevant information:\n"
+                    + "\n".join(f"- {info}" for info in additional_info)
+                )
                 response += additional_section
 
         return response
@@ -581,7 +664,7 @@ MANDATORY: Your response must end with exactly this references section:
         query_id: str,
         request: RecursiveFactRetrievalRequest,
         start_time: datetime,
-        error_message: str
+        error_message: str,
     ) -> RecursiveFactRetrievalResponse:
         """Create an error response."""
         end_time = datetime.now()
@@ -602,5 +685,5 @@ MANDATORY: Your response must end with exactly this references section:
             fca_llm_calls=0,
             final_llm_calls=0,
             final_answer=error_message,
-            confidence_score=0.0
+            confidence_score=0.0,
         )

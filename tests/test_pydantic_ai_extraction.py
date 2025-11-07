@@ -1,28 +1,29 @@
 """Tests for PydanticAI-based entity and relation extraction."""
 
-import pytest
 import asyncio
-import sys
 import os
+import sys
 from typing import List
 
-# Add the packages directory to the Python path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'packages', 'morag-core', 'src'))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'packages', 'morag-graph', 'src'))
+import pytest
 
-from morag_core.ai import (
-    MoRAGBaseAgent,
-    AgentConfig,
-    EntityExtractionResult,
-    RelationExtractionResult,
-    Entity as AIEntity,
-    Relation as AIRelation,
-    ConfidenceLevel,
+# Add the packages directory to the Python path
+sys.path.insert(
+    0, os.path.join(os.path.dirname(__file__), "..", "packages", "morag-core", "src")
+)
+sys.path.insert(
+    0, os.path.join(os.path.dirname(__file__), "..", "packages", "morag-graph", "src")
 )
 
+from morag_core.ai import AgentConfig, ConfidenceLevel
+from morag_core.ai import Entity as AIEntity
+from morag_core.ai import EntityExtractionResult, MoRAGBaseAgent
+from morag_core.ai import Relation as AIRelation
+from morag_core.ai import RelationExtractionResult
 from morag_graph.ai import EntityExtractionAgent, RelationExtractionAgent
 from morag_graph.extraction import EntityExtractor, RelationExtractor
-from morag_graph.models import Entity as GraphEntity, Relation as GraphRelation
+from morag_graph.models import Entity as GraphEntity
+from morag_graph.models import Relation as GraphRelation
 
 
 class TestEntityExtractionAgent:
@@ -65,7 +66,7 @@ class TestEntityExtractionAgent:
 
         # Check that chunks respect word boundaries
         for chunk in chunks:
-            assert len(chunk) <= 100 or not any(c in chunk for c in ' \n\t')
+            assert len(chunk) <= 100 or not any(c in chunk for c in " \n\t")
 
     def test_entity_conversion(self):
         """Test conversion from AI entity to graph entity."""
@@ -76,7 +77,7 @@ class TestEntityExtractionAgent:
             type="ORGANIZATION",
             confidence=0.95,
             context="Technology company",
-            metadata={"industry": "technology"}
+            metadata={"industry": "technology"},
         )
 
         graph_entity = agent._convert_to_graph_entity(ai_entity, "doc123")
@@ -93,21 +94,11 @@ class TestEntityExtractionAgent:
         agent = EntityExtractionAgent()
 
         # Create duplicate entities with different confidence scores
-        entity1 = GraphEntity(
-            name="Apple Inc.",
-            type="ORGANIZATION",
-            confidence=0.8
-        )
+        entity1 = GraphEntity(name="Apple Inc.", type="ORGANIZATION", confidence=0.8)
         entity2 = GraphEntity(
-            name="apple inc.",  # Different case
-            type="ORGANIZATION",
-            confidence=0.9
+            name="apple inc.", type="ORGANIZATION", confidence=0.9  # Different case
         )
-        entity3 = GraphEntity(
-            name="Microsoft",
-            type="ORGANIZATION",
-            confidence=0.85
-        )
+        entity3 = GraphEntity(name="Microsoft", type="ORGANIZATION", confidence=0.85)
 
         entities = [entity1, entity2, entity3]
         deduplicated = agent._deduplicate_entities(entities)
@@ -116,7 +107,9 @@ class TestEntityExtractionAgent:
         assert len(deduplicated) == 2
 
         # Should keep the higher confidence Apple entity
-        apple_entity = next(e for e in deduplicated if e.name.lower().startswith("apple"))
+        apple_entity = next(
+            e for e in deduplicated if e.name.lower().startswith("apple")
+        )
         assert apple_entity.confidence == 0.9
 
 
@@ -150,7 +143,7 @@ class TestRelationExtractionAgent:
         # Create test entities with proper IDs
         entities = [
             GraphEntity(name="John Doe", type="PERSON"),
-            GraphEntity(name="Apple Inc.", type="ORGANIZATION")
+            GraphEntity(name="Apple Inc.", type="ORGANIZATION"),
         ]
         # Set IDs manually after creation to avoid validation
         entities[0].id = "ent1"
@@ -161,10 +154,12 @@ class TestRelationExtractionAgent:
             target_entity="Apple Inc.",
             relation_type="WORKS_FOR",
             confidence=0.9,
-            context="John works at Apple"
+            context="John works at Apple",
         )
 
-        graph_relation = agent._convert_to_graph_relation(ai_relation, entities, "doc123")
+        graph_relation = agent._convert_to_graph_relation(
+            ai_relation, entities, "doc123"
+        )
 
         assert graph_relation is not None
         assert graph_relation.source_entity_id == "ent1"
@@ -178,9 +173,7 @@ class TestRelationExtractionAgent:
         agent = RelationExtractionAgent()
 
         # Create test entities (missing one entity)
-        entities = [
-            GraphEntity(name="John Doe", type="PERSON")
-        ]
+        entities = [GraphEntity(name="John Doe", type="PERSON")]
         # Set ID manually after creation to avoid validation
         entities[0].id = "ent1"
 
@@ -188,10 +181,12 @@ class TestRelationExtractionAgent:
             source_entity="John Doe",
             target_entity="Unknown Company",  # This entity doesn't exist
             relation_type="WORKS_FOR",
-            confidence=0.9
+            confidence=0.9,
         )
 
-        graph_relation = agent._convert_to_graph_relation(ai_relation, entities, "doc123")
+        graph_relation = agent._convert_to_graph_relation(
+            ai_relation, entities, "doc123"
+        )
 
         # Should return None when entity can't be resolved
         assert graph_relation is None
@@ -205,19 +200,19 @@ class TestRelationExtractionAgent:
             source_entity_id="ent1",
             target_entity_id="ent2",
             type="WORKS_FOR",
-            confidence=0.8
+            confidence=0.8,
         )
         relation2 = GraphRelation(
             source_entity_id="ent1",
             target_entity_id="ent2",
             type="WORKS_FOR",
-            confidence=0.9
+            confidence=0.9,
         )
         relation3 = GraphRelation(
             source_entity_id="ent2",
             target_entity_id="ent3",
             type="LOCATED_IN",
-            confidence=0.85
+            confidence=0.85,
         )
 
         relations = [relation1, relation2, relation3]
@@ -251,9 +246,9 @@ class TestEntityExtractor:
 
         # This would normally call the API, but we're just testing the interface
         # In a real test with API key, you would await the actual extraction
-        assert hasattr(extractor, 'extract')
-        assert hasattr(extractor, 'extract_entities')
-        assert hasattr(extractor, 'extract_with_context')
+        assert hasattr(extractor, "extract")
+        assert hasattr(extractor, "extract_entities")
+        assert hasattr(extractor, "extract_with_context")
 
 
 class TestRelationExtractor:
@@ -272,10 +267,10 @@ class TestRelationExtractor:
         extractor = RelationExtractor()
 
         # Test that old method names still work
-        assert hasattr(extractor, 'extract')
-        assert hasattr(extractor, 'extract_relations')
-        assert hasattr(extractor, 'extract_with_entities')
-        assert hasattr(extractor, 'extract_from_entity_pairs')
+        assert hasattr(extractor, "extract")
+        assert hasattr(extractor, "extract_relations")
+        assert hasattr(extractor, "extract_with_entities")
+        assert hasattr(extractor, "extract_from_entity_pairs")
 
     def test_entity_pair_filtering(self):
         """Test entity pair filtering logic."""
@@ -327,14 +322,14 @@ class TestIntegration:
 
         # Check entity extractor signature
         entity_sig = inspect.signature(entity_extractor.extract)
-        assert 'text' in entity_sig.parameters
-        assert 'source_doc_id' in entity_sig.parameters
+        assert "text" in entity_sig.parameters
+        assert "source_doc_id" in entity_sig.parameters
 
         # Check relation extractor signature
         relation_sig = inspect.signature(relation_extractor.extract)
-        assert 'text' in relation_sig.parameters
-        assert 'entities' in relation_sig.parameters
-        assert 'source_doc_id' in relation_sig.parameters
+        assert "text" in relation_sig.parameters
+        assert "entities" in relation_sig.parameters
+        assert "source_doc_id" in relation_sig.parameters
 
 
 if __name__ == "__main__":

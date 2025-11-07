@@ -4,18 +4,24 @@ Test script to verify progress logging and task status updates are working corre
 """
 
 import asyncio
-import tempfile
 import os
 import sys
+import tempfile
 from pathlib import Path
 from typing import Optional
 from unittest.mock import Mock, patch
 
 # Add the packages to the path
 sys.path.insert(0, str(Path(__file__).parent.parent / "packages" / "morag" / "src"))
-sys.path.insert(0, str(Path(__file__).parent.parent / "packages" / "morag-core" / "src"))
-sys.path.insert(0, str(Path(__file__).parent.parent / "packages" / "morag-document" / "src"))
-sys.path.insert(0, str(Path(__file__).parent.parent / "packages" / "morag-audio" / "src"))
+sys.path.insert(
+    0, str(Path(__file__).parent.parent / "packages" / "morag-core" / "src")
+)
+sys.path.insert(
+    0, str(Path(__file__).parent.parent / "packages" / "morag-document" / "src")
+)
+sys.path.insert(
+    0, str(Path(__file__).parent.parent / "packages" / "morag-audio" / "src")
+)
 
 from morag.worker import process_file_task
 from morag_core.interfaces.processor import ProcessingConfig
@@ -44,13 +50,12 @@ def test_progress_callback():
 
 def test_processing_config_with_progress():
     """Test that ProcessingConfig accepts progress_callback parameter."""
+
     def dummy_callback(progress: float, message: Optional[str] = None):
         pass
 
     config = ProcessingConfig(
-        chunk_size=1000,
-        chunk_overlap=100,
-        progress_callback=dummy_callback
+        chunk_size=1000, chunk_overlap=100, progress_callback=dummy_callback
     )
 
     assert config.progress_callback == dummy_callback
@@ -76,17 +81,40 @@ def test_celery_task_progress_updates():
     mock_task = MockTask()
 
     # Simulate progress updates like in the worker
-    mock_task.update_state(state='PROCESSING', meta={'stage': 'starting', 'progress': 0.0, 'message': 'Initializing file processing'})
-    mock_task.update_state(state='PROGRESS', meta={'progress': 0.3, 'message': 'Converting PDF structure and extracting text'})
-    mock_task.update_state(state='PROGRESS', meta={'progress': 0.7, 'message': 'Generating markdown from PDF content'})
-    mock_task.update_state(state='PROCESSING', meta={'stage': 'completing', 'progress': 0.95, 'message': 'Finalizing processing'})
+    mock_task.update_state(
+        state="PROCESSING",
+        meta={
+            "stage": "starting",
+            "progress": 0.0,
+            "message": "Initializing file processing",
+        },
+    )
+    mock_task.update_state(
+        state="PROGRESS",
+        meta={
+            "progress": 0.3,
+            "message": "Converting PDF structure and extracting text",
+        },
+    )
+    mock_task.update_state(
+        state="PROGRESS",
+        meta={"progress": 0.7, "message": "Generating markdown from PDF content"},
+    )
+    mock_task.update_state(
+        state="PROCESSING",
+        meta={
+            "stage": "completing",
+            "progress": 0.95,
+            "message": "Finalizing processing",
+        },
+    )
 
     # Verify updates were recorded
     assert len(mock_task.state_updates) == 4
-    assert mock_task.state_updates[0][1]['progress'] == 0.0
-    assert mock_task.state_updates[1][1]['progress'] == 0.3
-    assert mock_task.state_updates[2][1]['progress'] == 0.7
-    assert mock_task.state_updates[3][1]['progress'] == 0.95
+    assert mock_task.state_updates[0][1]["progress"] == 0.0
+    assert mock_task.state_updates[1][1]["progress"] == 0.3
+    assert mock_task.state_updates[2][1]["progress"] == 0.7
+    assert mock_task.state_updates[3][1]["progress"] == 0.95
 
     print("✓ Celery task progress updates test passed")
 
@@ -94,20 +122,20 @@ def test_celery_task_progress_updates():
 def test_document_processor_progress():
     """Test that document processor accepts and uses progress callback."""
     try:
-        from morag_document.processor import DocumentProcessor
-        from morag_document.converters.pdf import PDFConverter
         from morag_core.interfaces.converter import ConversionOptions
+        from morag_document.converters.pdf import PDFConverter
+        from morag_document.processor import DocumentProcessor
 
         # Create a mock progress callback
         progress_calls = []
+
         def progress_callback(progress: float, message: Optional[str] = None):
             progress_calls.append((progress, message))
             print(f"Document processing: {int(progress * 100)}% - {message}")
 
         # Test ConversionOptions with progress callback
         options = ConversionOptions(
-            chunk_size=1000,
-            progress_callback=progress_callback
+            chunk_size=1000, progress_callback=progress_callback
         )
 
         assert options.progress_callback == progress_callback
@@ -120,14 +148,17 @@ def test_document_processor_progress():
 def test_audio_processor_progress():
     """Test that audio processor accepts progress callback parameter."""
     try:
-        from morag_audio.processor import AudioProcessor
-
         # Check if the process method accepts progress_callback
         import inspect
+
+        from morag_audio.processor import AudioProcessor
+
         sig = inspect.signature(AudioProcessor.process)
         params = list(sig.parameters.keys())
 
-        assert 'progress_callback' in params, f"progress_callback not found in AudioProcessor.process parameters: {params}"
+        assert (
+            "progress_callback" in params
+        ), f"progress_callback not found in AudioProcessor.process parameters: {params}"
         print("✓ AudioProcessor.process accepts progress_callback parameter")
 
     except ImportError as e:
@@ -152,6 +183,7 @@ def main():
     except Exception as e:
         print(f"❌ Test failed: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
 

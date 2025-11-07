@@ -2,19 +2,19 @@
 
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import List, Optional
 from pathlib import Path
 
 # Import types only for type hints to avoid circular imports
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, List, Optional
 
 if TYPE_CHECKING:
-    from .result import StageResult
     from .context import StageContext
+    from .result import StageResult
 
 
 class StageType(Enum):
     """Canonical stage types for MoRAG processing."""
+
     MARKDOWN_CONVERSION = "markdown-conversion"
     MARKDOWN_OPTIMIZER = "markdown-optimizer"
     CHUNKER = "chunker"
@@ -24,6 +24,7 @@ class StageType(Enum):
 
 class StageStatus(Enum):
     """Stage execution status."""
+
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -43,10 +44,12 @@ class Stage(ABC):
         self.stage_type = stage_type
 
     @abstractmethod
-    async def execute(self,
-                     input_files: List[Path],
-                     context: "StageContext",
-                     output_dir: Optional[Path] = None) -> "StageResult":
+    async def execute(
+        self,
+        input_files: List[Path],
+        context: "StageContext",
+        output_dir: Optional[Path] = None,
+    ) -> "StageResult":
         """Execute the stage with given input files and context.
 
         Args:
@@ -84,7 +87,9 @@ class Stage(ABC):
         pass
 
     @abstractmethod
-    def get_expected_outputs(self, input_files: List[Path], context: "StageContext") -> List[Path]:
+    def get_expected_outputs(
+        self, input_files: List[Path], context: "StageContext"
+    ) -> List[Path]:
         """Get expected output file paths for given inputs.
 
         Args:
@@ -119,8 +124,4 @@ class Stage(ABC):
         Returns:
             JSON schema for stage configuration
         """
-        return {
-            "type": "object",
-            "properties": {},
-            "additionalProperties": True
-        }
+        return {"type": "object", "properties": {}, "additionalProperties": True}

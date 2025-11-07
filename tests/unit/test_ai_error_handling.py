@@ -1,19 +1,29 @@
 """Unit tests for AI error handling and resilience framework."""
 
-import pytest
 import asyncio
 
-from src.morag.core.resilience import (
-    AIServiceResilience, RetryConfig, CircuitBreakerConfig,
-    HealthMonitor, CircuitBreaker, ErrorType, CircuitBreakerState
+import pytest
+from morag_core.exceptions import (
+    CircuitBreakerOpenError,
+    ContentPolicyError,
+    QuotaExceededError,
+    RateLimitError,
+    TimeoutError,
 )
 from src.morag.core.ai_error_handlers import (
-    GeminiErrorHandler, WhisperErrorHandler, VisionErrorHandler,
-    UniversalAIErrorHandler
+    GeminiErrorHandler,
+    UniversalAIErrorHandler,
+    VisionErrorHandler,
+    WhisperErrorHandler,
 )
-from morag_core.exceptions import (
-    CircuitBreakerOpenError, RateLimitError, QuotaExceededError,
-    TimeoutError, ContentPolicyError
+from src.morag.core.resilience import (
+    AIServiceResilience,
+    CircuitBreaker,
+    CircuitBreakerConfig,
+    CircuitBreakerState,
+    ErrorType,
+    HealthMonitor,
+    RetryConfig,
 )
 
 
@@ -29,7 +39,7 @@ class TestErrorClassification:
             Exception("429 Too Many Requests"),
             Exception("Rate limit exceeded"),
             Exception("too many requests"),
-            RateLimitError("API rate limit")
+            RateLimitError("API rate limit"),
         ]
 
         for error in rate_limit_errors:
@@ -44,7 +54,7 @@ class TestErrorClassification:
             Exception("quota exceeded"),
             Exception("402 Payment Required"),
             Exception("billing limit reached"),
-            QuotaExceededError("Usage limit exceeded")
+            QuotaExceededError("Usage limit exceeded"),
         ]
 
         for error in quota_errors:
@@ -59,7 +69,7 @@ class TestErrorClassification:
             Exception("401 Unauthorized"),
             Exception("403 Forbidden"),
             Exception("invalid api key"),
-            Exception("unauthorized access")
+            Exception("unauthorized access"),
         ]
 
         for error in auth_errors:
@@ -74,7 +84,7 @@ class TestErrorClassification:
             Exception("timeout occurred"),
             Exception("deadline exceeded"),
             asyncio.TimeoutError("Operation timed out"),
-            TimeoutError("Request timeout")
+            TimeoutError("Request timeout"),
         ]
 
         for error in timeout_errors:
@@ -89,7 +99,7 @@ class TestErrorClassification:
             Exception("safety filter triggered"),
             Exception("content policy violation"),
             Exception("harmful content detected"),
-            ContentPolicyError("Blocked content")
+            ContentPolicyError("Blocked content"),
         ]
 
         for error in policy_errors:
@@ -123,10 +133,7 @@ class TestRetryLogic:
     def test_exponential_backoff_calculation(self):
         """Test exponential backoff delay calculation."""
         config = RetryConfig(
-            base_delay=1.0,
-            exponential_base=2.0,
-            max_delay=60.0,
-            jitter=False
+            base_delay=1.0, exponential_base=2.0, max_delay=60.0, jitter=False
         )
         handler = AIServiceResilience("test", config)
 
@@ -184,7 +191,9 @@ class TestCircuitBreaker:
 
     def test_circuit_breaker_recovery(self):
         """Test circuit breaker recovery mechanism."""
-        config = CircuitBreakerConfig(failure_threshold=2, recovery_timeout=0.1, half_open_max_calls=2)
+        config = CircuitBreakerConfig(
+            failure_threshold=2, recovery_timeout=0.1, half_open_max_calls=2
+        )
         cb = CircuitBreaker("test", config)
 
         # Trigger opening
@@ -194,6 +203,7 @@ class TestCircuitBreaker:
 
         # Wait for recovery timeout
         import time
+
         time.sleep(0.2)
 
         # Should transition to half-open
@@ -217,6 +227,7 @@ class TestCircuitBreaker:
 
         # Wait and transition to half-open
         import time
+
         time.sleep(0.2)
         cb.is_open()  # This triggers transition to half-open
         assert cb.state == CircuitBreakerState.HALF_OPEN
@@ -334,8 +345,7 @@ class TestAIServiceResilience:
             return "fallback_result"
 
         result = await handler.execute_with_resilience(
-            failing_operation,
-            fallback=fallback_operation
+            failing_operation, fallback=fallback_operation
         )
         assert result == "fallback_result"
 
@@ -368,31 +378,67 @@ class TestProviderSpecificHandlers:
         handler = GeminiErrorHandler()
 
         # Gemini-specific patterns
-        assert handler._classify_error(Exception("resource_exhausted")) == ErrorType.QUOTA_EXCEEDED
-        assert handler._classify_error(Exception("invalid_api_key")) == ErrorType.AUTHENTICATION
-        assert handler._classify_error(Exception("safety filter")) == ErrorType.CONTENT_POLICY
-        assert handler._classify_error(Exception("model_overloaded")) == ErrorType.SERVICE_UNAVAILABLE
-        assert handler._classify_error(Exception("deadline_exceeded")) == ErrorType.TIMEOUT
+        assert (
+            handler._classify_error(Exception("resource_exhausted"))
+            == ErrorType.QUOTA_EXCEEDED
+        )
+        assert (
+            handler._classify_error(Exception("invalid_api_key"))
+            == ErrorType.AUTHENTICATION
+        )
+        assert (
+            handler._classify_error(Exception("safety filter"))
+            == ErrorType.CONTENT_POLICY
+        )
+        assert (
+            handler._classify_error(Exception("model_overloaded"))
+            == ErrorType.SERVICE_UNAVAILABLE
+        )
+        assert (
+            handler._classify_error(Exception("deadline_exceeded")) == ErrorType.TIMEOUT
+        )
 
     def test_whisper_error_classification(self):
         """Test Whisper-specific error patterns."""
         handler = WhisperErrorHandler()
 
         # Whisper-specific patterns
-        assert handler._classify_error(Exception("model not found")) == ErrorType.SERVICE_UNAVAILABLE
-        assert handler._classify_error(Exception("audio file corrupt")) == ErrorType.UNKNOWN
-        assert handler._classify_error(Exception("out of memory")) == ErrorType.SERVICE_UNAVAILABLE
-        assert handler._classify_error(Exception("cuda error")) == ErrorType.SERVICE_UNAVAILABLE
+        assert (
+            handler._classify_error(Exception("model not found"))
+            == ErrorType.SERVICE_UNAVAILABLE
+        )
+        assert (
+            handler._classify_error(Exception("audio file corrupt"))
+            == ErrorType.UNKNOWN
+        )
+        assert (
+            handler._classify_error(Exception("out of memory"))
+            == ErrorType.SERVICE_UNAVAILABLE
+        )
+        assert (
+            handler._classify_error(Exception("cuda error"))
+            == ErrorType.SERVICE_UNAVAILABLE
+        )
 
     def test_vision_error_classification(self):
         """Test Vision-specific error patterns."""
         handler = VisionErrorHandler()
 
         # Vision-specific patterns
-        assert handler._classify_error(Exception("image format unsupported")) == ErrorType.UNKNOWN
-        assert handler._classify_error(Exception("image too large")) == ErrorType.UNKNOWN
-        assert handler._classify_error(Exception("image corrupted")) == ErrorType.UNKNOWN
-        assert handler._classify_error(Exception("vision model unavailable")) == ErrorType.SERVICE_UNAVAILABLE
+        assert (
+            handler._classify_error(Exception("image format unsupported"))
+            == ErrorType.UNKNOWN
+        )
+        assert (
+            handler._classify_error(Exception("image too large")) == ErrorType.UNKNOWN
+        )
+        assert (
+            handler._classify_error(Exception("image corrupted")) == ErrorType.UNKNOWN
+        )
+        assert (
+            handler._classify_error(Exception("vision model unavailable"))
+            == ErrorType.SERVICE_UNAVAILABLE
+        )
 
 
 class TestUniversalHandler:
@@ -424,10 +470,7 @@ class TestUniversalHandler:
         async def mock_operation():
             return "test_result"
 
-        result = await universal.execute_with_resilience(
-            "gemini",
-            mock_operation
-        )
+        result = await universal.execute_with_resilience("gemini", mock_operation)
         assert result == "test_result"
 
     def test_health_status_collection(self):

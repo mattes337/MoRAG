@@ -1,12 +1,12 @@
 """Main API interface for MoRAG system."""
 
-from typing import Dict, Any, List, Optional, Union
 from pathlib import Path
-import structlog
+from typing import Any, Dict, List, Optional, Union
 
+import structlog
+from morag.orchestrator import MoRAGOrchestrator
 from morag_core.models import ProcessingResult
 from morag_services import ContentType, ServiceConfig
-from morag.orchestrator import MoRAGOrchestrator
 
 logger = structlog.get_logger(__name__)
 
@@ -27,7 +27,7 @@ class MoRAGAPI:
         self,
         url: str,
         content_type: Optional[str] = None,
-        options: Optional[Dict[str, Any]] = None
+        options: Optional[Dict[str, Any]] = None,
     ) -> ProcessingResult:
         """Process content from a URL.
 
@@ -57,7 +57,7 @@ class MoRAGAPI:
         self,
         file_path: Union[str, Path],
         content_type: Optional[str] = None,
-        options: Optional[Dict[str, Any]] = None
+        options: Optional[Dict[str, Any]] = None,
     ) -> ProcessingResult:
         """Process content from a file.
 
@@ -83,12 +83,12 @@ class MoRAGAPI:
             content_type = self._normalize_content_type(content_type)
             content_type_enum = ContentType(content_type)
 
-        return await self.orchestrator.process_content(file_path, content_type_enum, options)
+        return await self.orchestrator.process_content(
+            file_path, content_type_enum, options
+        )
 
     async def process_web_page(
-        self,
-        url: str,
-        options: Optional[Dict[str, Any]] = None
+        self, url: str, options: Optional[Dict[str, Any]] = None
     ) -> ProcessingResult:
         """Process a web page.
 
@@ -102,9 +102,7 @@ class MoRAGAPI:
         return await self.orchestrator.process_content(url, ContentType.WEB, options)
 
     async def process_youtube_video(
-        self,
-        url: str,
-        options: Optional[Dict[str, Any]] = None
+        self, url: str, options: Optional[Dict[str, Any]] = None
     ) -> ProcessingResult:
         """Process a YouTube video.
 
@@ -115,12 +113,12 @@ class MoRAGAPI:
         Returns:
             Processing result
         """
-        return await self.orchestrator.process_content(url, ContentType.YOUTUBE, options)
+        return await self.orchestrator.process_content(
+            url, ContentType.YOUTUBE, options
+        )
 
     async def process_document(
-        self,
-        file_path: Union[str, Path],
-        options: Optional[Dict[str, Any]] = None
+        self, file_path: Union[str, Path], options: Optional[Dict[str, Any]] = None
     ) -> ProcessingResult:
         """Process a document file.
 
@@ -131,12 +129,12 @@ class MoRAGAPI:
         Returns:
             Processing result
         """
-        return await self.orchestrator.process_content(file_path, ContentType.DOCUMENT, options)
+        return await self.orchestrator.process_content(
+            file_path, ContentType.DOCUMENT, options
+        )
 
     async def process_audio(
-        self,
-        file_path: Union[str, Path],
-        options: Optional[Dict[str, Any]] = None
+        self, file_path: Union[str, Path], options: Optional[Dict[str, Any]] = None
     ) -> ProcessingResult:
         """Process an audio file.
 
@@ -147,12 +145,12 @@ class MoRAGAPI:
         Returns:
             Processing result
         """
-        return await self.orchestrator.process_content(file_path, ContentType.AUDIO, options)
+        return await self.orchestrator.process_content(
+            file_path, ContentType.AUDIO, options
+        )
 
     async def process_video(
-        self,
-        file_path: Union[str, Path],
-        options: Optional[Dict[str, Any]] = None
+        self, file_path: Union[str, Path], options: Optional[Dict[str, Any]] = None
     ) -> ProcessingResult:
         """Process a video file.
 
@@ -163,12 +161,12 @@ class MoRAGAPI:
         Returns:
             Processing result
         """
-        return await self.orchestrator.process_content(file_path, ContentType.VIDEO, options)
+        return await self.orchestrator.process_content(
+            file_path, ContentType.VIDEO, options
+        )
 
     async def process_image(
-        self,
-        file_path: Union[str, Path],
-        options: Optional[Dict[str, Any]] = None
+        self, file_path: Union[str, Path], options: Optional[Dict[str, Any]] = None
     ) -> ProcessingResult:
         """Process an image file.
 
@@ -179,12 +177,12 @@ class MoRAGAPI:
         Returns:
             Processing result
         """
-        return await self.orchestrator.process_content(file_path, ContentType.IMAGE, options)
+        return await self.orchestrator.process_content(
+            file_path, ContentType.IMAGE, options
+        )
 
     async def process_batch(
-        self,
-        items: List[Dict[str, Any]],
-        options: Optional[Dict[str, Any]] = None
+        self, items: List[Dict[str, Any]], options: Optional[Dict[str, Any]] = None
     ) -> List[ProcessingResult]:
         """Process multiple items in batch.
 
@@ -198,10 +196,7 @@ class MoRAGAPI:
         return await self.orchestrator.process_batch(items, options)
 
     async def search(
-        self,
-        query: str,
-        limit: int = 10,
-        filters: Optional[Dict[str, Any]] = None
+        self, query: str, limit: int = 10, filters: Optional[Dict[str, Any]] = None
     ) -> List[Dict[str, Any]]:
         """Search for similar content.
 
@@ -235,12 +230,12 @@ class MoRAGAPI:
         url_lower = url.lower()
 
         # YouTube detection
-        if 'youtube.com' in url_lower or 'youtu.be' in url_lower:
-            return 'youtube'
+        if "youtube.com" in url_lower or "youtu.be" in url_lower:
+            return "youtube"
 
         # Default to web for URLs
-        if url_lower.startswith(('http://', 'https://')):
-            return 'web'
+        if url_lower.startswith(("http://", "https://")):
+            return "web"
 
         # If it's not a URL, treat as file path
         return self._detect_content_type_from_file(Path(url))
@@ -257,27 +252,50 @@ class MoRAGAPI:
         suffix = file_path.suffix.lower()
 
         # Document types
-        if suffix in ['.pdf', '.doc', '.docx', '.txt', '.md', '.rtf', '.pptx', '.ppt', '.xlsx', '.xls', '.csv', '.json', '.xml']:
-            return 'document'
+        if suffix in [
+            ".pdf",
+            ".doc",
+            ".docx",
+            ".txt",
+            ".md",
+            ".rtf",
+            ".pptx",
+            ".ppt",
+            ".xlsx",
+            ".xls",
+            ".csv",
+            ".json",
+            ".xml",
+        ]:
+            return "document"
 
         # Audio types
-        if suffix in ['.mp3', '.wav', '.flac', '.m4a', '.ogg', '.aac']:
-            return 'audio'
+        if suffix in [".mp3", ".wav", ".flac", ".m4a", ".ogg", ".aac"]:
+            return "audio"
 
         # Video types
-        if suffix in ['.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm']:
-            return 'video'
+        if suffix in [".mp4", ".avi", ".mkv", ".mov", ".wmv", ".flv", ".webm"]:
+            return "video"
 
         # Image types
-        if suffix in ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.tiff', '.svg']:
-            return 'image'
+        if suffix in [
+            ".jpg",
+            ".jpeg",
+            ".png",
+            ".gif",
+            ".bmp",
+            ".webp",
+            ".tiff",
+            ".svg",
+        ]:
+            return "image"
 
         # Web types
-        if suffix in ['.html', '.htm']:
-            return 'web'
+        if suffix in [".html", ".htm"]:
+            return "web"
 
         # Default to document
-        return 'document'
+        return "document"
 
     def _normalize_content_type(self, content_type: str) -> str:
         """Normalize content type to valid ContentType enum value.
@@ -292,42 +310,42 @@ class MoRAGAPI:
 
         # Map common file extensions or formats to content types
         format_mapping = {
-            'pdf': 'document',
-            'doc': 'document',
-            'docx': 'document',
-            'txt': 'document',
-            'md': 'document',
-            'rtf': 'document',
-            'pptx': 'document',
-            'ppt': 'document',
-            'xlsx': 'document',
-            'xls': 'document',
-            'csv': 'document',
-            'json': 'document',
-            'xml': 'document',
-            'html': 'web',
-            'htm': 'web',
-            'mp3': 'audio',
-            'wav': 'audio',
-            'flac': 'audio',
-            'm4a': 'audio',
-            'ogg': 'audio',
-            'aac': 'audio',
-            'mp4': 'video',
-            'avi': 'video',
-            'mkv': 'video',
-            'mov': 'video',
-            'wmv': 'video',
-            'flv': 'video',
-            'webm': 'video',
-            'jpg': 'image',
-            'jpeg': 'image',
-            'png': 'image',
-            'gif': 'image',
-            'bmp': 'image',
-            'webp': 'image',
-            'tiff': 'image',
-            'svg': 'image',
+            "pdf": "document",
+            "doc": "document",
+            "docx": "document",
+            "txt": "document",
+            "md": "document",
+            "rtf": "document",
+            "pptx": "document",
+            "ppt": "document",
+            "xlsx": "document",
+            "xls": "document",
+            "csv": "document",
+            "json": "document",
+            "xml": "document",
+            "html": "web",
+            "htm": "web",
+            "mp3": "audio",
+            "wav": "audio",
+            "flac": "audio",
+            "m4a": "audio",
+            "ogg": "audio",
+            "aac": "audio",
+            "mp4": "video",
+            "avi": "video",
+            "mkv": "video",
+            "mov": "video",
+            "wmv": "video",
+            "flv": "video",
+            "webm": "video",
+            "jpg": "image",
+            "jpeg": "image",
+            "png": "image",
+            "gif": "image",
+            "bmp": "image",
+            "webp": "image",
+            "tiff": "image",
+            "svg": "image",
         }
 
         # Try to map the content type
@@ -335,12 +353,21 @@ class MoRAGAPI:
             return format_mapping[content_type_lower]
 
         # If it's already a valid content type, return as is
-        valid_types = ['document', 'audio', 'video', 'image', 'web', 'youtube', 'text', 'unknown']
+        valid_types = [
+            "document",
+            "audio",
+            "video",
+            "image",
+            "web",
+            "youtube",
+            "text",
+            "unknown",
+        ]
         if content_type_lower in valid_types:
             return content_type_lower
 
         # Default to unknown for unrecognized types
-        return 'unknown'
+        return "unknown"
 
     async def cleanup(self) -> None:
         """Clean up resources."""

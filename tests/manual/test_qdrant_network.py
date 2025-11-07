@@ -4,19 +4,21 @@ Network diagnostic script for Qdrant connection issues.
 """
 
 import asyncio
-import sys
 import os
 import socket
 import ssl
-import requests
-import httpx
+import sys
 from pathlib import Path
 from urllib.parse import urlparse
+
+import httpx
+import requests
 
 # Add the src directory to the Python path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from morag_core.config import settings
+
 
 def test_dns_resolution(hostname):
     """Test DNS resolution for the hostname."""
@@ -32,6 +34,7 @@ def test_dns_resolution(hostname):
         print(f"❌ DNS resolution failed: {e}")
         return False
 
+
 def test_tcp_connection(hostname, port, timeout=10):
     """Test TCP connection to hostname:port."""
     print(f"Testing TCP connection to {hostname}:{port}...")
@@ -43,6 +46,7 @@ def test_tcp_connection(hostname, port, timeout=10):
     except Exception as e:
         print(f"❌ TCP connection failed: {e}")
         return False
+
 
 def test_ssl_connection(hostname, port, timeout=10):
     """Test SSL/TLS connection to hostname:port."""
@@ -59,6 +63,7 @@ def test_ssl_connection(hostname, port, timeout=10):
         print(f"❌ SSL/TLS connection failed: {e}")
         return False
 
+
 def test_http_request(url, timeout=30):
     """Test HTTP request to the URL."""
     print(f"Testing HTTP request to {url}...")
@@ -73,6 +78,7 @@ def test_http_request(url, timeout=30):
     except Exception as e:
         print(f"❌ HTTP request failed: {e}")
         return False
+
 
 async def test_httpx_request(url, timeout=30):
     """Test HTTP request using httpx (same library as Qdrant client)."""
@@ -90,6 +96,7 @@ async def test_httpx_request(url, timeout=30):
         print(f"❌ HTTPX request failed: {e}")
         return False
 
+
 def test_qdrant_endpoints(base_url):
     """Test common Qdrant endpoints."""
     endpoints = [
@@ -105,7 +112,7 @@ def test_qdrant_endpoints(base_url):
         try:
             response = requests.get(url, timeout=10, verify=True)
             print(f"    ✅ Status: {response.status_code}")
-            if response.headers.get('content-type', '').startswith('application/json'):
+            if response.headers.get("content-type", "").startswith("application/json"):
                 try:
                     json_data = response.json()
                     print(f"    📄 JSON response: {json_data}")
@@ -116,6 +123,7 @@ def test_qdrant_endpoints(base_url):
         except Exception as e:
             print(f"    ❌ Failed: {e}")
 
+
 async def main():
     """Main diagnostic function."""
     print("Qdrant Network Diagnostic Script")
@@ -125,7 +133,7 @@ async def main():
     qdrant_url = settings.qdrant_host
     parsed = urlparse(qdrant_url)
     hostname = parsed.hostname
-    port = parsed.port or (443 if parsed.scheme == 'https' else 6333)
+    port = parsed.port or (443 if parsed.scheme == "https" else 6333)
 
     print(f"Configuration:")
     print(f"  URL: {qdrant_url}")
@@ -156,7 +164,7 @@ async def main():
         return False
 
     # Test 3: SSL/TLS Connection (if HTTPS)
-    if parsed.scheme == 'https':
+    if parsed.scheme == "https":
         print("3. SSL/TLS Connection Test")
         print("-" * 30)
         ssl_ok = test_ssl_connection(hostname, port)
@@ -187,7 +195,7 @@ async def main():
     # Summary
     print("Summary")
     print("=" * 50)
-    if dns_ok and tcp_ok and (parsed.scheme != 'https' or ssl_ok):
+    if dns_ok and tcp_ok and (parsed.scheme != "https" or ssl_ok):
         print("✅ Network connectivity looks good!")
         print("   The issue might be:")
         print("   - Qdrant server not running")
@@ -200,10 +208,11 @@ async def main():
             print("   - DNS resolution failed")
         if not tcp_ok:
             print("   - TCP connection failed")
-        if parsed.scheme == 'https' and not ssl_ok:
+        if parsed.scheme == "https" and not ssl_ok:
             print("   - SSL/TLS connection failed")
 
     return dns_ok and tcp_ok
+
 
 if __name__ == "__main__":
     success = asyncio.run(main())

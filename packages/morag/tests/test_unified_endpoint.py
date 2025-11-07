@@ -1,12 +1,12 @@
 """Tests for the unified processing endpoint."""
 
 import json
-import pytest
-from unittest.mock import Mock, AsyncMock, patch
-from fastapi.testclient import TestClient
-from fastapi import FastAPI
 from io import BytesIO
+from unittest.mock import AsyncMock, Mock, patch
 
+import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 from morag.api_models.endpoints.unified import setup_unified_endpoints
 from morag.api_models.models import UnifiedProcessRequest, UnifiedProcessResponse
 
@@ -46,37 +46,26 @@ class TestUnifiedEndpointValidation:
 
     def test_invalid_json_request_data(self, client):
         """Test that invalid JSON in request_data returns 400."""
-        response = client.post(
-            "/api/v1/process",
-            data={"request_data": "invalid json"}
-        )
+        response = client.post("/api/v1/process", data={"request_data": "invalid json"})
         assert response.status_code == 400
         assert "Invalid request data" in response.json()["detail"]
 
     def test_missing_file_for_file_source_type(self, client):
         """Test that missing file for source_type='file' returns 400."""
-        request_data = {
-            "mode": "convert",
-            "source_type": "file"
-        }
+        request_data = {"mode": "convert", "source_type": "file"}
 
         response = client.post(
-            "/api/v1/process",
-            data={"request_data": json.dumps(request_data)}
+            "/api/v1/process", data={"request_data": json.dumps(request_data)}
         )
         assert response.status_code == 400
         assert "File upload required" in response.json()["detail"]
 
     def test_missing_url_for_url_source_type(self, client):
         """Test that missing URL for source_type='url' returns 400."""
-        request_data = {
-            "mode": "process",
-            "source_type": "url"
-        }
+        request_data = {"mode": "process", "source_type": "url"}
 
         response = client.post(
-            "/api/v1/process",
-            data={"request_data": json.dumps(request_data)}
+            "/api/v1/process", data={"request_data": json.dumps(request_data)}
         )
         assert response.status_code == 400
         assert "URL required" in response.json()["detail"]
@@ -86,12 +75,11 @@ class TestUnifiedEndpointValidation:
         request_data = {
             "mode": "ingest",
             "source_type": "url",
-            "url": "https://example.com"
+            "url": "https://example.com",
         }
 
         response = client.post(
-            "/api/v1/process",
-            data={"request_data": json.dumps(request_data)}
+            "/api/v1/process", data={"request_data": json.dumps(request_data)}
         )
         assert response.status_code == 400
         assert "Webhook configuration required" in response.json()["detail"]
@@ -100,10 +88,12 @@ class TestUnifiedEndpointValidation:
 class TestConvertMode:
     """Test convert mode functionality."""
 
-    @patch('morag.api_models.endpoints.unified.get_upload_handler')
-    @patch('morag.api_models.endpoints.unified.get_deduplication_service')
-    @patch('morag.api_models.endpoints.unified.MarkitdownService')
-    def test_convert_mode_pdf_file(self, mock_markitdown, mock_dedup_service, mock_upload_handler, client):
+    @patch("morag.api_models.endpoints.unified.get_upload_handler")
+    @patch("morag.api_models.endpoints.unified.get_deduplication_service")
+    @patch("morag.api_models.endpoints.unified.MarkitdownService")
+    def test_convert_mode_pdf_file(
+        self, mock_markitdown, mock_dedup_service, mock_upload_handler, client
+    ):
         """Test convert mode with PDF file."""
         # Setup mocks
         mock_handler = Mock()
@@ -128,15 +118,13 @@ class TestConvertMode:
         request_data = {
             "mode": "convert",
             "source_type": "file",
-            "processing_options": {
-                "include_metadata": True
-            }
+            "processing_options": {"include_metadata": True},
         }
 
         response = client.post(
             "/api/v1/process",
             data={"request_data": json.dumps(request_data)},
-            files={"file": ("test.pdf", test_file, "application/pdf")}
+            files={"file": ("test.pdf", test_file, "application/pdf")},
         )
 
         assert response.status_code == 200
@@ -150,14 +138,10 @@ class TestConvertMode:
     def test_convert_mode_unsupported_file_type(self, client):
         """Test convert mode with unsupported file type."""
         # Test that convert mode with URL source type fails validation first
-        request_data = {
-            "mode": "convert",
-            "source_type": "url"
-        }
+        request_data = {"mode": "convert", "source_type": "url"}
 
         response = client.post(
-            "/api/v1/process",
-            data={"request_data": json.dumps(request_data)}
+            "/api/v1/process", data={"request_data": json.dumps(request_data)}
         )
         assert response.status_code == 400
         assert "URL required for source_type='url'" in response.json()["detail"]
@@ -166,9 +150,11 @@ class TestConvertMode:
 class TestProcessMode:
     """Test process mode functionality."""
 
-    @patch('morag.api_models.endpoints.unified.get_upload_handler')
-    @patch('morag.api_models.endpoints.unified.normalize_processing_result')
-    def test_process_mode_file(self, mock_normalize, mock_upload_handler, client, mock_morag_api):
+    @patch("morag.api_models.endpoints.unified.get_upload_handler")
+    @patch("morag.api_models.endpoints.unified.normalize_processing_result")
+    def test_process_mode_file(
+        self, mock_normalize, mock_upload_handler, client, mock_morag_api
+    ):
         """Test process mode with file upload."""
         # Setup mocks
         mock_handler = Mock()
@@ -195,13 +181,13 @@ class TestProcessMode:
         request_data = {
             "mode": "process",
             "source_type": "file",
-            "content_type": "document"
+            "content_type": "document",
         }
 
         response = client.post(
             "/api/v1/process",
             data={"request_data": json.dumps(request_data)},
-            files={"file": ("test.txt", test_file, "text/plain")}
+            files={"file": ("test.txt", test_file, "text/plain")},
         )
 
         assert response.status_code == 200
@@ -222,19 +208,21 @@ class TestProcessMode:
         mock_result.warnings = None
         mock_result.thumbnails = None
 
-        with patch('morag.api_models.endpoints.unified.normalize_processing_result', return_value=mock_result):
+        with patch(
+            "morag.api_models.endpoints.unified.normalize_processing_result",
+            return_value=mock_result,
+        ):
             mock_morag_api.process_url.return_value = mock_result
 
             request_data = {
                 "mode": "process",
                 "source_type": "url",
                 "url": "https://example.com",
-                "content_type": "web"
+                "content_type": "web",
             }
 
             response = client.post(
-                "/api/v1/process",
-                data={"request_data": json.dumps(request_data)}
+                "/api/v1/process", data={"request_data": json.dumps(request_data)}
             )
 
             assert response.status_code == 200
@@ -247,8 +235,8 @@ class TestProcessMode:
 class TestIngestMode:
     """Test ingest mode functionality."""
 
-    @patch('morag.api_models.endpoints.unified.get_upload_handler')
-    @patch('morag.api_models.endpoints.unified.ingest_file_task')
+    @patch("morag.api_models.endpoints.unified.get_upload_handler")
+    @patch("morag.api_models.endpoints.unified.ingest_file_task")
     def test_ingest_mode_file(self, mock_task, mock_upload_handler, client):
         """Test ingest mode with file upload."""
         # Setup mocks
@@ -272,19 +260,16 @@ class TestIngestMode:
             "source_type": "file",
             "webhook_config": {
                 "url": "https://webhook.example.com",
-                "auth_token": "test-token"
+                "auth_token": "test-token",
             },
             "document_id": "test-doc-123",
-            "processing_options": {
-                "language": "en",
-                "chunk_size": 1000
-            }
+            "processing_options": {"language": "en", "chunk_size": 1000},
         }
 
         response = client.post(
             "/api/v1/process",
             data={"request_data": json.dumps(request_data)},
-            files={"file": ("test.txt", test_file, "text/plain")}
+            files={"file": ("test.txt", test_file, "text/plain")},
         )
 
         assert response.status_code == 200
@@ -296,7 +281,7 @@ class TestIngestMode:
         assert "status_url" in data
         assert "estimated_time_seconds" in data
 
-    @patch('morag.api_models.endpoints.unified.ingest_url_task')
+    @patch("morag.api_models.endpoints.unified.ingest_url_task")
     def test_ingest_mode_url(self, mock_task, client):
         """Test ingest mode with URL."""
         # Mock Celery task
@@ -308,15 +293,12 @@ class TestIngestMode:
             "mode": "ingest",
             "source_type": "url",
             "url": "https://example.com/article",
-            "webhook_config": {
-                "url": "https://webhook.example.com"
-            },
-            "content_type": "web"
+            "webhook_config": {"url": "https://webhook.example.com"},
+            "content_type": "web",
         }
 
         response = client.post(
-            "/api/v1/process",
-            data={"request_data": json.dumps(request_data)}
+            "/api/v1/process", data={"request_data": json.dumps(request_data)}
         )
 
         assert response.status_code == 200
@@ -332,20 +314,19 @@ class TestErrorHandling:
 
     def test_invalid_mode(self, client):
         """Test that invalid mode returns 400."""
-        request_data = {
-            "mode": "invalid_mode",
-            "source_type": "file"
-        }
+        request_data = {"mode": "invalid_mode", "source_type": "file"}
 
         response = client.post(
-            "/api/v1/process",
-            data={"request_data": json.dumps(request_data)}
+            "/api/v1/process", data={"request_data": json.dumps(request_data)}
         )
         assert response.status_code == 400
         # Pydantic validation error message for invalid literal
-        assert "Input should be 'convert', 'process' or 'ingest'" in response.json()["detail"]
+        assert (
+            "Input should be 'convert', 'process' or 'ingest'"
+            in response.json()["detail"]
+        )
 
-    @patch('morag.api_models.endpoints.unified.get_upload_handler')
+    @patch("morag.api_models.endpoints.unified.get_upload_handler")
     def test_processing_exception_handling(self, mock_upload_handler, client):
         """Test that processing exceptions are handled gracefully."""
         # Setup mock to raise exception
@@ -355,15 +336,12 @@ class TestErrorHandling:
 
         test_file = BytesIO(b"test content")
 
-        request_data = {
-            "mode": "convert",
-            "source_type": "file"
-        }
+        request_data = {"mode": "convert", "source_type": "file"}
 
         response = client.post(
             "/api/v1/process",
             data={"request_data": json.dumps(request_data)},
-            files={"file": ("test.txt", test_file, "text/plain")}
+            files={"file": ("test.txt", test_file, "text/plain")},
         )
 
         assert response.status_code == 200  # Should return 200 with error in response

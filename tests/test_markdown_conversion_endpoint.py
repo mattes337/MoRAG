@@ -1,12 +1,12 @@
 """Tests for markdown conversion endpoint."""
 
-import pytest
-import tempfile
 import json
+import tempfile
 from pathlib import Path
-from fastapi.testclient import TestClient
 from unittest.mock import AsyncMock, patch
 
+import pytest
+from fastapi.testclient import TestClient
 from morag.server import create_app
 
 
@@ -20,7 +20,7 @@ def client():
 @pytest.fixture
 def sample_text_file():
     """Create a sample text file for testing."""
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
         f.write("# Test Document\n\nThis is a test document with some content.")
         temp_path = Path(f.name)
 
@@ -42,11 +42,11 @@ class TestMarkdownConversionEndpoint:
 
     def test_convert_text_file_success(self, client, sample_text_file):
         """Test successful conversion of text file."""
-        with open(sample_text_file, 'rb') as f:
+        with open(sample_text_file, "rb") as f:
             response = client.post(
                 "/api/convert/markdown",
                 files={"file": ("test.txt", f, "text/plain")},
-                data={"include_metadata": "true"}
+                data={"include_metadata": "true"},
             )
 
         assert response.status_code == 200
@@ -62,11 +62,11 @@ class TestMarkdownConversionEndpoint:
 
     def test_convert_with_metadata_disabled(self, client, sample_text_file):
         """Test conversion with metadata disabled."""
-        with open(sample_text_file, 'rb') as f:
+        with open(sample_text_file, "rb") as f:
             response = client.post(
                 "/api/convert/markdown",
                 files={"file": ("test.txt", f, "text/plain")},
-                data={"include_metadata": "false"}
+                data={"include_metadata": "false"},
             )
 
         assert response.status_code == 200
@@ -76,11 +76,11 @@ class TestMarkdownConversionEndpoint:
 
     def test_convert_with_language_hint(self, client, sample_text_file):
         """Test conversion with language hint."""
-        with open(sample_text_file, 'rb') as f:
+        with open(sample_text_file, "rb") as f:
             response = client.post(
                 "/api/convert/markdown",
                 files={"file": ("test.txt", f, "text/plain")},
-                data={"language": "en"}
+                data={"language": "en"},
             )
 
         assert response.status_code == 200
@@ -88,18 +88,18 @@ class TestMarkdownConversionEndpoint:
         assert data["success"] is True
         assert data["metadata"]["language"] == "en"
 
-    @patch('morag_document.services.markitdown_service.MarkitdownService.convert_file')
+    @patch("morag_document.services.markitdown_service.MarkitdownService.convert_file")
     def test_convert_pdf_file(self, mock_convert, client, sample_pdf_content):
         """Test PDF file conversion."""
         mock_convert.return_value = sample_pdf_content
 
         # Create a dummy PDF file
-        with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as f:
-            f.write(b'%PDF-1.4 dummy content')
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as f:
+            f.write(b"%PDF-1.4 dummy content")
             pdf_path = Path(f.name)
 
         try:
-            with open(pdf_path, 'rb') as f:
+            with open(pdf_path, "rb") as f:
                 response = client.post(
                     "/api/convert/markdown",
                     files={"file": ("test.pdf", f, "application/pdf")},
@@ -117,18 +117,20 @@ class TestMarkdownConversionEndpoint:
             if pdf_path.exists():
                 pdf_path.unlink()
 
-    @patch('morag_document.services.markitdown_service.MarkitdownService.convert_file')
+    @patch("morag_document.services.markitdown_service.MarkitdownService.convert_file")
     def test_convert_audio_file(self, mock_convert, client):
         """Test audio file conversion."""
-        mock_convert.return_value = "# Audio Transcription\n\nThis is the transcribed content."
+        mock_convert.return_value = (
+            "# Audio Transcription\n\nThis is the transcribed content."
+        )
 
         # Create a dummy audio file
-        with tempfile.NamedTemporaryFile(suffix='.mp3', delete=False) as f:
-            f.write(b'dummy audio content')
+        with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
+            f.write(b"dummy audio content")
             audio_path = Path(f.name)
 
         try:
-            with open(audio_path, 'rb') as f:
+            with open(audio_path, "rb") as f:
                 response = client.post(
                     "/api/convert/markdown",
                     files={"file": ("test.mp3", f, "audio/mpeg")},
@@ -146,18 +148,20 @@ class TestMarkdownConversionEndpoint:
             if audio_path.exists():
                 audio_path.unlink()
 
-    @patch('morag_document.services.markitdown_service.MarkitdownService.convert_file')
+    @patch("morag_document.services.markitdown_service.MarkitdownService.convert_file")
     def test_convert_video_file(self, mock_convert, client):
         """Test video file conversion."""
-        mock_convert.return_value = "# Video Transcription\n\nThis is the transcribed video content."
+        mock_convert.return_value = (
+            "# Video Transcription\n\nThis is the transcribed video content."
+        )
 
         # Create a dummy video file
-        with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as f:
-            f.write(b'dummy video content')
+        with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as f:
+            f.write(b"dummy video content")
             video_path = Path(f.name)
 
         try:
-            with open(video_path, 'rb') as f:
+            with open(video_path, "rb") as f:
                 response = client.post(
                     "/api/convert/markdown",
                     files={"file": ("test.mp4", f, "video/mp4")},
@@ -178,12 +182,12 @@ class TestMarkdownConversionEndpoint:
     def test_convert_audio_file_fallback(self, client):
         """Test audio file conversion with fallback when markitdown fails."""
         # Create a dummy audio file
-        with tempfile.NamedTemporaryFile(suffix='.mp3', delete=False) as f:
-            f.write(b'dummy audio content')
+        with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
+            f.write(b"dummy audio content")
             audio_path = Path(f.name)
 
         try:
-            with open(audio_path, 'rb') as f:
+            with open(audio_path, "rb") as f:
                 response = client.post(
                     "/api/convert/markdown",
                     files={"file": ("test.mp3", f, "audio/mpeg")},
@@ -203,12 +207,12 @@ class TestMarkdownConversionEndpoint:
     def test_convert_video_file_fallback(self, client):
         """Test video file conversion with fallback when markitdown fails."""
         # Create a dummy video file
-        with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as f:
-            f.write(b'dummy video content')
+        with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as f:
+            f.write(b"dummy video content")
             video_path = Path(f.name)
 
         try:
-            with open(video_path, 'rb') as f:
+            with open(video_path, "rb") as f:
                 response = client.post(
                     "/api/convert/markdown",
                     files={"file": ("test.mp4", f, "video/mp4")},
@@ -228,12 +232,12 @@ class TestMarkdownConversionEndpoint:
     def test_convert_unsupported_format(self, client):
         """Test conversion of unsupported file format."""
         # Create a dummy file with unsupported extension
-        with tempfile.NamedTemporaryFile(suffix='.xyz', delete=False) as f:
-            f.write(b'dummy content')
+        with tempfile.NamedTemporaryFile(suffix=".xyz", delete=False) as f:
+            f.write(b"dummy content")
             unsupported_path = Path(f.name)
 
         try:
-            with open(unsupported_path, 'rb') as f:
+            with open(unsupported_path, "rb") as f:
                 response = client.post(
                     "/api/convert/markdown",
                     files={"file": ("test.xyz", f, "application/octet-stream")},
@@ -253,12 +257,12 @@ class TestMarkdownConversionEndpoint:
 
     def test_convert_empty_file(self, client):
         """Test conversion of empty file."""
-        with tempfile.NamedTemporaryFile(suffix='.txt', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".txt", delete=False) as f:
             # Create empty file
             empty_path = Path(f.name)
 
         try:
-            with open(empty_path, 'rb') as f:
+            with open(empty_path, "rb") as f:
                 response = client.post(
                     "/api/convert/markdown",
                     files={"file": ("empty.txt", f, "text/plain")},
@@ -279,13 +283,13 @@ class TestMarkdownConversionEndpoint:
     def test_convert_large_file_metadata(self, client):
         """Test that large files are handled and metadata is correct."""
         # Create a larger text file
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
             content = "# Large Document\n\n" + "This is a test line.\n" * 1000
             f.write(content)
             large_path = Path(f.name)
 
         try:
-            with open(large_path, 'rb') as f:
+            with open(large_path, "rb") as f:
                 response = client.post(
                     "/api/convert/markdown",
                     files={"file": ("large.txt", f, "text/plain")},

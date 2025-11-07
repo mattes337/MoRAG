@@ -1,23 +1,28 @@
 """LLM-based entity normalization for converting entities to canonical forms."""
 
-import structlog
-from typing import Dict, List, Optional, Tuple, Any
-from dataclasses import dataclass
 import asyncio
+import os
 
 # Import agents framework - required dependency
 import sys
-import os
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Tuple
+
+import structlog
+
 # Add the project root to the path if not already there
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', '..', '..'))
+project_root = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "..")
+)
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from agents.base import LLMResponseParser
 from agents import get_agent
+from agents.base import LLMResponseParser
 
 try:
     import google.generativeai as genai
+
     GOOGLE_AI_AVAILABLE = True
 except ImportError:
     GOOGLE_AI_AVAILABLE = False
@@ -29,6 +34,7 @@ logger = structlog.get_logger(__name__)
 @dataclass
 class EntityVariation:
     """Represents an entity normalization result."""
+
     original: str
     normalized: str
     confidence: float
@@ -43,7 +49,7 @@ class LLMEntityNormalizer:
         model_name: str = "gemini-2.0-flash",
         api_key: Optional[str] = None,
         language: str = "auto",
-        cache_size: int = 1000
+        cache_size: int = 1000,
     ):
         """Initialize the LLM entity normalizer.
 
@@ -73,9 +79,12 @@ class LLMEntityNormalizer:
     def _get_api_key(self) -> Optional[str]:
         """Get API key from environment variables."""
         import os
+
         return os.getenv("GOOGLE_API_KEY") or os.getenv("LANGEXTRACT_API_KEY")
 
-    async def normalize_entity(self, entity_name: str, entity_type: Optional[str] = None) -> EntityVariation:
+    async def normalize_entity(
+        self, entity_name: str, entity_type: Optional[str] = None
+    ) -> EntityVariation:
         """Normalize a single entity to its canonical form.
 
         Args:
@@ -90,7 +99,7 @@ class LLMEntityNormalizer:
                 original=entity_name,
                 normalized="",
                 confidence=0.0,
-                rule_applied="empty_input"
+                rule_applied="empty_input",
             )
 
         # Check cache first
@@ -99,9 +108,9 @@ class LLMEntityNormalizer:
             cached = self.normalization_cache[cache_key]
             return EntityVariation(
                 original=entity_name,
-                normalized=cached['normalized'],
-                confidence=cached['confidence'],
-                rule_applied=cached['rule_applied']
+                normalized=cached["normalized"],
+                confidence=cached["confidence"],
+                rule_applied=cached["rule_applied"],
             )
 
         # Apply basic normalization first
@@ -111,13 +120,13 @@ class LLMEntityNormalizer:
         try:
             # Pass model override to ensure consistent model usage
             from agents.base.config import ModelConfig
+
             model_config = ModelConfig(model=self.model_name)
             entity_agent = get_agent("entity_extraction", model=model_config)
 
             # Use the agent to extract and normalize the entity
             extraction_result = await entity_agent.extract_entities(
-                text=f"Normalize this entity: {entity_name}",
-                domain="normalization"
+                text=f"Normalize this entity: {entity_name}", domain="normalization"
             )
 
             if extraction_result.entities:
@@ -127,7 +136,7 @@ class LLMEntityNormalizer:
                     original=entity_name,
                     normalized=normalized_entity.canonical_name,
                     confidence=normalized_entity.confidence,
-                    rule_applied="agent_normalization"
+                    rule_applied="agent_normalization",
                 )
             else:
                 # Fallback to basic normalization
@@ -135,26 +144,26 @@ class LLMEntityNormalizer:
                     original=entity_name,
                     normalized=basic_normalized,
                     confidence=0.7,
-                    rule_applied="basic_normalization"
+                    rule_applied="basic_normalization",
                 )
         except Exception as e:
             self.logger.warning(
                 "Agent normalization failed, using basic normalization",
                 entity=entity_name,
-                error=str(e)
+                error=str(e),
             )
             result = EntityVariation(
                 original=entity_name,
                 normalized=basic_normalized,
                 confidence=0.7,
-                rule_applied="basic_normalization"
+                rule_applied="basic_normalization",
             )
         else:
             result = EntityVariation(
                 original=entity_name,
                 normalized=basic_normalized,
                 confidence=0.7,
-                rule_applied="basic_normalization"
+                rule_applied="basic_normalization",
             )
 
         # Cache the result
@@ -167,21 +176,49 @@ class LLMEntityNormalizer:
         normalized = entity_name.strip()
 
         # Remove basic articles that are clearly not part of entity names
-        basic_prefixes = ["the ", "a ", "an ", "der ", "die ", "das ", "le ", "la ", "les "]
+        basic_prefixes = [
+            "the ",
+            "a ",
+            "an ",
+            "der ",
+            "die ",
+            "das ",
+            "le ",
+            "la ",
+            "les ",
+        ]
         for prefix in basic_prefixes:
             if normalized.lower().startswith(prefix.lower()):
-                normalized = normalized[len(prefix):].strip()
+                normalized = normalized[len(prefix) :].strip()
                 break
 
         # Remove content in parentheses (e.g., "Engelwurz (Wurzel)" -> "Engelwurz")
         import re
-        normalized = re.sub(r'\s*\([^)]*\)', '', normalized).strip()
+
+        normalized = re.sub(r"\s*\([^)]*\)", "", normalized).strip()
 
         # Remove common adjectives and qualifiers
         qualifiers_to_remove = [
-            'pure', 'natural', 'organic', 'fresh', 'raw', 'whole', 'complete',
-            'pur', 'natürlich', 'organisch', 'frisch', 'roh', 'ganz', 'komplett',
-            'normal', 'regular', 'standard', 'basic', 'simple', 'plain'
+            "pure",
+            "natural",
+            "organic",
+            "fresh",
+            "raw",
+            "whole",
+            "complete",
+            "pur",
+            "natürlich",
+            "organisch",
+            "frisch",
+            "roh",
+            "ganz",
+            "komplett",
+            "normal",
+            "regular",
+            "standard",
+            "basic",
+            "simple",
+            "plain",
         ]
 
         words = normalized.split()
@@ -191,13 +228,13 @@ class LLMEntityNormalizer:
                 filtered_words.append(word)
 
         if filtered_words:
-            normalized = ' '.join(filtered_words)
+            normalized = " ".join(filtered_words)
 
         # Convert to singular form (basic rules)
         normalized = self._to_singular(normalized)
 
         # Capitalize first letter of each word (proper case)
-        normalized = ' '.join(word.capitalize() for word in normalized.split())
+        normalized = " ".join(word.capitalize() for word in normalized.split())
 
         return normalized
 
@@ -210,26 +247,30 @@ class LLMEntityNormalizer:
             word_lower = word.lower()
 
             # German plural rules
-            if word_lower.endswith('e') and len(word) > 3:
+            if word_lower.endswith("e") and len(word) > 3:
                 # Remove 'e' ending for many German plurals
                 singular = word[:-1]
-            elif word_lower.endswith('en') and len(word) > 4:
+            elif word_lower.endswith("en") and len(word) > 4:
                 # Remove 'en' ending
                 singular = word[:-2]
-            elif word_lower.endswith('er') and len(word) > 4:
+            elif word_lower.endswith("er") and len(word) > 4:
                 # Remove 'er' ending
                 singular = word[:-2]
             # English plural rules
-            elif word_lower.endswith('ies') and len(word) > 4:
+            elif word_lower.endswith("ies") and len(word) > 4:
                 # "berries" -> "berry"
-                singular = word[:-3] + 'y'
-            elif word_lower.endswith('ves') and len(word) > 4:
+                singular = word[:-3] + "y"
+            elif word_lower.endswith("ves") and len(word) > 4:
                 # "leaves" -> "leaf"
-                singular = word[:-3] + 'f'
-            elif word_lower.endswith('ses') and len(word) > 4:
+                singular = word[:-3] + "f"
+            elif word_lower.endswith("ses") and len(word) > 4:
                 # "glasses" -> "glass"
                 singular = word[:-2]
-            elif word_lower.endswith('s') and len(word) > 3 and not word_lower.endswith('ss'):
+            elif (
+                word_lower.endswith("s")
+                and len(word) > 3
+                and not word_lower.endswith("ss")
+            ):
                 # General 's' removal, but not for words ending in 'ss'
                 singular = word[:-1]
             else:
@@ -237,9 +278,11 @@ class LLMEntityNormalizer:
 
             singular_words.append(singular)
 
-        return ' '.join(singular_words)
+        return " ".join(singular_words)
 
-    async def _llm_normalize(self, entity_name: str, entity_type: Optional[str] = None) -> Tuple[str, float, str]:
+    async def _llm_normalize(
+        self, entity_name: str, entity_type: Optional[str] = None
+    ) -> Tuple[str, float, str]:
         """Use LLM to normalize entity name."""
         prompt = self._create_normalization_prompt(entity_name, entity_type)
 
@@ -248,9 +291,8 @@ class LLMEntityNormalizer:
                 self.model.generate_content,
                 prompt,
                 generation_config=genai.types.GenerationConfig(
-                    max_output_tokens=200,
-                    temperature=0.1
-                )
+                    max_output_tokens=200, temperature=0.1
+                ),
             )
 
             # Parse JSON response using robust utility
@@ -258,33 +300,33 @@ class LLMEntityNormalizer:
 
             # Use the robust JSON parser with fallback
             fallback_result = {
-                'normalized': entity_name,
-                'confidence': 0.5,
-                'reasoning': 'fallback_due_to_parse_error'
+                "normalized": entity_name,
+                "confidence": 0.5,
+                "reasoning": "fallback_due_to_parse_error",
             }
 
             # Use agent system for response parsing
             result = LLMResponseParser.parse_json_response(
                 response=response_text,
                 fallback_value=fallback_result,
-                context=f"entity_normalization:{entity_name}"
+                context=f"entity_normalization:{entity_name}",
             )
 
             return (
-                result.get('normalized', entity_name),
-                float(result.get('confidence', 0.8)),
-                result.get('reasoning', 'llm_normalization')
+                result.get("normalized", entity_name),
+                float(result.get("confidence", 0.8)),
+                result.get("reasoning", "llm_normalization"),
             )
 
         except Exception as e:
             self.logger.warning(
-                "LLM normalization failed",
-                entity=entity_name,
-                error=str(e)
+                "LLM normalization failed", entity=entity_name, error=str(e)
             )
             return entity_name, 0.5, f"llm_error: {str(e)}"
 
-    def _create_normalization_prompt(self, entity_name: str, entity_type: Optional[str] = None) -> str:
+    def _create_normalization_prompt(
+        self, entity_name: str, entity_type: Optional[str] = None
+    ) -> str:
         """Create prompt for LLM normalization."""
         type_context = f" (Type: {entity_type})" if entity_type else ""
 
@@ -334,12 +376,14 @@ Respond with JSON:
             del self.normalization_cache[oldest_key]
 
         self.normalization_cache[cache_key] = {
-            'normalized': result.normalized,
-            'confidence': result.confidence,
-            'rule_applied': result.rule_applied
+            "normalized": result.normalized,
+            "confidence": result.confidence,
+            "rule_applied": result.rule_applied,
         }
 
-    async def normalize_entities_batch(self, entities: List[str], entity_types: Optional[List[str]] = None) -> List[EntityVariation]:
+    async def normalize_entities_batch(
+        self, entities: List[str], entity_types: Optional[List[str]] = None
+    ) -> List[EntityVariation]:
         """Normalize multiple entities in batch.
 
         Args:
@@ -371,16 +415,16 @@ Respond with JSON:
         for i, result in enumerate(results):
             if isinstance(result, Exception):
                 self.logger.warning(
-                    "Entity normalization failed",
-                    entity=entities[i],
-                    error=str(result)
+                    "Entity normalization failed", entity=entities[i], error=str(result)
                 )
-                normalized_results.append(EntityVariation(
-                    original=entities[i],
-                    normalized=entities[i],
-                    confidence=0.3,
-                    rule_applied="error_fallback"
-                ))
+                normalized_results.append(
+                    EntityVariation(
+                        original=entities[i],
+                        normalized=entities[i],
+                        confidence=0.3,
+                        rule_applied="error_fallback",
+                    )
+                )
             else:
                 normalized_results.append(result)
 

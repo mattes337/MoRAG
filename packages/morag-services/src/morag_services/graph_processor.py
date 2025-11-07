@@ -6,8 +6,9 @@ and the morag-graph package for entity and relation extraction.
 
 import asyncio
 import os
-from typing import Dict, List, Any, Optional, Tuple
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+
 import structlog
 from pydantic import BaseModel
 
@@ -16,23 +17,36 @@ logger = structlog.get_logger(__name__)
 try:
     # Import components directly to avoid circular import issues
     from morag_graph.extraction import EntityExtractor, RelationExtractor
-    from morag_graph.storage import Neo4jStorage, QdrantStorage, Neo4jConfig, QdrantConfig
-    from morag_graph.models.database_config import DatabaseType, DatabaseConfig, DatabaseResult
     from morag_graph.models import Entity, Relation
+    from morag_graph.models.database_config import (
+        DatabaseConfig,
+        DatabaseResult,
+        DatabaseType,
+    )
+    from morag_graph.storage import (
+        Neo4jConfig,
+        Neo4jStorage,
+        QdrantConfig,
+        QdrantStorage,
+    )
+
     # Import LLMConfig and batch processing from morag-reasoning package
     try:
-        from morag_reasoning.llm import LLMConfig, LLMClient
         from morag_reasoning.batch_processor import batch_document_chunks
+        from morag_reasoning.llm import LLMClient, LLMConfig
+
         BATCH_PROCESSING_AVAILABLE = True
     except ImportError:
         # Fallback LLMConfig for compatibility
         from pydantic import BaseModel
+
         class LLMConfig(BaseModel):
             provider: str = "gemini"
             model: str = "gemini-1.5-flash"
             api_key: str = None
             temperature: float = 0.1
             max_tokens: int = 2000
+
         LLMClient = None
         batch_document_chunks = None
         BATCH_PROCESSING_AVAILABLE = False
@@ -41,6 +55,7 @@ try:
     # Try to import enhanced graph builder with OpenIE support
     try:
         from morag_graph.builders import EnhancedGraphBuilder, EnhancedGraphBuildResult
+
         ENHANCED_BUILDER_AVAILABLE = True
     except ImportError:
         EnhancedGraphBuilder = None
@@ -49,7 +64,9 @@ try:
 
     GRAPH_AVAILABLE = True
 except ImportError as e:
-    logger.warning("morag-graph package not available - graph processing disabled", error=str(e))
+    logger.warning(
+        "morag-graph package not available - graph processing disabled", error=str(e)
+    )
     GRAPH_AVAILABLE = False
     ENHANCED_BUILDER_AVAILABLE = False
     EntityExtractor = None
@@ -93,20 +110,33 @@ class GraphProcessingConfig(BaseModel):
     openie_enable_predicate_normalization: bool = True
 
     @classmethod
-    def from_env(cls) -> 'GraphProcessingConfig':
+    def from_env(cls) -> "GraphProcessingConfig":
         """Create configuration from environment variables."""
         return cls(
-            enabled=os.getenv('MORAG_GRAPH_PROCESSING_ENABLED', 'false').lower() == 'true',
-            neo4j_uri=os.getenv('NEO4J_URI'),
-            neo4j_username=os.getenv('NEO4J_USERNAME'),
-            neo4j_password=os.getenv('NEO4J_PASSWORD'),
-            neo4j_database=os.getenv('NEO4J_DATABASE', 'neo4j'),
-            chunk_by_structure=os.getenv('MORAG_GRAPH_CHUNK_BY_STRUCTURE', 'true').lower() == 'true',
-            max_chunk_size=int(os.getenv('MORAG_GRAPH_MAX_CHUNK_SIZE', '4000')),
-            enable_openie=os.getenv('MORAG_GRAPH_ENABLE_OPENIE', 'true').lower() == 'true',
-            openie_min_confidence=float(os.getenv('MORAG_GRAPH_OPENIE_MIN_CONFIDENCE', '0.7')),
-            openie_enable_entity_linking=os.getenv('MORAG_GRAPH_OPENIE_ENTITY_LINKING', 'true').lower() == 'true',
-            openie_enable_predicate_normalization=os.getenv('MORAG_GRAPH_OPENIE_PREDICATE_NORM', 'true').lower() == 'true',
+            enabled=os.getenv("MORAG_GRAPH_PROCESSING_ENABLED", "false").lower()
+            == "true",
+            neo4j_uri=os.getenv("NEO4J_URI"),
+            neo4j_username=os.getenv("NEO4J_USERNAME"),
+            neo4j_password=os.getenv("NEO4J_PASSWORD"),
+            neo4j_database=os.getenv("NEO4J_DATABASE", "neo4j"),
+            chunk_by_structure=os.getenv(
+                "MORAG_GRAPH_CHUNK_BY_STRUCTURE", "true"
+            ).lower()
+            == "true",
+            max_chunk_size=int(os.getenv("MORAG_GRAPH_MAX_CHUNK_SIZE", "4000")),
+            enable_openie=os.getenv("MORAG_GRAPH_ENABLE_OPENIE", "true").lower()
+            == "true",
+            openie_min_confidence=float(
+                os.getenv("MORAG_GRAPH_OPENIE_MIN_CONFIDENCE", "0.7")
+            ),
+            openie_enable_entity_linking=os.getenv(
+                "MORAG_GRAPH_OPENIE_ENTITY_LINKING", "true"
+            ).lower()
+            == "true",
+            openie_enable_predicate_normalization=os.getenv(
+                "MORAG_GRAPH_OPENIE_PREDICATE_NORM", "true"
+            ).lower()
+            == "true",
         )
 
     @classmethod
@@ -121,12 +151,23 @@ class GraphProcessingConfig(BaseModel):
             llm_provider=os.getenv("MORAG_GRAPH_LLM_PROVIDER", "gemini"),
             llm_api_key=os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"),
             llm_model=os.getenv("MORAG_GRAPH_LLM_MODEL"),
-            chunk_by_structure=os.getenv("MORAG_GRAPH_CHUNK_BY_STRUCTURE", "true").lower() == "true",
+            chunk_by_structure=os.getenv(
+                "MORAG_GRAPH_CHUNK_BY_STRUCTURE", "true"
+            ).lower()
+            == "true",
             max_chunk_size=int(os.getenv("MORAG_GRAPH_MAX_CHUNK_SIZE", "4000")),
             enable_openie=os.getenv("MORAG_OPENIE_ENABLED", "true").lower() == "true",
-            openie_min_confidence=float(os.getenv("MORAG_OPENIE_CONFIDENCE_THRESHOLD", "0.7")),
-            openie_enable_entity_linking=os.getenv("MORAG_OPENIE_ENABLE_ENTITY_LINKING", "true").lower() == "true",
-            openie_enable_predicate_normalization=os.getenv("MORAG_OPENIE_ENABLE_PREDICATE_NORMALIZATION", "true").lower() == "true"
+            openie_min_confidence=float(
+                os.getenv("MORAG_OPENIE_CONFIDENCE_THRESHOLD", "0.7")
+            ),
+            openie_enable_entity_linking=os.getenv(
+                "MORAG_OPENIE_ENABLE_ENTITY_LINKING", "true"
+            ).lower()
+            == "true",
+            openie_enable_predicate_normalization=os.getenv(
+                "MORAG_OPENIE_ENABLE_PREDICATE_NORMALIZATION", "true"
+            ).lower()
+            == "true",
         )
 
 
@@ -141,7 +182,9 @@ class GraphProcessingResult(BaseModel):
     error_message: Optional[str] = None
     metadata: Dict[str, Any] = {}
     database_results: List[Dict[str, Any]] = []  # Results for each database
-    data_file_path: Optional[str] = None  # Path to the data file written before database operations
+    data_file_path: Optional[
+        str
+    ] = None  # Path to the data file written before database operations
 
     # OpenIE-specific metrics
     openie_enabled: bool = False
@@ -154,7 +197,11 @@ class GraphProcessingResult(BaseModel):
 class GraphProcessor:
     """Processor for extracting entities and relations from documents."""
 
-    def __init__(self, config: Optional[GraphProcessingConfig] = None, data_output_dir: Optional[str] = None):
+    def __init__(
+        self,
+        config: Optional[GraphProcessingConfig] = None,
+        data_output_dir: Optional[str] = None,
+    ):
         """Initialize the graph processor.
 
         Args:
@@ -173,7 +220,10 @@ class GraphProcessor:
         # Initialize data file writer if output directory is provided
         try:
             from .data_file_writer import DataFileWriter
-            self._data_writer = DataFileWriter(data_output_dir) if data_output_dir else None
+
+            self._data_writer = (
+                DataFileWriter(data_output_dir) if data_output_dir else None
+            )
         except ImportError:
             self._data_writer = None
 
@@ -191,7 +241,7 @@ class GraphProcessor:
             self._llm_config = LLMConfig(
                 provider=self.config.llm_provider,
                 api_key=self.config.llm_api_key,
-                model=self.config.llm_model
+                model=self.config.llm_model,
             )
 
             # Initialize LLM client for batch processing if available
@@ -200,16 +250,25 @@ class GraphProcessor:
                     self._llm_client = LLMClient(self._llm_config)
                     logger.info("LLM client initialized for batch processing")
                 except Exception as e:
-                    logger.warning("Failed to initialize LLM client for batch processing", error=str(e))
+                    logger.warning(
+                        "Failed to initialize LLM client for batch processing",
+                        error=str(e),
+                    )
                     self._llm_client = None
 
             # Initialize Neo4j storage first
-            if all([self.config.neo4j_uri, self.config.neo4j_username, self.config.neo4j_password]):
+            if all(
+                [
+                    self.config.neo4j_uri,
+                    self.config.neo4j_username,
+                    self.config.neo4j_password,
+                ]
+            ):
                 self._storage = Neo4jStorage(
                     uri=self.config.neo4j_uri,
                     username=self.config.neo4j_username,
                     password=self.config.neo4j_password,
-                    database=self.config.neo4j_database
+                    database=self.config.neo4j_database,
                 )
 
                 # Initialize file ingestion
@@ -220,7 +279,7 @@ class GraphProcessor:
                     openie_config = {
                         "min_confidence": self.config.openie_min_confidence,
                         "enable_entity_linking": self.config.openie_enable_entity_linking,
-                        "enable_predicate_normalization": self.config.openie_enable_predicate_normalization
+                        "enable_predicate_normalization": self.config.openie_enable_predicate_normalization,
                     }
 
                     self._enhanced_builder = EnhancedGraphBuilder(
@@ -229,36 +288,45 @@ class GraphProcessor:
                         entity_types=self.config.entity_types,
                         relation_types=self.config.relation_types,
                         enable_openie=True,
-                        openie_config=openie_config
+                        openie_config=openie_config,
                     )
 
-                    logger.info("Enhanced graph builder with OpenIE initialized successfully")
+                    logger.info(
+                        "Enhanced graph builder with OpenIE initialized successfully"
+                    )
                 else:
                     # Fallback to individual extractors
                     self._entity_extractor = EntityExtractor(
-                        config=self._llm_config,
-                        entity_types=self.config.entity_types
+                        config=self._llm_config, entity_types=self.config.entity_types
                     )
 
                     self._relation_extractor = RelationExtractor(
                         config=self._llm_config,
-                        relation_types=self.config.relation_types
+                        relation_types=self.config.relation_types,
                     )
 
-                    logger.info("Standard graph processing components initialized successfully")
+                    logger.info(
+                        "Standard graph processing components initialized successfully"
+                    )
             else:
-                logger.warning("Neo4j configuration incomplete - graph processing disabled")
+                logger.warning(
+                    "Neo4j configuration incomplete - graph processing disabled"
+                )
                 self.config.enabled = False
 
         except Exception as e:
-            logger.error("Failed to initialize graph processing components", error=str(e))
+            logger.error(
+                "Failed to initialize graph processing components", error=str(e)
+            )
             self.config.enabled = False
 
     def is_enabled(self) -> bool:
         """Check if graph processing is enabled and available."""
         return self.config.enabled and GRAPH_AVAILABLE and self._storage is not None
 
-    async def generate_document_intention(self, content: str, max_length: int = 200) -> Optional[str]:
+    async def generate_document_intention(
+        self, content: str, max_length: int = 200
+    ) -> Optional[str]:
         """Generate a concise intention summary for the document.
 
         Args:
@@ -306,7 +374,7 @@ Provide only the intention summary (maximum {max_length} characters):
 
             # Ensure it's within max length
             if len(intention) > max_length:
-                intention = intention[:max_length-3] + "..."
+                intention = intention[: max_length - 3] + "..."
 
             logger.debug(f"Generated document intention: {intention}")
             return intention
@@ -327,10 +395,14 @@ Provide only the intention summary (maximum {max_length} characters):
         if db_config.type == DatabaseType.NEO4J:
             # Use provided config or fall back to defaults
             neo4j_config = Neo4jConfig(
-                uri=db_config.hostname or self.config.neo4j_uri or "neo4j://localhost:7687",
+                uri=db_config.hostname
+                or self.config.neo4j_uri
+                or "neo4j://localhost:7687",
                 username=db_config.username or self.config.neo4j_username or "neo4j",
                 password=db_config.password or self.config.neo4j_password or "password",
-                database=db_config.database_name or self.config.neo4j_database or "neo4j"
+                database=db_config.database_name
+                or self.config.neo4j_database
+                or "neo4j",
             )
             return Neo4jStorage(neo4j_config)
 
@@ -340,12 +412,13 @@ Provide only the intention summary (maximum {max_length} characters):
             port = db_config.port or 6333
 
             # Check if hostname is a URL and extract components
-            if host.startswith(('http://', 'https://')):
+            if host.startswith(("http://", "https://")):
                 from urllib.parse import urlparse
+
                 parsed = urlparse(host)
                 hostname = parsed.hostname or "localhost"
-                port = parsed.port or (443 if parsed.scheme == 'https' else port)
-                https = parsed.scheme == 'https'
+                port = parsed.port or (443 if parsed.scheme == "https" else port)
+                https = parsed.scheme == "https"
                 # Use the full URL for QdrantStorage
                 config_host = host
             else:
@@ -353,14 +426,14 @@ Provide only the intention summary (maximum {max_length} characters):
                 https = port == 443  # Auto-detect HTTPS for port 443
                 config_host = hostname
 
-            verify_ssl = os.getenv('QDRANT_VERIFY_SSL', 'true').lower() == 'true'
+            verify_ssl = os.getenv("QDRANT_VERIFY_SSL", "true").lower() == "true"
             qdrant_config = QdrantConfig(
                 host=config_host,
                 port=port,
                 https=https,
                 api_key=db_config.password,  # Use password field for API key
                 collection_name=db_config.database_name or "morag_entities",
-                verify_ssl=verify_ssl
+                verify_ssl=verify_ssl,
             )
             return QdrantStorage(qdrant_config)
 
@@ -372,7 +445,7 @@ Provide only the intention summary (maximum {max_length} characters):
         content: str,
         source_doc_id: str,
         database_configs: List[DatabaseConfig],
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> GraphProcessingResult:
         """Process a document and store in multiple databases.
 
@@ -388,7 +461,7 @@ Provide only the intention summary (maximum {max_length} characters):
         if not GRAPH_AVAILABLE:
             return GraphProcessingResult(
                 success=False,
-                error_message="Graph processing not available - morag-graph package not installed"
+                error_message="Graph processing not available - morag-graph package not installed",
             )
 
         if not database_configs:
@@ -398,7 +471,7 @@ Provide only the intention summary (maximum {max_length} characters):
             else:
                 return GraphProcessingResult(
                     success=False,
-                    error_message="No database configurations provided and default graph processing not enabled"
+                    error_message="No database configurations provided and default graph processing not enabled",
                 )
 
         start_time = asyncio.get_event_loop().time()
@@ -414,8 +487,12 @@ Provide only the intention summary (maximum {max_length} characters):
                 logger.info(f"Generated document intention: {intention}")
 
             # Extract entities and relations once with intention context
-            entities = await self._entity_extractor.extract_entities(content, source_doc_id, intention=intention)
-            relations = await self._relation_extractor.extract_relations(content, entities, source_doc_id, intention=intention)
+            entities = await self._entity_extractor.extract_entities(
+                content, source_doc_id, intention=intention
+            )
+            relations = await self._relation_extractor.extract_relations(
+                content, entities, source_doc_id, intention=intention
+            )
 
             # Write data to file before database operations
             data_file_path = None
@@ -426,9 +503,11 @@ Provide only the intention summary (maximum {max_length} characters):
                         entities=entities,
                         relations=relations,
                         metadata=metadata,
-                        summary=f"Document processed with {len(entities)} entities and {len(relations)} relations"
+                        summary=f"Document processed with {len(entities)} entities and {len(relations)} relations",
                     )
-                    logger.info(f"Data file written before database operations: {data_file_path}")
+                    logger.info(
+                        f"Data file written before database operations: {data_file_path}"
+                    )
                 except Exception as e:
                     logger.warning(f"Failed to write data file: {str(e)}")
 
@@ -439,16 +518,20 @@ Provide only the intention summary (maximum {max_length} characters):
                 # Check for duplicate database configurations
                 connection_key = db_config.get_connection_key()
                 if connection_key in processed_databases:
-                    logger.warning(f"Skipping duplicate database configuration: {connection_key}")
-                    database_results.append({
-                        "database_type": db_config.type.value,
-                        "connection_key": connection_key,
-                        "success": False,
-                        "error_message": "Duplicate database configuration skipped",
-                        "entities_count": 0,
-                        "relations_count": 0,
-                        "processing_time": 0.0
-                    })
+                    logger.warning(
+                        f"Skipping duplicate database configuration: {connection_key}"
+                    )
+                    database_results.append(
+                        {
+                            "database_type": db_config.type.value,
+                            "connection_key": connection_key,
+                            "success": False,
+                            "error_message": "Duplicate database configuration skipped",
+                            "entities_count": 0,
+                            "relations_count": 0,
+                            "processing_time": 0.0,
+                        }
+                    )
                     continue
 
                 processed_databases.add(connection_key)
@@ -465,20 +548,26 @@ Provide only the intention summary (maximum {max_length} characters):
                         entity_ids = await storage.store_entities(entities)
                         relation_ids = await storage.store_relations(relations)
 
-                        db_processing_time = asyncio.get_event_loop().time() - db_start_time
+                        db_processing_time = (
+                            asyncio.get_event_loop().time() - db_start_time
+                        )
 
-                        database_results.append({
-                            "database_type": db_config.type.value,
-                            "connection_key": connection_key,
-                            "success": True,
-                            "entities_count": len(entity_ids),
-                            "relations_count": len(relation_ids),
-                            "processing_time": db_processing_time,
-                            "metadata": {
-                                "entity_ids": entity_ids[:10],  # Limit for webhook size
-                                "relation_ids": relation_ids[:10]
+                        database_results.append(
+                            {
+                                "database_type": db_config.type.value,
+                                "connection_key": connection_key,
+                                "success": True,
+                                "entities_count": len(entity_ids),
+                                "relations_count": len(relation_ids),
+                                "processing_time": db_processing_time,
+                                "metadata": {
+                                    "entity_ids": entity_ids[
+                                        :10
+                                    ],  # Limit for webhook size
+                                    "relation_ids": relation_ids[:10],
+                                },
                             }
-                        })
+                        )
 
                         total_entities += len(entity_ids)
                         total_relations += len(relation_ids)
@@ -487,7 +576,7 @@ Provide only the intention summary (maximum {max_length} characters):
                             f"Successfully processed document in {db_config.type.value} database",
                             entities=len(entity_ids),
                             relations=len(relation_ids),
-                            processing_time=db_processing_time
+                            processing_time=db_processing_time,
                         )
 
                     finally:
@@ -499,15 +588,17 @@ Provide only the intention summary (maximum {max_length} characters):
                     error_msg = f"Failed to process in {db_config.type.value} database: {str(e)}"
                     logger.error(error_msg)
 
-                    database_results.append({
-                        "database_type": db_config.type.value,
-                        "connection_key": connection_key,
-                        "success": False,
-                        "error_message": error_msg,
-                        "entities_count": 0,
-                        "relations_count": 0,
-                        "processing_time": db_processing_time
-                    })
+                    database_results.append(
+                        {
+                            "database_type": db_config.type.value,
+                            "connection_key": connection_key,
+                            "success": False,
+                            "error_message": error_msg,
+                            "entities_count": 0,
+                            "relations_count": 0,
+                            "processing_time": db_processing_time,
+                        }
+                    )
 
             total_processing_time = asyncio.get_event_loop().time() - start_time
 
@@ -526,8 +617,8 @@ Provide only the intention summary (maximum {max_length} characters):
                 metadata={
                     "successful_databases": successful_dbs,
                     "total_databases": len(database_configs),
-                    "processed_databases": list(processed_databases)
-                }
+                    "processed_databases": list(processed_databases),
+                },
             )
 
         except Exception as e:
@@ -540,10 +631,12 @@ Provide only the intention summary (maximum {max_length} characters):
                 processing_time=total_processing_time,
                 error_message=error_msg,
                 database_results=database_results,
-                data_file_path=str(data_file_path) if data_file_path else None
+                data_file_path=str(data_file_path) if data_file_path else None,
             )
 
-    def _chunk_by_structure(self, markdown_content: str) -> List[Tuple[str, Dict[str, Any]]]:
+    def _chunk_by_structure(
+        self, markdown_content: str
+    ) -> List[Tuple[str, Dict[str, Any]]]:
         """Chunk markdown content by structural elements.
 
         Args:
@@ -553,55 +646,55 @@ Provide only the intention summary (maximum {max_length} characters):
             List of (chunk_content, metadata) tuples
         """
         chunks = []
-        lines = markdown_content.split('\n')
+        lines = markdown_content.split("\n")
         current_chunk = []
         current_section = None
         current_subsection = None
 
         for line in lines:
             # Detect headers
-            if line.startswith('#'):
+            if line.startswith("#"):
                 # Save previous chunk if it exists
                 if current_chunk:
-                    chunk_content = '\n'.join(current_chunk).strip()
+                    chunk_content = "\n".join(current_chunk).strip()
                     if chunk_content:
                         metadata = {
-                            'section': current_section,
-                            'subsection': current_subsection,
-                            'chunk_type': 'structured'
+                            "section": current_section,
+                            "subsection": current_subsection,
+                            "chunk_type": "structured",
                         }
                         chunks.append((chunk_content, metadata))
                     current_chunk = []
 
                 # Update section tracking
-                if line.startswith('# '):
+                if line.startswith("# "):
                     current_section = line[2:].strip()
                     current_subsection = None
-                elif line.startswith('## '):
+                elif line.startswith("## "):
                     current_subsection = line[3:].strip()
 
             current_chunk.append(line)
 
             # Check if chunk is getting too large
-            chunk_text = '\n'.join(current_chunk)
+            chunk_text = "\n".join(current_chunk)
             if len(chunk_text) > self.config.max_chunk_size:
                 # Save current chunk
                 metadata = {
-                    'section': current_section,
-                    'subsection': current_subsection,
-                    'chunk_type': 'structured'
+                    "section": current_section,
+                    "subsection": current_subsection,
+                    "chunk_type": "structured",
                 }
                 chunks.append((chunk_text.strip(), metadata))
                 current_chunk = []
 
         # Save final chunk
         if current_chunk:
-            chunk_content = '\n'.join(current_chunk).strip()
+            chunk_content = "\n".join(current_chunk).strip()
             if chunk_content:
                 metadata = {
-                    'section': current_section,
-                    'subsection': current_subsection,
-                    'chunk_type': 'structured'
+                    "section": current_section,
+                    "subsection": current_subsection,
+                    "chunk_type": "structured",
                 }
                 chunks.append((chunk_content, metadata))
 
@@ -622,14 +715,14 @@ Provide only the intention summary (maximum {max_length} characters):
 
         for word in words:
             current_chunk.append(word)
-            chunk_text = ' '.join(current_chunk)
+            chunk_text = " ".join(current_chunk)
 
             if len(chunk_text) > self.config.max_chunk_size:
                 # Remove last word and save chunk
                 current_chunk.pop()
                 if current_chunk:
-                    chunk_content = ' '.join(current_chunk)
-                    metadata = {'chunk_type': 'size_based'}
+                    chunk_content = " ".join(current_chunk)
+                    metadata = {"chunk_type": "size_based"}
                     chunks.append((chunk_content, metadata))
 
                 # Start new chunk with the word that exceeded the limit
@@ -637,8 +730,8 @@ Provide only the intention summary (maximum {max_length} characters):
 
         # Save final chunk
         if current_chunk:
-            chunk_content = ' '.join(current_chunk)
-            metadata = {'chunk_type': 'size_based'}
+            chunk_content = " ".join(current_chunk)
+            metadata = {"chunk_type": "size_based"}
             chunks.append((chunk_content, metadata))
 
         return chunks
@@ -647,7 +740,7 @@ Provide only the intention summary (maximum {max_length} characters):
         self,
         markdown_content: str,
         document_path: Optional[str] = None,
-        document_metadata: Optional[Dict[str, Any]] = None
+        document_metadata: Optional[Dict[str, Any]] = None,
     ) -> GraphProcessingResult:
         """Process a document for graph extraction.
 
@@ -661,11 +754,11 @@ Provide only the intention summary (maximum {max_length} characters):
         """
         if not self.is_enabled():
             return GraphProcessingResult(
-                success=False,
-                error_message="Graph processing not enabled or available"
+                success=False, error_message="Graph processing not enabled or available"
             )
 
         import time
+
         start_time = time.time()
 
         try:
@@ -680,9 +773,11 @@ Provide only the intention summary (maximum {max_length} characters):
             else:
                 chunks = self._chunk_by_size(markdown_content)
 
-            logger.info("Document chunked for graph processing",
-                       chunks_count=len(chunks),
-                       chunk_by_structure=self.config.chunk_by_structure)
+            logger.info(
+                "Document chunked for graph processing",
+                chunks_count=len(chunks),
+                chunk_by_structure=self.config.chunk_by_structure,
+            )
 
             # Use enhanced graph builder if available, otherwise fallback to individual extractors
             if self._enhanced_builder:
@@ -693,15 +788,19 @@ Provide only the intention summary (maximum {max_length} characters):
                     enhanced_result = await self._enhanced_builder.process_document(
                         chunk_content,
                         document_path or "unknown_document",
-                        metadata=document_metadata
+                        metadata=document_metadata,
                     )
 
                     all_entities_count = enhanced_result.entities_created
                     all_relations_count = enhanced_result.relations_created
                     openie_relations_count = enhanced_result.openie_relations_created
-                    openie_triplets_processed = enhanced_result.openie_triplets_processed
+                    openie_triplets_processed = (
+                        enhanced_result.openie_triplets_processed
+                    )
                     openie_entity_matches = enhanced_result.openie_entity_matches
-                    openie_normalized_predicates = enhanced_result.openie_normalized_predicates
+                    openie_normalized_predicates = (
+                        enhanced_result.openie_normalized_predicates
+                    )
 
                 else:
                     # Multiple chunks - use process_document_chunks
@@ -710,30 +809,36 @@ Provide only the intention summary (maximum {max_length} characters):
                     document_chunks = []
                     for i, (chunk_content, chunk_metadata) in enumerate(chunks):
                         chunk = DocumentChunk(
-                            id=f"chunk_{i}",
-                            text=chunk_content,
-                            metadata=chunk_metadata
+                            id=f"chunk_{i}", text=chunk_content, metadata=chunk_metadata
                         )
                         document_chunks.append(chunk)
 
-                    enhanced_result = await self._enhanced_builder.process_document_chunks(
-                        document_chunks,
-                        document_path or "unknown_document",
-                        metadata=document_metadata
+                    enhanced_result = (
+                        await self._enhanced_builder.process_document_chunks(
+                            document_chunks,
+                            document_path or "unknown_document",
+                            metadata=document_metadata,
+                        )
                     )
 
                     all_entities_count = enhanced_result.entities_created
                     all_relations_count = enhanced_result.relations_created
                     openie_relations_count = enhanced_result.openie_relations_created
-                    openie_triplets_processed = enhanced_result.openie_triplets_processed
+                    openie_triplets_processed = (
+                        enhanced_result.openie_triplets_processed
+                    )
                     openie_entity_matches = enhanced_result.openie_entity_matches
-                    openie_normalized_predicates = enhanced_result.openie_normalized_predicates
+                    openie_normalized_predicates = (
+                        enhanced_result.openie_normalized_predicates
+                    )
 
-                logger.info("Enhanced graph processing completed",
-                           entities_count=all_entities_count,
-                           relations_count=all_relations_count,
-                           openie_relations_count=openie_relations_count,
-                           openie_triplets_processed=openie_triplets_processed)
+                logger.info(
+                    "Enhanced graph processing completed",
+                    entities_count=all_entities_count,
+                    relations_count=all_relations_count,
+                    openie_relations_count=openie_relations_count,
+                    openie_triplets_processed=openie_triplets_processed,
+                )
 
             else:
                 # Fallback to individual extractors (legacy mode)
@@ -741,29 +846,32 @@ Provide only the intention summary (maximum {max_length} characters):
                 all_relations = []
 
                 # Try batch processing if available and beneficial
-                if (self._llm_client and BATCH_PROCESSING_AVAILABLE and
-                    batch_document_chunks and len(chunks) > 1):
-
+                if (
+                    self._llm_client
+                    and BATCH_PROCESSING_AVAILABLE
+                    and batch_document_chunks
+                    and len(chunks) > 1
+                ):
                     logger.info(f"Using batch processing for {len(chunks)} chunks")
 
                     try:
                         # Prepare chunks for batch processing
                         chunk_data = []
                         for i, (chunk_content, chunk_metadata) in enumerate(chunks):
-                            chunk_data.append({
-                                "id": f"chunk_{i}",
-                                "text": chunk_content,
-                                "document_id": document_path or "unknown",
-                                "metadata": chunk_metadata,
-                                "chunk_index": i,
-                                "intention": intention
-                            })
+                            chunk_data.append(
+                                {
+                                    "id": f"chunk_{i}",
+                                    "text": chunk_content,
+                                    "document_id": document_path or "unknown",
+                                    "metadata": chunk_metadata,
+                                    "chunk_index": i,
+                                    "intention": intention,
+                                }
+                            )
 
                         # Process chunks in batch for entity extraction
                         batch_results = await batch_document_chunks(
-                            self._llm_client,
-                            chunk_data,
-                            processing_type="extraction"
+                            self._llm_client, chunk_data, processing_type="extraction"
                         )
 
                         # Process batch results
@@ -779,36 +887,62 @@ Provide only the intention summary (maximum {max_length} characters):
                                         entity = Entity(
                                             name=entity_data.get("name", ""),
                                             type=entity_data.get("type", "UNKNOWN"),
-                                            confidence=entity_data.get("confidence", 0.5),
+                                            confidence=entity_data.get(
+                                                "confidence", 0.5
+                                            ),
                                             source_doc_id=document_path,
-                                            metadata={**chunk_metadata, "chunk_index": chunk_index}
+                                            metadata={
+                                                **chunk_metadata,
+                                                "chunk_index": chunk_index,
+                                            },
                                         )
                                         all_entities.append(entity)
                                     except Exception as e:
-                                        logger.warning(f"Failed to create entity from batch result: {str(e)}")
+                                        logger.warning(
+                                            f"Failed to create entity from batch result: {str(e)}"
+                                        )
 
                                 # Extract relations from batch result
                                 relations_data = result.result.get("relations", [])
                                 for relation_data in relations_data:
                                     try:
                                         relation = Relation(
-                                            source_entity_id=relation_data.get("source", ""),
-                                            target_entity_id=relation_data.get("target", ""),
-                                            type=relation_data.get("relation", "RELATED_TO"),
-                                            confidence=relation_data.get("confidence", 0.5),
+                                            source_entity_id=relation_data.get(
+                                                "source", ""
+                                            ),
+                                            target_entity_id=relation_data.get(
+                                                "target", ""
+                                            ),
+                                            type=relation_data.get(
+                                                "relation", "RELATED_TO"
+                                            ),
+                                            confidence=relation_data.get(
+                                                "confidence", 0.5
+                                            ),
                                             source_doc_id=document_path,
-                                            metadata={**chunk_metadata, "chunk_index": chunk_index}
+                                            metadata={
+                                                **chunk_metadata,
+                                                "chunk_index": chunk_index,
+                                            },
                                         )
                                         all_relations.append(relation)
                                     except Exception as e:
-                                        logger.warning(f"Failed to create relation from batch result: {str(e)}")
+                                        logger.warning(
+                                            f"Failed to create relation from batch result: {str(e)}"
+                                        )
                             else:
-                                logger.warning(f"Batch processing failed for chunk: {result.error_message}")
+                                logger.warning(
+                                    f"Batch processing failed for chunk: {result.error_message}"
+                                )
 
-                        logger.info(f"Batch processing completed: {len(all_entities)} entities, {len(all_relations)} relations")
+                        logger.info(
+                            f"Batch processing completed: {len(all_entities)} entities, {len(all_relations)} relations"
+                        )
 
                     except Exception as e:
-                        logger.warning(f"Batch processing failed, falling back to individual processing: {str(e)}")
+                        logger.warning(
+                            f"Batch processing failed, falling back to individual processing: {str(e)}"
+                        )
                         # Fall back to individual processing
                         all_entities = []
                         all_relations = []
@@ -820,37 +954,41 @@ Provide only the intention summary (maximum {max_length} characters):
                                 entities = await self._entity_extractor.extract(
                                     chunk_content,
                                     source_doc_id=document_path,
-                                    intention=intention
+                                    intention=intention,
                                 )
 
                                 # Extract relations with intention context
                                 relations = await self._relation_extractor.extract(
                                     chunk_content,
                                     entities=entities,
-                                    intention=intention
+                                    intention=intention,
                                 )
 
                                 # Add chunk metadata to entities and relations
                                 for entity in entities:
                                     entity.metadata.update(chunk_metadata)
-                                    entity.metadata['chunk_index'] = i
+                                    entity.metadata["chunk_index"] = i
 
                                 for relation in relations:
                                     relation.metadata.update(chunk_metadata)
-                                    relation.metadata['chunk_index'] = i
+                                    relation.metadata["chunk_index"] = i
 
                                 all_entities.extend(entities)
                                 all_relations.extend(relations)
 
-                                logger.debug("Processed chunk for graph extraction",
-                                           chunk_index=i,
-                                           entities_count=len(entities),
-                                           relations_count=len(relations))
+                                logger.debug(
+                                    "Processed chunk for graph extraction",
+                                    chunk_index=i,
+                                    entities_count=len(entities),
+                                    relations_count=len(relations),
+                                )
 
                             except Exception as e:
-                                logger.warning("Failed to process chunk for graph extraction",
-                                             chunk_index=i,
-                                             error=str(e))
+                                logger.warning(
+                                    "Failed to process chunk for graph extraction",
+                                    chunk_index=i,
+                                    error=str(e),
+                                )
                                 continue
                 else:
                     # Process each chunk individually (original behavior)
@@ -860,37 +998,39 @@ Provide only the intention summary (maximum {max_length} characters):
                             entities = await self._entity_extractor.extract(
                                 chunk_content,
                                 source_doc_id=document_path,
-                                intention=intention
+                                intention=intention,
                             )
 
                             # Extract relations with intention context
                             relations = await self._relation_extractor.extract(
-                                chunk_content,
-                                entities=entities,
-                                intention=intention
+                                chunk_content, entities=entities, intention=intention
                             )
 
                             # Add chunk metadata to entities and relations
                             for entity in entities:
                                 entity.metadata.update(chunk_metadata)
-                                entity.metadata['chunk_index'] = i
+                                entity.metadata["chunk_index"] = i
 
                             for relation in relations:
                                 relation.metadata.update(chunk_metadata)
-                                relation.metadata['chunk_index'] = i
+                                relation.metadata["chunk_index"] = i
 
                             all_entities.extend(entities)
                             all_relations.extend(relations)
 
-                            logger.debug("Processed chunk for graph extraction",
-                                       chunk_index=i,
-                                       entities_count=len(entities),
-                                       relations_count=len(relations))
+                            logger.debug(
+                                "Processed chunk for graph extraction",
+                                chunk_index=i,
+                                entities_count=len(entities),
+                                relations_count=len(relations),
+                            )
 
                         except Exception as e:
-                            logger.warning("Failed to process chunk for graph extraction",
-                                         chunk_index=i,
-                                         error=str(e))
+                            logger.warning(
+                                "Failed to process chunk for graph extraction",
+                                chunk_index=i,
+                                error=str(e),
+                            )
                             continue
 
                 # Write data to file before database operations
@@ -903,9 +1043,11 @@ Provide only the intention summary (maximum {max_length} characters):
                             relations=all_relations,
                             chunks=chunks,
                             metadata=document_metadata,
-                            summary=f"Document processed with {len(all_entities)} entities and {len(all_relations)} relations"
+                            summary=f"Document processed with {len(all_entities)} entities and {len(all_relations)} relations",
                         )
-                        logger.info(f"Data file written before database operations: {data_file_path}")
+                        logger.info(
+                            f"Data file written before database operations: {data_file_path}"
+                        )
                     except Exception as e:
                         logger.warning(f"Failed to write data file: {str(e)}")
 
@@ -914,9 +1056,11 @@ Provide only the intention summary (maximum {max_length} characters):
                     await self._storage.store_entities(all_entities)
                     await self._storage.store_relations(all_relations)
 
-                    logger.info("Graph data stored successfully",
-                               entities_count=len(all_entities),
-                               relations_count=len(all_relations))
+                    logger.info(
+                        "Graph data stored successfully",
+                        entities_count=len(all_entities),
+                        relations_count=len(all_relations),
+                    )
 
                 all_entities_count = len(all_entities)
                 all_relations_count = len(all_relations)
@@ -940,12 +1084,14 @@ Provide only the intention summary (maximum {max_length} characters):
                 openie_normalized_predicates=openie_normalized_predicates,
                 data_file_path=str(data_file_path) if data_file_path else None,
                 metadata={
-                    'document_path': document_path,
-                    'chunk_strategy': 'structure' if self.config.chunk_by_structure else 'size',
-                    'total_chunks': len(chunks),
-                    'enhanced_builder_used': self._enhanced_builder is not None,
-                    'openie_enabled': self._enhanced_builder is not None
-                }
+                    "document_path": document_path,
+                    "chunk_strategy": "structure"
+                    if self.config.chunk_by_structure
+                    else "size",
+                    "total_chunks": len(chunks),
+                    "enhanced_builder_used": self._enhanced_builder is not None,
+                    "openie_enabled": self._enhanced_builder is not None,
+                },
             )
 
         except Exception as e:
@@ -956,7 +1102,9 @@ Provide only the intention summary (maximum {max_length} characters):
                 success=False,
                 processing_time=processing_time,
                 error_message=str(e),
-                data_file_path=str(data_file_path) if 'data_file_path' in locals() and data_file_path else None
+                data_file_path=str(data_file_path)
+                if "data_file_path" in locals() and data_file_path
+                else None,
             )
 
     async def close(self):

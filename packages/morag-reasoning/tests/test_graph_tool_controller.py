@@ -3,17 +3,17 @@
 Tests the Gemini function calling schema implementation for graph operations.
 """
 
-import pytest
 import asyncio
-from unittest.mock import Mock, AsyncMock, patch
-from typing import List, Dict, Any
+from typing import Any, Dict, List
+from unittest.mock import AsyncMock, Mock, patch
 
+import pytest
 from morag_reasoning.graph_tool_controller import (
+    ActionTrace,
     GraphToolController,
     ToolCall,
-    ToolResult,
     ToolCallError,
-    ActionTrace
+    ToolResult,
 )
 
 
@@ -28,7 +28,7 @@ class TestGraphToolController:
             score_threshold=0.8,
             max_entities_per_call=5,
             max_neighbors_per_entity=3,
-            max_chunks_per_entity=2
+            max_chunks_per_entity=2,
         )
 
     @pytest.fixture
@@ -39,9 +39,9 @@ class TestGraphToolController:
         mock_embedding_service = Mock()
 
         return {
-            'graph_store': mock_graph_store,
-            'fact_extractor': mock_fact_extractor,
-            'embedding_service': mock_embedding_service
+            "graph_store": mock_graph_store,
+            "fact_extractor": mock_fact_extractor,
+            "embedding_service": mock_embedding_service,
         }
 
     def test_function_specs(self, controller):
@@ -51,23 +51,26 @@ class TestGraphToolController:
         assert len(specs) == 5
 
         # Check all required functions are present
-        function_names = {spec['name'] for spec in specs}
+        function_names = {spec["name"] for spec in specs}
         expected_names = {
-            'extract_entities', 'match_entity', 'expand_neighbors',
-            'fetch_chunk', 'extract_facts'
+            "extract_entities",
+            "match_entity",
+            "expand_neighbors",
+            "fetch_chunk",
+            "extract_facts",
         }
         assert function_names == expected_names
 
         # Check extract_entities spec
-        extract_spec = next(s for s in specs if s['name'] == 'extract_entities')
-        assert 'text' in extract_spec['parameters']['properties']
-        assert extract_spec['parameters']['required'] == ['text']
+        extract_spec = next(s for s in specs if s["name"] == "extract_entities")
+        assert "text" in extract_spec["parameters"]["properties"]
+        assert extract_spec["parameters"]["required"] == ["text"]
 
         # Check expand_neighbors spec has depth limits
-        expand_spec = next(s for s in specs if s['name'] == 'expand_neighbors')
-        depth_prop = expand_spec['parameters']['properties']['depth']
-        assert depth_prop['minimum'] == 1
-        assert depth_prop['maximum'] == 3
+        expand_spec = next(s for s in specs if s["name"] == "expand_neighbors")
+        depth_prop = expand_spec["parameters"]["properties"]["depth"]
+        assert depth_prop["minimum"] == 1
+        assert depth_prop["maximum"] == 3
 
     @pytest.mark.asyncio
     async def test_tool_policy_enforced(self, controller):
@@ -89,13 +92,15 @@ class TestGraphToolController:
         mock_fact.object = "programming language"
         mock_fact.fact_id = "fact_1"
 
-        mock_services['fact_extractor'].extract_facts = AsyncMock(
+        mock_services["fact_extractor"].extract_facts = AsyncMock(
             return_value=[mock_fact]
         )
 
-        controller.fact_extractor = mock_services['fact_extractor']
+        controller.fact_extractor = mock_services["fact_extractor"]
 
-        call = ToolCall(name="extract_entities", args={"text": "Python is a programming language"})
+        call = ToolCall(
+            name="extract_entities", args={"text": "Python is a programming language"}
+        )
         result = await controller.handle_tool_call(call)
 
         assert result.error is None
@@ -122,11 +127,11 @@ class TestGraphToolController:
         mock_entity.name = "Python Programming"
         mock_entity.type = "Technology"
 
-        mock_services['graph_store'].search_entities = AsyncMock(
+        mock_services["graph_store"].search_entities = AsyncMock(
             return_value=[mock_entity]
         )
 
-        controller.graph_store = mock_services['graph_store']
+        controller.graph_store = mock_services["graph_store"]
 
         call = ToolCall(name="match_entity", args={"name": "Python"})
         result = await controller.handle_tool_call(call)
@@ -139,8 +144,8 @@ class TestGraphToolController:
     @pytest.mark.asyncio
     async def test_match_entity_not_found(self, controller, mock_services):
         """Test entity matching when entity is not found."""
-        mock_services['graph_store'].search_entities = AsyncMock(return_value=[])
-        controller.graph_store = mock_services['graph_store']
+        mock_services["graph_store"].search_entities = AsyncMock(return_value=[])
+        controller.graph_store = mock_services["graph_store"]
 
         call = ToolCall(name="match_entity", args={"name": "NonexistentEntity"})
         result = await controller.handle_tool_call(call)
@@ -165,13 +170,15 @@ class TestGraphToolController:
         mock_neighbor2.type = "Tool"
         mock_neighbor2.properties = {"category": "software"}
 
-        mock_services['graph_store'].get_neighbors = AsyncMock(
+        mock_services["graph_store"].get_neighbors = AsyncMock(
             return_value=[mock_neighbor1, mock_neighbor2]
         )
 
-        controller.graph_store = mock_services['graph_store']
+        controller.graph_store = mock_services["graph_store"]
 
-        call = ToolCall(name="expand_neighbors", args={"entity_id": "entity_123", "depth": 2})
+        call = ToolCall(
+            name="expand_neighbors", args={"entity_id": "entity_123", "depth": 2}
+        )
         result = await controller.handle_tool_call(call)
 
         assert result.error is None
@@ -186,18 +193,20 @@ class TestGraphToolController:
     @pytest.mark.asyncio
     async def test_expand_neighbors_depth_limit(self, controller, mock_services):
         """Test that depth limits are enforced."""
-        mock_services['graph_store'].get_neighbors = AsyncMock(return_value=[])
-        controller.graph_store = mock_services['graph_store']
+        mock_services["graph_store"].get_neighbors = AsyncMock(return_value=[])
+        controller.graph_store = mock_services["graph_store"]
 
         # Request depth > max_hops (2)
-        call = ToolCall(name="expand_neighbors", args={"entity_id": "entity_123", "depth": 5})
+        call = ToolCall(
+            name="expand_neighbors", args={"entity_id": "entity_123", "depth": 5}
+        )
         result = await controller.handle_tool_call(call)
 
         assert result.error is None
         assert result.result["depth_used"] == 2  # Should be limited to max_hops
 
         # Verify the call was made with limited depth
-        mock_services['graph_store'].get_neighbors.assert_called_with(
+        mock_services["graph_store"].get_neighbors.assert_called_with(
             "entity_123", max_depth=2
         )
 
@@ -209,8 +218,8 @@ class TestGraphToolController:
         mock_entity.id = "entity_123"
         mock_entity.name = "Python"
 
-        mock_services['graph_store'].get_entity = AsyncMock(return_value=mock_entity)
-        controller.graph_store = mock_services['graph_store']
+        mock_services["graph_store"].get_entity = AsyncMock(return_value=mock_entity)
+        controller.graph_store = mock_services["graph_store"]
 
         call = ToolCall(name="fetch_chunk", args={"entity_id": "entity_123"})
         result = await controller.handle_tool_call(call)
@@ -223,8 +232,8 @@ class TestGraphToolController:
     @pytest.mark.asyncio
     async def test_fetch_chunk_entity_not_found(self, controller, mock_services):
         """Test chunk fetching when entity is not found."""
-        mock_services['graph_store'].get_entity = AsyncMock(return_value=None)
-        controller.graph_store = mock_services['graph_store']
+        mock_services["graph_store"].get_entity = AsyncMock(return_value=None)
+        controller.graph_store = mock_services["graph_store"]
 
         call = ToolCall(name="fetch_chunk", args={"entity_id": "nonexistent"})
         result = await controller.handle_tool_call(call)
@@ -253,13 +262,16 @@ class TestGraphToolController:
         mock_fact2.confidence = 0.7  # Below threshold (0.8)
         mock_fact2.metadata = {"domain": "technology"}
 
-        mock_services['fact_extractor'].extract_facts = AsyncMock(
+        mock_services["fact_extractor"].extract_facts = AsyncMock(
             return_value=[mock_fact1, mock_fact2]
         )
 
-        controller.fact_extractor = mock_services['fact_extractor']
+        controller.fact_extractor = mock_services["fact_extractor"]
 
-        call = ToolCall(name="extract_facts", args={"text": "Python is a programming language used for web development"})
+        call = ToolCall(
+            name="extract_facts",
+            args={"text": "Python is a programming language used for web development"},
+        )
         result = await controller.handle_tool_call(call)
 
         assert result.error is None
@@ -282,14 +294,17 @@ class TestGraphToolController:
             "[document:extracted_text:0:fact_id=fact_1]",
             "[document:unknown:0:entity_id=entity_123]",
             "[pdf:research.pdf:1:page=15:chapter=2.2]",
-            "[audio:interview.mp3:3:timecode=00:15:30]"
+            "[audio:interview.mp3:3:timecode=00:15:30]",
         ]
 
         import re
+
         citation_pattern = r"^\[\w+:[^:]+:\d+(?::[^\]]+)*\]$"
 
         for citation in test_cases:
-            assert re.match(citation_pattern, citation), f"Citation '{citation}' doesn't match pattern"
+            assert re.match(
+                citation_pattern, citation
+            ), f"Citation '{citation}' doesn't match pattern"
 
     def test_action_traces(self, controller):
         """Test action trace recording."""
@@ -302,7 +317,7 @@ class TestGraphToolController:
             args={"text": "test"},
             result={"entities": ["test"]},
             execution_time=0.1,
-            timestamp="123456789"
+            timestamp="123456789",
         )
         controller.action_traces.append(trace)
 
@@ -321,7 +336,7 @@ class TestGraphToolController:
             ActionTrace("extract_entities", {}, {}, 0.1, "1"),
             ActionTrace("match_entity", {}, {}, 0.2, "2"),
             ActionTrace("extract_entities", {}, {}, 0.15, "3"),
-            ActionTrace("expand_neighbors", {}, None, 0.05, "4", error="Test error")
+            ActionTrace("expand_neighbors", {}, None, 0.05, "4", error="Test error"),
         ]
 
         controller.action_traces.extend(traces)
@@ -348,10 +363,14 @@ class TestGraphToolController:
             mock_fact.fact_id = f"fact_{i}"
             mock_facts.append(mock_fact)
 
-        mock_services['fact_extractor'].extract_facts = AsyncMock(return_value=mock_facts)
-        controller.fact_extractor = mock_services['fact_extractor']
+        mock_services["fact_extractor"].extract_facts = AsyncMock(
+            return_value=mock_facts
+        )
+        controller.fact_extractor = mock_services["fact_extractor"]
 
-        call = ToolCall(name="extract_entities", args={"text": "Long text with many entities"})
+        call = ToolCall(
+            name="extract_entities", args={"text": "Long text with many entities"}
+        )
         result = await controller.handle_tool_call(call)
 
         assert result.error is None
@@ -372,8 +391,10 @@ class TestGraphToolController:
             mock_neighbor.properties = {}
             mock_neighbors.append(mock_neighbor)
 
-        mock_services['graph_store'].get_neighbors = AsyncMock(return_value=mock_neighbors)
-        controller.graph_store = mock_services['graph_store']
+        mock_services["graph_store"].get_neighbors = AsyncMock(
+            return_value=mock_neighbors
+        )
+        controller.graph_store = mock_services["graph_store"]
 
         call = ToolCall(name="expand_neighbors", args={"entity_id": "entity_123"})
         result = await controller.handle_tool_call(call)
@@ -396,7 +417,7 @@ class TestToolCallIntegration:
             controller,
             fact_extractor=AsyncMock(),
             graph_store=AsyncMock(),
-            embedding_service=AsyncMock()
+            embedding_service=AsyncMock(),
         ):
             # Step 1: Extract entities
             mock_fact = Mock()
@@ -406,7 +427,9 @@ class TestToolCallIntegration:
 
             controller.fact_extractor.extract_facts.return_value = [mock_fact]
 
-            extract_call = ToolCall(name="extract_entities", args={"text": "Python is great"})
+            extract_call = ToolCall(
+                name="extract_entities", args={"text": "Python is great"}
+            )
             extract_result = await controller.handle_tool_call(extract_call)
 
             assert extract_result.error is None
@@ -434,7 +457,9 @@ class TestToolCallIntegration:
 
             controller.graph_store.get_neighbors.return_value = [mock_neighbor]
 
-            expand_call = ToolCall(name="expand_neighbors", args={"entity_id": "python_123"})
+            expand_call = ToolCall(
+                name="expand_neighbors", args={"entity_id": "python_123"}
+            )
             expand_result = await controller.handle_tool_call(expand_call)
 
             assert expand_result.error is None
@@ -454,9 +479,11 @@ class TestToolCallIntegration:
         controller = GraphToolController()
 
         # Test with failing service
-        with patch.object(controller, 'fact_extractor', None):
+        with patch.object(controller, "fact_extractor", None):
             # This should trigger service initialization
-            with patch('morag_reasoning.graph_tool_controller.GraphFactExtractor') as mock_extractor_class:
+            with patch(
+                "morag_reasoning.graph_tool_controller.GraphFactExtractor"
+            ) as mock_extractor_class:
                 mock_extractor_class.side_effect = Exception("Service unavailable")
 
                 call = ToolCall(name="extract_entities", args={"text": "test"})

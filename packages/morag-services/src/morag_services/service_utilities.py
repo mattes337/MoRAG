@@ -1,9 +1,10 @@
 """Utility functions for MoRAG services."""
 
 import re
-from typing import Dict, List, Any, Optional
 from pathlib import Path
+from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
+
 import structlog
 
 logger = structlog.get_logger(__name__)
@@ -16,44 +17,97 @@ class ServiceUtilities:
     def is_document(path_or_url: str) -> bool:
         """Check if path/URL is a document."""
         path = Path(path_or_url)
-        document_extensions = {'.pdf', '.doc', '.docx', '.txt', '.md', '.rtf',
-                              '.odt', '.pages', '.epub', '.mobi', '.djvu',
-                              '.xls', '.xlsx', '.csv', '.ppt', '.pptx'}
+        document_extensions = {
+            ".pdf",
+            ".doc",
+            ".docx",
+            ".txt",
+            ".md",
+            ".rtf",
+            ".odt",
+            ".pages",
+            ".epub",
+            ".mobi",
+            ".djvu",
+            ".xls",
+            ".xlsx",
+            ".csv",
+            ".ppt",
+            ".pptx",
+        }
         return path.suffix.lower() in document_extensions
 
     @staticmethod
     def is_audio(path_or_url: str) -> bool:
         """Check if path/URL is audio."""
         path = Path(path_or_url)
-        audio_extensions = {'.mp3', '.wav', '.m4a', '.aac', '.ogg', '.wma',
-                           '.flac', '.aiff', '.au', '.ra', '.3gp', '.amr'}
+        audio_extensions = {
+            ".mp3",
+            ".wav",
+            ".m4a",
+            ".aac",
+            ".ogg",
+            ".wma",
+            ".flac",
+            ".aiff",
+            ".au",
+            ".ra",
+            ".3gp",
+            ".amr",
+        }
         return path.suffix.lower() in audio_extensions
 
     @staticmethod
     def is_video(path_or_url: str) -> bool:
         """Check if path/URL is video."""
         path = Path(path_or_url)
-        video_extensions = {'.mp4', '.avi', '.mov', '.mkv', '.wmv', '.flv',
-                           '.webm', '.m4v', '.3gp', '.ogv', '.ts', '.mts'}
+        video_extensions = {
+            ".mp4",
+            ".avi",
+            ".mov",
+            ".mkv",
+            ".wmv",
+            ".flv",
+            ".webm",
+            ".m4v",
+            ".3gp",
+            ".ogv",
+            ".ts",
+            ".mts",
+        }
         return path.suffix.lower() in video_extensions
 
     @staticmethod
     def is_image(path_or_url: str) -> bool:
         """Check if path/URL is an image."""
         path = Path(path_or_url)
-        image_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff',
-                           '.tif', '.webp', '.svg', '.ico', '.heic', '.heif'}
+        image_extensions = {
+            ".jpg",
+            ".jpeg",
+            ".png",
+            ".gif",
+            ".bmp",
+            ".tiff",
+            ".tif",
+            ".webp",
+            ".svg",
+            ".ico",
+            ".heic",
+            ".heif",
+        }
         return path.suffix.lower() in image_extensions
 
     @staticmethod
     def is_web(path_or_url: str) -> bool:
         """Check if this is a web URL (but not YouTube)."""
-        return path_or_url.startswith(('http://', 'https://')) and not ServiceUtilities.is_youtube(path_or_url)
+        return path_or_url.startswith(
+            ("http://", "https://")
+        ) and not ServiceUtilities.is_youtube(path_or_url)
 
     @staticmethod
     def is_youtube(path_or_url: str) -> bool:
         """Check if this is a YouTube URL."""
-        youtube_patterns = [r'youtube\.com', r'youtu\.be', r'youtube-nocookie\.com']
+        youtube_patterns = [r"youtube\.com", r"youtu\.be", r"youtube-nocookie\.com"]
         return any(re.search(pattern, path_or_url) for pattern in youtube_patterns)
 
     @staticmethod
@@ -94,7 +148,7 @@ class ServiceUtilities:
         """
         try:
             # Check if it's a URL
-            if path_or_url.startswith(('http://', 'https://')):
+            if path_or_url.startswith(("http://", "https://")):
                 parsed = urlparse(path_or_url)
                 return bool(parsed.netloc and parsed.scheme)
 
@@ -119,19 +173,21 @@ class ServiceUtilities:
         info = {
             "path_or_url": path_or_url,
             "content_type": ServiceUtilities.detect_content_type(path_or_url),
-            "is_url": path_or_url.startswith(('http://', 'https://')),
+            "is_url": path_or_url.startswith(("http://", "https://")),
             "is_local_file": False,
             "exists": False,
             "size": None,
             "extension": None,
-            "name": None
+            "name": None,
         }
 
         try:
             if info["is_url"]:
                 parsed = urlparse(path_or_url)
                 info["name"] = Path(parsed.path).name or parsed.netloc
-                info["exists"] = True  # Assume URLs exist (will be validated during processing)
+                info[
+                    "exists"
+                ] = True  # Assume URLs exist (will be validated during processing)
             else:
                 path = Path(path_or_url)
                 info["is_local_file"] = True
@@ -162,10 +218,10 @@ class ServiceUtilities:
             Sanitized filename
         """
         # Remove or replace invalid characters
-        sanitized = re.sub(r'[<>:"/\\|?*]', '_', filename)
+        sanitized = re.sub(r'[<>:"/\\|?*]', "_", filename)
 
         # Remove control characters
-        sanitized = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', sanitized)
+        sanitized = re.sub(r"[\x00-\x1f\x7f-\x9f]", "", sanitized)
 
         # Limit length
         if len(sanitized) > 255:
@@ -176,7 +232,9 @@ class ServiceUtilities:
         return sanitized.strip()
 
     @staticmethod
-    def estimate_processing_time(content_type: str, size_bytes: Optional[int] = None) -> float:
+    def estimate_processing_time(
+        content_type: str, size_bytes: Optional[int] = None
+    ) -> float:
         """Estimate processing time based on content type and size.
 
         Args:
@@ -188,12 +246,12 @@ class ServiceUtilities:
         """
         base_times = {
             "document": 2.0,  # Base time for documents
-            "audio": 10.0,    # Audio processing takes longer
-            "video": 30.0,    # Video processing takes longest
-            "image": 3.0,     # Image OCR processing
-            "web": 5.0,       # Web scraping and processing
+            "audio": 10.0,  # Audio processing takes longer
+            "video": 30.0,  # Video processing takes longest
+            "image": 3.0,  # Image OCR processing
+            "web": 5.0,  # Web scraping and processing
             "youtube": 20.0,  # YouTube download + processing
-            "unknown": 5.0    # Default estimate
+            "unknown": 5.0,  # Default estimate
         }
 
         base_time = base_times.get(content_type, base_times["unknown"])

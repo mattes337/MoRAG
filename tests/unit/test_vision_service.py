@@ -1,11 +1,12 @@
 """Unit tests for vision service."""
 
-import pytest
 from unittest.mock import Mock, patch
+
+import pytest
+from morag_core.exceptions import ExternalServiceError
+from morag_image import ImageService
 from PIL import Image
 
-from morag_image import ImageService
-from morag_core.exceptions import ExternalServiceError
 
 class TestImageService:
     """Test cases for ImageService."""
@@ -19,14 +20,16 @@ class TestImageService:
     def mock_image_file(self, tmp_path):
         """Create mock image file."""
         image_file = tmp_path / "test_image.jpg"
-        test_image = Image.new('RGB', (100, 100), color='blue')
-        test_image.save(image_file, 'JPEG')
+        test_image = Image.new("RGB", (100, 100), color="blue")
+        test_image.save(image_file, "JPEG")
         return image_file
 
     @pytest.mark.asyncio
-    @patch('google.generativeai.GenerativeModel')
-    @patch('morag.core.config.settings')
-    async def test_generate_caption_success(self, mock_settings, mock_model_class, service, mock_image_file):
+    @patch("google.generativeai.GenerativeModel")
+    @patch("morag.core.config.settings")
+    async def test_generate_caption_success(
+        self, mock_settings, mock_model_class, service, mock_image_file
+    ):
         """Test successful caption generation."""
         mock_settings.gemini_api_key = "test_api_key"
 
@@ -37,15 +40,17 @@ class TestImageService:
         mock_model.generate_content.return_value = mock_response
         mock_model_class.return_value = mock_model
 
-        with patch('asyncio.to_thread', return_value=mock_response):
+        with patch("asyncio.to_thread", return_value=mock_response):
             caption = await service.generate_caption(mock_image_file)
 
             assert caption == "A blue square image with vibrant colors"
-            mock_model_class.assert_called_once_with('gemini-1.5-flash')
+            mock_model_class.assert_called_once_with("gemini-1.5-flash")
 
     @pytest.mark.asyncio
-    @patch('morag.core.config.settings')
-    async def test_generate_caption_no_api_key(self, mock_settings, service, mock_image_file):
+    @patch("morag.core.config.settings")
+    async def test_generate_caption_no_api_key(
+        self, mock_settings, service, mock_image_file
+    ):
         """Test caption generation without API key."""
         mock_settings.gemini_api_key = None
 
@@ -53,9 +58,11 @@ class TestImageService:
             await service.generate_caption(mock_image_file)
 
     @pytest.mark.asyncio
-    @patch('google.generativeai.GenerativeModel')
-    @patch('morag.core.config.settings')
-    async def test_generate_caption_with_custom_prompt(self, mock_settings, mock_model_class, service, mock_image_file):
+    @patch("google.generativeai.GenerativeModel")
+    @patch("morag.core.config.settings")
+    async def test_generate_caption_with_custom_prompt(
+        self, mock_settings, mock_model_class, service, mock_image_file
+    ):
         """Test caption generation with custom prompt."""
         mock_settings.gemini_api_key = "test_api_key"
 
@@ -67,15 +74,19 @@ class TestImageService:
 
         custom_prompt = "Describe this image in one word."
 
-        with patch('asyncio.to_thread', return_value=mock_response):
-            caption = await service.generate_caption(mock_image_file, custom_prompt=custom_prompt)
+        with patch("asyncio.to_thread", return_value=mock_response):
+            caption = await service.generate_caption(
+                mock_image_file, custom_prompt=custom_prompt
+            )
 
             assert caption == "Custom analysis result"
 
     @pytest.mark.asyncio
-    @patch('google.generativeai.GenerativeModel')
-    @patch('morag.core.config.settings')
-    async def test_generate_caption_api_error(self, mock_settings, mock_model_class, service, mock_image_file):
+    @patch("google.generativeai.GenerativeModel")
+    @patch("morag.core.config.settings")
+    async def test_generate_caption_api_error(
+        self, mock_settings, mock_model_class, service, mock_image_file
+    ):
         """Test caption generation with API error."""
         mock_settings.gemini_api_key = "test_api_key"
 
@@ -85,9 +96,11 @@ class TestImageService:
             await service.generate_caption(mock_image_file)
 
     @pytest.mark.asyncio
-    @patch('google.generativeai.GenerativeModel')
-    @patch('morag.core.config.settings')
-    async def test_analyze_image_content_success(self, mock_settings, mock_model_class, service, mock_image_file):
+    @patch("google.generativeai.GenerativeModel")
+    @patch("morag.core.config.settings")
+    async def test_analyze_image_content_success(
+        self, mock_settings, mock_model_class, service, mock_image_file
+    ):
         """Test successful image content analysis."""
         mock_settings.gemini_api_key = "test_api_key"
 
@@ -105,7 +118,7 @@ class TestImageService:
         mock_model.generate_content.return_value = mock_response
         mock_model_class.return_value = mock_model
 
-        with patch('asyncio.to_thread', return_value=mock_response):
+        with patch("asyncio.to_thread", return_value=mock_response):
             analysis = await service.analyze_image_content(mock_image_file)
 
             assert isinstance(analysis, dict)
@@ -115,9 +128,11 @@ class TestImageService:
             assert analysis["raw_analysis"] == mock_response.text.strip()
 
     @pytest.mark.asyncio
-    @patch('google.generativeai.GenerativeModel')
-    @patch('morag.core.config.settings')
-    async def test_classify_image_type_success(self, mock_settings, mock_model_class, service, mock_image_file):
+    @patch("google.generativeai.GenerativeModel")
+    @patch("morag.core.config.settings")
+    async def test_classify_image_type_success(
+        self, mock_settings, mock_model_class, service, mock_image_file
+    ):
         """Test successful image type classification."""
         mock_settings.gemini_api_key = "test_api_key"
 
@@ -127,15 +142,17 @@ class TestImageService:
         mock_model.generate_content.return_value = mock_response
         mock_model_class.return_value = mock_model
 
-        with patch('asyncio.to_thread', return_value=mock_response):
+        with patch("asyncio.to_thread", return_value=mock_response):
             classification = await service.classify_image_type(mock_image_file)
 
             assert classification == "artwork"
 
     @pytest.mark.asyncio
-    @patch('google.generativeai.GenerativeModel')
-    @patch('morag.core.config.settings')
-    async def test_classify_image_type_invalid_response(self, mock_settings, mock_model_class, service, mock_image_file):
+    @patch("google.generativeai.GenerativeModel")
+    @patch("morag.core.config.settings")
+    async def test_classify_image_type_invalid_response(
+        self, mock_settings, mock_model_class, service, mock_image_file
+    ):
         """Test image classification with invalid response."""
         mock_settings.gemini_api_key = "test_api_key"
 
@@ -145,16 +162,18 @@ class TestImageService:
         mock_model.generate_content.return_value = mock_response
         mock_model_class.return_value = mock_model
 
-        with patch('asyncio.to_thread', return_value=mock_response):
+        with patch("asyncio.to_thread", return_value=mock_response):
             classification = await service.classify_image_type(mock_image_file)
 
             # Should fallback to "other" for invalid categories
             assert classification == "other"
 
     @pytest.mark.asyncio
-    @patch('google.generativeai.GenerativeModel')
-    @patch('morag.core.config.settings')
-    async def test_classify_image_type_error(self, mock_settings, mock_model_class, service, mock_image_file):
+    @patch("google.generativeai.GenerativeModel")
+    @patch("morag.core.config.settings")
+    async def test_classify_image_type_error(
+        self, mock_settings, mock_model_class, service, mock_image_file
+    ):
         """Test image classification with error."""
         mock_settings.gemini_api_key = "test_api_key"
 
@@ -165,9 +184,11 @@ class TestImageService:
         assert classification == "other"
 
     @pytest.mark.asyncio
-    @patch('google.generativeai.GenerativeModel')
-    @patch('morag.core.config.settings')
-    async def test_extract_text_content_success(self, mock_settings, mock_model_class, service, mock_image_file):
+    @patch("google.generativeai.GenerativeModel")
+    @patch("morag.core.config.settings")
+    async def test_extract_text_content_success(
+        self, mock_settings, mock_model_class, service, mock_image_file
+    ):
         """Test successful text content extraction."""
         mock_settings.gemini_api_key = "test_api_key"
 
@@ -177,15 +198,17 @@ class TestImageService:
         mock_model.generate_content.return_value = mock_response
         mock_model_class.return_value = mock_model
 
-        with patch('asyncio.to_thread', return_value=mock_response):
+        with patch("asyncio.to_thread", return_value=mock_response):
             text = await service.extract_text_content(mock_image_file)
 
             assert text == "Hello World\nWelcome to the test"
 
     @pytest.mark.asyncio
-    @patch('google.generativeai.GenerativeModel')
-    @patch('morag.core.config.settings')
-    async def test_extract_text_content_no_text(self, mock_settings, mock_model_class, service, mock_image_file):
+    @patch("google.generativeai.GenerativeModel")
+    @patch("morag.core.config.settings")
+    async def test_extract_text_content_no_text(
+        self, mock_settings, mock_model_class, service, mock_image_file
+    ):
         """Test text extraction when no text is detected."""
         mock_settings.gemini_api_key = "test_api_key"
 
@@ -195,7 +218,7 @@ class TestImageService:
         mock_model.generate_content.return_value = mock_response
         mock_model_class.return_value = mock_model
 
-        with patch('asyncio.to_thread', return_value=mock_response):
+        with patch("asyncio.to_thread", return_value=mock_response):
             text = await service.extract_text_content(mock_image_file)
 
             # Should return empty string when no text detected
@@ -243,8 +266,10 @@ class TestImageService:
         assert "raw_analysis" in result
 
     @pytest.mark.asyncio
-    @patch('morag.core.config.settings')
-    async def test_extract_text_content_no_api_key(self, mock_settings, service, mock_image_file):
+    @patch("morag.core.config.settings")
+    async def test_extract_text_content_no_api_key(
+        self, mock_settings, service, mock_image_file
+    ):
         """Test text extraction without API key."""
         mock_settings.gemini_api_key = None
 
@@ -252,8 +277,10 @@ class TestImageService:
             await service.extract_text_content(mock_image_file)
 
     @pytest.mark.asyncio
-    @patch('morag.core.config.settings')
-    async def test_analyze_image_content_no_api_key(self, mock_settings, service, mock_image_file):
+    @patch("morag.core.config.settings")
+    async def test_analyze_image_content_no_api_key(
+        self, mock_settings, service, mock_image_file
+    ):
         """Test content analysis without API key."""
         mock_settings.gemini_api_key = None
 
@@ -261,13 +288,16 @@ class TestImageService:
             await service.analyze_image_content(mock_image_file)
 
     @pytest.mark.asyncio
-    @patch('morag.core.config.settings')
-    async def test_classify_image_type_no_api_key(self, mock_settings, service, mock_image_file):
+    @patch("morag.core.config.settings")
+    async def test_classify_image_type_no_api_key(
+        self, mock_settings, service, mock_image_file
+    ):
         """Test image classification without API key."""
         mock_settings.gemini_api_key = None
 
         with pytest.raises(ExternalServiceError, match="Gemini API key not configured"):
             await service.classify_image_type(mock_image_file)
+
 
 def test_global_service_instance():
     """Test that global service instance is available."""

@@ -1,12 +1,13 @@
 """Tests for remote job API endpoints."""
 
-import pytest
-from fastapi.testclient import TestClient
-from unittest.mock import Mock, patch, AsyncMock
 from datetime import datetime
-from morag_core.models.remote_job import RemoteJob
-from morag.endpoints.remote_jobs import router, get_remote_job_service
+from unittest.mock import AsyncMock, Mock, patch
+
+import pytest
 from fastapi import FastAPI
+from fastapi.testclient import TestClient
+from morag.endpoints.remote_jobs import get_remote_job_service, router
+from morag_core.models.remote_job import RemoteJob
 
 
 @pytest.fixture
@@ -47,17 +48,20 @@ class TestRemoteJobAPI:
             ingestion_task_id="test-task-123",
             source_file_path="/tmp/test.mp3",
             content_type="audio",
-            task_options={"webhook_url": "http://example.com/webhook"}
+            task_options={"webhook_url": "http://example.com/webhook"},
         )
         override_service.create_job.return_value = mock_job
 
         # Make request
-        response = client.post("/api/v1/remote-jobs/", json={
-            "source_file_path": "/tmp/test.mp3",
-            "content_type": "audio",
-            "task_options": {"webhook_url": "http://example.com/webhook"},
-            "ingestion_task_id": "test-task-123"
-        })
+        response = client.post(
+            "/api/v1/remote-jobs/",
+            json={
+                "source_file_path": "/tmp/test.mp3",
+                "content_type": "audio",
+                "task_options": {"webhook_url": "http://example.com/webhook"},
+                "ingestion_task_id": "test-task-123",
+            },
+        )
 
         # Verify response
         assert response.status_code == 200
@@ -72,12 +76,15 @@ class TestRemoteJobAPI:
         override_service.create_job.side_effect = Exception("Database error")
 
         # Make request
-        response = client.post("/api/v1/remote-jobs/", json={
-            "source_file_path": "/tmp/test.mp3",
-            "content_type": "audio",
-            "task_options": {},
-            "ingestion_task_id": "test-task-123"
-        })
+        response = client.post(
+            "/api/v1/remote-jobs/",
+            json={
+                "source_file_path": "/tmp/test.mp3",
+                "content_type": "audio",
+                "task_options": {},
+                "ingestion_task_id": "test-task-123",
+            },
+        )
 
         # Verify error response
         assert response.status_code == 500
@@ -90,16 +97,19 @@ class TestRemoteJobAPI:
             ingestion_task_id="test-task-123",
             source_file_path="/tmp/test.mp3",
             content_type="audio",
-            task_options={"webhook_url": "http://example.com/webhook"}
+            task_options={"webhook_url": "http://example.com/webhook"},
         )
         override_service.poll_available_jobs.return_value = [mock_job]
 
         # Make request
-        response = client.get("/api/v1/remote-jobs/poll", params={
-            "worker_id": "worker-1",
-            "content_types": "audio,video",
-            "max_jobs": 1
-        })
+        response = client.get(
+            "/api/v1/remote-jobs/poll",
+            params={
+                "worker_id": "worker-1",
+                "content_types": "audio,video",
+                "max_jobs": 1,
+            },
+        )
 
         # Verify response
         assert response.status_code == 200
@@ -115,11 +125,14 @@ class TestRemoteJobAPI:
         override_service.poll_available_jobs.return_value = []
 
         # Make request
-        response = client.get("/api/v1/remote-jobs/poll", params={
-            "worker_id": "worker-1",
-            "content_types": "audio,video",
-            "max_jobs": 1
-        })
+        response = client.get(
+            "/api/v1/remote-jobs/poll",
+            params={
+                "worker_id": "worker-1",
+                "content_types": "audio,video",
+                "max_jobs": 1,
+            },
+        )
 
         # Verify response
         assert response.status_code == 200
@@ -129,7 +142,7 @@ class TestRemoteJobAPI:
         assert data["content_type"] is None
         assert data["task_options"] is None
 
-    @patch('morag.ingest_tasks.continue_ingestion_after_remote_processing')
+    @patch("morag.ingest_tasks.continue_ingestion_after_remote_processing")
     def test_submit_job_result_success(self, mock_continue, client, override_service):
         """Test submitting successful job result."""
         # Setup mocks
@@ -137,19 +150,22 @@ class TestRemoteJobAPI:
             ingestion_task_id="test-task-123",
             source_file_path="/tmp/test.mp3",
             content_type="audio",
-            task_options={}
+            task_options={},
         )
         mock_job.status = "completed"
         override_service.submit_result.return_value = mock_job
         mock_continue.return_value = True
 
         # Make request
-        response = client.put("/api/v1/remote-jobs/job-123/result", json={
-            "success": True,
-            "content": "Processed content",
-            "metadata": {"duration": 120.5},
-            "processing_time": 45.2
-        })
+        response = client.put(
+            "/api/v1/remote-jobs/job-123/result",
+            json={
+                "success": True,
+                "content": "Processed content",
+                "metadata": {"duration": 120.5},
+                "processing_time": 45.2,
+            },
+        )
 
         # Verify response
         assert response.status_code == 200
@@ -159,10 +175,7 @@ class TestRemoteJobAPI:
 
         # Verify continuation was called
         mock_continue.assert_called_once_with(
-            "job-123",
-            "Processed content",
-            {"duration": 120.5},
-            45.2
+            "job-123", "Processed content", {"duration": 120.5}, 45.2
         )
 
     def test_submit_job_result_failure(self, client, override_service):
@@ -172,16 +185,16 @@ class TestRemoteJobAPI:
             ingestion_task_id="test-task-123",
             source_file_path="/tmp/test.mp3",
             content_type="audio",
-            task_options={}
+            task_options={},
         )
         mock_job.status = "failed"
         override_service.submit_result.return_value = mock_job
 
         # Make request
-        response = client.put("/api/v1/remote-jobs/job-123/result", json={
-            "success": False,
-            "error_message": "Processing failed"
-        })
+        response = client.put(
+            "/api/v1/remote-jobs/job-123/result",
+            json={"success": False, "error_message": "Processing failed"},
+        )
 
         # Verify response
         assert response.status_code == 200
@@ -195,10 +208,10 @@ class TestRemoteJobAPI:
         override_service.submit_result.return_value = None
 
         # Make request
-        response = client.put("/api/v1/remote-jobs/nonexistent/result", json={
-            "success": True,
-            "content": "Processed content"
-        })
+        response = client.put(
+            "/api/v1/remote-jobs/nonexistent/result",
+            json={"success": True, "content": "Processed content"},
+        )
 
         # Verify error response
         assert response.status_code == 404
@@ -211,7 +224,7 @@ class TestRemoteJobAPI:
             ingestion_task_id="test-task-123",
             source_file_path="/tmp/test.mp3",
             content_type="audio",
-            task_options={}
+            task_options={},
         )
         mock_job.status = "processing"
         mock_job.worker_id = "worker-1"
@@ -242,7 +255,7 @@ class TestRemoteJobAPI:
         assert response.status_code == 404
         assert "not found" in response.json()["detail"]
 
-    @patch('pathlib.Path')
+    @patch("pathlib.Path")
     def test_download_job_file(self, mock_path, client, override_service):
         """Test downloading job file."""
         # Setup mock
@@ -250,7 +263,7 @@ class TestRemoteJobAPI:
             ingestion_task_id="test-task-123",
             source_file_path="/tmp/test.mp3",
             content_type="audio",
-            task_options={}
+            task_options={},
         )
         mock_job.status = "processing"
         override_service.get_job_status.return_value = mock_job
@@ -275,7 +288,7 @@ class TestRemoteJobAPI:
             ingestion_task_id="test-task-123",
             source_file_path="/tmp/test.mp3",
             content_type="audio",
-            task_options={}
+            task_options={},
         )
         mock_job.status = "pending"  # Not processing
         override_service.get_job_status.return_value = mock_job

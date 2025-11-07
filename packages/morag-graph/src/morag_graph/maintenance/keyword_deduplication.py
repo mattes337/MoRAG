@@ -21,23 +21,22 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
 import structlog
-
-from morag_graph.storage import Neo4jStorage, Neo4jConfig
 from morag_graph.extraction.systematic_deduplicator import (
     EntitySimilarityCalculator,
+    MergeCandidate,
     SystematicDeduplicator,
-    MergeCandidate
 )
-from morag_graph.models.entity import Entity
 from morag_graph.maintenance.base import (
     MaintenanceJobBase,
     MaintenanceJobError,
     PartialFailureError,
+    validate_float_range,
     validate_positive_int,
-    validate_float_range
 )
 from morag_graph.maintenance.config_validator import MaintenanceConfigValidator
 from morag_graph.maintenance.query_optimizer import QueryOptimizer
+from morag_graph.models.entity import Entity
+from morag_graph.storage import Neo4jConfig, Neo4jStorage
 
 logger = structlog.get_logger(__name__)
 
@@ -45,22 +44,25 @@ logger = structlog.get_logger(__name__)
 @dataclass
 class KeywordDeduplicationConfig:
     similarity_threshold: float = 0.75  # Higher threshold for keyword deduplication
-    max_cluster_size: int = 8           # Max entities per merge cluster
-    min_fact_threshold: int = 1         # Min facts to consider for deduplication (removed restrictive filter)
+    max_cluster_size: int = 8  # Max entities per merge cluster
+    min_fact_threshold: int = (
+        1  # Min facts to consider for deduplication (removed restrictive filter)
+    )
     preserve_high_confidence: float = 0.95  # Don't merge high-confidence entities
     semantic_similarity_weight: float = 0.6  # Weight for embedding vs string similarity
-    batch_size: int = 50                # Batch size for merge operations
-    dry_run: bool = True                # Preview merges without applying
-    job_tag: str = ""                   # Job tag for tracking
-    limit_entities: int = 100           # Max entities to process per run
-    enable_rotation: bool = True        # Enable rotation to prevent starvation
-    process_all_if_small: bool = True   # Process all entities if total < limit_entities
+    batch_size: int = 50  # Batch size for merge operations
+    dry_run: bool = True  # Preview merges without applying
+    job_tag: str = ""  # Job tag for tracking
+    limit_entities: int = 100  # Max entities to process per run
+    enable_rotation: bool = True  # Enable rotation to prevent starvation
+    process_all_if_small: bool = True  # Process all entities if total < limit_entities
 
     def ensure_defaults(self) -> None:
         if not self.job_tag:
             # Use date-based tag for more predictable rotation across deployments
             # This allows multiple runs per day while maintaining rotation consistency
             import datetime
+
             date_str = datetime.datetime.now().strftime("%Y%m%d")
             self.job_tag = f"kw_dedup_{date_str}"
 
@@ -68,22 +70,24 @@ class KeywordDeduplicationConfig:
 class KeywordDeduplicationService(MaintenanceJobBase):
     """Intelligent keyword deduplication using LLM-based viability analysis."""
 
-    def __init__(self, storage: Neo4jStorage, config: Optional[KeywordDeduplicationConfig] = None):
+    def __init__(
+        self, storage: Neo4jStorage, config: Optional[KeywordDeduplicationConfig] = None
+    ):
         # Convert config to dict for base class
         config_obj = config or KeywordDeduplicationConfig()
         config_obj.ensure_defaults()
         config_dict = {
-            'similarity_threshold': config_obj.similarity_threshold,
-            'max_cluster_size': config_obj.max_cluster_size,
-            'min_fact_threshold': config_obj.min_fact_threshold,
-            'preserve_high_confidence': config_obj.preserve_high_confidence,
-            'semantic_similarity_weight': config_obj.semantic_similarity_weight,
-            'batch_size': config_obj.batch_size,
-            'dry_run': config_obj.dry_run,
-            'job_tag': config_obj.job_tag,
-            'limit_entities': config_obj.limit_entities,
-            'enable_rotation': config_obj.enable_rotation,
-            'process_all_if_small': config_obj.process_all_if_small
+            "similarity_threshold": config_obj.similarity_threshold,
+            "max_cluster_size": config_obj.max_cluster_size,
+            "min_fact_threshold": config_obj.min_fact_threshold,
+            "preserve_high_confidence": config_obj.preserve_high_confidence,
+            "semantic_similarity_weight": config_obj.semantic_similarity_weight,
+            "batch_size": config_obj.batch_size,
+            "dry_run": config_obj.dry_run,
+            "job_tag": config_obj.job_tag,
+            "limit_entities": config_obj.limit_entities,
+            "enable_rotation": config_obj.enable_rotation,
+            "process_all_if_small": config_obj.process_all_if_small,
         }
 
         super().__init__(config_dict)
@@ -96,27 +100,32 @@ class KeywordDeduplicationService(MaintenanceJobBase):
         self.deduplicator = SystematicDeduplicator(
             similarity_threshold=self.config.similarity_threshold,
             merge_confidence_threshold=0.7,  # Lower threshold for keyword merging
-            enable_llm_validation=True
+            enable_llm_validation=True,
         )
 
     def validate_config(self) -> List[str]:
         """Validate configuration and return list of errors."""
         validation_result = MaintenanceConfigValidator.validate_job_config(
-            'keyword_deduplication',
-            self.config.__dict__
+            "keyword_deduplication", self.config.__dict__
         )
 
         if not validation_result.is_valid:
-            logger.error("Configuration validation failed",
-                        errors=validation_result.errors,
-                        warnings=validation_result.warnings)
+            logger.error(
+                "Configuration validation failed",
+                errors=validation_result.errors,
+                warnings=validation_result.warnings,
+            )
 
         if validation_result.warnings:
-            logger.warning("Configuration warnings", warnings=validation_result.warnings)
+            logger.warning(
+                "Configuration warnings", warnings=validation_result.warnings
+            )
 
         if validation_result.recommendations:
-            logger.info("Configuration recommendations",
-                       recommendations=validation_result.recommendations)
+            logger.info(
+                "Configuration recommendations",
+                recommendations=validation_result.recommendations,
+            )
 
         return validation_result.errors
 
@@ -125,10 +134,13 @@ class KeywordDeduplicationService(MaintenanceJobBase):
             return self._llm_client
         try:
             from morag_reasoning.llm import LLMClient  # type: ignore
+
             self._llm_client = LLMClient(None)
             return self._llm_client
         except Exception as e:
-            logger.warning("LLM client unavailable for keyword deduplication", error=str(e))
+            logger.warning(
+                "LLM client unavailable for keyword deduplication", error=str(e)
+            )
             return None
 
     async def run(self) -> Dict[str, Any]:
@@ -136,7 +148,9 @@ class KeywordDeduplicationService(MaintenanceJobBase):
         # Validate configuration first
         config_errors = self.validate_config()
         if config_errors:
-            raise MaintenanceJobError(f"Configuration validation failed: {'; '.join(config_errors)}")
+            raise MaintenanceJobError(
+                f"Configuration validation failed: {'; '.join(config_errors)}"
+            )
 
         self.log_job_start()
         start_time = time.time()
@@ -151,7 +165,7 @@ class KeywordDeduplicationService(MaintenanceJobBase):
                     "processed": 0,
                     "merges_performed": 0,
                     "processing_time": time.time() - start_time,
-                    "message": "No entities found for deduplication"
+                    "message": "No entities found for deduplication",
                 }
                 self.log_job_complete(result)
                 return result
@@ -160,7 +174,9 @@ class KeywordDeduplicationService(MaintenanceJobBase):
             merge_candidates = await self._find_keyword_merge_candidates(entities)
 
             # Validate merges with LLM viability analysis
-            confirmed_merges = await self._validate_merges_with_viability_analysis(merge_candidates)
+            confirmed_merges = await self._validate_merges_with_viability_analysis(
+                merge_candidates
+            )
 
             # Apply merges if not dry run
             merges_applied = 0
@@ -186,10 +202,10 @@ class KeywordDeduplicationService(MaintenanceJobBase):
                     "primary": merge.primary_entity.name,
                     "duplicates": [e.name for e in merge.duplicate_entities],
                     "similarity": merge.similarity_score,
-                    "confidence": merge.merge_confidence
+                    "confidence": merge.merge_confidence,
                 }
                 for merge in confirmed_merges
-            ]
+            ],
         }
 
     async def _get_deduplication_candidates(self) -> List[Entity]:
@@ -207,12 +223,14 @@ class KeywordDeduplicationService(MaintenanceJobBase):
             RETURN count(e) AS eligible_count
             """
 
-            count_params = {
-                "max_confidence": self.config.preserve_high_confidence
-            }
+            count_params = {"max_confidence": self.config.preserve_high_confidence}
 
-            total_result = await self.query_optimizer._execute_with_stats(total_count_query, {}, "total_entity_count")
-            eligible_result = await self.query_optimizer._execute_with_stats(eligible_count_query, count_params, "eligible_entity_count")
+            total_result = await self.query_optimizer._execute_with_stats(
+                total_count_query, {}, "total_entity_count"
+            )
+            eligible_result = await self.query_optimizer._execute_with_stats(
+                eligible_count_query, count_params, "eligible_entity_count"
+            )
 
         except Exception as e:
             logger.error("Failed to get entity counts", error=str(e))
@@ -222,24 +240,41 @@ class KeywordDeduplicationService(MaintenanceJobBase):
         total_entities = eligible_result[0]["eligible_count"] if eligible_result else 0
 
         # If total entities is small or rotation is disabled, process all
-        if (not self.config.enable_rotation or
-            (self.config.process_all_if_small and total_entities <= self.config.limit_entities)):
+        if not self.config.enable_rotation or (
+            self.config.process_all_if_small
+            and total_entities <= self.config.limit_entities
+        ):
             offset = 0
-            limit = total_entities if self.config.process_all_if_small else self.config.limit_entities
-            logger.info(f"Processing all {total_entities} eligible entities (no rotation needed, {total_entities_all} total entities)")
+            limit = (
+                total_entities
+                if self.config.process_all_if_small
+                else self.config.limit_entities
+            )
+            logger.info(
+                f"Processing all {total_entities} eligible entities (no rotation needed, {total_entities_all} total entities)"
+            )
         else:
             # Calculate rotation offset based on job_tag for deterministic but varied selection
             import hashlib
-            tag_hash = int(hashlib.md5(self.config.job_tag.encode()).hexdigest()[:8], 16)
+
+            tag_hash = int(
+                hashlib.md5(self.config.job_tag.encode()).hexdigest()[:8], 16
+            )
 
             # Calculate number of possible batches based on ALL entities, not just eligible ones
             # This ensures we cycle through the entire entity space over multiple runs
-            num_batches = max(1, (total_entities_all + self.config.limit_entities - 1) // self.config.limit_entities)
+            num_batches = max(
+                1,
+                (total_entities_all + self.config.limit_entities - 1)
+                // self.config.limit_entities,
+            )
             batch_index = tag_hash % num_batches
             offset = batch_index * self.config.limit_entities
             limit = self.config.limit_entities
 
-            logger.info(f"Using rotation: batch {batch_index + 1}/{num_batches}, offset {offset}, eligible entities: {total_entities}/{total_entities_all} total")
+            logger.info(
+                f"Using rotation: batch {batch_index + 1}/{num_batches}, offset {offset}, eligible entities: {total_entities}/{total_entities_all} total"
+            )
 
         # Get entities with optional rotation
         if self.config.enable_rotation and total_entities > self.config.limit_entities:
@@ -270,7 +305,7 @@ class KeywordDeduplicationService(MaintenanceJobBase):
         params = {
             "max_confidence": self.config.preserve_high_confidence,
             "offset": offset,
-            "limit": limit
+            "limit": limit,
         }
 
         results = await self.storage._connection_ops._execute_query(query, params)
@@ -282,7 +317,9 @@ class KeywordDeduplicationService(MaintenanceJobBase):
                 entity = Entity.from_neo4j_node(entity_data)
                 entities.append(entity)
             except Exception as e:
-                logger.warning(f"Failed to parse entity from deduplication candidates: {e}")
+                logger.warning(
+                    f"Failed to parse entity from deduplication candidates: {e}"
+                )
 
         # Mark entities as processed to track rotation (only in non-dry-run mode)
         if entities and not self.config.dry_run and self.config.enable_rotation:
@@ -294,14 +331,15 @@ class KeywordDeduplicationService(MaintenanceJobBase):
                 e.last_dedup_job_tag = $job_tag
             """
             await self.storage._connection_ops._execute_query(
-                mark_query,
-                {"entity_ids": entity_ids, "job_tag": self.config.job_tag}
+                mark_query, {"entity_ids": entity_ids, "job_tag": self.config.job_tag}
             )
 
         logger.info(f"Selected {len(entities)} entities for deduplication analysis")
         return entities
 
-    async def _find_keyword_merge_candidates(self, entities: List[Entity]) -> List[MergeCandidate]:
+    async def _find_keyword_merge_candidates(
+        self, entities: List[Entity]
+    ) -> List[MergeCandidate]:
         """Find merge candidates using enhanced keyword similarity."""
         candidates = []
         processed = set()
@@ -312,7 +350,7 @@ class KeywordDeduplicationService(MaintenanceJobBase):
 
             similar_entities = []
 
-            for j, entity2 in enumerate(entities[i+1:], i+1):
+            for j, entity2 in enumerate(entities[i + 1 :], i + 1):
                 if entity2.id in processed or entity2.type != entity1.type:
                     continue
 
@@ -323,7 +361,10 @@ class KeywordDeduplicationService(MaintenanceJobBase):
                     similar_entities.append(entity2)
                     processed.add(entity2.id)
 
-            if similar_entities and len(similar_entities) < self.config.max_cluster_size:
+            if (
+                similar_entities
+                and len(similar_entities) < self.config.max_cluster_size
+            ):
                 # Get fact counts for viability analysis
                 fact_counts = await self._get_fact_counts([entity1] + similar_entities)
 
@@ -332,33 +373,45 @@ class KeywordDeduplicationService(MaintenanceJobBase):
                 for e in similar_entities:
                     score = await self._calculate_keyword_similarity(entity1, e)
                     similarity_scores.append(score)
-                avg_similarity = sum(similarity_scores) / len(similarity_scores) if similarity_scores else 0.0
+                avg_similarity = (
+                    sum(similarity_scores) / len(similarity_scores)
+                    if similarity_scores
+                    else 0.0
+                )
 
-                candidates.append(MergeCandidate(
-                    primary_entity=entity1,
-                    duplicate_entities=similar_entities,
-                    similarity_score=avg_similarity,
-                    merge_confidence=0.0,  # Will be set by LLM validation
-                    merge_reason=f"keyword_similarity_cluster_{len(similar_entities)}_entities"
-                ))
+                candidates.append(
+                    MergeCandidate(
+                        primary_entity=entity1,
+                        duplicate_entities=similar_entities,
+                        similarity_score=avg_similarity,
+                        merge_confidence=0.0,  # Will be set by LLM validation
+                        merge_reason=f"keyword_similarity_cluster_{len(similar_entities)}_entities",
+                    )
+                )
 
                 processed.add(entity1.id)
 
         logger.info(f"Found {len(candidates)} keyword merge candidates")
         return candidates
 
-    async def _calculate_keyword_similarity(self, entity1: Entity, entity2: Entity) -> float:
+    async def _calculate_keyword_similarity(
+        self, entity1: Entity, entity2: Entity
+    ) -> float:
         """Calculate enhanced similarity for keyword entities."""
         # Use existing similarity calculator as base
-        base_similarity = self.deduplicator.similarity_calculator.calculate_similarity(entity1, entity2)
+        base_similarity = self.deduplicator.similarity_calculator.calculate_similarity(
+            entity1, entity2
+        )
 
         # Add keyword-specific enhancements
-        keyword_bonus = self._calculate_keyword_specific_similarity(entity1.name, entity2.name)
+        keyword_bonus = self._calculate_keyword_specific_similarity(
+            entity1.name, entity2.name
+        )
 
         # Combine with weights
         enhanced_similarity = (
-            base_similarity * (1 - self.config.semantic_similarity_weight) +
-            keyword_bonus * self.config.semantic_similarity_weight
+            base_similarity * (1 - self.config.semantic_similarity_weight)
+            + keyword_bonus * self.config.semantic_similarity_weight
         )
 
         return min(1.0, enhanced_similarity)
@@ -375,12 +428,12 @@ class KeywordDeduplicationService(MaintenanceJobBase):
         # Check for common keyword patterns
         patterns = [
             # Plural/singular variations
-            (name1_clean.rstrip('s'), name2_clean.rstrip('s')),
+            (name1_clean.rstrip("s"), name2_clean.rstrip("s")),
             # Hyphen/space variations
-            (name1_clean.replace('-', ' '), name2_clean.replace('-', ' ')),
-            (name1_clean.replace(' ', '-'), name2_clean.replace(' ', '-')),
+            (name1_clean.replace("-", " "), name2_clean.replace("-", " ")),
+            (name1_clean.replace(" ", "-"), name2_clean.replace(" ", "-")),
             # Number/word variations
-            (name1_clean.replace('3', 'drei'), name2_clean.replace('3', 'drei')),
+            (name1_clean.replace("3", "drei"), name2_clean.replace("3", "drei")),
         ]
 
         for pattern1, pattern2 in patterns:
@@ -409,7 +462,7 @@ class KeywordDeduplicationService(MaintenanceJobBase):
 
     def _normalize_keyword_name(self, name: str) -> str:
         """Normalize keyword name for comparison."""
-        return name.lower().strip().replace('_', ' ')
+        return name.lower().strip().replace("_", " ")
 
     async def _get_fact_counts(self, entities: List[Entity]) -> Dict[str, int]:
         """Get fact counts for entities."""
@@ -429,13 +482,14 @@ class KeywordDeduplicationService(MaintenanceJobBase):
         return {r["entity_id"]: r["fact_count"] for r in results}
 
     async def _validate_merges_with_viability_analysis(
-        self,
-        candidates: List[MergeCandidate]
+        self, candidates: List[MergeCandidate]
     ) -> List[MergeCandidate]:
         """Validate merges using LLM viability analysis."""
         client = await self._get_llm_client()
         if not client:
-            logger.warning("No LLM available for viability analysis, using rule-based validation")
+            logger.warning(
+                "No LLM available for viability analysis, using rule-based validation"
+            )
             return self._rule_based_validation(candidates)
 
         confirmed_merges = []
@@ -443,7 +497,7 @@ class KeywordDeduplicationService(MaintenanceJobBase):
         # Process candidates in batches with error handling
         batch_result = await self.safe_execute_batch(
             candidates,
-            lambda candidate: self._analyze_single_merge_viability(client, candidate)
+            lambda candidate: self._analyze_single_merge_viability(client, candidate),
         )
 
         # Add successful merges to confirmed list
@@ -455,16 +509,16 @@ class KeywordDeduplicationService(MaintenanceJobBase):
 
         # Log any failures
         if batch_result.failed:
-            logger.warning(f"Viability analysis failed for {len(batch_result.failed)} candidates",
-                         success_rate=batch_result.success_rate)
+            logger.warning(
+                f"Viability analysis failed for {len(batch_result.failed)} candidates",
+                success_rate=batch_result.success_rate,
+            )
 
         logger.info(f"Confirmed {len(confirmed_merges)} merges via viability analysis")
         return confirmed_merges
 
     async def _analyze_single_merge_viability(
-        self,
-        client,
-        candidate: MergeCandidate
+        self, client, candidate: MergeCandidate
     ) -> Tuple[bool, float, MergeCandidate]:
         """Analyze a single merge candidate with circuit breaker protection."""
         try:
@@ -473,9 +527,11 @@ class KeywordDeduplicationService(MaintenanceJobBase):
             )
             return should_merge, confidence, candidate
         except Exception as e:
-            logger.error("LLM viability analysis failed",
-                        candidate=candidate.primary_entity.name,
-                        error=str(e))
+            logger.error(
+                "LLM viability analysis failed",
+                candidate=candidate.primary_entity.name,
+                error=str(e),
+            )
             # Fall back to rule-based validation for this candidate
             rule_based_result = self._rule_based_validation([candidate])
             if rule_based_result:
@@ -483,9 +539,7 @@ class KeywordDeduplicationService(MaintenanceJobBase):
             return False, 0.0, candidate
 
     async def _analyze_merge_viability(
-        self,
-        client,
-        candidate: MergeCandidate
+        self, client, candidate: MergeCandidate
     ) -> Tuple[bool, float, str]:
         """Analyze merge viability using LLM."""
         # Get fact counts for analysis
@@ -496,7 +550,9 @@ class KeywordDeduplicationService(MaintenanceJobBase):
         entity_info = []
         for entity in all_entities:
             fact_count = fact_counts.get(entity.id, 0)
-            entity_info.append(f"- {entity.name} (Type: {entity.type}, Facts: {fact_count})")
+            entity_info.append(
+                f"- {entity.name} (Type: {entity.type}, Facts: {fact_count})"
+            )
 
         prompt = f"""
         Should these entities be merged? Entities:
@@ -518,13 +574,14 @@ class KeywordDeduplicationService(MaintenanceJobBase):
 
             # Parse JSON response
             import re
-            json_match = re.search(r'\{.*\}', response, re.DOTALL)
+
+            json_match = re.search(r"\{.*\}", response, re.DOTALL)
             if json_match:
                 data = json.loads(json_match.group(0))
                 return (
                     data.get("should_merge", False),
                     float(data.get("confidence", 0.0)),
-                    "llm_approved"
+                    "llm_approved",
                 )
 
         except Exception as e:
@@ -533,21 +590,27 @@ class KeywordDeduplicationService(MaintenanceJobBase):
         # Fallback to rule-based decision
         return False, 0.0, "llm_failed"
 
-    def _rule_based_validation(self, candidates: List[MergeCandidate]) -> List[MergeCandidate]:
+    def _rule_based_validation(
+        self, candidates: List[MergeCandidate]
+    ) -> List[MergeCandidate]:
         """Rule-based validation fallback."""
         confirmed = []
 
         for candidate in candidates:
             # Simple rule: high similarity + same type = merge
-            if (candidate.similarity_score >= 0.85 and
-                all(e.type == candidate.primary_entity.type for e in candidate.duplicate_entities)):
+            if candidate.similarity_score >= 0.85 and all(
+                e.type == candidate.primary_entity.type
+                for e in candidate.duplicate_entities
+            ):
                 candidate.merge_confidence = candidate.similarity_score
                 candidate.merge_reason = "rule_based_high_similarity"
                 confirmed.append(candidate)
 
         return confirmed
 
-    async def _apply_keyword_merges(self, confirmed_merges: List[MergeCandidate]) -> int:
+    async def _apply_keyword_merges(
+        self, confirmed_merges: List[MergeCandidate]
+    ) -> int:
         """Apply confirmed keyword merges to the graph."""
         merges_applied = 0
 
@@ -619,18 +682,30 @@ class KeywordDeduplicationService(MaintenanceJobBase):
         # Execute relationship updates using APOC
         try:
             result1 = await self.storage._connection_ops._execute_query(
-                query1, {"dup_id": dup_id, "primary_id": primary_id, "job_tag": self.config.job_tag}
+                query1,
+                {
+                    "dup_id": dup_id,
+                    "primary_id": primary_id,
+                    "job_tag": self.config.job_tag,
+                },
             )
             moved_incoming = result1[0]["moved_count"] if result1 else 0
             logger.debug(f"APOC moved {moved_incoming} incoming relationships")
 
             result2 = await self.storage._connection_ops._execute_query(
-                query2, {"dup_id": dup_id, "primary_id": primary_id, "job_tag": self.config.job_tag}
+                query2,
+                {
+                    "dup_id": dup_id,
+                    "primary_id": primary_id,
+                    "job_tag": self.config.job_tag,
+                },
             )
             moved_outgoing = result2[0]["moved_count"] if result2 else 0
             logger.debug(f"APOC moved {moved_outgoing} outgoing relationships")
 
-            logger.info(f"APOC merge completed: {moved_incoming} incoming + {moved_outgoing} outgoing relationships moved")
+            logger.info(
+                f"APOC merge completed: {moved_incoming} incoming + {moved_outgoing} outgoing relationships moved"
+            )
 
         except Exception as e:
             logger.error(f"APOC merge failed for {dup_id}: {e}")
@@ -661,7 +736,9 @@ class KeywordDeduplicationService(MaintenanceJobBase):
         incoming_rels = [r for r in result[0]["incoming_rels"] if r["type"] is not None]
         outgoing_rels = [r for r in result[0]["outgoing_rels"] if r["type"] is not None]
 
-        logger.info(f"Found {len(incoming_rels)} incoming and {len(outgoing_rels)} outgoing relationship types for {dup_id}")
+        logger.info(
+            f"Found {len(incoming_rels)} incoming and {len(outgoing_rels)} outgoing relationship types for {dup_id}"
+        )
 
         # Handle incoming relationships with more robust approach
         for rel_info in incoming_rels:
@@ -683,10 +760,16 @@ class KeywordDeduplicationService(MaintenanceJobBase):
 
             move_result = await self.storage._connection_ops._execute_query(
                 move_incoming_query,
-                {"dup_id": dup_id, "primary_id": primary_id, "job_tag": self.config.job_tag}
+                {
+                    "dup_id": dup_id,
+                    "primary_id": primary_id,
+                    "job_tag": self.config.job_tag,
+                },
             )
             moved_count = move_result[0]["moved_count"] if move_result else 0
-            logger.debug(f"Moved {moved_count} incoming relationships of type {rel_type}")
+            logger.debug(
+                f"Moved {moved_count} incoming relationships of type {rel_type}"
+            )
 
         # Handle outgoing relationships with more robust approach
         for rel_info in outgoing_rels:
@@ -707,10 +790,16 @@ class KeywordDeduplicationService(MaintenanceJobBase):
 
             move_result = await self.storage._connection_ops._execute_query(
                 move_outgoing_query,
-                {"dup_id": dup_id, "primary_id": primary_id, "job_tag": self.config.job_tag}
+                {
+                    "dup_id": dup_id,
+                    "primary_id": primary_id,
+                    "job_tag": self.config.job_tag,
+                },
             )
             moved_count = move_result[0]["moved_count"] if move_result else 0
-            logger.debug(f"Moved {moved_count} outgoing relationships of type {rel_type}")
+            logger.debug(
+                f"Moved {moved_count} outgoing relationships of type {rel_type}"
+            )
 
         # Verify all relationships have been moved before proceeding
         verify_query = """
@@ -723,12 +812,16 @@ class KeywordDeduplicationService(MaintenanceJobBase):
             verify_query, {"dup_id": dup_id}
         )
 
-        remaining_rels = verify_result[0]["remaining_relationships"] if verify_result else 0
+        remaining_rels = (
+            verify_result[0]["remaining_relationships"] if verify_result else 0
+        )
         remaining_types = verify_result[0]["remaining_types"] if verify_result else []
 
         if remaining_rels > 0:
-            logger.warning(f"Entity {dup_id} still has {remaining_rels} relationships after merge attempt",
-                         remaining_types=remaining_types)
+            logger.warning(
+                f"Entity {dup_id} still has {remaining_rels} relationships after merge attempt",
+                remaining_types=remaining_types,
+            )
 
             # Try a more aggressive approach - delete relationships one by one
             for rel_type in set(remaining_types):
@@ -741,8 +834,12 @@ class KeywordDeduplicationService(MaintenanceJobBase):
                     delete_result = await self.storage._connection_ops._execute_query(
                         force_delete_type_query, {"dup_id": dup_id}
                     )
-                    deleted_count = delete_result[0]["deleted_count"] if delete_result else 0
-                    logger.info(f"Force deleted {deleted_count} relationships of type {rel_type}")
+                    deleted_count = (
+                        delete_result[0]["deleted_count"] if delete_result else 0
+                    )
+                    logger.info(
+                        f"Force deleted {deleted_count} relationships of type {rel_type}"
+                    )
 
             # Final cleanup - delete any remaining relationships
             final_cleanup_query = """
@@ -754,23 +851,33 @@ class KeywordDeduplicationService(MaintenanceJobBase):
             final_result = await self.storage._connection_ops._execute_query(
                 final_cleanup_query, {"dup_id": dup_id}
             )
-            final_deleted = final_result[0]["final_deleted_count"] if final_result else 0
+            final_deleted = (
+                final_result[0]["final_deleted_count"] if final_result else 0
+            )
             if final_deleted > 0:
-                logger.info(f"Final cleanup deleted {final_deleted} remaining relationships")
+                logger.info(
+                    f"Final cleanup deleted {final_deleted} remaining relationships"
+                )
         else:
             logger.info(f"Successfully moved all relationships for entity {dup_id}")
 
 
-async def run_keyword_deduplication(config_overrides: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+async def run_keyword_deduplication(
+    config_overrides: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
     """Entrypoint to run the keyword deduplication job."""
     import os
+
     neo_config = Neo4jConfig(
         uri=os.getenv("NEO4J_URI", "neo4j://localhost:7687"),
         username=os.getenv("NEO4J_USERNAME", "neo4j"),
         password=os.getenv("NEO4J_PASSWORD", "password"),
         database=os.getenv("NEO4J_DATABASE", "neo4j"),
         verify_ssl=os.getenv("NEO4J_VERIFY_SSL", "true").lower() == "true",
-        trust_all_certificates=os.getenv("NEO4J_TRUST_ALL_CERTIFICATES", "false").lower() == "true",
+        trust_all_certificates=os.getenv(
+            "NEO4J_TRUST_ALL_CERTIFICATES", "false"
+        ).lower()
+        == "true",
     )
     storage = Neo4jStorage(neo_config)
     await storage.connect()
@@ -789,17 +896,30 @@ async def run_keyword_deduplication(config_overrides: Optional[Dict[str, Any]] =
 
 def main():
     import argparse
-    parser = argparse.ArgumentParser(description="Run Keyword Deduplication maintenance job")
+
+    parser = argparse.ArgumentParser(
+        description="Run Keyword Deduplication maintenance job"
+    )
     parser.add_argument("--similarity-threshold", type=float, default=0.75)
     parser.add_argument("--max-cluster-size", type=int, default=8)
     parser.add_argument("--min-facts", type=int, default=3)
     parser.add_argument("--preserve-confidence", type=float, default=0.95)
     parser.add_argument("--batch-size", type=int, default=50)
     parser.add_argument("--limit-entities", type=int, default=100)
-    parser.add_argument("--apply", action="store_true", help="Apply changes (disable dry-run)")
+    parser.add_argument(
+        "--apply", action="store_true", help="Apply changes (disable dry-run)"
+    )
     parser.add_argument("--job-tag", type=str, default="")
-    parser.add_argument("--no-rotation", action="store_true", help="Disable rotation (always process top entities)")
-    parser.add_argument("--no-process-all-small", action="store_true", help="Don't process all entities when count is small")
+    parser.add_argument(
+        "--no-rotation",
+        action="store_true",
+        help="Disable rotation (always process top entities)",
+    )
+    parser.add_argument(
+        "--no-process-all-small",
+        action="store_true",
+        help="Don't process all entities when count is small",
+    )
     args = parser.parse_args()
 
     overrides = {

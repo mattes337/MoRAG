@@ -3,11 +3,12 @@
 import os
 import tempfile
 import webbrowser
-from typing import List, Optional, Dict, Any
 from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 try:
     import langextract as lx
+
     LANGEXTRACT_AVAILABLE = True
 except ImportError:
     LANGEXTRACT_AVAILABLE = False
@@ -23,7 +24,7 @@ class LangExtractVisualizer:
         self,
         model_id: str = "gemini-2.0-flash",
         api_key: Optional[str] = None,
-        **kwargs
+        **kwargs,
     ):
         """Initialize the LangExtract visualizer.
 
@@ -33,13 +34,17 @@ class LangExtractVisualizer:
             **kwargs: Additional arguments
         """
         if not LANGEXTRACT_AVAILABLE:
-            raise ImportError("LangExtract is not available. Please install it with: pip install langextract")
+            raise ImportError(
+                "LangExtract is not available. Please install it with: pip install langextract"
+            )
 
         self.model_id = model_id
         self.api_key = api_key or self._get_api_key()
 
         if not self.api_key:
-            raise ValueError("No API key found for LangExtract. Set LANGEXTRACT_API_KEY or GOOGLE_API_KEY.")
+            raise ValueError(
+                "No API key found for LangExtract. Set LANGEXTRACT_API_KEY or GOOGLE_API_KEY."
+            )
 
     def _get_api_key(self) -> Optional[str]:
         """Get API key from environment variables."""
@@ -52,7 +57,7 @@ class LangExtractVisualizer:
         relations: Optional[List[Relation]] = None,
         output_file: Optional[str] = None,
         open_browser: bool = True,
-        **extraction_kwargs
+        **extraction_kwargs,
     ) -> str:
         """Visualize entity and relation extraction using LangExtract.
 
@@ -82,17 +87,19 @@ class LangExtractVisualizer:
             examples=examples,
             model_id=self.model_id,
             api_key=self.api_key,
-            **extraction_kwargs
+            **extraction_kwargs,
         )
 
         # Generate HTML visualization
-        html_content = self._generate_html_visualization(result, text, entities, relations)
+        html_content = self._generate_html_visualization(
+            result, text, entities, relations
+        )
 
         # Save to file
         if output_file is None:
             output_file = tempfile.mktemp(suffix=".html")
 
-        with open(output_file, 'w', encoding='utf-8') as f:
+        with open(output_file, "w", encoding="utf-8") as f:
             f.write(html_content)
 
         # Open in browser if requested
@@ -105,7 +112,7 @@ class LangExtractVisualizer:
         self,
         text: str,
         entities: Optional[List[Entity]],
-        relations: Optional[List[Relation]]
+        relations: Optional[List[Relation]],
     ) -> List[Any]:
         """Create LangExtract examples from existing entity/relation data."""
         examples: List[Dict[str, Any]] = []
@@ -126,8 +133,8 @@ class LangExtractVisualizer:
                             extraction_text=entity.name,
                             attributes={
                                 "entity_type": entity.type,
-                                "confidence": entity.confidence
-                            }
+                                "confidence": entity.confidence,
+                            },
                         )
                     )
 
@@ -137,21 +144,24 @@ class LangExtractVisualizer:
                     extractions.append(
                         lx.data.Extraction(
                             extraction_class="relationship",
-                            extraction_text=relation.context or f"{relation.source_entity_id} {relation.type} {relation.target_entity_id}",
+                            extraction_text=relation.context
+                            or f"{relation.source_entity_id} {relation.type} {relation.target_entity_id}",
                             attributes={
                                 "source_entity": relation.source_entity_id,
                                 "target_entity": relation.target_entity_id,
                                 "relationship_type": relation.type,
-                                "confidence": relation.confidence
-                            }
+                                "confidence": relation.confidence,
+                            },
                         )
                     )
 
             if extractions:
                 examples.append(
                     lx.data.ExampleData(
-                        text=text[:500] + "..." if len(text) > 500 else text,  # Truncate for example
-                        extractions=extractions
+                        text=text[:500] + "..."
+                        if len(text) > 500
+                        else text,  # Truncate for example
+                        extractions=extractions,
                     )
                 )
 
@@ -166,7 +176,7 @@ class LangExtractVisualizer:
         langextract_result: Any,
         original_text: str,
         entities: Optional[List[Entity]] = None,
-        relations: Optional[List[Relation]] = None
+        relations: Optional[List[Relation]] = None,
     ) -> str:
         """Generate HTML visualization combining LangExtract results with MoRAG data."""
 
@@ -261,8 +271,10 @@ class LangExtractVisualizer:
 
         # Generate LangExtract section
         langextract_section = ""
-        if langextract_result and hasattr(langextract_result, 'extractions'):
-            langextract_section = "<div class='section'><h2>LangExtract Extractions</h2>"
+        if langextract_result and hasattr(langextract_result, "extractions"):
+            langextract_section = (
+                "<div class='section'><h2>LangExtract Extractions</h2>"
+            )
             for extraction in langextract_result.extractions:
                 langextract_section += f"""
                 <div class="extraction-item langextract-item">
@@ -277,10 +289,12 @@ class LangExtractVisualizer:
             original_text=display_text,
             morag_entities_count=len(entities) if entities else 0,
             morag_relations_count=len(relations) if relations else 0,
-            langextract_extractions_count=len(langextract_result.extractions) if langextract_result and hasattr(langextract_result, 'extractions') else 0,
+            langextract_extractions_count=len(langextract_result.extractions)
+            if langextract_result and hasattr(langextract_result, "extractions")
+            else 0,
             morag_entities_section=morag_entities_section,
             morag_relations_section=morag_relations_section,
-            langextract_section=langextract_section
+            langextract_section=langextract_section,
         )
 
         return html_content
@@ -290,7 +304,7 @@ class LangExtractVisualizer:
         entities: List[Entity],
         relations: List[Relation],
         output_file: Optional[str] = None,
-        open_browser: bool = True
+        open_browser: bool = True,
     ) -> str:
         """Visualize a complete graph of entities and relations.
 
@@ -310,7 +324,7 @@ class LangExtractVisualizer:
         if output_file is None:
             output_file = tempfile.mktemp(suffix=".html")
 
-        with open(output_file, 'w', encoding='utf-8') as f:
+        with open(output_file, "w", encoding="utf-8") as f:
             f.write(html_content)
 
         # Open in browser if requested
@@ -319,7 +333,9 @@ class LangExtractVisualizer:
 
         return output_file
 
-    def _generate_graph_html(self, entities: List[Entity], relations: List[Relation]) -> str:
+    def _generate_graph_html(
+        self, entities: List[Entity], relations: List[Relation]
+    ) -> str:
         """Generate HTML for graph visualization."""
 
         html_template = """
@@ -398,8 +414,12 @@ class LangExtractVisualizer:
             """
 
         # Calculate average confidence
-        all_confidences = [e.confidence for e in entities] + [r.confidence for r in relations]
-        avg_confidence = sum(all_confidences) / len(all_confidences) if all_confidences else 0
+        all_confidences = [e.confidence for e in entities] + [
+            r.confidence for r in relations
+        ]
+        avg_confidence = (
+            sum(all_confidences) / len(all_confidences) if all_confidences else 0
+        )
 
         # Fill in the template
         html_content = html_template.format(
@@ -407,7 +427,7 @@ class LangExtractVisualizer:
             relation_count=len(relations),
             avg_confidence=avg_confidence,
             entity_list=entity_list,
-            relation_list=relation_list
+            relation_list=relation_list,
         )
 
         return html_content

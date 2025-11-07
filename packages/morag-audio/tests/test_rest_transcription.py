@@ -1,12 +1,15 @@
 """Tests for the RestTranscriptionService class."""
 
-import pytest
-import aiohttp
-from unittest.mock import AsyncMock, patch, MagicMock
 from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import aiohttp
+import pytest
 from morag_audio.models import AudioConfig, AudioSegment
-from morag_audio.rest_transcription import RestTranscriptionService, RestTranscriptionError
+from morag_audio.rest_transcription import (
+    RestTranscriptionError,
+    RestTranscriptionService,
+)
 
 
 @pytest.fixture
@@ -17,7 +20,7 @@ def rest_config():
         use_rest_api=True,
         openai_api_key="test-api-key",
         api_base_url="https://api.openai.com/v1",
-        timeout=30
+        timeout=30,
     )
 
 
@@ -48,7 +51,7 @@ def mock_openai_response():
                 "temperature": 0.0,
                 "avg_logprob": -0.3,
                 "compression_ratio": 1.2,
-                "no_speech_prob": 0.1
+                "no_speech_prob": 0.1,
             },
             {
                 "id": 1,
@@ -60,9 +63,9 @@ def mock_openai_response():
                 "temperature": 0.0,
                 "avg_logprob": -0.25,
                 "compression_ratio": 1.3,
-                "no_speech_prob": 0.05
-            }
-        ]
+                "no_speech_prob": 0.05,
+            },
+        ],
     }
 
 
@@ -85,15 +88,14 @@ class TestRestTranscriptionService:
 
     def test_default_timeout_value(self):
         """Test that default timeout is 60 minutes (3600 seconds)."""
-        config = AudioConfig(
-            use_rest_api=True,
-            openai_api_key="test-api-key"
-        )
+        config = AudioConfig(use_rest_api=True, openai_api_key="test-api-key")
         service = RestTranscriptionService(config)
         assert service.config.timeout == 3600  # 60 minutes for long transcriptions
 
     @pytest.mark.asyncio
-    async def test_transcribe_audio_success(self, rest_config, mock_audio_file, mock_openai_response):
+    async def test_transcribe_audio_success(
+        self, rest_config, mock_audio_file, mock_openai_response
+    ):
         """Test successful audio transcription."""
         service = RestTranscriptionService(rest_config)
 
@@ -106,7 +108,7 @@ class TestRestTranscriptionService:
         mock_session = AsyncMock()
         mock_session.post.return_value.__aenter__.return_value = mock_response
 
-        with patch('aiohttp.ClientSession', return_value=mock_session):
+        with patch("aiohttp.ClientSession", return_value=mock_session):
             text, segments, language = await service.transcribe_audio(mock_audio_file)
 
             # Verify results
@@ -140,7 +142,7 @@ class TestRestTranscriptionService:
         mock_session = AsyncMock()
         mock_session.post.return_value.__aenter__.return_value = mock_response
 
-        with patch('aiohttp.ClientSession', return_value=mock_session):
+        with patch("aiohttp.ClientSession", return_value=mock_session):
             with pytest.raises(RestTranscriptionError, match="HTTP 400: Bad Request"):
                 await service.transcribe_audio(mock_audio_file)
 
@@ -153,8 +155,10 @@ class TestRestTranscriptionService:
         mock_session = AsyncMock()
         mock_session.post.side_effect = aiohttp.ClientError("Network error")
 
-        with patch('aiohttp.ClientSession', return_value=mock_session):
-            with pytest.raises(RestTranscriptionError, match="Network error during transcription"):
+        with patch("aiohttp.ClientSession", return_value=mock_session):
+            with pytest.raises(
+                RestTranscriptionError, match="Network error during transcription"
+            ):
                 await service.transcribe_audio(mock_audio_file)
 
     @pytest.mark.asyncio
@@ -166,8 +170,10 @@ class TestRestTranscriptionService:
         mock_session = AsyncMock()
         mock_session.post.side_effect = aiohttp.ServerTimeoutError("Timeout")
 
-        with patch('aiohttp.ClientSession', return_value=mock_session):
-            with pytest.raises(RestTranscriptionError, match="Request timeout during transcription"):
+        with patch("aiohttp.ClientSession", return_value=mock_session):
+            with pytest.raises(
+                RestTranscriptionError, match="Request timeout during transcription"
+            ):
                 await service.transcribe_audio(mock_audio_file)
 
     def test_convert_to_markdown(self, rest_config):
@@ -176,7 +182,7 @@ class TestRestTranscriptionService:
 
         segments = [
             AudioSegment(start=0.0, end=2.5, text="Hello world,", confidence=0.95),
-            AudioSegment(start=2.5, end=5.0, text=" this is a test.", confidence=0.90)
+            AudioSegment(start=2.5, end=5.0, text=" this is a test.", confidence=0.90),
         ]
 
         markdown = service.convert_to_markdown("Hello world, this is a test.", segments)
@@ -205,8 +211,20 @@ Hello world, this is a test.
         service = RestTranscriptionService(rest_config)
 
         segments = [
-            AudioSegment(start=0.0, end=2.5, text="Hello world,", confidence=0.95, speaker="Speaker A"),
-            AudioSegment(start=2.5, end=5.0, text=" this is a test.", confidence=0.90, speaker="Speaker B")
+            AudioSegment(
+                start=0.0,
+                end=2.5,
+                text="Hello world,",
+                confidence=0.95,
+                speaker="Speaker A",
+            ),
+            AudioSegment(
+                start=2.5,
+                end=5.0,
+                text=" this is a test.",
+                confidence=0.90,
+                speaker="Speaker B",
+            ),
         ]
 
         markdown = service.convert_to_markdown("Hello world, this is a test.", segments)

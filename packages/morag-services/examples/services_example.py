@@ -7,10 +7,10 @@ different types of content and build processing pipelines.
 import asyncio
 import os
 from pathlib import Path
-import structlog
 
-from morag_services.services import MoRAGServices, ServiceConfig, ContentType
+import structlog
 from morag_services.pipeline import Pipeline
+from morag_services.services import ContentType, MoRAGServices, ServiceConfig
 
 # Configure logging
 structlog.configure(
@@ -21,6 +21,7 @@ structlog.configure(
     ],
 )
 logger = structlog.get_logger()
+
 
 async def process_single_item():
     """Process a single content item."""
@@ -64,12 +65,11 @@ async def process_single_item():
     else:
         logger.error("YouTube processing failed", error=result.error_message)
 
+
 async def process_batch():
     """Process multiple content items in batch."""
     # Initialize services with custom configuration
-    config = ServiceConfig(
-        max_concurrent_tasks=3  # Limit concurrent processing
-    )
+    config = ServiceConfig(max_concurrent_tasks=3)  # Limit concurrent processing
     services = MoRAGServices(config)
 
     # Define batch of items to process
@@ -77,11 +77,13 @@ async def process_batch():
         "path/to/document1.pdf",
         "path/to/image.jpg",
         "https://example.com",
-        "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+        "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
     ]
 
     # Filter to only existing files and valid URLs
-    valid_items = [item for item in items if item.startswith("http") or os.path.exists(item)]
+    valid_items = [
+        item for item in items if item.startswith("http") or os.path.exists(item)
+    ]
 
     logger.info("Processing batch", items=valid_items)
     results = await services.process_batch(valid_items)
@@ -94,6 +96,7 @@ async def process_batch():
         print(f"{status} {result.content_type}: {item}")
         if not result.success:
             print(f"  Error: {result.error_message}")
+
 
 async def use_pipeline():
     """Use a processing pipeline."""
@@ -120,14 +123,11 @@ async def use_pipeline():
         name="count_words",
         process_fn=count_words,
         input_key="texts",
-        output_key="word_counts"
+        output_key="word_counts",
     )
 
     # Define items to process
-    items = [
-        "https://example.com",
-        "https://www.python.org"
-    ]
+    items = ["https://example.com", "https://www.python.org"]
 
     # Execute pipeline
     logger.info("Executing pipeline", items=items)
@@ -145,7 +145,10 @@ async def use_pipeline():
 
         if item_id in context.embeddings:
             embedding = context.embeddings[item_id]
-            print(f"  Embedding: [{embedding[0]:.4f}, {embedding[1]:.4f}, ...] (length: {len(embedding)})")
+            print(
+                f"  Embedding: [{embedding[0]:.4f}, {embedding[1]:.4f}, ...] (length: {len(embedding)})"
+            )
+
 
 async def detect_content_types():
     """Demonstrate content type detection."""
@@ -157,7 +160,7 @@ async def detect_content_types():
         "audio.mp3",
         "video.mp4",
         "https://example.com",
-        "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+        "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
     ]
 
     print("\nContent Type Detection:")
@@ -165,6 +168,7 @@ async def detect_content_types():
     for item in test_items:
         content_type = services.detect_content_type(item)
         print(f"{item}: {content_type}")
+
 
 async def main():
     """Run all examples."""
@@ -182,6 +186,7 @@ async def main():
 
     print("\n4. Content Type Detection")
     await detect_content_types()
+
 
 if __name__ == "__main__":
     asyncio.run(main())

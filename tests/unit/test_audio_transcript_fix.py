@@ -7,10 +7,8 @@ the transcript section and properly formats the content.
 """
 
 import pytest
-
-from morag_audio import AudioConverter
-from morag_services import ConversionOptions, ChunkingStrategy
-from morag_audio import AudioProcessingResult, AudioTranscriptSegment
+from morag_audio import AudioConverter, AudioProcessingResult, AudioTranscriptSegment
+from morag_services import ChunkingStrategy, ConversionOptions
 
 
 class TestAudioTranscriptFix:
@@ -35,17 +33,17 @@ class TestAudioTranscriptFix:
                     start_time=0.0,
                     end_time=5.29,
                     confidence=0.95,
-                    language="de"
+                    language="de",
                 )
             ],
             metadata={
-                'filename': 'recording.m4a',
-                'duration': 5.29,
-                'language': 'de',
-                'model_used': 'base'
+                "filename": "recording.m4a",
+                "duration": 5.29,
+                "language": "de",
+                "model_used": "base",
             },
             processing_time=2.0,
-            model_used="base"
+            model_used="base",
         )
 
     @pytest.fixture
@@ -56,34 +54,34 @@ class TestAudioTranscriptFix:
             include_metadata=False,
             extract_images=False,
             format_options={
-                'enable_diarization': True,
-                'include_timestamps': True,
-                'confidence_threshold': 0.8
-            }
+                "enable_diarization": True,
+                "include_timestamps": True,
+                "confidence_threshold": 0.8,
+            },
         )
 
     @pytest.mark.asyncio
     async def test_enhanced_markdown_includes_transcript(
-        self,
-        audio_converter,
-        mock_audio_result,
-        conversion_options
+        self, audio_converter, mock_audio_result, conversion_options
     ):
         """Test that enhanced markdown includes transcript section."""
         # Create enhanced result
-        enhanced_result = type('EnhancedAudioResult', (), {
-            'transcript': mock_audio_result.text,
-            'metadata': mock_audio_result.metadata.copy(),
-            'summary': '',
-            'segments': mock_audio_result.segments,
-            'speakers': [],
-            'topics': []
-        })()
+        enhanced_result = type(
+            "EnhancedAudioResult",
+            (),
+            {
+                "transcript": mock_audio_result.text,
+                "metadata": mock_audio_result.metadata.copy(),
+                "summary": "",
+                "segments": mock_audio_result.segments,
+                "speakers": [],
+                "topics": [],
+            },
+        )()
 
         # Generate markdown
         markdown = await audio_converter._create_enhanced_structured_markdown(
-            enhanced_result,
-            conversion_options
+            enhanced_result, conversion_options
         )
 
         # Verify transcript section is present
@@ -94,40 +92,41 @@ class TestAudioTranscriptFix:
 
     @pytest.mark.asyncio
     async def test_enhanced_markdown_with_multiple_segments(
-        self,
-        audio_converter,
-        conversion_options
+        self, audio_converter, conversion_options
     ):
         """Test enhanced markdown with multiple audio segments."""
         # Create result with multiple segments
-        enhanced_result = type('EnhancedAudioResult', (), {
-            'transcript': "Hello world. This is a test.",
-            'metadata': {'filename': 'test.wav', 'model_used': 'base'},
-            'summary': '',
-            'segments': [
-                AudioTranscriptSegment(
-                    text="Hello world.",
-                    start_time=0.0,
-                    end_time=2.0,
-                    confidence=0.95,
-                    language="en"
-                ),
-                AudioTranscriptSegment(
-                    text="This is a test.",
-                    start_time=2.0,
-                    end_time=4.0,
-                    confidence=0.90,
-                    language="en"
-                )
-            ],
-            'speakers': [],
-            'topics': []
-        })()
+        enhanced_result = type(
+            "EnhancedAudioResult",
+            (),
+            {
+                "transcript": "Hello world. This is a test.",
+                "metadata": {"filename": "test.wav", "model_used": "base"},
+                "summary": "",
+                "segments": [
+                    AudioTranscriptSegment(
+                        text="Hello world.",
+                        start_time=0.0,
+                        end_time=2.0,
+                        confidence=0.95,
+                        language="en",
+                    ),
+                    AudioTranscriptSegment(
+                        text="This is a test.",
+                        start_time=2.0,
+                        end_time=4.0,
+                        confidence=0.90,
+                        language="en",
+                    ),
+                ],
+                "speakers": [],
+                "topics": [],
+            },
+        )()
 
         # Generate markdown
         markdown = await audio_converter._create_enhanced_structured_markdown(
-            enhanced_result,
-            conversion_options
+            enhanced_result, conversion_options
         )
 
         # Verify both segments are present
@@ -138,25 +137,26 @@ class TestAudioTranscriptFix:
 
     @pytest.mark.asyncio
     async def test_enhanced_markdown_without_segments(
-        self,
-        audio_converter,
-        conversion_options
+        self, audio_converter, conversion_options
     ):
         """Test enhanced markdown fallback when no segments available."""
         # Create result without segments
-        enhanced_result = type('EnhancedAudioResult', (), {
-            'transcript': "Simple transcript text.",
-            'metadata': {'filename': 'test.wav', 'model_used': 'base'},
-            'summary': '',
-            'segments': [],
-            'speakers': [],
-            'topics': []
-        })()
+        enhanced_result = type(
+            "EnhancedAudioResult",
+            (),
+            {
+                "transcript": "Simple transcript text.",
+                "metadata": {"filename": "test.wav", "model_used": "base"},
+                "summary": "",
+                "segments": [],
+                "speakers": [],
+                "topics": [],
+            },
+        )()
 
         # Generate markdown
         markdown = await audio_converter._create_enhanced_structured_markdown(
-            enhanced_result,
-            conversion_options
+            enhanced_result, conversion_options
         )
 
         # Verify fallback transcript is used - now should be in topic format
@@ -167,34 +167,37 @@ class TestAudioTranscriptFix:
 
     @pytest.mark.asyncio
     async def test_enhanced_markdown_with_topics(
-        self,
-        audio_converter,
-        mock_audio_result,
-        conversion_options
+        self, audio_converter, mock_audio_result, conversion_options
     ):
         """Test enhanced markdown with topic segmentation."""
         # Create enhanced result with topics
-        enhanced_result = type('EnhancedAudioResult', (), {
-            'transcript': mock_audio_result.text,
-            'metadata': mock_audio_result.metadata.copy(),
-            'summary': '',
-            'segments': mock_audio_result.segments,
-            'speakers': [],
-            'topics': [
-                {
-                    'topic': 'Test Topic',
-                    'sentences': ['Dies ist ein Testtext.', 'Bitte transcribieren.']
-                }
-            ]
-        })()
+        enhanced_result = type(
+            "EnhancedAudioResult",
+            (),
+            {
+                "transcript": mock_audio_result.text,
+                "metadata": mock_audio_result.metadata.copy(),
+                "summary": "",
+                "segments": mock_audio_result.segments,
+                "speakers": [],
+                "topics": [
+                    {
+                        "topic": "Test Topic",
+                        "sentences": [
+                            "Dies ist ein Testtext.",
+                            "Bitte transcribieren.",
+                        ],
+                    }
+                ],
+            },
+        )()
 
         # Enable topic info in options
-        conversion_options.format_options['include_topic_info'] = True
+        conversion_options.format_options["include_topic_info"] = True
 
         # Generate markdown
         markdown = await audio_converter._create_enhanced_structured_markdown(
-            enhanced_result,
-            conversion_options
+            enhanced_result, conversion_options
         )
 
         # Verify topics section is present
@@ -213,16 +216,12 @@ class TestAudioTranscriptFix:
 
     @pytest.mark.asyncio
     async def test_regular_markdown_still_works(
-        self,
-        audio_converter,
-        mock_audio_result,
-        conversion_options
+        self, audio_converter, mock_audio_result, conversion_options
     ):
         """Test that regular markdown creation still works correctly."""
         # Generate regular markdown
         markdown = await audio_converter._create_structured_markdown(
-            mock_audio_result,
-            conversion_options
+            mock_audio_result, conversion_options
         )
 
         # Verify transcript section is now in topic format

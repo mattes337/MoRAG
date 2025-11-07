@@ -1,6 +1,7 @@
 """Explanation agent."""
 
-from typing import Type, Optional
+from typing import Optional, Type
+
 import structlog
 
 from ..base.agent import BaseAgent
@@ -49,7 +50,7 @@ class ExplanationAgent(BaseAgent[ExplanationResult]):
             topic_length=len(topic),
             explanation_type=explanation_type,
             audience=audience or "general",
-            version=self.config.version
+            version=self.config.version,
         )
 
         try:
@@ -58,22 +59,23 @@ class ExplanationAgent(BaseAgent[ExplanationResult]):
                 "explanation_type": explanation_type or "general",
                 "audience": audience or "general",
                 "context": context,
-                **kwargs
+                **kwargs,
             }
 
             # Execute the agent
-            result = await self.execute(
-                user_input=topic,
-                **context_data
-            )
+            result = await self.execute(user_input=topic, **context_data)
 
             logger.info(
                 "Explanation generation completed",
                 agent=self.__class__.__name__,
-                explanation_length=len(result.explanation) if hasattr(result, 'explanation') else 0,
-                reasoning_steps=len(result.reasoning_steps) if hasattr(result, 'reasoning_steps') else 0,
+                explanation_length=len(result.explanation)
+                if hasattr(result, "explanation")
+                else 0,
+                reasoning_steps=len(result.reasoning_steps)
+                if hasattr(result, "reasoning_steps")
+                else 0,
                 confidence=result.confidence,
-                version=self.config.version
+                version=self.config.version,
             )
 
             return result
@@ -83,6 +85,6 @@ class ExplanationAgent(BaseAgent[ExplanationResult]):
                 "Explanation generation failed",
                 agent=self.__class__.__name__,
                 error=str(e),
-                version=self.config.version
+                version=self.config.version,
             )
             raise

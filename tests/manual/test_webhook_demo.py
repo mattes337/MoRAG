@@ -14,15 +14,17 @@ Usage:
 """
 
 import asyncio
-import httpx
 import json
 import time
 from pathlib import Path
+
+import httpx
 
 # Configuration
 API_BASE_URL = "http://localhost:8000/api/v1"
 WEBHOOK_URL = "http://localhost:8001/webhook"
 API_KEY = "test-api-key"
+
 
 async def test_webhook_integration():
     """Test the complete webhook integration."""
@@ -34,8 +36,10 @@ async def test_webhook_integration():
     print("\n1. Testing API connectivity...")
     try:
         async with httpx.AsyncClient() as client:
-            response = await client.get(f"{API_BASE_URL}/status/",
-                                      headers={"Authorization": f"Bearer {API_KEY}"})
+            response = await client.get(
+                f"{API_BASE_URL}/status/",
+                headers={"Authorization": f"Bearer {API_KEY}"},
+            )
             if response.status_code == 200:
                 print("✅ API is running")
             else:
@@ -90,22 +94,21 @@ async def test_webhook_integration():
     print("\n5. Submitting ingestion task with webhook...")
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
-            with open(test_file_path, 'rb') as f:
+            with open(test_file_path, "rb") as f:
                 files = {"file": ("test_document.txt", f, "text/plain")}
                 data = {
                     "source_type": "document",
                     "webhook_url": WEBHOOK_URL,
-                    "metadata": json.dumps({
-                        "test_run": True,
-                        "description": "Webhook integration test"
-                    })
+                    "metadata": json.dumps(
+                        {"test_run": True, "description": "Webhook integration test"}
+                    ),
                 }
 
                 response = await client.post(
                     f"{API_BASE_URL}/ingest/file",
                     headers={"Authorization": f"Bearer {API_KEY}"},
                     files=files,
-                    data=data
+                    data=data,
                 )
 
                 if response.status_code == 200:
@@ -133,14 +136,16 @@ async def test_webhook_integration():
             async with httpx.AsyncClient() as client:
                 status_response = await client.get(
                     f"{API_BASE_URL}/status/{task_id}",
-                    headers={"Authorization": f"Bearer {API_KEY}"}
+                    headers={"Authorization": f"Bearer {API_KEY}"},
                 )
 
                 if status_response.status_code == 200:
                     status_data = status_response.json()
-                    print(f"📊 Task Status: {status_data['status']} - Progress: {status_data.get('progress', 0)*100:.1f}%")
+                    print(
+                        f"📊 Task Status: {status_data['status']} - Progress: {status_data.get('progress', 0)*100:.1f}%"
+                    )
 
-                    if status_data['status'] in ['success', 'failure']:
+                    if status_data["status"] in ["success", "failure"]:
                         print(f"🏁 Task completed with status: {status_data['status']}")
                         break
 
@@ -148,12 +153,12 @@ async def test_webhook_integration():
                 webhook_response = await client.get("http://localhost:8001/webhooks")
                 if webhook_response.status_code == 200:
                     webhook_data = webhook_response.json()
-                    webhook_count = webhook_data['total_webhooks']
+                    webhook_count = webhook_data["total_webhooks"]
                     print(f"📨 Received {webhook_count} webhooks")
 
                     if webhook_count > 0:
-                        latest = webhook_data['webhooks'][-1]
-                        event_type = latest['payload'].get('event_type', 'unknown')
+                        latest = webhook_data["webhooks"][-1]
+                        event_type = latest["payload"].get("event_type", "unknown")
                         print(f"   Latest: {event_type}")
 
         except Exception as e:
@@ -170,20 +175,20 @@ async def test_webhook_integration():
                 data = response.json()
                 print(f"📨 Total webhooks received: {data['total_webhooks']}")
 
-                if data['total_webhooks'] > 0:
+                if data["total_webhooks"] > 0:
                     print("\n📋 Webhook Summary:")
-                    for i, webhook in enumerate(data['webhooks'], 1):
-                        payload = webhook['payload']
-                        event_type = payload.get('event_type', 'unknown')
-                        task_data = payload.get('data', {})
-                        status = task_data.get('status', 'unknown')
+                    for i, webhook in enumerate(data["webhooks"], 1):
+                        payload = webhook["payload"]
+                        event_type = payload.get("event_type", "unknown")
+                        task_data = payload.get("data", {})
+                        status = task_data.get("status", "unknown")
                         print(f"   {i}. {event_type} - {status}")
 
-                        if 'progress' in task_data:
+                        if "progress" in task_data:
                             print(f"      Progress: {task_data['progress']*100:.1f}%")
-                        if 'message' in task_data:
+                        if "message" in task_data:
                             print(f"      Message: {task_data['message']}")
-                        if 'error' in task_data:
+                        if "error" in task_data:
                             print(f"      Error: {task_data['error']}")
                 else:
                     print("❌ No webhooks received!")
@@ -197,18 +202,22 @@ async def test_webhook_integration():
         async with httpx.AsyncClient() as client:
             response = await client.get(
                 f"{API_BASE_URL}/status/{task_id}/history",
-                headers={"Authorization": f"Bearer {API_KEY}"}
+                headers={"Authorization": f"Bearer {API_KEY}"},
             )
 
             if response.status_code == 200:
                 history_data = response.json()
                 print(f"📚 Task history events: {history_data['event_count']}")
 
-                if history_data['event_count'] > 0:
+                if history_data["event_count"] > 0:
                     print("\n📋 History Summary:")
-                    for i, event in enumerate(history_data['history'][:5], 1):  # Show first 5
-                        print(f"   {i}. {event['status']} - {event.get('message', 'No message')}")
-                        if event.get('progress') is not None:
+                    for i, event in enumerate(
+                        history_data["history"][:5], 1
+                    ):  # Show first 5
+                        print(
+                            f"   {i}. {event['status']} - {event.get('message', 'No message')}"
+                        )
+                        if event.get("progress") is not None:
                             print(f"      Progress: {event['progress']*100:.1f}%")
             else:
                 print(f"❌ Failed to get task history: {response.status_code}")
@@ -227,6 +236,7 @@ async def test_webhook_integration():
     print("\n" + "=" * 50)
     print("🎉 Webhook Integration Test Complete!")
     print("\nTo view detailed webhook data, visit: http://localhost:8001/webhooks")
+
 
 if __name__ == "__main__":
     asyncio.run(test_webhook_integration())

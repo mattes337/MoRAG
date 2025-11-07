@@ -2,21 +2,25 @@
 
 import asyncio
 import time
-from typing import List, Dict, Any, Optional, NamedTuple, Set, Tuple
 from dataclasses import dataclass
 from enum import Enum
-import structlog
+from typing import Any, Dict, List, NamedTuple, Optional, Set, Tuple
 
+import structlog
 from morag_core.config import get_settings
 from morag_core.exceptions import ProcessingError
+
 from ..models import Entity, Relation
-from ..operations.traversal import GraphTraversal, GraphPath
+from ..operations.traversal import GraphPath, GraphTraversal
+
 # Import robust parser from agents framework with fallback
 try:
     from agents.base import LLMResponseParser
+
     AGENTS_PARSER_AVAILABLE = True
 except ImportError:
     from ..utils.llm_response_parser import parse_json_response
+
     LLMResponseParser = None
     AGENTS_PARSER_AVAILABLE = False
 
@@ -25,6 +29,7 @@ logger = structlog.get_logger(__name__)
 # Optional LLM imports
 try:
     import google.generativeai as genai
+
     GEMINI_AVAILABLE = True
 except ImportError:
     GEMINI_AVAILABLE = False
@@ -33,6 +38,7 @@ except ImportError:
 @dataclass
 class PathRelevanceScore:
     """Represents a path with its relevance score and enhanced context."""
+
     path: GraphPath
     relevance_score: float
     confidence: float
@@ -69,15 +75,16 @@ class PathRelevanceScore:
         """Calculate overall path quality considering multiple factors."""
         factors = [
             self.relevance_score * 0.4,  # Primary relevance
-            self.confidence * 0.2,       # Confidence in scoring
+            self.confidence * 0.2,  # Confidence in scoring
             self.semantic_coherence * 0.2,  # Semantic coherence
-            self.query_alignment * 0.2   # Query alignment
+            self.query_alignment * 0.2,  # Query alignment
         ]
         return sum(factors)
 
 
 class TraversalStrategy(Enum):
     """Strategies for graph traversal."""
+
     BREADTH_FIRST = "breadth_first"
     DEPTH_FIRST = "depth_first"
     RELEVANCE_GUIDED = "relevance_guided"
@@ -88,6 +95,7 @@ class TraversalStrategy(Enum):
 @dataclass
 class QueryContext:
     """Context information for query-guided traversal."""
+
     query: str
     intent: str
     entities: List[str]
@@ -110,20 +118,20 @@ class LLMPathSelector:
         self.settings = get_settings()
 
         # LLM configuration
-        self.llm_enabled = self.config.get('llm_enabled', True) and GEMINI_AVAILABLE
-        self.model_name = self.config.get('model_name', 'gemini-1.5-flash')
-        self.temperature = self.config.get('temperature', 0.1)
-        self.max_tokens = self.config.get('max_tokens', 1000)
+        self.llm_enabled = self.config.get("llm_enabled", True) and GEMINI_AVAILABLE
+        self.model_name = self.config.get("model_name", "gemini-1.5-flash")
+        self.temperature = self.config.get("temperature", 0.1)
+        self.max_tokens = self.config.get("max_tokens", 1000)
 
         # Path selection parameters
-        self.max_paths_to_evaluate = self.config.get('max_paths_to_evaluate', 20)
-        self.min_relevance_threshold = self.config.get('min_relevance_threshold', 0.3)
-        self.max_path_length = self.config.get('max_path_length', 5)
+        self.max_paths_to_evaluate = self.config.get("max_paths_to_evaluate", 20)
+        self.min_relevance_threshold = self.config.get("min_relevance_threshold", 0.3)
+        self.max_path_length = self.config.get("max_path_length", 5)
 
         # Performance settings
-        self.enable_caching = self.config.get('enable_caching', True)
-        self.cache_size = self.config.get('cache_size', 1000)
-        self.batch_size = self.config.get('batch_size', 5)
+        self.enable_caching = self.config.get("enable_caching", True)
+        self.cache_size = self.config.get("cache_size", 1000)
+        self.batch_size = self.config.get("batch_size", 5)
 
         # Initialize components
         self._llm_client = None
@@ -134,7 +142,7 @@ class LLMPathSelector:
             llm_enabled=self.llm_enabled,
             model_name=self.model_name,
             max_paths_to_evaluate=self.max_paths_to_evaluate,
-            min_relevance_threshold=self.min_relevance_threshold
+            min_relevance_threshold=self.min_relevance_threshold,
         )
 
     async def initialize(self) -> None:
@@ -163,7 +171,7 @@ class LLMPathSelector:
         starting_entities: List[Entity],
         available_paths: List[GraphPath],
         query_context: Optional[QueryContext] = None,
-        strategy: TraversalStrategy = TraversalStrategy.RELEVANCE_GUIDED
+        strategy: TraversalStrategy = TraversalStrategy.RELEVANCE_GUIDED,
     ) -> List[PathRelevanceScore]:
         """Select and score paths based on relevance to the query.
 
@@ -185,7 +193,7 @@ class LLMPathSelector:
                 "Starting path selection",
                 query=query,
                 num_paths=len(available_paths),
-                strategy=strategy.value
+                strategy=strategy.value,
             )
 
             # Initialize LLM if needed
@@ -195,7 +203,7 @@ class LLMPathSelector:
             filtered_paths = self._filter_paths_basic(available_paths)
 
             # Limit number of paths to evaluate
-            paths_to_evaluate = filtered_paths[:self.max_paths_to_evaluate]
+            paths_to_evaluate = filtered_paths[: self.max_paths_to_evaluate]
 
             # Score paths
             if self.llm_enabled:
@@ -209,7 +217,8 @@ class LLMPathSelector:
 
             # Filter by relevance threshold
             relevant_paths = [
-                p for p in scored_paths
+                p
+                for p in scored_paths
                 if p.relevance_score >= self.min_relevance_threshold
             ]
 
@@ -221,7 +230,7 @@ class LLMPathSelector:
                 total_paths=len(available_paths),
                 evaluated_paths=len(paths_to_evaluate),
                 relevant_paths=len(relevant_paths),
-                strategy=strategy.value
+                strategy=strategy.value,
             )
 
             return relevant_paths
@@ -229,7 +238,9 @@ class LLMPathSelector:
         except Exception as e:
             logger.error(f"Path selection failed: {e}")
             # Fallback to heuristic scoring
-            return await self._score_paths_heuristic(query, available_paths[:10], query_context)
+            return await self._score_paths_heuristic(
+                query, available_paths[:10], query_context
+            )
 
     def _filter_paths_basic(self, paths: List[GraphPath]) -> List[GraphPath]:
         """Apply basic filtering to paths."""
@@ -253,27 +264,21 @@ class LLMPathSelector:
         return filtered
 
     async def _score_paths_with_llm(
-        self,
-        query: str,
-        paths: List[GraphPath],
-        query_context: Optional[QueryContext]
+        self, query: str, paths: List[GraphPath], query_context: Optional[QueryContext]
     ) -> List[PathRelevanceScore]:
         """Score paths using LLM evaluation."""
         scored_paths = []
 
         # Process paths in batches
         for i in range(0, len(paths), self.batch_size):
-            batch = paths[i:i + self.batch_size]
+            batch = paths[i : i + self.batch_size]
             batch_scores = await self._evaluate_path_batch(query, batch, query_context)
             scored_paths.extend(batch_scores)
 
         return scored_paths
 
     async def _evaluate_path_batch(
-        self,
-        query: str,
-        paths: List[GraphPath],
-        query_context: Optional[QueryContext]
+        self, query: str, paths: List[GraphPath], query_context: Optional[QueryContext]
     ) -> List[PathRelevanceScore]:
         """Evaluate a batch of paths with LLM."""
         try:
@@ -292,10 +297,7 @@ class LLMPathSelector:
             return await self._score_paths_heuristic(query, paths, query_context)
 
     def _create_evaluation_prompt(
-        self,
-        query: str,
-        paths: List[GraphPath],
-        query_context: Optional[QueryContext]
+        self, query: str, paths: List[GraphPath], query_context: Optional[QueryContext]
     ) -> str:
         """Create enhanced evaluation prompt for LLM."""
         # Add context information
@@ -379,14 +381,16 @@ Format as JSON:
             return "Empty path"
 
         # Build detailed description
-        description = f"Length: {len(path.entities)} entities, {len(path.relations)} relations\n"
+        description = (
+            f"Length: {len(path.entities)} entities, {len(path.relations)} relations\n"
+        )
         description += "Path: "
 
         path_parts = []
         for i, entity in enumerate(path.entities):
             # Add entity with type and description if available
             entity_desc = f"{entity.name}"
-            if hasattr(entity, 'type') and entity.type:
+            if hasattr(entity, "type") and entity.type:
                 entity_desc += f" ({entity.type})"
 
             path_parts.append(entity_desc)
@@ -395,11 +399,13 @@ Format as JSON:
             if i < len(path.relations):
                 relation = path.relations[i]
                 relation_desc = f" --[{relation.type}]"
-                if hasattr(relation, 'properties') and relation.properties:
+                if hasattr(relation, "properties") and relation.properties:
                     # Add key properties for context
                     key_props = []
                     for key, value in relation.properties.items():
-                        if key in ['confidence', 'weight', 'strength'] and isinstance(value, (int, float)):
+                        if key in ["confidence", "weight", "strength"] and isinstance(
+                            value, (int, float)
+                        ):
                             key_props.append(f"{key}:{value:.2f}")
                     if key_props:
                         relation_desc += f"({', '.join(key_props)})"
@@ -409,10 +415,12 @@ Format as JSON:
         description += "".join(path_parts)
 
         # Add metadata if available
-        if hasattr(path, 'metadata') and path.metadata:
+        if hasattr(path, "metadata") and path.metadata:
             metadata_info = []
             for key, value in path.metadata.items():
-                if key in ['confidence', 'weight', 'relevance'] and isinstance(value, (int, float)):
+                if key in ["confidence", "weight", "relevance"] and isinstance(
+                    value, (int, float)
+                ):
                     metadata_info.append(f"{key}: {value:.3f}")
             if metadata_info:
                 description += f"\nMetadata: {', '.join(metadata_info)}"
@@ -420,41 +428,39 @@ Format as JSON:
         return description
 
     def _parse_llm_response(
-        self,
-        response_text: str,
-        paths: List[GraphPath]
+        self, response_text: str, paths: List[GraphPath]
     ) -> List[PathRelevanceScore]:
         """Parse LLM response into path scores."""
         try:
             # Use centralized parser if available, otherwise fallback
-            fallback_data = {'evaluations': []}
+            fallback_data = {"evaluations": []}
             if AGENTS_PARSER_AVAILABLE and LLMResponseParser:
                 data = LLMResponseParser.parse_json_response(
                     response=response_text,
                     fallback_value=fallback_data,
-                    context="path_evaluation"
+                    context="path_evaluation",
                 )
             else:
                 data = parse_json_response(
                     response_text,
                     fallback_value=fallback_data,
-                    context="path_evaluation"
+                    context="path_evaluation",
                 )
 
             scored_paths = []
-            evaluations = data.get('evaluations', [])
+            evaluations = data.get("evaluations", [])
 
             for eval_data in evaluations:
-                path_id = eval_data.get('path_id', 1) - 1  # Convert to 0-based index
+                path_id = eval_data.get("path_id", 1) - 1  # Convert to 0-based index
 
                 if 0 <= path_id < len(paths):
                     path = paths[path_id]
                     score = PathRelevanceScore(
                         path=path,
-                        relevance_score=float(eval_data.get('relevance_score', 0.0)),
-                        confidence=float(eval_data.get('confidence', 0.0)),
-                        reasoning=eval_data.get('reasoning', ''),
-                        metadata={'evaluation_method': 'llm'}
+                        relevance_score=float(eval_data.get("relevance_score", 0.0)),
+                        confidence=float(eval_data.get("confidence", 0.0)),
+                        reasoning=eval_data.get("reasoning", ""),
+                        metadata={"evaluation_method": "llm"},
                     )
                     scored_paths.append(score)
 
@@ -469,16 +475,13 @@ Format as JSON:
                     relevance_score=0.5,
                     confidence=0.3,
                     reasoning="LLM parsing failed, using default score",
-                    metadata={'evaluation_method': 'fallback'}
+                    metadata={"evaluation_method": "fallback"},
                 )
                 for path in paths
             ]
 
     async def _score_paths_heuristic(
-        self,
-        query: str,
-        paths: List[GraphPath],
-        query_context: Optional[QueryContext]
+        self, query: str, paths: List[GraphPath], query_context: Optional[QueryContext]
     ) -> List[PathRelevanceScore]:
         """Score paths using heuristic methods."""
         scored_paths = []
@@ -505,20 +508,29 @@ Format as JSON:
                     relevance_score += overlap_ratio * 0.8
                     match_count += 1
                 # Partial match for entity type
-                elif entity.type and any(word in entity.type.lower() for word in query_words):
+                elif entity.type and any(
+                    word in entity.type.lower() for word in query_words
+                ):
                     relevance_score += 0.3
                     match_count += 1
 
             # Score relations
             for relation in path.relations:
-                relation_words = set(relation.type.lower().split('_'))
+                relation_words = set(relation.type.lower().split("_"))
 
                 if relation_words & query_words:
-                    overlap_ratio = len(relation_words & query_words) / len(relation_words)
+                    overlap_ratio = len(relation_words & query_words) / len(
+                        relation_words
+                    )
                     relevance_score += overlap_ratio * 0.6
                     match_count += 1
                 # Common relation types get small boost
-                elif relation.type.lower() in ['developed', 'created', 'worked_at', 'related_to']:
+                elif relation.type.lower() in [
+                    "developed",
+                    "created",
+                    "worked_at",
+                    "related_to",
+                ]:
                     relevance_score += 0.2
 
             # Normalize score - ensure we always get some score for valid paths
@@ -542,7 +554,7 @@ Format as JSON:
                 relevance_score=min(final_score, 1.0),
                 confidence=0.7,  # Moderate confidence for heuristic scoring
                 reasoning=f"Heuristic scoring: {match_count} matches out of {total_elements} elements",
-                metadata={'evaluation_method': 'heuristic', 'match_count': match_count}
+                metadata={"evaluation_method": "heuristic", "match_count": match_count},
             )
             scored_paths.append(scored_path)
 

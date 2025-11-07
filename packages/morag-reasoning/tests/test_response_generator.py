@@ -1,19 +1,19 @@
 """Tests for response generation system."""
 
-import pytest
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from morag_reasoning.response_generator import (
-    ResponseGenerator,
-    GeneratedResponse,
-    ResponseFormat,
-    ResponseOptions,
-    ResponseStructure
-)
-from morag_reasoning.citation_manager import CitedFact, SourceReference, CitationFormat
+import pytest
+from morag_reasoning.citation_manager import CitationFormat, CitedFact, SourceReference
 from morag_reasoning.graph_fact_extractor import ExtractedFact, FactType
 from morag_reasoning.llm import LLMClient
+from morag_reasoning.response_generator import (
+    GeneratedResponse,
+    ResponseFormat,
+    ResponseGenerator,
+    ResponseOptions,
+    ResponseStructure,
+)
 
 
 class TestResponseGenerator:
@@ -38,7 +38,7 @@ class TestResponseGenerator:
             source_documents=["doc_physics"],
             extraction_path=["ent_einstein", "ent_relativity"],
             context={"relation_type": "DEVELOPED"},
-            metadata={"extraction_method": "direct_triplet"}
+            metadata={"extraction_method": "direct_triplet"},
         )
 
         extracted_fact2 = ExtractedFact(
@@ -51,7 +51,7 @@ class TestResponseGenerator:
             source_documents=["doc_physics"],
             extraction_path=["ent_relativity"],
             context={"year": "1905"},
-            metadata={"extraction_method": "direct_triplet"}
+            metadata={"extraction_method": "direct_triplet"},
         )
 
         # Create source references
@@ -61,7 +61,7 @@ class TestResponseGenerator:
             chunk_id="chunk_001",
             page_number=42,
             timestamp="1905-06-30",
-            confidence=0.9
+            confidence=0.9,
         )
 
         source2 = SourceReference(
@@ -70,7 +70,7 @@ class TestResponseGenerator:
             chunk_id="chunk_002",
             page_number=43,
             timestamp="1905-06-30",
-            confidence=0.8
+            confidence=0.8,
         )
 
         # Create cited facts
@@ -81,7 +81,7 @@ class TestResponseGenerator:
             citation_text="Physics Papers, p. 42",
             citation_format=CitationFormat.STRUCTURED,
             verification_status="verified",
-            metadata={}
+            metadata={},
         )
 
         cited_fact2 = CitedFact(
@@ -91,7 +91,7 @@ class TestResponseGenerator:
             citation_text="Physics Papers, p. 43",
             citation_format=CitationFormat.STRUCTURED,
             verification_status="verified",
-            metadata={}
+            metadata={},
         )
 
         return [cited_fact1, cited_fact2]
@@ -100,9 +100,9 @@ class TestResponseGenerator:
     async def test_generator_initialization(self, mock_llm_client):
         """Test response generator initialization."""
         config = {
-            'llm_enabled': False,  # Disable LLM for testing
-            'default_max_length': 1000,
-            'min_facts_required': 1
+            "llm_enabled": False,  # Disable LLM for testing
+            "default_max_length": 1000,
+            "min_facts_required": 1,
         }
 
         generator = ResponseGenerator(mock_llm_client, config)
@@ -114,18 +114,13 @@ class TestResponseGenerator:
     @pytest.mark.asyncio
     async def test_fallback_response_generation(self, mock_llm_client, sample_facts):
         """Test fallback response generation when LLM is disabled."""
-        config = {'llm_enabled': False}
+        config = {"llm_enabled": False}
         generator = ResponseGenerator(mock_llm_client, config)
 
-        options = ResponseOptions(
-            format=ResponseFormat.DETAILED,
-            max_length=500
-        )
+        options = ResponseOptions(format=ResponseFormat.DETAILED, max_length=500)
 
         response = await generator.generate_response(
-            sample_facts,
-            "What did Einstein develop?",
-            options
+            sample_facts, "What did Einstein develop?", options
         )
 
         assert isinstance(response, GeneratedResponse)
@@ -139,38 +134,34 @@ class TestResponseGenerator:
     @pytest.mark.asyncio
     async def test_different_response_formats(self, mock_llm_client, sample_facts):
         """Test different response formats."""
-        config = {'llm_enabled': False}
+        config = {"llm_enabled": False}
         generator = ResponseGenerator(mock_llm_client, config)
 
         formats = [
             ResponseFormat.DETAILED,
             ResponseFormat.SUMMARY,
-            ResponseFormat.BULLET_POINTS
+            ResponseFormat.BULLET_POINTS,
         ]
 
         for format_type in formats:
             options = ResponseOptions(format=format_type)
 
             response = await generator.generate_response(
-                sample_facts,
-                "What did Einstein develop?",
-                options
+                sample_facts, "What did Einstein develop?", options
             )
 
             assert isinstance(response, GeneratedResponse)
             assert response.content
-            assert response.metadata['generation_method'] == 'fallback'
+            assert response.metadata["generation_method"] == "fallback"
 
     @pytest.mark.asyncio
     async def test_empty_facts_handling(self, mock_llm_client):
         """Test handling of empty facts list."""
-        config = {'llm_enabled': False}
+        config = {"llm_enabled": False}
         generator = ResponseGenerator(mock_llm_client, config)
 
         response = await generator.generate_response(
-            [],
-            "Test query",
-            ResponseOptions()
+            [], "Test query", ResponseOptions()
         )
 
         assert isinstance(response, GeneratedResponse)
@@ -182,8 +173,8 @@ class TestResponseGenerator:
     async def test_insufficient_facts_handling(self, mock_llm_client):
         """Test handling when facts don't meet minimum requirements."""
         config = {
-            'llm_enabled': False,
-            'min_facts_required': 5  # Require more facts than provided
+            "llm_enabled": False,
+            "min_facts_required": 5,  # Require more facts than provided
         }
         generator = ResponseGenerator(mock_llm_client, config)
 
@@ -199,20 +190,18 @@ class TestResponseGenerator:
                 source_documents=[],
                 extraction_path=[],
                 context={},
-                metadata={}
+                metadata={},
             ),
             score=0.1,
             sources=[],
             citation_text="",
             citation_format=CitationFormat.STRUCTURED,
             verification_status="unverified",
-            metadata={}
+            metadata={},
         )
 
         response = await generator.generate_response(
-            [low_quality_fact],
-            "Test query",
-            ResponseOptions()
+            [low_quality_fact], "Test query", ResponseOptions()
         )
 
         assert isinstance(response, GeneratedResponse)
@@ -223,9 +212,9 @@ class TestResponseGenerator:
     async def test_fact_preparation_and_filtering(self, mock_llm_client, sample_facts):
         """Test fact preparation and filtering."""
         config = {
-            'llm_enabled': False,
-            'max_facts_to_use': 1,  # Limit to 1 fact
-            'min_fact_score': 0.5
+            "llm_enabled": False,
+            "max_facts_to_use": 1,  # Limit to 1 fact
+            "min_fact_score": 0.5,
         }
         generator = ResponseGenerator(mock_llm_client, config)
 
@@ -241,22 +230,20 @@ class TestResponseGenerator:
                 source_documents=[],
                 extraction_path=[],
                 context={},
-                metadata={}
+                metadata={},
             ),
             score=0.3,  # Below threshold
             sources=[],
             citation_text="",
             citation_format=CitationFormat.STRUCTURED,
             verification_status="unverified",
-            metadata={}
+            metadata={},
         )
 
         all_facts = sample_facts + [low_score_fact]
 
         response = await generator.generate_response(
-            all_facts,
-            "Test query",
-            ResponseOptions()
+            all_facts, "Test query", ResponseOptions()
         )
 
         # Should use only the high-quality facts, limited by max_facts_to_use
@@ -266,7 +253,7 @@ class TestResponseGenerator:
     @pytest.mark.asyncio
     async def test_response_options_handling(self, mock_llm_client, sample_facts):
         """Test different response options."""
-        config = {'llm_enabled': False}
+        config = {"llm_enabled": False}
         generator = ResponseGenerator(mock_llm_client, config)
 
         # Test with custom options
@@ -277,73 +264,67 @@ class TestResponseGenerator:
             include_reasoning=True,
             include_confidence=True,
             tone="casual",
-            language="en"
+            language="en",
         )
 
         response = await generator.generate_response(
-            sample_facts,
-            "What did Einstein develop?",
-            options
+            sample_facts, "What did Einstein develop?", options
         )
 
         assert isinstance(response, GeneratedResponse)
         assert response.content
         assert response.reasoning
-        assert response.metadata['options_used']['format'] == 'summary'
-        assert response.metadata['options_used']['tone'] == 'casual'
+        assert response.metadata["options_used"]["format"] == "summary"
+        assert response.metadata["options_used"]["tone"] == "casual"
 
     @pytest.mark.asyncio
     async def test_error_handling(self, mock_llm_client):
         """Test error handling in response generation."""
-        config = {'llm_enabled': False}
+        config = {"llm_enabled": False}
         generator = ResponseGenerator(mock_llm_client, config)
 
         # Mock an error in the fallback generation
-        with patch.object(generator, '_generate_fallback', side_effect=Exception("Test error")):
+        with patch.object(
+            generator, "_generate_fallback", side_effect=Exception("Test error")
+        ):
             response = await generator.generate_response(
-                [],  # Empty facts will trigger fallback
-                "Test query",
-                ResponseOptions()
+                [], "Test query", ResponseOptions()  # Empty facts will trigger fallback
             )
 
         assert isinstance(response, GeneratedResponse)
         assert "Error generating response" in response.content
         assert response.confidence_score == 0.0
-        assert 'error' in response.metadata
+        assert "error" in response.metadata
 
     @pytest.mark.asyncio
     async def test_response_metadata(self, mock_llm_client, sample_facts):
         """Test response metadata generation."""
-        config = {'llm_enabled': False}
+        config = {"llm_enabled": False}
         generator = ResponseGenerator(mock_llm_client, config)
 
         response = await generator.generate_response(
-            sample_facts,
-            "What did Einstein develop?",
-            ResponseOptions()
+            sample_facts, "What did Einstein develop?", ResponseOptions()
         )
 
         # Check metadata completeness
-        assert 'generation_method' in response.metadata
-        assert 'options_used' in response.metadata
-        assert 'num_facts_used' in response.metadata
-        assert 'query_length' in response.metadata
-        assert 'response_length' in response.metadata
+        assert "generation_method" in response.metadata
+        assert "options_used" in response.metadata
+        assert "num_facts_used" in response.metadata
+        assert "query_length" in response.metadata
+        assert "response_length" in response.metadata
 
-        assert response.metadata['generation_method'] == 'fallback'
-        assert response.metadata['num_facts_used'] == 2
+        assert response.metadata["generation_method"] == "fallback"
+        assert response.metadata["num_facts_used"] == 2
         assert response.generation_time > 0
 
     @pytest.mark.asyncio
     async def test_key_points_extraction(self, mock_llm_client, sample_facts):
         """Test key points extraction from facts."""
-        config = {'llm_enabled': False}
+        config = {"llm_enabled": False}
         generator = ResponseGenerator(mock_llm_client, config)
 
         response = await generator.generate_response(
-            sample_facts,
-            "What did Einstein develop?",
-            ResponseOptions()
+            sample_facts, "What did Einstein develop?", ResponseOptions()
         )
 
         # Should extract key points from the facts

@@ -1,6 +1,7 @@
 """Agent factory for creating and managing agent instances."""
 
-from typing import Type, Dict, Any, Optional, TypeVar, Generic
+from typing import Any, Dict, Generic, Optional, Type, TypeVar
+
 import structlog
 
 from ..base.agent import BaseAgent
@@ -10,7 +11,7 @@ from ..config.manager import AgentConfigManager
 
 logger = structlog.get_logger(__name__)
 
-T = TypeVar('T', bound=BaseAgent)
+T = TypeVar("T", bound=BaseAgent)
 
 
 class AgentFactory:
@@ -26,7 +27,9 @@ class AgentFactory:
         self.agent_classes: Dict[str, Type[BaseAgent]] = {}
         self.logger = logger.bind(component="agent_factory")
 
-    def register_agent_class(self, agent_name: str, agent_class: Type[BaseAgent]) -> None:
+    def register_agent_class(
+        self, agent_name: str, agent_class: Type[BaseAgent]
+    ) -> None:
         """Register an agent class.
 
         Args:
@@ -41,7 +44,7 @@ class AgentFactory:
         agent_name: str,
         config: Optional[AgentConfig] = None,
         model_override: Optional[str] = None,
-        **config_overrides
+        **config_overrides,
     ) -> BaseAgent:
         """Create an agent instance.
 
@@ -70,7 +73,9 @@ class AgentFactory:
         if model_override:
             config = config.copy(deep=True)
             config.model.model = model_override
-            self.logger.info(f"Applied model override for {agent_name}: {model_override}")
+            self.logger.info(
+                f"Applied model override for {agent_name}: {model_override}"
+            )
 
         # Apply other overrides
         if config_overrides:
@@ -93,7 +98,7 @@ class AgentFactory:
         self,
         agent_class: Type[T],
         config: Optional[AgentConfig] = None,
-        **config_overrides
+        **config_overrides,
     ) -> T:
         """Create an agent instance with a specific class and config.
 
@@ -135,10 +140,7 @@ class AgentFactory:
         Returns:
             Dictionary mapping agent names to class names
         """
-        return {
-            name: cls.__name__
-            for name, cls in self.agent_classes.items()
-        }
+        return {name: cls.__name__ for name, cls in self.agent_classes.items()}
 
     def get_agent_class(self, agent_name: str) -> Type[BaseAgent]:
         """Get an agent class by name.
@@ -178,7 +180,7 @@ class AgentFactory:
             agent_class = self.agent_classes[agent_name]
 
             # Check if agent class has custom validation
-            if hasattr(agent_class, 'validate_config'):
+            if hasattr(agent_class, "validate_config"):
                 return agent_class.validate_config(config)
 
         return True

@@ -1,9 +1,9 @@
 """Tests for LLM client."""
 
-import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
-import httpx
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
+import pytest
 from morag_reasoning.llm import LLMClient, LLMConfig
 
 
@@ -26,7 +26,7 @@ class TestLLMConfig:
             model="gpt-4",
             temperature=0.5,
             max_tokens=1000,
-            max_retries=3
+            max_retries=3,
         )
         assert config.provider == "openai"
         assert config.model == "gpt-4"
@@ -46,15 +46,18 @@ class TestLLMClient:
 
     def test_init_without_config(self):
         """Test initialization without config (uses environment)."""
-        with patch.dict('os.environ', {
-            'MORAG_LLM_PROVIDER': 'openai',
-            'MORAG_GEMINI_MODEL': 'gpt-3.5-turbo',
-            'GEMINI_API_KEY': 'test-key'
-        }):
+        with patch.dict(
+            "os.environ",
+            {
+                "MORAG_LLM_PROVIDER": "openai",
+                "MORAG_GEMINI_MODEL": "gpt-3.5-turbo",
+                "GEMINI_API_KEY": "test-key",
+            },
+        ):
             client = LLMClient()
-            assert client.config.provider == 'openai'
-            assert client.config.model == 'gpt-3.5-turbo'
-            assert client.config.api_key == 'test-key'
+            assert client.config.provider == "openai"
+            assert client.config.model == "gpt-3.5-turbo"
+            assert client.config.api_key == "test-key"
 
     @pytest.mark.asyncio
     async def test_context_manager(self, llm_config):
@@ -75,11 +78,7 @@ class TestLLMClient:
     async def test_generate_with_parameters(self, mock_llm_client):
         """Test generating text with custom parameters."""
         prompt = "Tell me about AI"
-        result = await mock_llm_client.generate(
-            prompt,
-            max_tokens=500,
-            temperature=0.5
-        )
+        result = await mock_llm_client.generate(prompt, max_tokens=500, temperature=0.5)
         assert isinstance(result, str)
         assert len(result) > 0
 
@@ -88,7 +87,7 @@ class TestLLMClient:
         """Test generating text from message list."""
         messages = [
             {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": "What is machine learning?"}
+            {"role": "user", "content": "What is machine learning?"},
         ]
         result = await mock_llm_client.generate_from_messages(messages)
         assert isinstance(result, str)
@@ -126,13 +125,7 @@ class TestLLMClient:
 
         # Mock successful response
         mock_response = {
-            "candidates": [
-                {
-                    "content": {
-                        "parts": [{"text": "Test response"}]
-                    }
-                }
-            ]
+            "candidates": [{"content": {"parts": [{"text": "Test response"}]}}]
         }
 
         # Create a proper mock response object
@@ -140,11 +133,11 @@ class TestLLMClient:
         mock_response_obj.json.return_value = mock_response
         mock_response_obj.raise_for_status.return_value = None
 
-        with patch.object(client.client, 'post', return_value=mock_response_obj) as mock_post:
+        with patch.object(
+            client.client, "post", return_value=mock_response_obj
+        ) as mock_post:
             result = await client._call_gemini(
-                [{"role": "user", "content": "test"}],
-                1000,
-                0.1
+                [{"role": "user", "content": "test"}], 1000, 0.1
             )
             assert result == "Test response"
 
@@ -155,26 +148,18 @@ class TestLLMClient:
         client = LLMClient(llm_config)
 
         # Mock successful response
-        mock_response = {
-            "choices": [
-                {
-                    "message": {
-                        "content": "Test response"
-                    }
-                }
-            ]
-        }
+        mock_response = {"choices": [{"message": {"content": "Test response"}}]}
 
         # Create a proper mock response object
         mock_response_obj = MagicMock()
         mock_response_obj.json.return_value = mock_response
         mock_response_obj.raise_for_status.return_value = None
 
-        with patch.object(client.client, 'post', return_value=mock_response_obj) as mock_post:
+        with patch.object(
+            client.client, "post", return_value=mock_response_obj
+        ) as mock_post:
             result = await client._call_openai(
-                [{"role": "user", "content": "test"}],
-                1000,
-                0.1
+                [{"role": "user", "content": "test"}], 1000, 0.1
             )
             assert result == "Test response"
 
@@ -187,23 +172,19 @@ class TestLLMClient:
         # Create mock response for successful call
         success_response = MagicMock()
         success_response.json.return_value = {
-            "candidates": [
-                {"content": {"parts": [{"text": "Success"}]}}
-            ]
+            "candidates": [{"content": {"parts": [{"text": "Success"}]}}]
         }
         success_response.raise_for_status.return_value = None
 
-        with patch.object(client.client, 'post') as mock_post:
+        with patch.object(client.client, "post") as mock_post:
             # First call fails, second succeeds
             mock_post.side_effect = [
                 httpx.HTTPStatusError("Server error", request=None, response=None),
-                success_response
+                success_response,
             ]
 
             result = await client._call_gemini(
-                [{"role": "user", "content": "test"}],
-                1000,
-                0.1
+                [{"role": "user", "content": "test"}], 1000, 0.1
             )
             assert result == "Success"
             assert mock_post.call_count == 2

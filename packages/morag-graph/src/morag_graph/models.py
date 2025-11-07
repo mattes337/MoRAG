@@ -1,8 +1,8 @@
 """Graph models for entities and relations."""
 
 from dataclasses import dataclass
-from typing import Dict, Any, Optional, List
 from datetime import datetime
+from typing import Any, Dict, List, Optional
 
 
 @dataclass

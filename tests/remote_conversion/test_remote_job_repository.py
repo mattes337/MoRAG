@@ -1,10 +1,11 @@
 """Tests for remote job repository."""
 
-import pytest
-import tempfile
 import shutil
-from pathlib import Path
+import tempfile
 from datetime import datetime, timedelta
+from pathlib import Path
+
+import pytest
 from morag.repositories.remote_job_repository import RemoteJobRepository
 from morag_core.models.remote_job import RemoteJob
 
@@ -30,7 +31,7 @@ class TestRemoteJobRepository:
             ingestion_task_id="test-task-123",
             source_file_path="/tmp/test.mp3",
             content_type="audio",
-            task_options={"webhook_url": "http://example.com/webhook"}
+            task_options={"webhook_url": "http://example.com/webhook"},
         )
 
         assert job.id is not None
@@ -51,7 +52,7 @@ class TestRemoteJobRepository:
             ingestion_task_id="test-task-123",
             source_file_path="/tmp/test.mp3",
             content_type="audio",
-            task_options={}
+            task_options={},
         )
 
         # Retrieve the job
@@ -75,7 +76,7 @@ class TestRemoteJobRepository:
             ingestion_task_id="test-task-123",
             source_file_path="/tmp/test.mp3",
             content_type="audio",
-            task_options={}
+            task_options={},
         )
 
         # Update job status
@@ -106,21 +107,21 @@ class TestRemoteJobRepository:
             ingestion_task_id="task-1",
             source_file_path="/tmp/test1.mp3",
             content_type="audio",
-            task_options={}
+            task_options={},
         )
 
         job2 = repository.create_job(
             ingestion_task_id="task-2",
             source_file_path="/tmp/test2.mp4",
             content_type="video",
-            task_options={}
+            task_options={},
         )
 
         job3 = repository.create_job(
             ingestion_task_id="task-3",
             source_file_path="/tmp/test3.pdf",
             content_type="document",
-            task_options={}
+            task_options={},
         )
 
         # Poll for audio jobs
@@ -136,11 +137,15 @@ class TestRemoteJobRepository:
         assert video_jobs[0].content_type == "video"
 
         # Poll for audio/video jobs (should get video since audio is already claimed)
-        av_jobs = repository.poll_available_jobs("worker-3", ["audio", "video"], max_jobs=2)
+        av_jobs = repository.poll_available_jobs(
+            "worker-3", ["audio", "video"], max_jobs=2
+        )
         assert len(av_jobs) == 0  # video is already claimed
 
         # Poll for document jobs (not supported by workers)
-        doc_jobs = repository.poll_available_jobs("worker-4", ["audio", "video"], max_jobs=2)
+        doc_jobs = repository.poll_available_jobs(
+            "worker-4", ["audio", "video"], max_jobs=2
+        )
         assert len(doc_jobs) == 0
 
     def test_submit_result_success(self, repository):
@@ -150,7 +155,7 @@ class TestRemoteJobRepository:
             ingestion_task_id="test-task-123",
             source_file_path="/tmp/test.mp3",
             content_type="audio",
-            task_options={}
+            task_options={},
         )
 
         # Claim the job
@@ -163,7 +168,7 @@ class TestRemoteJobRepository:
             success=True,
             content="Processed audio content",
             metadata={"duration": 120.5},
-            processing_time=45.2
+            processing_time=45.2,
         )
 
         assert result_job is not None
@@ -184,7 +189,7 @@ class TestRemoteJobRepository:
             ingestion_task_id="test-task-123",
             source_file_path="/tmp/test.mp3",
             content_type="audio",
-            task_options={}
+            task_options={},
         )
 
         jobs = repository.poll_available_jobs("worker-1", ["audio"], max_jobs=1)
@@ -194,7 +199,7 @@ class TestRemoteJobRepository:
         result_job = repository.submit_result(
             job_id=job.id,
             success=False,
-            error_message="Processing failed due to corrupted file"
+            error_message="Processing failed due to corrupted file",
         )
 
         assert result_job is not None
@@ -269,6 +274,7 @@ class TestRemoteJobRepository:
         completed_file = Path(repository.data_dir) / "completed" / f"{job.id}.json"
         old_time = datetime.now().timestamp() - (8 * 24 * 60 * 60)  # 8 days ago
         import os
+
         os.utime(completed_file, (old_time, old_time))
 
         # Run cleanup (7 days old)

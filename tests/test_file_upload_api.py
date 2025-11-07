@@ -1,18 +1,18 @@
 """Tests for file upload API endpoint."""
 
-import pytest
-import tempfile
-import json
 import asyncio
+import io
+import json
+import tempfile
 from pathlib import Path
 from typing import Optional
-from unittest.mock import Mock, patch, AsyncMock
-from fastapi.testclient import TestClient
-from fastapi import UploadFile
-import io
+from unittest.mock import AsyncMock, Mock, patch
 
+import pytest
+from fastapi import UploadFile
+from fastapi.testclient import TestClient
 from morag.server import create_app
-from morag.utils.file_upload import FileUploadHandler, FileUploadConfig, FileUploadError
+from morag.utils.file_upload import FileUploadConfig, FileUploadError, FileUploadHandler
 from morag_core.models import ProcessingResult
 
 
@@ -24,8 +24,8 @@ class TestFileUploadHandler:
         """Create test upload configuration."""
         return FileUploadConfig(
             max_file_size=1024 * 1024,  # 1MB for testing
-            allowed_extensions={'.txt', '.pdf', '.mp3', '.mp4', '.jpg'},
-            cleanup_timeout=60  # 1 minute for testing
+            allowed_extensions={".txt", ".pdf", ".mp3", ".mp4", ".jpg"},
+            cleanup_timeout=60,  # 1 minute for testing
         )
 
     @pytest.fixture
@@ -36,7 +36,9 @@ class TestFileUploadHandler:
         # Cleanup after test
         handler.cleanup_temp_dir()
 
-    def create_mock_upload_file(self, filename: str, content: bytes, content_type: Optional[str] = None):
+    def create_mock_upload_file(
+        self, filename: str, content: bytes, content_type: Optional[str] = None
+    ):
         """Create mock UploadFile for testing."""
         upload_file = Mock(spec=UploadFile)
         upload_file.filename = filename
@@ -45,10 +47,11 @@ class TestFileUploadHandler:
 
         # Mock async read method
         content_buffer = bytearray(content)  # Use mutable bytearray
+
         async def mock_read(size: int = -1):
             if size == -1 or size >= len(content_buffer):
                 data = bytes(content_buffer)
-                content_buffer[:] = b''  # Clear content to simulate reading
+                content_buffer[:] = b""  # Clear content to simulate reading
                 return data
             else:
                 data = bytes(content_buffer[:size])
@@ -74,10 +77,14 @@ class TestFileUploadHandler:
     async def test_save_valid_json_file(self, upload_handler):
         """Test saving a valid JSON file (for stage intermediate files)."""
         content = b'{"chunks": [], "metadata": {"test": true}}'
-        upload_file = self.create_mock_upload_file("test.chunks.json", content, "application/json")
+        upload_file = self.create_mock_upload_file(
+            "test.chunks.json", content, "application/json"
+        )
 
         # Should work with allow_intermediate=True
-        temp_path = await upload_handler.save_upload(upload_file, allow_intermediate=True)
+        temp_path = await upload_handler.save_upload(
+            upload_file, allow_intermediate=True
+        )
 
         assert temp_path.exists()
         assert temp_path.read_bytes() == content
@@ -87,7 +94,9 @@ class TestFileUploadHandler:
     async def test_reject_json_file_for_user_upload(self, upload_handler):
         """Test rejection of JSON files for regular user uploads."""
         content = b'{"malicious": "data"}'
-        upload_file = self.create_mock_upload_file("malicious.json", content, "application/json")
+        upload_file = self.create_mock_upload_file(
+            "malicious.json", content, "application/json"
+        )
 
         # Should fail without allow_intermediate=True
         with pytest.raises(FileUploadError, match="File extension '.json' not allowed"):
@@ -98,7 +107,9 @@ class TestFileUploadHandler:
         """Test rejection of files that are too large."""
         # Create content larger than max_file_size (1MB)
         large_content = b"x" * (2 * 1024 * 1024)  # 2MB
-        upload_file = self.create_mock_upload_file("large.txt", large_content, "text/plain")
+        upload_file = self.create_mock_upload_file(
+            "large.txt", large_content, "text/plain"
+        )
 
         with pytest.raises(FileUploadError, match="exceeds maximum"):
             await upload_handler.save_upload(upload_file)
@@ -107,7 +118,9 @@ class TestFileUploadHandler:
     async def test_invalid_extension(self, upload_handler):
         """Test rejection of files with invalid extensions."""
         content = b"Test content"
-        upload_file = self.create_mock_upload_file("test.xyz", content, "application/xyz")
+        upload_file = self.create_mock_upload_file(
+            "test.xyz", content, "application/xyz"
+        )
 
         with pytest.raises(FileUploadError, match="File extension '.xyz' not allowed"):
             await upload_handler.save_upload(upload_file)
@@ -126,7 +139,9 @@ class TestFileUploadHandler:
         """Test filename sanitization."""
         content = b"Test content"
         dangerous_filename = "../../../etc/passwd"
-        upload_file = self.create_mock_upload_file(dangerous_filename, content, "text/plain")
+        upload_file = self.create_mock_upload_file(
+            dangerous_filename, content, "text/plain"
+        )
 
         # Should not raise error but sanitize filename
         upload_file.filename = "passwd.txt"  # Simulate sanitized result
@@ -141,7 +156,10 @@ class TestFileUploadHandler:
         # Test dangerous characters
         assert upload_handler._sanitize_filename("test<>file.txt") == "test__file.txt"
         assert upload_handler._sanitize_filename("../../../passwd") == "passwd"
-        assert upload_handler._sanitize_filename("file:with|bad*chars.txt") == "file_with_bad_chars.txt"
+        assert (
+            upload_handler._sanitize_filename("file:with|bad*chars.txt")
+            == "file_with_bad_chars.txt"
+        )
 
         # Test empty/invalid names
         assert upload_handler._sanitize_filename("") == ""
@@ -167,7 +185,7 @@ class TestFileUploadAPI:
     @pytest.fixture
     def mock_morag_api(self):
         """Mock MoRAG API for testing."""
-        with patch('morag.server.MoRAGAPI') as mock_api_class:
+        with patch("morag.server.MoRAGAPI") as mock_api_class:
             mock_api = Mock()
             mock_api_class.return_value = mock_api
 
@@ -177,7 +195,7 @@ class TestFileUploadAPI:
                 content="Processed content",
                 metadata={"test": True},
                 processing_time=1.5,
-                error_message=None
+                error_message=None,
             )
             mock_api.process_file = AsyncMock(return_value=mock_result)
 
@@ -191,7 +209,7 @@ class TestFileUploadAPI:
         response = client.post(
             "/process/file",
             files={"file": ("test.pdf", test_content, "application/pdf")},
-            data={"content_type": "document"}
+            data={"content_type": "document"},
         )
 
         assert response.status_code == 200
@@ -209,10 +227,7 @@ class TestFileUploadAPI:
         response = client.post(
             "/process/file",
             files={"file": ("test.mp3", test_content, "audio/mpeg")},
-            data={
-                "content_type": "audio",
-                "options": json.dumps(options)
-            }
+            data={"content_type": "audio", "options": json.dumps(options)},
         )
 
         assert response.status_code == 200
@@ -228,7 +243,7 @@ class TestFileUploadAPI:
 
         response = client.post(
             "/process/file",
-            files={"file": ("test.xyz", test_content, "application/xyz")}
+            files={"file": ("test.xyz", test_content, "application/xyz")},
         )
 
         assert response.status_code == 400
@@ -240,8 +255,7 @@ class TestFileUploadAPI:
         large_content = b"x" * (101 * 1024 * 1024)  # 101MB
 
         response = client.post(
-            "/process/file",
-            files={"file": ("large.txt", large_content, "text/plain")}
+            "/process/file", files={"file": ("large.txt", large_content, "text/plain")}
         )
 
         assert response.status_code == 400
@@ -254,7 +268,7 @@ class TestFileUploadAPI:
         response = client.post(
             "/process/file",
             files={"file": ("test.txt", test_content, "text/plain")},
-            data={"options": "invalid json"}
+            data={"options": "invalid json"},
         )
 
         assert response.status_code == 400
@@ -262,16 +276,18 @@ class TestFileUploadAPI:
 
     def test_processing_failure(self, client):
         """Test handling of processing failures."""
-        with patch('morag.server.MoRAGAPI') as mock_api_class:
+        with patch("morag.server.MoRAGAPI") as mock_api_class:
             mock_api = Mock()
             mock_api_class.return_value = mock_api
-            mock_api.process_file = AsyncMock(side_effect=Exception("Processing failed"))
+            mock_api.process_file = AsyncMock(
+                side_effect=Exception("Processing failed")
+            )
 
             test_content = b"Test content"
 
             response = client.post(
                 "/process/file",
-                files={"file": ("test.txt", test_content, "text/plain")}
+                files={"file": ("test.txt", test_content, "text/plain")},
             )
 
             assert response.status_code == 500
@@ -306,6 +322,7 @@ class TestFileUploadIntegration:
 
             # Mock read method
             content_copy = bytearray(content)
+
             async def mock_read(size: int = -1):
                 if size == -1 or size >= len(content_copy):
                     data = bytes(content_copy)

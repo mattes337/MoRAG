@@ -9,15 +9,23 @@ import time
 from pathlib import Path
 
 # Add the packages to the path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "packages" / "morag" / "src"))
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "packages" / "morag-core" / "src"))
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "packages" / "morag-services" / "src"))
+sys.path.insert(
+    0, str(Path(__file__).parent.parent.parent / "packages" / "morag" / "src")
+)
+sys.path.insert(
+    0, str(Path(__file__).parent.parent.parent / "packages" / "morag-core" / "src")
+)
+sys.path.insert(
+    0, str(Path(__file__).parent.parent.parent / "packages" / "morag-services" / "src")
+)
+
 
 def print_section(title: str):
     """Print a section header."""
     print(f"\n{'='*60}")
     print(f"🔧 {title}")
     print(f"{'='*60}")
+
 
 def test_content_type_validation():
     """Test that content type validation works correctly."""
@@ -43,7 +51,9 @@ def test_content_type_validation():
                 # This should not fail anymore
                 content_type_enum = ContentType(normalized_type)
 
-                print(f"✅ {ext} -> detected: {detected_type}, normalized: {normalized_type}, enum: {content_type_enum}")
+                print(
+                    f"✅ {ext} -> detected: {detected_type}, normalized: {normalized_type}, enum: {content_type_enum}"
+                )
 
             except Exception as e:
                 print(f"❌ {ext} -> Error: {e}")
@@ -55,8 +65,10 @@ def test_content_type_validation():
     except Exception as e:
         print(f"❌ Content type validation test failed: {e}")
         import traceback
+
         traceback.print_exc()
         return False
+
 
 def test_processing_config_with_task_options():
     """Test ProcessingConfig with task options that caused the original error."""
@@ -67,18 +79,15 @@ def test_processing_config_with_task_options():
 
         # These are the exact parameters that caused the original error
         task_options = {
-            'webhook_url': '',
-            'metadata': None,
-            'use_docling': False,
-            'store_in_vector_db': True,
-            'remote': False
+            "webhook_url": "",
+            "metadata": None,
+            "use_docling": False,
+            "store_in_vector_db": True,
+            "remote": False,
         }
 
         # Add file_path as required
-        config_params = {
-            'file_path': '/tmp/test.pdf',
-            **task_options
-        }
+        config_params = {"file_path": "/tmp/test.pdf", **task_options}
 
         print("Testing ProcessingConfig with task options that caused original error:")
         try:
@@ -100,8 +109,10 @@ def test_processing_config_with_task_options():
     except Exception as e:
         print(f"❌ ProcessingConfig test failed: {e}")
         import traceback
+
         traceback.print_exc()
         return False
+
 
 def test_celery_task_simulation():
     """Simulate the Celery task execution that was failing."""
@@ -109,8 +120,8 @@ def test_celery_task_simulation():
 
     try:
         from morag.api import MoRAGAPI
-        from morag_services import ContentType
         from morag_core.interfaces.processor import ProcessingConfig
+        from morag_services import ContentType
 
         # Create API instance
         api = MoRAGAPI()
@@ -118,10 +129,10 @@ def test_celery_task_simulation():
         # Simulate the exact scenario that was failing
         file_path = "/tmp/test.pdf"
         task_options = {
-            'webhook_url': '',
-            'metadata': None,
-            'use_docling': False,
-            'store_in_vector_db': True
+            "webhook_url": "",
+            "metadata": None,
+            "use_docling": False,
+            "store_in_vector_db": True,
         }
 
         print("Simulating the exact worker task scenario that was failing:")
@@ -132,7 +143,9 @@ def test_celery_task_simulation():
             normalized_type = api._normalize_content_type(detected_type)
             content_type_enum = ContentType(normalized_type)
 
-            print(f"✅ Step 1 - Content type detection: {detected_type} -> {normalized_type} -> {content_type_enum}")
+            print(
+                f"✅ Step 1 - Content type detection: {detected_type} -> {normalized_type} -> {content_type_enum}"
+            )
 
         except Exception as e:
             print(f"❌ Step 1 - Content type detection failed: {e}")
@@ -140,10 +153,7 @@ def test_celery_task_simulation():
 
         # Step 2: ProcessingConfig creation (this was failing with unexpected keyword arguments)
         try:
-            config = ProcessingConfig(
-                file_path=file_path,
-                **task_options
-            )
+            config = ProcessingConfig(file_path=file_path, **task_options)
 
             print(f"✅ Step 2 - ProcessingConfig creation successful")
 
@@ -158,9 +168,9 @@ def test_celery_task_simulation():
 
             # This is how we now handle exceptions in the fixed code
             error_info = {
-                'error': str(test_exception),
-                'error_type': test_exception.__class__.__name__,
-                'file_path': file_path
+                "error": str(test_exception),
+                "error_type": test_exception.__class__.__name__,
+                "file_path": file_path,
             }
 
             # Re-raise with proper exception type information
@@ -178,8 +188,10 @@ def test_celery_task_simulation():
     except Exception as e:
         print(f"❌ Celery task simulation failed: {e}")
         import traceback
+
         traceback.print_exc()
         return False
+
 
 def create_test_pdf():
     """Create a simple test PDF file."""
@@ -200,7 +212,7 @@ Any exceptions should be properly serialized for Celery.
 """
 
         # Create temporary file
-        temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False)
+        temp_file = tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False)
         temp_file.write(test_content)
         temp_file.close()
 
@@ -209,6 +221,7 @@ Any exceptions should be properly serialized for Celery.
     except Exception as e:
         print(f"❌ Failed to create test file: {e}")
         return None
+
 
 def main():
     """Run all worker fix tests."""
@@ -242,6 +255,7 @@ def main():
     print("=" * 60)
 
     return passed_tests == total_tests
+
 
 if __name__ == "__main__":
     success = main()

@@ -2,10 +2,10 @@
 
 import json
 import os
-from pathlib import Path
-from typing import Dict, List, Any
-from datetime import datetime, timezone
 import uuid
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Dict, List
 
 from morag_core.utils.logging import get_logger
 
@@ -23,8 +23,8 @@ class ResultProcessor:
         embeddings: List[List[float]],
         chunk_metadata_list: List[Dict[str, Any]],
         summary: str,
-        content_type: str = 'document',
-        base_metadata: Dict[str, Any] = None
+        content_type: str = "document",
+        base_metadata: Dict[str, Any] = None,
     ) -> Dict[str, Any]:
         """Create comprehensive ingest result with all processing information.
 
@@ -47,7 +47,9 @@ class ResultProcessor:
         # Calculate processing statistics
         total_chunks = len(chunks)
         total_words = len(content.split()) if content else 0
-        avg_chunk_size = sum(len(chunk.split()) for chunk in chunks) / total_chunks if chunks else 0
+        avg_chunk_size = (
+            sum(len(chunk.split()) for chunk in chunks) / total_chunks if chunks else 0
+        )
 
         ingest_result = {
             "source": {
@@ -69,7 +71,7 @@ class ResultProcessor:
                 "embedding_dimensions": len(embeddings[0]) if embeddings else 0,
                 "processing_method": "chunk_processor_v2",
             },
-            "chunks": []
+            "chunks": [],
         }
 
         # Add base metadata
@@ -77,7 +79,9 @@ class ResultProcessor:
             ingest_result["metadata"] = base_metadata.copy()
 
         # Process each chunk
-        for i, (chunk_text, embedding, chunk_metadata) in enumerate(zip(chunks, embeddings, chunk_metadata_list)):
+        for i, (chunk_text, embedding, chunk_metadata) in enumerate(
+            zip(chunks, embeddings, chunk_metadata_list)
+        ):
             chunk_data = {
                 "index": i,
                 "text": chunk_text,
@@ -86,35 +90,47 @@ class ResultProcessor:
                 "statistics": {
                     "word_count": len(chunk_text.split()),
                     "character_count": len(chunk_text),
-                    "embedding_norm": round(sum(x*x for x in embedding) ** 0.5, 4) if embedding else 0,
-                }
+                    "embedding_norm": round(sum(x * x for x in embedding) ** 0.5, 4)
+                    if embedding
+                    else 0,
+                },
             }
 
             ingest_result["chunks"].append(chunk_data)
 
-        logger.info("Created ingest result",
-                   source=source_path,
-                   chunk_count=total_chunks,
-                   content_type=content_type)
+        logger.info(
+            "Created ingest result",
+            source=source_path,
+            chunk_count=total_chunks,
+            content_type=content_type,
+        )
 
         return ingest_result
 
-    def _serialize_enhanced_processing(self, enhanced_processing: Dict[str, Any]) -> Dict[str, Any]:
+    def _serialize_enhanced_processing(
+        self, enhanced_processing: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Serialize enhanced processing results for JSON storage."""
         serialized = {}
 
         for key, value in enhanced_processing.items():
-            if hasattr(value, '__dict__'):
+            if hasattr(value, "__dict__"):
                 # Object with attributes - convert to dict
-                serialized[key] = value.__dict__ if hasattr(value, '__dict__') else str(value)
+                serialized[key] = (
+                    value.__dict__ if hasattr(value, "__dict__") else str(value)
+                )
             elif isinstance(value, list):
                 # List - process each item
                 serialized[key] = []
                 for item in value:
-                    if hasattr(item, '__dict__'):
+                    if hasattr(item, "__dict__"):
                         serialized[key].append(item.__dict__)
                     else:
-                        serialized[key].append(str(item) if not isinstance(item, (str, int, float, bool, dict)) else item)
+                        serialized[key].append(
+                            str(item)
+                            if not isinstance(item, (str, int, float, bool, dict))
+                            else item
+                        )
             elif isinstance(value, dict):
                 # Dictionary - recursively process
                 serialized[key] = self._serialize_enhanced_processing(value)
@@ -124,23 +140,27 @@ class ResultProcessor:
 
         return serialized
 
-    def write_ingest_result_file(self, source_path: str, ingest_result: Dict[str, Any]) -> str:
+    def write_ingest_result_file(
+        self, source_path: str, ingest_result: Dict[str, Any]
+    ) -> str:
         """Write ingest result to JSON file."""
         source_path_obj = Path(source_path)
         result_filename = f"{source_path_obj.stem}.ingest_result.json"
         result_path = source_path_obj.parent / result_filename
 
         try:
-            with open(result_path, 'w', encoding='utf-8') as f:
+            with open(result_path, "w", encoding="utf-8") as f:
                 json.dump(ingest_result, f, indent=2, ensure_ascii=False)
 
             logger.info("Wrote ingest result file", path=str(result_path))
             return str(result_path)
 
         except Exception as e:
-            logger.error("Failed to write ingest result file",
-                        path=str(result_path),
-                        error=str(e))
+            logger.error(
+                "Failed to write ingest result file",
+                path=str(result_path),
+                error=str(e),
+            )
             raise
 
     def create_ingest_data(
@@ -150,7 +170,7 @@ class ResultProcessor:
         embeddings: List[List[float]],
         chunk_metadata_list: List[Dict[str, Any]],
         document_id: str = None,
-        collection_name: str = None
+        collection_name: str = None,
     ) -> Dict[str, Any]:
         """Create ingest data for database storage.
 
@@ -169,12 +189,14 @@ class ResultProcessor:
             document_id = str(uuid.uuid4())
 
         if collection_name is None:
-            collection_name = os.getenv('QDRANT_COLLECTION_NAME', 'morag_documents')
+            collection_name = os.getenv("QDRANT_COLLECTION_NAME", "morag_documents")
 
         # Prepare data points for database storage
         data_points = []
 
-        for i, (chunk_text, embedding, chunk_metadata) in enumerate(zip(chunks, embeddings, chunk_metadata_list)):
+        for i, (chunk_text, embedding, chunk_metadata) in enumerate(
+            zip(chunks, embeddings, chunk_metadata_list)
+        ):
             point_id = str(uuid.uuid4())
 
             # Prepare payload with all metadata
@@ -185,14 +207,10 @@ class ResultProcessor:
                 "source_path": source_path,
                 "source_filename": Path(source_path).name,
                 "processing_timestamp": datetime.now(timezone.utc).isoformat(),
-                **chunk_metadata  # Include all chunk-specific metadata
+                **chunk_metadata,  # Include all chunk-specific metadata
             }
 
-            data_point = {
-                "id": point_id,
-                "vector": embedding,
-                "payload": payload
-            }
+            data_point = {"id": point_id, "vector": embedding, "payload": payload}
 
             data_points.append(data_point)
 
@@ -202,33 +220,37 @@ class ResultProcessor:
             "source_path": source_path,
             "total_chunks": len(chunks),
             "processing_timestamp": datetime.now(timezone.utc).isoformat(),
-            "data_points": data_points
+            "data_points": data_points,
         }
 
-        logger.info("Created ingest data",
-                   document_id=document_id,
-                   chunk_count=len(chunks),
-                   collection=collection_name)
+        logger.info(
+            "Created ingest data",
+            document_id=document_id,
+            chunk_count=len(chunks),
+            collection=collection_name,
+        )
 
         return ingest_data
 
-    def write_ingest_data_file(self, source_path: str, ingest_data: Dict[str, Any]) -> str:
+    def write_ingest_data_file(
+        self, source_path: str, ingest_data: Dict[str, Any]
+    ) -> str:
         """Write ingest data to JSON file."""
         source_path_obj = Path(source_path)
         data_filename = f"{source_path_obj.stem}.ingest_data.json"
         data_path = source_path_obj.parent / data_filename
 
         try:
-            with open(data_path, 'w', encoding='utf-8') as f:
+            with open(data_path, "w", encoding="utf-8") as f:
                 json.dump(ingest_data, f, indent=2, ensure_ascii=False)
 
             logger.info("Wrote ingest data file", path=str(data_path))
             return str(data_path)
 
         except Exception as e:
-            logger.error("Failed to write ingest data file",
-                        path=str(data_path),
-                        error=str(e))
+            logger.error(
+                "Failed to write ingest data file", path=str(data_path), error=str(e)
+            )
             raise
 
 

@@ -1,14 +1,14 @@
 """Tests for relationship merger maintenance job."""
-import pytest
+from typing import Any, Dict, List
 from unittest.mock import AsyncMock, MagicMock, patch
-from typing import Dict, Any, List
 
+import pytest
 from morag_graph.maintenance.relationship_merger import (
+    MergeCandidate,
+    RelationshipCandidate,
     RelationshipMerger,
     RelationshipMergerConfig,
-    RelationshipCandidate,
-    MergeCandidate,
-    run_relationship_merger
+    run_relationship_merger,
 )
 
 
@@ -23,7 +23,7 @@ def config():
         enable_rotation=False,
         merge_bidirectional=True,
         merge_transitive=False,
-        min_confidence=0.5
+        min_confidence=0.5,
     )
 
 
@@ -54,7 +54,7 @@ def sample_relationships():
             target_id="entity2",
             type="WORKS_FOR",
             confidence=0.9,
-            metadata={}
+            metadata={},
         ),
         RelationshipCandidate(
             id="rel2",
@@ -62,7 +62,7 @@ def sample_relationships():
             target_id="entity2",
             type="WORKS_FOR",
             confidence=0.8,
-            metadata={}
+            metadata={},
         ),
         RelationshipCandidate(
             id="rel3",
@@ -70,7 +70,7 @@ def sample_relationships():
             target_id="entity2",
             type="EMPLOYED_BY",
             confidence=0.85,
-            metadata={}
+            metadata={},
         ),
         RelationshipCandidate(
             id="rel4",
@@ -78,8 +78,8 @@ def sample_relationships():
             target_id="entity1",
             type="EMPLOYS",
             confidence=0.7,
-            metadata={}
-        )
+            metadata={},
+        ),
     ]
 
 
@@ -91,7 +91,7 @@ class TestRelationshipMergerConfig:
         config = RelationshipMergerConfig(
             similarity_threshold=1.5,  # Invalid
             batch_size=0,  # Invalid
-            min_confidence=-0.1  # Invalid
+            min_confidence=-0.1,  # Invalid
         )
 
         config.ensure_defaults()
@@ -105,12 +105,16 @@ class TestRelationshipMerger:
     """Test relationship merger functionality."""
 
     @pytest.mark.asyncio
-    async def test_find_duplicate_relationships(self, config, mock_neo4j_storage, mock_llm_client, sample_relationships):
+    async def test_find_duplicate_relationships(
+        self, config, mock_neo4j_storage, mock_llm_client, sample_relationships
+    ):
         """Test finding exact duplicate relationships."""
         merger = RelationshipMerger(config, mock_neo4j_storage, mock_llm_client)
 
         # Test with relationships that have exact duplicates
-        duplicates = await merger._find_duplicate_relationships(sample_relationships[:2])
+        duplicates = await merger._find_duplicate_relationships(
+            sample_relationships[:2]
+        )
 
         assert len(duplicates) == 1
         assert duplicates[0].primary_relationship.id == "rel1"  # Higher confidence
@@ -119,15 +123,22 @@ class TestRelationshipMerger:
         assert duplicates[0].merge_reason == "duplicate_exact"
 
     @pytest.mark.asyncio
-    async def test_find_semantic_equivalents(self, config, mock_neo4j_storage, mock_llm_client, sample_relationships):
+    async def test_find_semantic_equivalents(
+        self, config, mock_neo4j_storage, mock_llm_client, sample_relationships
+    ):
         """Test finding semantically equivalent relationships."""
         merger = RelationshipMerger(config, mock_neo4j_storage, mock_llm_client)
 
         # Mock LLM response for semantic similarity
-        mock_llm_client.generate = AsyncMock(return_value='[["WORKS_FOR", "EMPLOYED_BY"]]')
+        mock_llm_client.generate = AsyncMock(
+            return_value='[["WORKS_FOR", "EMPLOYED_BY"]]'
+        )
 
         # Test with relationships that are semantically similar
-        test_rels = [sample_relationships[0], sample_relationships[2]]  # WORKS_FOR and EMPLOYED_BY
+        test_rels = [
+            sample_relationships[0],
+            sample_relationships[2],
+        ]  # WORKS_FOR and EMPLOYED_BY
         semantic_groups = await merger._find_semantic_equivalents(test_rels)
 
         assert len(semantic_groups) == 1
@@ -137,7 +148,9 @@ class TestRelationshipMerger:
         assert semantic_groups[0].merge_reason == "semantic_equivalent"
 
     @pytest.mark.asyncio
-    async def test_get_merger_candidates(self, config, mock_neo4j_storage, mock_llm_client):
+    async def test_get_merger_candidates(
+        self, config, mock_neo4j_storage, mock_llm_client
+    ):
         """Test getting merger candidates from database."""
         merger = RelationshipMerger(config, mock_neo4j_storage, mock_llm_client)
 
@@ -149,7 +162,7 @@ class TestRelationshipMerger:
                 "target_id": "entity2",
                 "type": "WORKS_FOR",
                 "confidence": 0.9,
-                "metadata": "{}"
+                "metadata": "{}",
             }
         ]
 
@@ -161,7 +174,9 @@ class TestRelationshipMerger:
         assert candidates[0].confidence == 0.9
 
     @pytest.mark.asyncio
-    async def test_apply_merge_dry_run(self, config, mock_neo4j_storage, mock_llm_client):
+    async def test_apply_merge_dry_run(
+        self, config, mock_neo4j_storage, mock_llm_client
+    ):
         """Test merge application in dry run mode."""
         config.dry_run = True
         merger = RelationshipMerger(config, mock_neo4j_storage, mock_llm_client)
@@ -173,7 +188,7 @@ class TestRelationshipMerger:
             primary_relationship=primary,
             duplicate_relationships=[duplicate],
             merge_reason="duplicate_exact",
-            confidence_score=1.0
+            confidence_score=1.0,
         )
 
         # Should not call any database operations in dry run
@@ -195,7 +210,7 @@ class TestRelationshipMerger:
             primary_relationship=primary,
             duplicate_relationships=[duplicate],
             merge_reason="duplicate_exact",
-            confidence_score=1.0
+            confidence_score=1.0,
         )
 
         # Should call database operations
@@ -205,7 +220,9 @@ class TestRelationshipMerger:
         assert mock_neo4j_storage._connection_ops._execute_query.call_count == 2
 
     @pytest.mark.asyncio
-    async def test_run_merger_empty_result(self, config, mock_neo4j_storage, mock_llm_client):
+    async def test_run_merger_empty_result(
+        self, config, mock_neo4j_storage, mock_llm_client
+    ):
         """Test merger with no relationships to process."""
         merger = RelationshipMerger(config, mock_neo4j_storage, mock_llm_client)
 
@@ -230,13 +247,16 @@ class TestRunRelationshipMerger:
             "similarity_threshold": 0.9,
             "batch_size": 50,
             "dry_run": False,
-            "limit_relations": 500
+            "limit_relations": 500,
         }
 
-        with patch('morag_graph.maintenance.relationship_merger.Neo4jStorage') as mock_storage_class, \
-             patch('morag_graph.maintenance.relationship_merger.Neo4jConfig') as mock_config_class, \
-             patch('morag_graph.maintenance.relationship_merger.LLMClient') as mock_llm_class:
-
+        with patch(
+            "morag_graph.maintenance.relationship_merger.Neo4jStorage"
+        ) as mock_storage_class, patch(
+            "morag_graph.maintenance.relationship_merger.Neo4jConfig"
+        ) as mock_config_class, patch(
+            "morag_graph.maintenance.relationship_merger.LLMClient"
+        ) as mock_llm_class:
             # Setup mocks
             mock_storage = AsyncMock()
             mock_storage_class.return_value = mock_storage
@@ -245,7 +265,7 @@ class TestRunRelationshipMerger:
             mock_llm_class.return_value = mock_llm
 
             # Mock the merger run method
-            with patch.object(RelationshipMerger, 'run_merger') as mock_run:
+            with patch.object(RelationshipMerger, "run_merger") as mock_run:
                 mock_result = MagicMock()
                 mock_run.return_value = mock_result
 

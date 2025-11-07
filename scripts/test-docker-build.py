@@ -3,11 +3,12 @@
 Test script to verify Docker build and module imports.
 """
 
+import json
 import subprocess
 import sys
 import time
-import json
 from pathlib import Path
+
 
 def run_command(cmd, capture_output=True, timeout=300):
     """Run a command and return the result."""
@@ -18,7 +19,7 @@ def run_command(cmd, capture_output=True, timeout=300):
             capture_output=capture_output,
             text=True,
             timeout=timeout,
-            cwd=Path(__file__).parent.parent
+            cwd=Path(__file__).parent.parent,
         )
         return result
     except subprocess.TimeoutExpired:
@@ -28,17 +29,16 @@ def run_command(cmd, capture_output=True, timeout=300):
         print(f"Error running command: {e}")
         return None
 
+
 def test_docker_build():
     """Test Docker build process."""
     print("🔨 Testing Docker build...")
 
     # Build the production image
-    result = run_command([
-        "docker", "build",
-        "--target", "production",
-        "--tag", "morag:test",
-        "."
-    ], timeout=600)
+    result = run_command(
+        ["docker", "build", "--target", "production", "--tag", "morag:test", "."],
+        timeout=600,
+    )
 
     if result is None or result.returncode != 0:
         print("❌ Docker build failed!")
@@ -50,16 +50,23 @@ def test_docker_build():
     print("✅ Docker build successful!")
     return True
 
+
 def test_module_import():
     """Test that the morag module can be imported in the container."""
     print("🐍 Testing module import...")
 
     # Test basic import
-    result = run_command([
-        "docker", "run", "--rm",
-        "morag:test",
-        "python", "-c", "import morag; print('morag module imported successfully')"
-    ])
+    result = run_command(
+        [
+            "docker",
+            "run",
+            "--rm",
+            "morag:test",
+            "python",
+            "-c",
+            "import morag; print('morag module imported successfully')",
+        ]
+    )
 
     if result is None or result.returncode != 0:
         print("❌ Module import failed!")
@@ -71,15 +78,22 @@ def test_module_import():
     print("✅ Module import successful!")
     return True
 
+
 def test_worker_module():
     """Test that the worker module can be imported."""
     print("👷 Testing worker module...")
 
-    result = run_command([
-        "docker", "run", "--rm",
-        "morag:test",
-        "python", "-c", "import morag.worker; print('worker module imported successfully')"
-    ])
+    result = run_command(
+        [
+            "docker",
+            "run",
+            "--rm",
+            "morag:test",
+            "python",
+            "-c",
+            "import morag.worker; print('worker module imported successfully')",
+        ]
+    )
 
     if result is None or result.returncode != 0:
         print("❌ Worker module import failed!")
@@ -91,16 +105,22 @@ def test_worker_module():
     print("✅ Worker module import successful!")
     return True
 
+
 def test_celery_app():
     """Test that Celery app can be created."""
     print("🌿 Testing Celery app...")
 
-    result = run_command([
-        "docker", "run", "--rm",
-        "morag:test",
-        "python", "-c",
-        "from morag.worker import celery_app; print(f'Celery app: {celery_app.main}')"
-    ])
+    result = run_command(
+        [
+            "docker",
+            "run",
+            "--rm",
+            "morag:test",
+            "python",
+            "-c",
+            "from morag.worker import celery_app; print(f'Celery app: {celery_app.main}')",
+        ]
+    )
 
     if result is None or result.returncode != 0:
         print("❌ Celery app test failed!")
@@ -111,6 +131,7 @@ def test_celery_app():
 
     print("✅ Celery app test successful!")
     return True
+
 
 def test_package_versions():
     """Test that all packages are properly installed."""
@@ -126,16 +147,21 @@ def test_package_versions():
         "morag-image",
         "morag-web",
         "morag-youtube",
-        "morag-embedding"
+        "morag-embedding",
     ]
 
     for package in packages:
-        result = run_command([
-            "docker", "run", "--rm",
-            "morag:test",
-            "python", "-c",
-            f"import pkg_resources; print(f'{package}: {{pkg_resources.get_distribution(\"{package}\").version}}')"
-        ])
+        result = run_command(
+            [
+                "docker",
+                "run",
+                "--rm",
+                "morag:test",
+                "python",
+                "-c",
+                f"import pkg_resources; print(f'{package}: {{pkg_resources.get_distribution(\"{package}\").version}}')",
+            ]
+        )
 
         if result is None or result.returncode != 0:
             print(f"❌ Package {package} not found!")
@@ -147,10 +173,12 @@ def test_package_versions():
 
     return True
 
+
 def cleanup():
     """Clean up test resources."""
     print("🧹 Cleaning up...")
     run_command(["docker", "rmi", "morag:test"], capture_output=False)
+
 
 def main():
     """Main test function."""
@@ -169,7 +197,7 @@ def main():
     for test_name, test_func in tests:
         print(f"\n{'='*50}")
         print(f"Running: {test_name}")
-        print('='*50)
+        print("=" * 50)
 
         try:
             success = test_func()
@@ -181,7 +209,7 @@ def main():
     # Print summary
     print(f"\n{'='*50}")
     print("TEST SUMMARY")
-    print('='*50)
+    print("=" * 50)
 
     all_passed = True
     for test_name, success in results.items():
@@ -198,6 +226,7 @@ def main():
         print("\n💥 Some tests failed!")
         print("Docker image 'morag:test' left for debugging.")
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

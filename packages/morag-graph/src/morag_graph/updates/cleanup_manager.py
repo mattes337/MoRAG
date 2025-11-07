@@ -4,14 +4,15 @@ import logging
 from dataclasses import dataclass, field
 from typing import List, Optional
 
-from ..storage.base import BaseStorage
 from ..models.entity import EntityId
 from ..models.relation import RelationId
+from ..storage.base import BaseStorage
 
 
 @dataclass
 class CleanupResult:
     """Result of document cleanup operation."""
+
     document_id: str
     entities_deleted: int = 0
     relations_deleted: int = 0
@@ -119,17 +120,25 @@ class DocumentCleanupManager:
         """
         try:
             # This method needs to be implemented in storage backends
-            if hasattr(self.graph_storage, 'get_entities_by_document'):
-                entities = await self.graph_storage.get_entities_by_document(document_id)
+            if hasattr(self.graph_storage, "get_entities_by_document"):
+                entities = await self.graph_storage.get_entities_by_document(
+                    document_id
+                )
                 return [entity.id for entity in entities]
             else:
-                self.logger.warning("Storage backend does not support document-based entity queries")
+                self.logger.warning(
+                    "Storage backend does not support document-based entity queries"
+                )
                 return []
         except Exception as e:
-            self.logger.error(f"Error getting entities for document {document_id}: {str(e)}")
+            self.logger.error(
+                f"Error getting entities for document {document_id}: {str(e)}"
+            )
             return []
 
-    async def _get_document_relations(self, entity_ids: List[EntityId]) -> List[RelationId]:
+    async def _get_document_relations(
+        self, entity_ids: List[EntityId]
+    ) -> List[RelationId]:
         """Get all relation IDs involving the given entities.
 
         Args:
@@ -147,7 +156,9 @@ class DocumentCleanupManager:
                 for relation in relations:
                     relation_ids.add(relation.id)
             except Exception as e:
-                self.logger.error(f"Error getting relations for entity {entity_id}: {str(e)}")
+                self.logger.error(
+                    f"Error getting relations for entity {entity_id}: {str(e)}"
+                )
 
         return list(relation_ids)
 
@@ -158,7 +169,9 @@ class DocumentCleanupManager:
             document_id: Document identifier
         """
         try:
-            if hasattr(self.graph_storage, 'delete_document_checksum'):
+            if hasattr(self.graph_storage, "delete_document_checksum"):
                 await self.graph_storage.delete_document_checksum(document_id)
         except Exception as e:
-            self.logger.error(f"Error removing checksum for document {document_id}: {str(e)}")
+            self.logger.error(
+                f"Error removing checksum for document {document_id}: {str(e)}"
+            )

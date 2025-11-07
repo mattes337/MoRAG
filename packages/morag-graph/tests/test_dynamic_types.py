@@ -9,10 +9,10 @@ These tests ensure 100% coverage of the dynamic type system including:
 - Edge cases and error handling
 """
 
-import pytest
-from unittest.mock import Mock, AsyncMock, patch
 from typing import Dict, List, Optional
+from unittest.mock import AsyncMock, Mock, patch
 
+import pytest
 from morag_graph.extraction import EntityExtractor, RelationExtractor
 from morag_graph.models import Entity, Relation
 
@@ -22,6 +22,7 @@ try:
 except ImportError:
     # Fallback LLMConfig for compatibility
     from pydantic import BaseModel
+
     class LLMConfig(BaseModel):
         provider: str = "gemini"
         model: str = "gemini-1.5-flash"
@@ -49,7 +50,7 @@ class TestEntityExtractorDynamicTypes:
         config = LLMConfig(provider="mock", model="test")
         custom_types = {
             "DISEASE": "Medical condition or illness",
-            "TREATMENT": "Medical intervention or therapy"
+            "TREATMENT": "Medical intervention or therapy",
         }
         extractor = EntityExtractor(config, entity_types=custom_types)
 
@@ -84,7 +85,7 @@ class TestEntityExtractorDynamicTypes:
         config = LLMConfig(provider="mock", model="test")
         custom_types = {
             "DISEASE": "Medical condition",
-            "SYMPTOM": "Observable sign of disease"
+            "SYMPTOM": "Observable sign of disease",
         }
         extractor = EntityExtractor(config, entity_types=custom_types)
 
@@ -163,7 +164,7 @@ class TestRelationExtractorDynamicTypes:
         config = LLMConfig(provider="mock", model="test")
         custom_types = {
             "CAUSES": "Pathogen causes disease",
-            "TREATS": "Treatment treats condition"
+            "TREATS": "Treatment treats condition",
         }
         extractor = RelationExtractor(config, relation_types=custom_types)
 
@@ -172,7 +173,9 @@ class TestRelationExtractorDynamicTypes:
         assert len(extractor.relation_types) == 2
         assert "CAUSES" in extractor.relation_types
         assert "TREATS" in extractor.relation_types
-        assert "WORKS_FOR" not in extractor.relation_types  # Default should not be included
+        assert (
+            "WORKS_FOR" not in extractor.relation_types
+        )  # Default should not be included
 
     def test_empty_relation_types_initialization(self):
         """Test that RelationExtractor handles empty types dictionary."""
@@ -198,7 +201,7 @@ class TestRelationExtractorDynamicTypes:
         config = LLMConfig(provider="mock", model="test")
         custom_types = {
             "CAUSES": "Direct causal relationship",
-            "PREVENTS": "Prevention relationship"
+            "PREVENTS": "Prevention relationship",
         }
         extractor = RelationExtractor(config, relation_types=custom_types)
 
@@ -269,18 +272,20 @@ class TestDynamicTypesIntegration:
             "DISEASE": "Medical condition or illness",
             "TREATMENT": "Medical intervention or therapy",
             "SYMPTOM": "Observable sign of disease",
-            "MEDICATION": "Pharmaceutical drug"
+            "MEDICATION": "Pharmaceutical drug",
         }
 
         medical_relation_types = {
             "CAUSES": "Pathogen causes disease",
             "TREATS": "Treatment treats condition",
             "MANIFESTS_AS": "Disease manifests as symptom",
-            "PRESCRIBED_FOR": "Medication prescribed for condition"
+            "PRESCRIBED_FOR": "Medication prescribed for condition",
         }
 
         entity_extractor = EntityExtractor(config, entity_types=medical_entity_types)
-        relation_extractor = RelationExtractor(config, relation_types=medical_relation_types)
+        relation_extractor = RelationExtractor(
+            config, relation_types=medical_relation_types
+        )
 
         # Verify medical types are used
         assert entity_extractor.entity_types == medical_entity_types
@@ -301,13 +306,17 @@ class TestDynamicTypesIntegration:
         minimal_relation_types = {"KNOWS": "Person knows another person"}
 
         entity_extractor = EntityExtractor(config, entity_types=minimal_entity_types)
-        relation_extractor = RelationExtractor(config, relation_types=minimal_relation_types)
+        relation_extractor = RelationExtractor(
+            config, relation_types=minimal_relation_types
+        )
 
         # Should use only specified types
         assert len(entity_extractor.entity_types) == 1
         assert len(relation_extractor.relation_types) == 1
         assert entity_extractor.entity_types["PERSON"] == "Individual person"
-        assert relation_extractor.relation_types["KNOWS"] == "Person knows another person"
+        assert (
+            relation_extractor.relation_types["KNOWS"] == "Person knows another person"
+        )
 
     def test_maximum_control_empty_types(self):
         """Test maximum control scenario with empty type dictionaries."""
@@ -355,12 +364,12 @@ class TestDynamicTypesIntegration:
 
         entity_types = {
             "CUSTOM_TYPE_1": "This is a detailed description of custom type 1",
-            "CUSTOM_TYPE_2": "This is a detailed description of custom type 2"
+            "CUSTOM_TYPE_2": "This is a detailed description of custom type 2",
         }
 
         relation_types = {
             "CUSTOM_REL_1": "This is a detailed description of custom relation 1",
-            "CUSTOM_REL_2": "This is a detailed description of custom relation 2"
+            "CUSTOM_REL_2": "This is a detailed description of custom relation 2",
         }
 
         entity_extractor = EntityExtractor(config, entity_types=entity_types)
@@ -370,10 +379,22 @@ class TestDynamicTypesIntegration:
         relation_prompt = relation_extractor.get_system_prompt()
 
         # Check that full descriptions are included
-        assert "CUSTOM_TYPE_1: This is a detailed description of custom type 1" in entity_prompt
-        assert "CUSTOM_TYPE_2: This is a detailed description of custom type 2" in entity_prompt
-        assert "CUSTOM_REL_1: This is a detailed description of custom relation 1" in relation_prompt
-        assert "CUSTOM_REL_2: This is a detailed description of custom relation 2" in relation_prompt
+        assert (
+            "CUSTOM_TYPE_1: This is a detailed description of custom type 1"
+            in entity_prompt
+        )
+        assert (
+            "CUSTOM_TYPE_2: This is a detailed description of custom type 2"
+            in entity_prompt
+        )
+        assert (
+            "CUSTOM_REL_1: This is a detailed description of custom relation 1"
+            in relation_prompt
+        )
+        assert (
+            "CUSTOM_REL_2: This is a detailed description of custom relation 2"
+            in relation_prompt
+        )
 
 
 class TestDynamicTypesEdgeCases:
@@ -385,8 +406,8 @@ class TestDynamicTypesEdgeCases:
 
         special_entity_types = {
             "TYPE_WITH_UNDERSCORE": "Description with special chars: !@#$%",
-            "TYPE-WITH-DASH": "Description with quotes: \"quoted text\"",
-            "TYPE.WITH.DOTS": "Description with newlines:\nSecond line"
+            "TYPE-WITH-DASH": 'Description with quotes: "quoted text"',
+            "TYPE.WITH.DOTS": "Description with newlines:\nSecond line",
         }
 
         entity_extractor = EntityExtractor(config, entity_types=special_entity_types)
@@ -422,7 +443,7 @@ class TestDynamicTypesEdgeCases:
         unicode_entity_types = {
             "PERSÖN": "Person with Unicode characters: äöü",
             "组织": "Organization in Chinese: 公司",
-            "ÉMOTIONS": "Emotions with accents: café, naïve"
+            "ÉMOTIONS": "Emotions with accents: café, naïve",
         }
 
         entity_extractor = EntityExtractor(config, entity_types=unicode_entity_types)
@@ -441,7 +462,7 @@ class TestDynamicTypesEdgeCases:
         empty_desc_types = {
             "TYPE_WITH_EMPTY_DESC": "",
             "TYPE_WITH_SPACE_DESC": "   ",
-            "NORMAL_TYPE": "Normal description"
+            "NORMAL_TYPE": "Normal description",
         }
 
         entity_extractor = EntityExtractor(config, entity_types=empty_desc_types)
@@ -461,8 +482,7 @@ class TestDynamicTypesEdgeCases:
 
         # Create 100 custom types
         large_entity_types = {
-            f"TYPE_{i:03d}": f"Description for type {i}"
-            for i in range(100)
+            f"TYPE_{i:03d}": f"Description for type {i}" for i in range(100)
         }
 
         entity_extractor = EntityExtractor(config, entity_types=large_entity_types)
@@ -494,9 +514,11 @@ class TestDynamicTypesDocumentation:
         medical_types = {
             "DISEASE": "Medical condition or illness",
             "TREATMENT": "Medical intervention or therapy",
-            "SYMPTOM": "Observable sign of disease"
+            "SYMPTOM": "Observable sign of disease",
         }
-        extractor2 = EntityExtractor(config, entity_types=medical_types, dynamic_types=False)
+        extractor2 = EntityExtractor(
+            config, entity_types=medical_types, dynamic_types=False
+        )
         assert extractor2.dynamic_types == False
         assert extractor2.entity_types == medical_types
 
@@ -522,9 +544,11 @@ class TestDynamicTypesDocumentation:
         # Example 2: Medical domain in static mode
         medical_relations = {
             "CAUSES": "Pathogen causes disease",
-            "TREATS": "Treatment treats condition"
+            "TREATS": "Treatment treats condition",
         }
-        extractor2 = RelationExtractor(config, relation_types=medical_relations, dynamic_types=False)
+        extractor2 = RelationExtractor(
+            config, relation_types=medical_relations, dynamic_types=False
+        )
         assert extractor2.dynamic_types == False
         assert extractor2.relation_types == medical_relations
 

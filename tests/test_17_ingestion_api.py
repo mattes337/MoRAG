@@ -1,17 +1,18 @@
 """Tests for ingestion API functionality."""
 
-import pytest
+import io
 import json
 import tempfile
 from pathlib import Path
-from unittest.mock import AsyncMock, patch, MagicMock
-from fastapi.testclient import TestClient
-from fastapi import UploadFile
-import io
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+from fastapi import UploadFile
+from fastapi.testclient import TestClient
 from morag.api.main import create_app
-from morag_core.utils import file_handler
 from morag.api.models import SourceType
+from morag_core.utils import file_handler
+
 
 class TestFileHandling:
     """Test file handling utilities."""
@@ -19,13 +20,13 @@ class TestFileHandling:
     def test_supported_mime_types(self):
         """Test that all expected MIME types are supported."""
         expected_types = [
-            'application/pdf',
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            'audio/mpeg',
-            'audio/wav',
-            'video/mp4',
-            'image/jpeg',
-            'image/png'
+            "application/pdf",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "audio/mpeg",
+            "audio/wav",
+            "video/mp4",
+            "image/jpeg",
+            "image/png",
         ]
 
         for mime_type in expected_types:
@@ -34,31 +35,31 @@ class TestFileHandling:
     def test_file_extension_validation(self):
         """Test file extension validation for different source types."""
         # Document extensions
-        assert file_handler._is_valid_for_source_type('pdf', 'document')
-        assert file_handler._is_valid_for_source_type('docx', 'document')
-        assert not file_handler._is_valid_for_source_type('mp3', 'document')
+        assert file_handler._is_valid_for_source_type("pdf", "document")
+        assert file_handler._is_valid_for_source_type("docx", "document")
+        assert not file_handler._is_valid_for_source_type("mp3", "document")
 
         # Audio extensions
-        assert file_handler._is_valid_for_source_type('mp3', 'audio')
-        assert file_handler._is_valid_for_source_type('wav', 'audio')
-        assert not file_handler._is_valid_for_source_type('pdf', 'audio')
+        assert file_handler._is_valid_for_source_type("mp3", "audio")
+        assert file_handler._is_valid_for_source_type("wav", "audio")
+        assert not file_handler._is_valid_for_source_type("pdf", "audio")
 
         # Video extensions
-        assert file_handler._is_valid_for_source_type('mp4', 'video')
-        assert file_handler._is_valid_for_source_type('mov', 'video')
-        assert not file_handler._is_valid_for_source_type('jpg', 'video')
+        assert file_handler._is_valid_for_source_type("mp4", "video")
+        assert file_handler._is_valid_for_source_type("mov", "video")
+        assert not file_handler._is_valid_for_source_type("jpg", "video")
 
         # Image extensions
-        assert file_handler._is_valid_for_source_type('jpg', 'image')
-        assert file_handler._is_valid_for_source_type('png', 'image')
-        assert not file_handler._is_valid_for_source_type('mp4', 'image')
+        assert file_handler._is_valid_for_source_type("jpg", "image")
+        assert file_handler._is_valid_for_source_type("png", "image")
+        assert not file_handler._is_valid_for_source_type("mp4", "image")
 
     def test_max_file_sizes(self):
         """Test maximum file size limits."""
-        assert file_handler._get_max_size_for_type('document') == 100 * 1024 * 1024
-        assert file_handler._get_max_size_for_type('audio') == 500 * 1024 * 1024
-        assert file_handler._get_max_size_for_type('video') == 2 * 1024 * 1024 * 1024
-        assert file_handler._get_max_size_for_type('image') == 50 * 1024 * 1024
+        assert file_handler._get_max_size_for_type("document") == 100 * 1024 * 1024
+        assert file_handler._get_max_size_for_type("audio") == 500 * 1024 * 1024
+        assert file_handler._get_max_size_for_type("video") == 2 * 1024 * 1024 * 1024
+        assert file_handler._get_max_size_for_type("image") == 50 * 1024 * 1024
 
     @pytest.mark.asyncio
     async def test_file_validation_success(self):
@@ -66,45 +67,40 @@ class TestFileHandling:
         # Create mock upload file
         content = b"Test PDF content"
         upload_file = UploadFile(
-            filename="test.pdf",
-            file=io.BytesIO(content),
-            size=len(content)
+            filename="test.pdf", file=io.BytesIO(content), size=len(content)
         )
         upload_file.content_type = "application/pdf"
 
-        extension, file_info = file_handler.validate_file(upload_file, 'document')
+        extension, file_info = file_handler.validate_file(upload_file, "document")
 
-        assert extension == 'pdf'
-        assert file_info['original_filename'] == 'test.pdf'
-        assert file_info['mime_type'] == 'application/pdf'
-        assert file_info['file_extension'] == 'pdf'
-        assert file_info['size'] == len(content)
+        assert extension == "pdf"
+        assert file_info["original_filename"] == "test.pdf"
+        assert file_info["mime_type"] == "application/pdf"
+        assert file_info["file_extension"] == "pdf"
+        assert file_info["size"] == len(content)
 
     @pytest.mark.asyncio
     async def test_file_validation_unsupported_type(self):
         """Test file validation with unsupported type."""
         upload_file = UploadFile(
-            filename="test.xyz",
-            file=io.BytesIO(b"content"),
-            size=7
+            filename="test.xyz", file=io.BytesIO(b"content"), size=7
         )
         upload_file.content_type = "application/xyz"
 
         with pytest.raises(Exception):  # Should raise ValidationError
-            file_handler.validate_file(upload_file, 'document')
+            file_handler.validate_file(upload_file, "document")
 
     @pytest.mark.asyncio
     async def test_file_validation_wrong_source_type(self):
         """Test file validation with wrong source type."""
         upload_file = UploadFile(
-            filename="test.pdf",
-            file=io.BytesIO(b"content"),
-            size=7
+            filename="test.pdf", file=io.BytesIO(b"content"), size=7
         )
         upload_file.content_type = "application/pdf"
 
         with pytest.raises(Exception):  # Should raise ValidationError
-            file_handler.validate_file(upload_file, 'audio')
+            file_handler.validate_file(upload_file, "audio")
+
 
 class TestIngestionAPI:
     """Test ingestion API endpoints."""
@@ -125,30 +121,35 @@ class TestIngestionAPI:
         # Create a small test file
         test_content = b"Test document content"
 
-        with patch('morag.tasks.document_tasks.process_document_task') as mock_task:
+        with patch("morag.tasks.document_tasks.process_document_task") as mock_task:
             # Mock the Celery task
             mock_result = MagicMock()
             mock_result.id = "test-task-id"
             mock_task.delay.return_value = mock_result
 
-            with patch('morag.utils.file_handling.file_handler.save_uploaded_file') as mock_save:
-                mock_save.return_value = (Path("/tmp/test.pdf"), {
-                    'original_filename': 'test.pdf',
-                    'mime_type': 'application/pdf',
-                    'file_extension': 'pdf',
-                    'size': len(test_content),
-                    'file_path': '/tmp/test.pdf',
-                    'file_hash': 'abcd1234'
-                })
+            with patch(
+                "morag.utils.file_handling.file_handler.save_uploaded_file"
+            ) as mock_save:
+                mock_save.return_value = (
+                    Path("/tmp/test.pdf"),
+                    {
+                        "original_filename": "test.pdf",
+                        "mime_type": "application/pdf",
+                        "file_extension": "pdf",
+                        "size": len(test_content),
+                        "file_path": "/tmp/test.pdf",
+                        "file_hash": "abcd1234",
+                    },
+                )
 
                 response = client.post(
                     "/api/v1/ingest/file",
                     headers=auth_headers,
                     data={
                         "source_type": "document",
-                        "metadata": json.dumps({"test": True})
+                        "metadata": json.dumps({"test": True}),
                     },
-                    files={"file": ("test.pdf", test_content, "application/pdf")}
+                    files={"file": ("test.pdf", test_content, "application/pdf")},
                 )
 
         assert response.status_code == 200
@@ -160,7 +161,7 @@ class TestIngestionAPI:
 
     def test_url_ingestion_endpoint(self, client, auth_headers):
         """Test URL ingestion endpoint."""
-        with patch('morag.tasks.web_tasks.process_web_task') as mock_task:
+        with patch("morag.tasks.web_tasks.process_web_task") as mock_task:
             mock_result = MagicMock()
             mock_result.id = "test-task-id"
             mock_task.delay.return_value = mock_result
@@ -171,8 +172,8 @@ class TestIngestionAPI:
                 json={
                     "source_type": "web",
                     "url": "https://example.com",
-                    "metadata": {"test": True}
-                }
+                    "metadata": {"test": True},
+                },
             )
 
         assert response.status_code == 200
@@ -183,7 +184,7 @@ class TestIngestionAPI:
 
     def test_youtube_ingestion_endpoint(self, client, auth_headers):
         """Test YouTube URL ingestion."""
-        with patch('morag.tasks.video_tasks.process_video_task') as mock_task:
+        with patch("morag.tasks.video_tasks.process_video_task") as mock_task:
             mock_result = MagicMock()
             mock_result.id = "test-task-id"
             mock_task.delay.return_value = mock_result
@@ -193,8 +194,8 @@ class TestIngestionAPI:
                 headers=auth_headers,
                 json={
                     "source_type": "youtube",
-                    "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
-                }
+                    "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+                },
             )
 
         assert response.status_code == 200
@@ -204,8 +205,8 @@ class TestIngestionAPI:
 
     def test_batch_ingestion_endpoint(self, client, auth_headers):
         """Test batch ingestion endpoint."""
-        with patch('morag.tasks.web_tasks.process_web_task') as mock_web_task:
-            with patch('morag.tasks.video_tasks.process_video_task') as mock_video_task:
+        with patch("morag.tasks.web_tasks.process_web_task") as mock_web_task:
+            with patch("morag.tasks.video_tasks.process_video_task") as mock_video_task:
                 mock_result1 = MagicMock()
                 mock_result1.id = "task-1"
                 mock_result2 = MagicMock()
@@ -219,16 +220,13 @@ class TestIngestionAPI:
                     headers=auth_headers,
                     json={
                         "items": [
-                            {
-                                "source_type": "web",
-                                "url": "https://example.com"
-                            },
+                            {"source_type": "web", "url": "https://example.com"},
                             {
                                 "source_type": "youtube",
-                                "url": "https://www.youtube.com/watch?v=test"
-                            }
+                                "url": "https://www.youtube.com/watch?v=test",
+                            },
                         ]
-                    }
+                    },
                 )
 
         assert response.status_code == 200
@@ -241,10 +239,7 @@ class TestIngestionAPI:
         """Test that authentication is required."""
         response = client.post(
             "/api/v1/ingest/url",
-            json={
-                "source_type": "web",
-                "url": "https://example.com"
-            }
+            json={"source_type": "web", "url": "https://example.com"},
         )
 
         assert response.status_code == 401
@@ -254,10 +249,7 @@ class TestIngestionAPI:
         response = client.post(
             "/api/v1/ingest/url",
             headers=auth_headers,
-            json={
-                "source_type": "web",
-                "url": "not-a-valid-url"
-            }
+            json={"source_type": "web", "url": "not-a-valid-url"},
         )
 
         assert response.status_code == 422  # Validation error
@@ -269,11 +261,12 @@ class TestIngestionAPI:
             headers=auth_headers,
             json={
                 "source_type": "document",  # Not supported for URL
-                "url": "https://example.com"
-            }
+                "url": "https://example.com",
+            },
         )
 
         assert response.status_code == 500  # Should be handled as ValidationError
+
 
 class TestStatusAPI:
     """Test status API endpoints."""
@@ -291,9 +284,12 @@ class TestStatusAPI:
 
     def test_task_status_endpoint(self, client, auth_headers):
         """Test task status endpoint."""
-        with patch('morag.services.task_manager.task_manager.get_task_status') as mock_status:
-            from src.morag.services.task_manager import TaskInfo, TaskStatus
+        with patch(
+            "morag.services.task_manager.task_manager.get_task_status"
+        ) as mock_status:
             from datetime import datetime
+
+            from src.morag.services.task_manager import TaskInfo, TaskStatus
 
             mock_task_info = TaskInfo(
                 task_id="test-task-id",
@@ -303,14 +299,11 @@ class TestStatusAPI:
                 error=None,
                 created_at=datetime.now(),
                 started_at=datetime.now(),
-                completed_at=None
+                completed_at=None,
             )
             mock_status.return_value = mock_task_info
 
-            response = client.get(
-                "/api/v1/status/test-task-id",
-                headers=auth_headers
-            )
+            response = client.get("/api/v1/status/test-task-id", headers=auth_headers)
 
         assert response.status_code == 200
         data = response.json()
@@ -320,13 +313,12 @@ class TestStatusAPI:
 
     def test_list_active_tasks(self, client, auth_headers):
         """Test listing active tasks."""
-        with patch('morag.services.task_manager.task_manager.get_active_tasks') as mock_active:
+        with patch(
+            "morag.services.task_manager.task_manager.get_active_tasks"
+        ) as mock_active:
             mock_active.return_value = ["task-1", "task-2", "task-3"]
 
-            response = client.get(
-                "/api/v1/status/",
-                headers=auth_headers
-            )
+            response = client.get("/api/v1/status/", headers=auth_headers)
 
         assert response.status_code == 200
         data = response.json()
@@ -335,18 +327,17 @@ class TestStatusAPI:
 
     def test_queue_stats(self, client, auth_headers):
         """Test queue statistics endpoint."""
-        with patch('morag.services.task_manager.task_manager.get_queue_stats') as mock_stats:
+        with patch(
+            "morag.services.task_manager.task_manager.get_queue_stats"
+        ) as mock_stats:
             mock_stats.return_value = {
                 "pending": 5,
                 "active": 2,
                 "completed": 100,
-                "failed": 3
+                "failed": 3,
             }
 
-            response = client.get(
-                "/api/v1/status/stats/queues",
-                headers=auth_headers
-            )
+            response = client.get("/api/v1/status/stats/queues", headers=auth_headers)
 
         assert response.status_code == 200
         data = response.json()
@@ -354,6 +345,7 @@ class TestStatusAPI:
         assert data["active"] == 2
         assert data["completed"] == 100
         assert data["failed"] == 3
+
 
 if __name__ == "__main__":
     pytest.main([__file__])

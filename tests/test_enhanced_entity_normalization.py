@@ -1,13 +1,18 @@
 """Test enhanced entity normalization and relationship creation."""
 
-import pytest
 import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
-from morag_graph.models.fact import Fact
+import pytest
+from morag_graph.extraction.entity_normalizer import (
+    EntityVariation,
+    LLMEntityNormalizer,
+)
 from morag_graph.models.entity import Entity
-from morag_graph.services.enhanced_fact_processing_service import EnhancedFactProcessingService
-from morag_graph.extraction.entity_normalizer import LLMEntityNormalizer, EntityVariation
+from morag_graph.models.fact import Fact
+from morag_graph.services.enhanced_fact_processing_service import (
+    EnhancedFactProcessingService,
+)
 
 
 @pytest.fixture
@@ -34,7 +39,7 @@ def mock_entity_normalizer():
         "männliche Hormone": "Hormon",
         "weibliche Geschlechtshormone": "Geschlechtshormon",
         "ADHD": "ADHD",
-        "Stress": "Stress"
+        "Stress": "Stress",
     }
 
     async def normalize_side_effect(entity_name):
@@ -43,7 +48,7 @@ def mock_entity_normalizer():
             original=entity_name,
             normalized=normalized,
             confidence=0.9,
-            rule_applied="test_normalization"
+            rule_applied="test_normalization",
         )
 
     normalizer.normalize_entity.side_effect = normalize_side_effect
@@ -57,7 +62,9 @@ def enhanced_service(mock_neo4j_storage, mock_entity_normalizer):
 
 
 @pytest.mark.asyncio
-async def test_entity_normalization_and_uniqueness(enhanced_service, mock_neo4j_storage):
+async def test_entity_normalization_and_uniqueness(
+    enhanced_service, mock_neo4j_storage
+):
     """Test that entities are normalized and unique by name."""
     facts = [
         Fact(
@@ -69,7 +76,7 @@ async def test_entity_normalization_and_uniqueness(enhanced_service, mock_neo4j_
             extraction_confidence=0.9,
             source_document_id="doc1",
             domain="health",
-            language="en"
+            language="en",
         ),
         Fact(
             id="fact2",
@@ -80,7 +87,7 @@ async def test_entity_normalization_and_uniqueness(enhanced_service, mock_neo4j_
             extraction_confidence=0.8,
             source_document_id="doc2",
             domain="health",
-            language="en"
+            language="en",
         ),
         Fact(
             id="fact3",
@@ -91,15 +98,13 @@ async def test_entity_normalization_and_uniqueness(enhanced_service, mock_neo4j_
             extraction_confidence=0.85,
             source_document_id="doc3",
             domain="health",
-            language="en"
-        )
+            language="en",
+        ),
     ]
 
     # Process facts
     result = await enhanced_service.process_facts_with_entities(
-        facts=facts,
-        create_keyword_entities=False,
-        create_mandatory_relations=True
+        facts=facts, create_keyword_entities=False, create_mandatory_relations=True
     )
 
     # Verify entities were created
@@ -119,10 +124,10 @@ async def test_entity_normalization_and_uniqueness(enhanced_service, mock_neo4j_
     # Check that entity names are normalized
     entity_names = [entity.name for entity in stored_entities]
     assert "Silizium" in entity_names  # Normalized from "Silizium Pur"
-    assert "Vitamin" in entity_names   # Normalized from "natural vitamins"
-    assert "Metal" in entity_names     # Normalized from "heavy metals"
-    assert "ADHD" in entity_names      # Already normalized
-    assert "Stress" in entity_names    # Already normalized
+    assert "Vitamin" in entity_names  # Normalized from "natural vitamins"
+    assert "Metal" in entity_names  # Normalized from "heavy metals"
+    assert "ADHD" in entity_names  # Already normalized
+    assert "Stress" in entity_names  # Already normalized
 
     # Check that duplicate entities are not created (Silizium appears in fact1 and fact3)
     silizium_entities = [e for e in stored_entities if e.name == "Silizium"]
@@ -143,7 +148,7 @@ async def test_semantic_relationship_types(enhanced_service, mock_neo4j_storage)
             extraction_confidence=0.9,
             source_document_id="doc1",
             domain="health",
-            language="en"
+            language="en",
         ),
         Fact(
             id="fact2",
@@ -155,7 +160,7 @@ async def test_semantic_relationship_types(enhanced_service, mock_neo4j_storage)
             extraction_confidence=0.8,
             source_document_id="doc2",
             domain="health",
-            language="en"
+            language="en",
         ),
         Fact(
             id="fact3",
@@ -167,15 +172,13 @@ async def test_semantic_relationship_types(enhanced_service, mock_neo4j_storage)
             extraction_confidence=0.85,
             source_document_id="doc3",
             domain="health",
-            language="en"
-        )
+            language="en",
+        ),
     ]
 
     # Process facts with relationships
     result = await enhanced_service.process_facts_with_entities(
-        facts=facts,
-        create_keyword_entities=False,
-        create_mandatory_relations=True
+        facts=facts, create_keyword_entities=False, create_mandatory_relations=True
     )
 
     # Verify relationships were created with semantic types
@@ -188,13 +191,13 @@ async def test_semantic_relationship_types(enhanced_service, mock_neo4j_storage)
     relation_types = []
     for call in relation_calls:
         args, kwargs = call
-        if len(args) > 1 and isinstance(args[1], dict) and 'relation_type' in args[1]:
-            relation_types.append(args[1]['relation_type'])
+        if len(args) > 1 and isinstance(args[1], dict) and "relation_type" in args[1]:
+            relation_types.append(args[1]["relation_type"])
 
     # Verify semantic relationship types are used
-    assert 'TREATS' in relation_types  # Engelwurz treats ADHD
-    assert 'CAUSES' in relation_types  # Stress causes hormonal imbalances
-    assert 'REDUCES' in relation_types # Vitamin reduces stress
+    assert "TREATS" in relation_types  # Engelwurz treats ADHD
+    assert "CAUSES" in relation_types  # Stress causes hormonal imbalances
+    assert "REDUCES" in relation_types  # Vitamin reduces stress
 
 
 @pytest.mark.asyncio
@@ -211,15 +214,13 @@ async def test_keyword_entity_normalization(enhanced_service, mock_neo4j_storage
             extraction_confidence=0.9,
             source_document_id="doc1",
             domain="health",
-            language="en"
+            language="en",
         )
     ]
 
     # Process facts with keyword entities
     result = await enhanced_service.process_facts_with_entities(
-        facts=facts,
-        create_keyword_entities=True,
-        create_mandatory_relations=True
+        facts=facts, create_keyword_entities=True, create_mandatory_relations=True
     )
 
     # Get all stored entities
@@ -230,9 +231,9 @@ async def test_keyword_entity_normalization(enhanced_service, mock_neo4j_storage
 
     # Check that keyword entities are normalized
     entity_names = [entity.name for entity in stored_entities]
-    assert "Vitamin" in entity_names   # Normalized from "natural vitamins"
-    assert "Metal" in entity_names     # Normalized from "heavy metals"
-    assert "Engelwurz" in entity_names # Normalized from "Engelwurz (Wurzel)"
+    assert "Vitamin" in entity_names  # Normalized from "natural vitamins"
+    assert "Metal" in entity_names  # Normalized from "heavy metals"
+    assert "Engelwurz" in entity_names  # Normalized from "Engelwurz (Wurzel)"
 
     # Check that all entities use generic ENTITY label
     for entity in stored_entities:

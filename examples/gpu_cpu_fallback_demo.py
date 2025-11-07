@@ -17,12 +17,10 @@ from pathlib import Path
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
+from morag_audio import AudioConfig, AudioProcessor, AudioService
+from morag_audio.services import SpeakerDiarizationService, TopicSegmentationService
 from morag_core.config import Settings, detect_device, get_safe_device
-from morag_audio import AudioProcessor, AudioConfig
 from morag_image import ImageProcessor
-from morag_audio.services import TopicSegmentationService
-from morag_audio.services import SpeakerDiarizationService
-from morag_audio import AudioService
 
 
 def print_section(title: str):
@@ -117,7 +115,9 @@ def test_image_processor():
 
         print("\n2. Testing EasyOCR GPU fallback:")
         # This will trigger EasyOCR initialization with GPU fallback
-        print(f"   EasyOCR will be initialized on first use with automatic GPU/CPU fallback")
+        print(
+            f"   EasyOCR will be initialized on first use with automatic GPU/CPU fallback"
+        )
 
     except Exception as e:
         print(f"   Error: {e}")
@@ -169,7 +169,9 @@ async def test_async_operations():
         print("1. Testing async topic segmentation:")
         service = TopicSegmentationService()
 
-        test_text = "This is a test sentence. This is another sentence about a different topic."
+        test_text = (
+            "This is a test sentence. This is another sentence about a different topic."
+        )
         result = await service.segment_topics(test_text)
 
         print(f"   Segmentation completed successfully")
@@ -186,10 +188,26 @@ def test_configuration_scenarios():
     print_section("Configuration Scenarios")
 
     scenarios = [
-        {"preferred_device": "auto", "force_cpu": False, "description": "Auto-detection"},
-        {"preferred_device": "cpu", "force_cpu": False, "description": "CPU preference"},
-        {"preferred_device": "cuda", "force_cpu": False, "description": "GPU preference"},
-        {"preferred_device": "cuda", "force_cpu": True, "description": "Force CPU override"},
+        {
+            "preferred_device": "auto",
+            "force_cpu": False,
+            "description": "Auto-detection",
+        },
+        {
+            "preferred_device": "cpu",
+            "force_cpu": False,
+            "description": "CPU preference",
+        },
+        {
+            "preferred_device": "cuda",
+            "force_cpu": False,
+            "description": "GPU preference",
+        },
+        {
+            "preferred_device": "cuda",
+            "force_cpu": True,
+            "description": "Force CPU override",
+        },
     ]
 
     for i, scenario in enumerate(scenarios, 1):

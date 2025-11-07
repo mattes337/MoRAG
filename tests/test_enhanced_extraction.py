@@ -1,33 +1,37 @@
 """Tests for enhanced entity and relation extraction components."""
 
-import pytest
 import asyncio
-from unittest.mock import Mock, AsyncMock, patch
-from typing import List, Dict
+import os
 
 # Import the enhanced extraction components
 import sys
-import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'packages', 'morag-graph', 'src'))
+from typing import Dict, List
+from unittest.mock import AsyncMock, Mock, patch
+
+import pytest
+
+sys.path.insert(
+    0, os.path.join(os.path.dirname(__file__), "..", "packages", "morag-graph", "src")
+)
 
 from morag_graph.extraction.enhanced_entity_extractor import (
-    EnhancedEntityExtractor,
-    ConfidenceEntity,
-    EntityConfidenceModel,
     BasicGleaningStrategy,
+    ConfidenceEntity,
     ContextualGleaningStrategy,
-    SemanticGleaningStrategy
+    EnhancedEntityExtractor,
+    EntityConfidenceModel,
+    SemanticGleaningStrategy,
 )
 from morag_graph.extraction.enhanced_relation_extractor import (
     EnhancedRelationExtractor,
+    RelationCandidate,
     RelationValidator,
-    RelationCandidate
 )
 from morag_graph.extraction.systematic_deduplicator import (
-    SystematicDeduplicator,
     EntitySimilarityCalculator,
     LLMMergeValidator,
-    MergeCandidate
+    MergeCandidate,
+    SystematicDeduplicator,
 )
 from morag_graph.models import Entity, Relation
 
@@ -43,16 +47,15 @@ class TestEntityConfidenceModel:
     async def test_score_entity_high_confidence(self):
         """Test scoring entity with high confidence factors."""
         entity = Entity(
-            name="Python",
-            type="TECHNOLOGY",
-            confidence=0.9,
-            source_doc_id="test_doc"
+            name="Python", type="TECHNOLOGY", confidence=0.9, source_doc_id="test_doc"
         )
 
         text = "Python is a programming language used for data science and web development."
         existing_entities = []
 
-        score = await self.confidence_model.score_entity(entity, text, existing_entities)
+        score = await self.confidence_model.score_entity(
+            entity, text, existing_entities
+        )
 
         # Should have high score due to exact name match and good base confidence
         assert score > 0.8
@@ -62,10 +65,7 @@ class TestEntityConfidenceModel:
     async def test_score_entity_with_duplicates(self):
         """Test scoring entity with existing duplicates."""
         entity = Entity(
-            name="Python",
-            type="TECHNOLOGY",
-            confidence=0.8,
-            source_doc_id="test_doc"
+            name="Python", type="TECHNOLOGY", confidence=0.8, source_doc_id="test_doc"
         )
 
         existing_entity = ConfidenceEntity(
@@ -73,17 +73,19 @@ class TestEntityConfidenceModel:
                 name="Python Programming",
                 type="TECHNOLOGY",
                 confidence=0.9,
-                source_doc_id="test_doc"
+                source_doc_id="test_doc",
             ),
             confidence=0.9,
             extraction_round=1,
-            gleaning_strategy="basic"
+            gleaning_strategy="basic",
         )
 
         text = "Python is a programming language."
         existing_entities = [existing_entity]
 
-        score = await self.confidence_model.score_entity(entity, text, existing_entities)
+        score = await self.confidence_model.score_entity(
+            entity, text, existing_entities
+        )
 
         # Should have lower score due to duplicate penalty
         assert score < 0.8
@@ -121,19 +123,21 @@ class TestGleaningStrategies:
                 entity=Entity(name="John", type="PERSON", confidence=0.8),
                 confidence=0.8,
                 extraction_round=1,
-                gleaning_strategy="basic"
+                gleaning_strategy="basic",
             )
         ]
 
         text = "John works at Microsoft in Seattle."
 
         # Mock the focused extractor creation
-        with patch.object(strategy, '_create_focused_extractor') as mock_create:
+        with patch.object(strategy, "_create_focused_extractor") as mock_create:
             mock_focused_extractor = Mock()
             mock_focused_extractor.extract = AsyncMock(return_value=[])
             mock_create.return_value = mock_focused_extractor
 
-            await strategy.extract(text, existing_entities, self.mock_extractor, "test_doc")
+            await strategy.extract(
+                text, existing_entities, self.mock_extractor, "test_doc"
+            )
 
             # Should create focused extractor for missing types
             mock_create.assert_called_once()
@@ -154,15 +158,14 @@ class TestEnhancedEntityExtractor:
             base_extractor=self.mock_base_extractor,
             max_rounds=2,
             target_confidence=0.8,
-            enable_gleaning=True
+            enable_gleaning=True,
         )
 
     @pytest.mark.asyncio
     async def test_extract_with_gleaning_disabled(self):
         """Test extraction with gleaning disabled."""
         extractor = EnhancedEntityExtractor(
-            base_extractor=self.mock_base_extractor,
-            enable_gleaning=False
+            base_extractor=self.mock_base_extractor, enable_gleaning=False
         )
 
         text = "Test text"
@@ -177,7 +180,7 @@ class TestEnhancedEntityExtractor:
         # Mock entities returned by base extractor
         mock_entities = [
             Entity(name="Python", type="TECHNOLOGY", confidence=0.9),
-            Entity(name="Microsoft", type="ORGANIZATION", confidence=0.8)
+            Entity(name="Microsoft", type="ORGANIZATION", confidence=0.8),
         ]
 
         self.mock_base_extractor.extract.return_value = mock_entities
@@ -197,20 +200,20 @@ class TestEnhancedEntityExtractor:
                 entity=Entity(name="Python", type="TECHNOLOGY", confidence=0.9),
                 confidence=0.9,
                 extraction_round=1,
-                gleaning_strategy="basic"
+                gleaning_strategy="basic",
             ),
             ConfidenceEntity(
                 entity=Entity(name="python", type="technology", confidence=0.7),
                 confidence=0.7,
                 extraction_round=2,
-                gleaning_strategy="contextual"
+                gleaning_strategy="contextual",
             ),
             ConfidenceEntity(
                 entity=Entity(name="Java", type="TECHNOLOGY", confidence=0.8),
                 confidence=0.8,
                 extraction_round=1,
-                gleaning_strategy="basic"
-            )
+                gleaning_strategy="basic",
+            ),
         ]
 
         deduplicated = self.extractor._deduplicate_entities(entities)
@@ -264,8 +267,7 @@ class TestEntitySimilarityCalculator:
     def test_calculate_name_similarity_jaccard(self):
         """Test Jaccard similarity calculation."""
         similarity = self.calculator._calculate_name_similarity(
-            "Machine Learning Algorithm",
-            "Deep Learning Algorithm"
+            "Machine Learning Algorithm", "Deep Learning Algorithm"
         )
 
         # Should have moderate similarity (shared words: Learning, Algorithm)
@@ -280,7 +282,7 @@ class TestSystematicDeduplicator:
         self.deduplicator = SystematicDeduplicator(
             similarity_threshold=0.7,
             merge_confidence_threshold=0.8,
-            enable_llm_validation=False  # Disable for testing
+            enable_llm_validation=False,  # Disable for testing
         )
 
     @pytest.mark.asyncio
@@ -289,15 +291,17 @@ class TestSystematicDeduplicator:
         entities_by_chunk = {
             "chunk1": [
                 Entity(name="Python", type="TECHNOLOGY", confidence=0.9),
-                Entity(name="Java", type="TECHNOLOGY", confidence=0.8)
+                Entity(name="Java", type="TECHNOLOGY", confidence=0.8),
             ],
             "chunk2": [
                 Entity(name="Microsoft", type="ORGANIZATION", confidence=0.9),
-                Entity(name="Google", type="ORGANIZATION", confidence=0.8)
-            ]
+                Entity(name="Google", type="ORGANIZATION", confidence=0.8),
+            ],
         }
 
-        result_chunks, result = await self.deduplicator.deduplicate_across_chunks(entities_by_chunk)
+        result_chunks, result = await self.deduplicator.deduplicate_across_chunks(
+            entities_by_chunk
+        )
 
         # Should have same number of entities (no duplicates)
         assert result.original_count == 4
@@ -310,15 +314,17 @@ class TestSystematicDeduplicator:
         entities_by_chunk = {
             "chunk1": [
                 Entity(name="Python", type="TECHNOLOGY", confidence=0.9),
-                Entity(name="Microsoft", type="ORGANIZATION", confidence=0.8)
+                Entity(name="Microsoft", type="ORGANIZATION", confidence=0.8),
             ],
             "chunk2": [
                 Entity(name="python", type="technology", confidence=0.7),  # Duplicate
-                Entity(name="Google", type="ORGANIZATION", confidence=0.9)
-            ]
+                Entity(name="Google", type="ORGANIZATION", confidence=0.9),
+            ],
         }
 
-        result_chunks, result = await self.deduplicator.deduplicate_across_chunks(entities_by_chunk)
+        result_chunks, result = await self.deduplicator.deduplicate_across_chunks(
+            entities_by_chunk
+        )
 
         # Should have fewer entities after deduplication
         assert result.original_count == 4
@@ -341,7 +347,7 @@ class TestRelationValidator:
             target_entity_id="org1",
             type="WORKS_FOR",
             description="John works for Microsoft",
-            confidence=0.9
+            confidence=0.9,
         )
 
         source_entity = Entity(name="John", type="PERSON", confidence=0.9)
@@ -364,7 +370,7 @@ class TestRelationValidator:
             target_entity_id="tech2",
             type="WORKS_FOR",  # Incompatible: technology can't work for technology
             description="Python works for Java",
-            confidence=0.8
+            confidence=0.8,
         )
 
         source_entity = Entity(name="Python", type="TECHNOLOGY", confidence=0.9)
@@ -394,7 +400,7 @@ class TestEnhancedRelationExtractor:
             base_extractor=self.mock_base_extractor,
             max_rounds=2,
             confidence_threshold=0.7,
-            enable_validation=False  # Disable for simpler testing
+            enable_validation=False,  # Disable for simpler testing
         )
 
     @pytest.mark.asyncio
@@ -412,7 +418,7 @@ class TestEnhancedRelationExtractor:
         """Test extraction with entities."""
         entities = [
             Entity(name="John", type="PERSON", confidence=0.9),
-            Entity(name="Microsoft", type="ORGANIZATION", confidence=0.8)
+            Entity(name="Microsoft", type="ORGANIZATION", confidence=0.8),
         ]
 
         mock_relations = [
@@ -421,7 +427,7 @@ class TestEnhancedRelationExtractor:
                 target_entity_id=entities[1].id,
                 type="WORKS_FOR",
                 description="John works for Microsoft",
-                confidence=0.8
+                confidence=0.8,
             )
         ]
 
@@ -443,25 +449,25 @@ class TestEnhancedRelationExtractor:
                     source_entity_id="e1",
                     target_entity_id="e2",
                     type="WORKS_FOR",
-                    confidence=0.9
+                    confidence=0.9,
                 ),
                 confidence=0.9,
                 extraction_round=1,
                 validation_score=0.8,
-                context_evidence="test"
+                context_evidence="test",
             ),
             RelationCandidate(
                 relation=Relation(
                     source_entity_id="e1",
                     target_entity_id="e2",
                     type="works_for",  # Same type, different case
-                    confidence=0.7
+                    confidence=0.7,
                 ),
                 confidence=0.7,
                 extraction_round=2,
                 validation_score=0.6,
-                context_evidence="test"
-            )
+                context_evidence="test",
+            ),
         ]
 
         deduplicated = self.extractor._deduplicate_relations(relations)

@@ -1,12 +1,12 @@
 """Mock utilities for testing MoRAG components."""
 
 import asyncio
-from typing import Any, Dict, List, Optional, Union
-from pathlib import Path
-from unittest.mock import Mock, AsyncMock
 import tempfile
 import uuid
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Union
+from unittest.mock import AsyncMock, Mock
 
 
 class MockStorage:
@@ -54,19 +54,20 @@ class MockStorage:
         """Simple mock vector search."""
         results = []
         for i in range(min(limit, len(self._vectors))):
-            results.append({
-                "id": f"result_{i}",
-                "score": 0.9 - (i * 0.1),
-                "payload": {"text": f"Mock result {i}"}
-            })
+            results.append(
+                {
+                    "id": f"result_{i}",
+                    "score": 0.9 - (i * 0.1),
+                    "payload": {"text": f"Mock result {i}"},
+                }
+            )
         return results
 
-    async def store_vector(self, vector_id: str, vector: List[float], payload: Dict[str, Any]):
+    async def store_vector(
+        self, vector_id: str, vector: List[float], payload: Dict[str, Any]
+    ):
         """Store vector."""
-        self._vectors[vector_id] = {
-            "vector": vector,
-            "payload": payload
-        }
+        self._vectors[vector_id] = {"vector": vector, "payload": payload}
         return True
 
     async def health_check(self) -> Dict[str, Any]:
@@ -75,7 +76,7 @@ class MockStorage:
             "status": self._health_status,
             "connected": self._connected,
             "data_count": len(self._data),
-            "vector_count": len(self._vectors)
+            "vector_count": len(self._vectors),
         }
 
     def clear(self):
@@ -133,7 +134,7 @@ class MockEmbeddingService:
             "status": self._health_status,
             "embedding_dimension": self.embedding_dim,
             "call_count": self._call_count,
-            "rate_limited": self._rate_limited
+            "rate_limited": self._rate_limited,
         }
 
 
@@ -166,14 +167,14 @@ class MockProcessor:
             return {
                 "success": False,
                 "error": "Mock processing failed",
-                "file_path": str(file_path)
+                "file_path": str(file_path),
             }
 
         if not self.is_supported_format(file_path):
             return {
                 "success": False,
                 "error": f"Unsupported format: {file_path.suffix}",
-                "file_path": str(file_path)
+                "file_path": str(file_path),
             }
 
         self._processed_files.append(str(file_path))
@@ -183,7 +184,7 @@ class MockProcessor:
             "content": f"Processed content from {file_path.name}",
             "file_path": str(file_path),
             "processing_time": self._processing_time,
-            "metadata": {"format": file_path.suffix, "size": 1024}
+            "metadata": {"format": file_path.suffix, "size": 1024},
         }
 
     def get_processed_files(self) -> List[str]:
@@ -211,7 +212,7 @@ class MockTaskManager:
             "created_at": datetime.now(),
             "result": None,
             "error": None,
-            **kwargs
+            **kwargs,
         }
 
         return task_id
@@ -220,7 +221,9 @@ class MockTaskManager:
         """Get task by ID."""
         return self.tasks.get(task_id)
 
-    async def update_task_status(self, task_id: str, status: str, result: Any = None, error: str = None):
+    async def update_task_status(
+        self, task_id: str, status: str, result: Any = None, error: str = None
+    ):
         """Update task status."""
         if task_id in self.tasks:
             self.tasks[task_id]["status"] = status
@@ -229,7 +232,9 @@ class MockTaskManager:
             if error is not None:
                 self.tasks[task_id]["error"] = error
 
-    async def list_tasks(self, task_type: str = None, status: str = None) -> List[Dict[str, Any]]:
+    async def list_tasks(
+        self, task_type: str = None, status: str = None
+    ) -> List[Dict[str, Any]]:
         """List tasks with optional filters."""
         tasks = list(self.tasks.values())
 
@@ -254,14 +259,16 @@ class MockFileSystem:
         self._files = {}
         self._directories = set()
 
-    def create_file(self, path: Union[str, Path], content: str = "", binary: bool = False):
+    def create_file(
+        self, path: Union[str, Path], content: str = "", binary: bool = False
+    ):
         """Create a mock file."""
         path = Path(path)
         self._files[str(path)] = {
             "content": content.encode() if binary else content,
             "binary": binary,
             "size": len(content.encode() if binary else content.encode()),
-            "created": datetime.now()
+            "created": datetime.now(),
         }
 
         # Ensure parent directories exist
@@ -315,8 +322,10 @@ class MockFileSystem:
 
         for file_path in self._files.keys():
             if file_path.startswith(directory_str):
-                relative_path = file_path[len(directory_str):].lstrip("/\\")
-                if "/" not in relative_path and "\\" not in relative_path:  # Direct child
+                relative_path = file_path[len(directory_str) :].lstrip("/\\")
+                if (
+                    "/" not in relative_path and "\\" not in relative_path
+                ):  # Direct child
                     files.append(file_path)
 
         return files
@@ -346,7 +355,7 @@ class MockConfiguration:
             "timeout": 30,
             "retry_attempts": 3,
             "debug": True,
-            **kwargs
+            **kwargs,
         }
 
     def get(self, key: str, default: Any = None) -> Any:
@@ -368,7 +377,7 @@ class MockConfiguration:
 
 def create_temp_file(content: str = "test content", suffix: str = ".txt") -> Path:
     """Create a temporary file for testing."""
-    temp_file = tempfile.NamedTemporaryFile(mode='w', suffix=suffix, delete=False)
+    temp_file = tempfile.NamedTemporaryFile(mode="w", suffix=suffix, delete=False)
     temp_file.write(content)
     temp_file.close()
     return Path(temp_file.name)
@@ -385,17 +394,16 @@ def generate_test_data(count: int = 10) -> List[Dict[str, Any]]:
     test_data = []
 
     for i in range(count):
-        test_data.append({
-            "id": f"test_{i}",
-            "name": f"Test Item {i}",
-            "value": i * 10,
-            "category": "A" if i % 2 == 0 else "B",
-            "active": i % 3 == 0,
-            "metadata": {
-                "created": datetime.now().isoformat(),
-                "index": i
+        test_data.append(
+            {
+                "id": f"test_{i}",
+                "name": f"Test Item {i}",
+                "value": i * 10,
+                "category": "A" if i % 2 == 0 else "B",
+                "active": i % 3 == 0,
+                "metadata": {"created": datetime.now().isoformat(), "index": i},
             }
-        })
+        )
 
     return test_data
 

@@ -18,14 +18,14 @@ import asyncio
 import json
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple, Set
 from datetime import datetime
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 import structlog
-
-from morag_graph.storage import Neo4jStorage, Neo4jConfig
+from morag_graph.storage import Neo4jConfig, Neo4jStorage
 from morag_reasoning.llm import LLMClient
-from .base import MaintenanceJobBase, validate_positive_int, validate_float_range
+
+from .base import MaintenanceJobBase, validate_float_range, validate_positive_int
 from .query_optimizer import QueryOptimizer
 
 logger = structlog.get_logger(__name__)
@@ -33,15 +33,15 @@ logger = structlog.get_logger(__name__)
 
 @dataclass
 class RelationshipMergerConfig:
-    similarity_threshold: float = 0.8       # Threshold for semantic similarity
-    batch_size: int = 100                   # Batch size for merge operations
-    dry_run: bool = False                   # Apply merges by default (set to True for preview)
-    job_tag: str = ""                       # Job tag for tracking
-    limit_relations: int = 1000             # Max relationships to process per run
-    enable_rotation: bool = True            # Enable rotation to prevent starvation
-    merge_bidirectional: bool = True        # Merge bidirectional relationships
-    merge_transitive: bool = False          # Merge transitive relationships (conservative)
-    min_confidence: float = 0.5             # Minimum confidence for relationships to consider
+    similarity_threshold: float = 0.8  # Threshold for semantic similarity
+    batch_size: int = 100  # Batch size for merge operations
+    dry_run: bool = False  # Apply merges by default (set to True for preview)
+    job_tag: str = ""  # Job tag for tracking
+    limit_relations: int = 1000  # Max relationships to process per run
+    enable_rotation: bool = True  # Enable rotation to prevent starvation
+    merge_bidirectional: bool = True  # Merge bidirectional relationships
+    merge_transitive: bool = False  # Merge transitive relationships (conservative)
+    min_confidence: float = 0.5  # Minimum confidence for relationships to consider
     # Circuit breaker settings
     circuit_breaker_threshold: int = 5
     circuit_breaker_timeout: int = 60
@@ -59,6 +59,7 @@ class RelationshipMergerConfig:
 @dataclass
 class RelationshipCandidate:
     """Represents a relationship that could be merged."""
+
     id: str
     source_id: str
     target_id: str
@@ -70,6 +71,7 @@ class RelationshipCandidate:
 @dataclass
 class MergeCandidate:
     """Represents a group of relationships that should be merged."""
+
     primary_relationship: RelationshipCandidate
     duplicate_relationships: List[RelationshipCandidate]
     merge_reason: str
@@ -79,6 +81,7 @@ class MergeCandidate:
 @dataclass
 class RelationshipMergerResult:
     """Result of relationship merger operation."""
+
     total_relationships: int
     processed_relationships: int
     duplicate_merges: int
@@ -102,14 +105,19 @@ class RelationshipMergerResult:
             "total_merges": self.total_merges,
             "processing_time": self.processing_time,
             "dry_run": self.dry_run,
-            "job_tag": self.job_tag
+            "job_tag": self.job_tag,
         }
 
 
 class RelationshipMerger(MaintenanceJobBase):
     """Handles relationship merging operations."""
 
-    def __init__(self, config: RelationshipMergerConfig, neo4j_storage: Neo4jStorage, llm_client: LLMClient):
+    def __init__(
+        self,
+        config: RelationshipMergerConfig,
+        neo4j_storage: Neo4jStorage,
+        llm_client: LLMClient,
+    ):
         self.merger_config = config
         self.neo4j_storage = neo4j_storage
         self.llm_client = llm_client
@@ -117,11 +125,11 @@ class RelationshipMerger(MaintenanceJobBase):
 
         # Initialize base class with config dict
         config_dict = {
-            'job_tag': self.merger_config.job_tag,
-            'dry_run': self.merger_config.dry_run,
-            'batch_size': self.merger_config.batch_size,
-            'circuit_breaker_threshold': self.merger_config.circuit_breaker_threshold,
-            'circuit_breaker_timeout': self.merger_config.circuit_breaker_timeout,
+            "job_tag": self.merger_config.job_tag,
+            "dry_run": self.merger_config.dry_run,
+            "batch_size": self.merger_config.batch_size,
+            "circuit_breaker_threshold": self.merger_config.circuit_breaker_threshold,
+            "circuit_breaker_timeout": self.merger_config.circuit_breaker_timeout,
         }
         super().__init__(config_dict)
 
@@ -132,12 +140,40 @@ class RelationshipMerger(MaintenanceJobBase):
         errors = []
 
         # Validate integer parameters
-        errors.extend(validate_positive_int(self.merger_config.batch_size, "batch_size", min_value=1, max_value=10000))
-        errors.extend(validate_positive_int(self.merger_config.limit_relations, "limit_relations", min_value=1, max_value=100000))
+        errors.extend(
+            validate_positive_int(
+                self.merger_config.batch_size,
+                "batch_size",
+                min_value=1,
+                max_value=10000,
+            )
+        )
+        errors.extend(
+            validate_positive_int(
+                self.merger_config.limit_relations,
+                "limit_relations",
+                min_value=1,
+                max_value=100000,
+            )
+        )
 
         # Validate float parameters
-        errors.extend(validate_float_range(self.merger_config.similarity_threshold, "similarity_threshold", min_value=0.0, max_value=1.0))
-        errors.extend(validate_float_range(self.merger_config.min_confidence, "min_confidence", min_value=0.0, max_value=1.0))
+        errors.extend(
+            validate_float_range(
+                self.merger_config.similarity_threshold,
+                "similarity_threshold",
+                min_value=0.0,
+                max_value=1.0,
+            )
+        )
+        errors.extend(
+            validate_float_range(
+                self.merger_config.min_confidence,
+                "min_confidence",
+                min_value=0.0,
+                max_value=1.0,
+            )
+        )
 
         return errors
 
@@ -154,7 +190,7 @@ class RelationshipMerger(MaintenanceJobBase):
             "total_merges": result.total_merges,
             "processing_time": result.processing_time,
             "dry_run": result.dry_run,
-            "job_tag": result.job_tag
+            "job_tag": result.job_tag,
         }
 
     async def run_merger(self) -> RelationshipMergerResult:
@@ -187,10 +223,12 @@ class RelationshipMerger(MaintenanceJobBase):
                 total_merges=0,
                 processing_time=time.time() - start_time,
                 dry_run=self.merger_config.dry_run,
-                job_tag=self.merger_config.job_tag
+                job_tag=self.merger_config.job_tag,
             )
 
-        self.logger.info(f"Found {total_relationships} relationships for potential merging")
+        self.logger.info(
+            f"Found {total_relationships} relationships for potential merging"
+        )
 
         # Find merge candidates
         merge_candidates = await self._find_merge_candidates(relationships)
@@ -209,8 +247,10 @@ class RelationshipMerger(MaintenanceJobBase):
                 self.logger.info(
                     "Would merge relationships (dry run)",
                     primary_id=merge_candidate.primary_relationship.id,
-                    duplicate_ids=[d.id for d in merge_candidate.duplicate_relationships],
-                    reason=merge_candidate.merge_reason
+                    duplicate_ids=[
+                        d.id for d in merge_candidate.duplicate_relationships
+                    ],
+                    reason=merge_candidate.merge_reason,
                 )
 
             # Count merge types
@@ -236,7 +276,7 @@ class RelationshipMerger(MaintenanceJobBase):
             total_merges=total_merges,
             processing_time=processing_time,
             dry_run=self.merger_config.dry_run,
-            job_tag=self.merger_config.job_tag
+            job_tag=self.merger_config.job_tag,
         )
 
         self.logger.info("Relationship merger completed", result=result)
@@ -260,33 +300,44 @@ class RelationshipMerger(MaintenanceJobBase):
         LIMIT $limit
         """
 
-        result = await self.neo4j_storage._connection_ops._execute_query(query, {
-            "min_confidence": self.merger_config.min_confidence,
-            "offset": offset,
-            "limit": self.merger_config.limit_relations
-        })
+        result = await self.neo4j_storage._connection_ops._execute_query(
+            query,
+            {
+                "min_confidence": self.merger_config.min_confidence,
+                "offset": offset,
+                "limit": self.merger_config.limit_relations,
+            },
+        )
 
         relationships = []
         for record in result:
             metadata = {}
             if record.get("metadata"):
                 try:
-                    metadata = json.loads(record["metadata"]) if isinstance(record["metadata"], str) else record["metadata"]
+                    metadata = (
+                        json.loads(record["metadata"])
+                        if isinstance(record["metadata"], str)
+                        else record["metadata"]
+                    )
                 except (json.JSONDecodeError, TypeError):
                     metadata = {}
 
-            relationships.append(RelationshipCandidate(
-                id=record["id"],
-                source_id=record["source_id"],
-                target_id=record["target_id"],
-                type=record["type"],
-                confidence=record["confidence"],
-                metadata=metadata
-            ))
+            relationships.append(
+                RelationshipCandidate(
+                    id=record["id"],
+                    source_id=record["source_id"],
+                    target_id=record["target_id"],
+                    type=record["type"],
+                    confidence=record["confidence"],
+                    metadata=metadata,
+                )
+            )
 
         return relationships
 
-    async def _find_merge_candidates(self, relationships: List[RelationshipCandidate]) -> List[MergeCandidate]:
+    async def _find_merge_candidates(
+        self, relationships: List[RelationshipCandidate]
+    ) -> List[MergeCandidate]:
         """Find relationships that should be merged."""
         merge_candidates = []
 
@@ -298,15 +349,21 @@ class RelationshipMerger(MaintenanceJobBase):
 
         # 3. Find bidirectional redundancy
         if self.merger_config.merge_bidirectional:
-            merge_candidates.extend(await self._find_bidirectional_redundancy(relationships))
+            merge_candidates.extend(
+                await self._find_bidirectional_redundancy(relationships)
+            )
 
         # 4. Find transitive redundancy
         if self.merger_config.merge_transitive:
-            merge_candidates.extend(await self._find_transitive_redundancy(relationships))
+            merge_candidates.extend(
+                await self._find_transitive_redundancy(relationships)
+            )
 
         return merge_candidates
 
-    async def _find_duplicate_relationships(self, relationships: List[RelationshipCandidate]) -> List[MergeCandidate]:
+    async def _find_duplicate_relationships(
+        self, relationships: List[RelationshipCandidate]
+    ) -> List[MergeCandidate]:
         """Find exact duplicate relationships."""
         duplicates_map: Dict[Tuple[str, str, str], List[RelationshipCandidate]] = {}
 
@@ -324,16 +381,20 @@ class RelationshipMerger(MaintenanceJobBase):
                 primary = rels[0]
                 duplicates = rels[1:]
 
-                merge_candidates.append(MergeCandidate(
-                    primary_relationship=primary,
-                    duplicate_relationships=duplicates,
-                    merge_reason="duplicate_exact",
-                    confidence_score=1.0
-                ))
+                merge_candidates.append(
+                    MergeCandidate(
+                        primary_relationship=primary,
+                        duplicate_relationships=duplicates,
+                        merge_reason="duplicate_exact",
+                        confidence_score=1.0,
+                    )
+                )
 
         return merge_candidates
 
-    async def _find_semantic_equivalents(self, relationships: List[RelationshipCandidate]) -> List[MergeCandidate]:
+    async def _find_semantic_equivalents(
+        self, relationships: List[RelationshipCandidate]
+    ) -> List[MergeCandidate]:
         """Find semantically equivalent relationships using LLM."""
         # Group relationships by source-target pairs
         pairs_map: Dict[Tuple[str, str], List[RelationshipCandidate]] = {}
@@ -356,16 +417,20 @@ class RelationshipMerger(MaintenanceJobBase):
                         primary = group[0]
                         duplicates = group[1:]
 
-                        merge_candidates.append(MergeCandidate(
-                            primary_relationship=primary,
-                            duplicate_relationships=duplicates,
-                            merge_reason="semantic_equivalent",
-                            confidence_score=0.8
-                        ))
+                        merge_candidates.append(
+                            MergeCandidate(
+                                primary_relationship=primary,
+                                duplicate_relationships=duplicates,
+                                merge_reason="semantic_equivalent",
+                                confidence_score=0.8,
+                            )
+                        )
 
         return merge_candidates
 
-    async def _find_bidirectional_redundancy(self, relationships: List[RelationshipCandidate]) -> List[MergeCandidate]:
+    async def _find_bidirectional_redundancy(
+        self, relationships: List[RelationshipCandidate]
+    ) -> List[MergeCandidate]:
         """Find bidirectional relationships that could be consolidated."""
         # Create lookup for reverse relationships
         forward_map: Dict[Tuple[str, str, str], RelationshipCandidate] = {}
@@ -390,22 +455,28 @@ class RelationshipMerger(MaintenanceJobBase):
                 # Only merge if they're not already processed
                 if reverse_key not in reverse_map:
                     reverse_map[forward_key] = rel
-                    merge_candidates.append(MergeCandidate(
-                        primary_relationship=primary,
-                        duplicate_relationships=[duplicate],
-                        merge_reason="bidirectional_redundancy",
-                        confidence_score=0.7
-                    ))
+                    merge_candidates.append(
+                        MergeCandidate(
+                            primary_relationship=primary,
+                            duplicate_relationships=[duplicate],
+                            merge_reason="bidirectional_redundancy",
+                            confidence_score=0.7,
+                        )
+                    )
 
         return merge_candidates
 
-    async def _find_transitive_redundancy(self, relationships: List[RelationshipCandidate]) -> List[MergeCandidate]:
+    async def _find_transitive_redundancy(
+        self, relationships: List[RelationshipCandidate]
+    ) -> List[MergeCandidate]:
         """Find transitive relationships that could be consolidated."""
         # This is more complex and requires graph analysis
         # For now, return empty list - can be implemented later if needed
         return []
 
-    async def _group_by_semantic_similarity(self, relationships: List[RelationshipCandidate]) -> List[List[RelationshipCandidate]]:
+    async def _group_by_semantic_similarity(
+        self, relationships: List[RelationshipCandidate]
+    ) -> List[List[RelationshipCandidate]]:
         """Group relationships by semantic similarity of their types."""
         if len(relationships) <= 1:
             return [relationships]
@@ -436,7 +507,9 @@ class RelationshipMerger(MaintenanceJobBase):
 
             # Handle empty or whitespace-only responses
             if not response or not response.strip():
-                self.logger.warning("LLM returned empty response for semantic similarity")
+                self.logger.warning(
+                    "LLM returned empty response for semantic similarity"
+                )
                 return []
 
             # Try to parse JSON response
@@ -445,18 +518,26 @@ class RelationshipMerger(MaintenanceJobBase):
             except json.JSONDecodeError:
                 # Try to extract JSON from markdown code blocks
                 import re
-                json_match = re.search(r'```(?:json)?\s*(\[.*?\])\s*```', response, re.DOTALL)
+
+                json_match = re.search(
+                    r"```(?:json)?\s*(\[.*?\])\s*```", response, re.DOTALL
+                )
                 if json_match:
                     groups_data = json.loads(json_match.group(1))
                 else:
-                    self.logger.warning("Failed to parse LLM response as JSON", response_preview=response[:100])
+                    self.logger.warning(
+                        "Failed to parse LLM response as JSON",
+                        response_preview=response[:100],
+                    )
                     return []
 
             # Map back to relationships
             semantic_groups = []
             for group_types in groups_data:
                 if len(group_types) > 1:
-                    group_rels = [rel for rel in relationships if rel.type in group_types]
+                    group_rels = [
+                        rel for rel in relationships if rel.type in group_types
+                    ]
                     if len(group_rels) > 1:
                         semantic_groups.append(group_rels)
 
@@ -485,10 +566,12 @@ class RelationshipMerger(MaintenanceJobBase):
             "Merged relationships",
             primary_id=primary.id,
             duplicate_ids=[d.id for d in duplicates],
-            reason=merge_candidate.merge_reason
+            reason=merge_candidate.merge_reason,
         )
 
-    async def _merge_relationship_metadata(self, primary: RelationshipCandidate, duplicate: RelationshipCandidate) -> None:
+    async def _merge_relationship_metadata(
+        self, primary: RelationshipCandidate, duplicate: RelationshipCandidate
+    ) -> None:
         """Merge metadata from duplicate into primary relationship."""
         # Combine metadata
         merged_metadata = primary.metadata.copy()
@@ -509,11 +592,14 @@ class RelationshipMerger(MaintenanceJobBase):
             r.updated_at = datetime()
         """
 
-        await self.neo4j_storage._connection_ops._execute_query(query, {
-            "rel_id": primary.id,
-            "metadata": json.dumps(merged_metadata),
-            "confidence": max(primary.confidence, duplicate.confidence)
-        })
+        await self.neo4j_storage._connection_ops._execute_query(
+            query,
+            {
+                "rel_id": primary.id,
+                "metadata": json.dumps(merged_metadata),
+                "confidence": max(primary.confidence, duplicate.confidence),
+            },
+        )
 
     async def _delete_relationship(self, relationship_id: str) -> None:
         """Delete a relationship by ID."""
@@ -522,12 +608,14 @@ class RelationshipMerger(MaintenanceJobBase):
         DELETE r
         """
 
-        await self.neo4j_storage._connection_ops._execute_query(query, {
-            "rel_id": relationship_id
-        })
+        await self.neo4j_storage._connection_ops._execute_query(
+            query, {"rel_id": relationship_id}
+        )
 
 
-async def run_relationship_merger(overrides: Dict[str, Any]) -> RelationshipMergerResult:
+async def run_relationship_merger(
+    overrides: Dict[str, Any]
+) -> RelationshipMergerResult:
     """Run relationship merger with configuration overrides."""
     import os
 

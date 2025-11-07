@@ -1,23 +1,24 @@
 """Tests for analysis agents."""
 
-import pytest
 import asyncio
 import os
-from unittest.mock import Mock, AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
+
+import pytest
 
 # Set up test environment
 os.environ["GEMINI_API_KEY"] = "test-key"
 
-from agents.analysis.query_analysis import QueryAnalysisAgent
 from agents.analysis.content_analysis import ContentAnalysisAgent
+from agents.analysis.models import (
+    ContentAnalysisResult,
+    QueryAnalysisResult,
+    SentimentAnalysisResult,
+    TopicAnalysisResult,
+)
+from agents.analysis.query_analysis import QueryAnalysisAgent
 from agents.analysis.sentiment_analysis import SentimentAnalysisAgent
 from agents.analysis.topic_analysis import TopicAnalysisAgent
-from agents.analysis.models import (
-    QueryAnalysisResult,
-    ContentAnalysisResult,
-    SentimentAnalysisResult,
-    TopicAnalysisResult
-)
 from agents.base.config import AgentConfig
 
 
@@ -40,7 +41,7 @@ class TestQueryAnalysisAgent:
         """Test analysis of a simple query."""
         query = "What is machine learning?"
 
-        with patch.object(query_agent, '_call_model') as mock_llm:
+        with patch.object(query_agent, "_call_model") as mock_llm:
             mock_llm.return_value = """{
                 "intent": "question",
                 "entities": ["machine learning"],
@@ -70,15 +71,19 @@ class TestQueryAnalysisAgent:
         """Test analysis of a complex query."""
         query = "How do convolutional neural networks compare to transformer models for image classification tasks in terms of accuracy and computational efficiency?"
 
-        with patch.object(query_agent, '_call_model') as mock_llm:
+        with patch.object(query_agent, "_call_model") as mock_llm:
             mock_llm.return_value = {
                 "query_type": "comparative",
                 "complexity": "complex",
                 "intent": "comparison_request",
-                "entities": ["convolutional neural networks", "transformer models", "image classification"],
+                "entities": [
+                    "convolutional neural networks",
+                    "transformer models",
+                    "image classification",
+                ],
                 "keywords": ["CNN", "transformers", "accuracy", "efficiency"],
                 "domain": "machine_learning",
-                "confidence": "high"
+                "confidence": "high",
             }
 
             result = await query_agent.analyze_query(query)
@@ -112,9 +117,13 @@ class TestContentAnalysisAgent:
         Results: Our model achieved state-of-the-art performance...
         """
 
-        with patch.object(content_agent, '_call_model') as mock_llm:
+        with patch.object(content_agent, "_call_model") as mock_llm:
             mock_llm.return_value = {
-                "main_topics": ["deep learning", "computer vision", "image classification"],
+                "main_topics": [
+                    "deep learning",
+                    "computer vision",
+                    "image classification",
+                ],
                 "key_concepts": ["deep learning", "CNN", "image classification"],
                 "content_type": "research_paper",
                 "complexity": "high",
@@ -127,10 +136,10 @@ class TestContentAnalysisAgent:
                         "abstract": True,
                         "introduction": True,
                         "methodology": True,
-                        "results": True
+                        "results": True,
                     },
-                    "quality_score": 0.9
-                }
+                    "quality_score": 0.9,
+                },
             }
 
             result = await content_agent.analyze_content(content)
@@ -151,9 +160,13 @@ class TestContentAnalysisAgent:
         Outcome: Patient stabilized after 2 hours.
         """
 
-        with patch.object(content_agent, '_call_model') as mock_llm:
+        with patch.object(content_agent, "_call_model") as mock_llm:
             mock_llm.return_value = {
-                "main_topics": ["cardiology", "myocardial infarction", "emergency medicine"],
+                "main_topics": [
+                    "cardiology",
+                    "myocardial infarction",
+                    "emergency medicine",
+                ],
                 "key_concepts": ["chest pain", "myocardial infarction", "aspirin"],
                 "content_type": "medical_record",
                 "complexity": "medium",
@@ -166,10 +179,10 @@ class TestContentAnalysisAgent:
                         "symptoms": True,
                         "diagnosis": True,
                         "treatment": True,
-                        "outcome": True
+                        "outcome": True,
                     },
-                    "quality_score": 0.85
-                }
+                    "quality_score": 0.85,
+                },
             }
 
             result = await content_agent.analyze_content(content)
@@ -193,7 +206,7 @@ class TestSentimentAnalysisAgent:
         """Test positive sentiment analysis."""
         text = "This new treatment is absolutely amazing! It completely cured my symptoms and I feel fantastic."
 
-        with patch.object(sentiment_agent, '_call_model') as mock_llm:
+        with patch.object(sentiment_agent, "_call_model") as mock_llm:
             mock_llm.return_value = {
                 "polarity": "positive",
                 "confidence": "high",
@@ -201,8 +214,12 @@ class TestSentimentAnalysisAgent:
                 "emotions": {"joy": 0.8, "relief": 0.7, "satisfaction": 0.9},
                 "aspects": [],
                 "metadata": {
-                    "key_phrases": ["absolutely amazing", "completely cured", "feel fantastic"]
-                }
+                    "key_phrases": [
+                        "absolutely amazing",
+                        "completely cured",
+                        "feel fantastic",
+                    ]
+                },
             }
 
             result = await sentiment_agent.analyze_sentiment(text)
@@ -218,7 +235,7 @@ class TestSentimentAnalysisAgent:
         """Test negative sentiment analysis."""
         text = "This treatment was terrible. It made my symptoms worse and caused severe side effects."
 
-        with patch.object(sentiment_agent, '_call_model') as mock_llm:
+        with patch.object(sentiment_agent, "_call_model") as mock_llm:
             mock_llm.return_value = {
                 "polarity": "negative",
                 "confidence": "high",
@@ -227,7 +244,7 @@ class TestSentimentAnalysisAgent:
                 "aspects": [],
                 "metadata": {
                     "key_phrases": ["terrible", "made worse", "severe side effects"]
-                }
+                },
             }
 
             result = await sentiment_agent.analyze_sentiment(text)
@@ -255,22 +272,27 @@ class TestTopicAnalysisAgent:
         Prevention strategies focus on lifestyle modifications and medication.
         """
 
-        with patch.object(topic_agent, '_call_model') as mock_llm:
+        with patch.object(topic_agent, "_call_model") as mock_llm:
             mock_llm.return_value = {
                 "primary_topic": "cardiovascular_disease",
                 "secondary_topics": ["risk_factors", "prevention", "epidemiology"],
                 "topic_distribution": {
                     "cardiovascular_disease": 0.8,
                     "risk_factors": 0.6,
-                    "prevention": 0.5
+                    "prevention": 0.5,
                 },
                 "coherence_score": 0.9,
                 "confidence": "high",
                 "metadata": {
                     "category": "medical",
-                    "keywords": ["cardiovascular", "hypertension", "diabetes", "prevention"],
-                    "domain_specificity": 0.95
-                }
+                    "keywords": [
+                        "cardiovascular",
+                        "hypertension",
+                        "diabetes",
+                        "prevention",
+                    ],
+                    "domain_specificity": 0.95,
+                },
             }
 
             result = await topic_agent.analyze_topics(text)
@@ -290,22 +312,22 @@ class TestTopicAnalysisAgent:
         Natural language processing enables better human-computer interaction.
         """
 
-        with patch.object(topic_agent, '_call_model') as mock_llm:
+        with patch.object(topic_agent, "_call_model") as mock_llm:
             mock_llm.return_value = {
                 "primary_topic": "artificial_intelligence",
                 "secondary_topics": ["machine_learning", "computer_vision", "nlp"],
                 "topic_distribution": {
                     "artificial_intelligence": 0.9,
                     "machine_learning": 0.7,
-                    "computer_vision": 0.6
+                    "computer_vision": 0.6,
                 },
                 "coherence_score": 0.95,
                 "confidence": "high",
                 "metadata": {
                     "category": "technology",
                     "keywords": ["AI", "deep learning", "computer vision", "NLP"],
-                    "domain_specificity": 0.9
-                }
+                    "domain_specificity": 0.9,
+                },
             }
 
             result = await topic_agent.analyze_topics(text)
@@ -335,19 +357,20 @@ class TestAnalysisAgentsIntegration:
         topic_agent = TopicAnalysisAgent(topic_config)
 
         # Mock responses
-        with patch.object(sentiment_agent, '_call_model') as mock_sentiment, \
-             patch.object(topic_agent, '_call_model') as mock_topic, \
-             patch.object(content_agent, '_call_model') as mock_content:
-
+        with patch.object(
+            sentiment_agent, "_call_model"
+        ) as mock_sentiment, patch.object(
+            topic_agent, "_call_model"
+        ) as mock_topic, patch.object(
+            content_agent, "_call_model"
+        ) as mock_content:
             mock_sentiment.return_value = {
                 "polarity": "positive",
                 "confidence": "high",
                 "intensity": 0.8,
                 "emotions": {"excitement": 0.9},
                 "aspects": [],
-                "metadata": {
-                    "key_phrases": ["really excited"]
-                }
+                "metadata": {"key_phrases": ["really excited"]},
             }
 
             mock_topic.return_value = {
@@ -356,15 +379,15 @@ class TestAnalysisAgentsIntegration:
                 "topic_distribution": {
                     "medical_ai": 0.8,
                     "AI": 0.7,
-                    "medical_diagnosis": 0.6
+                    "medical_diagnosis": 0.6,
                 },
                 "coherence_score": 0.85,
                 "confidence": "high",
                 "metadata": {
                     "category": "technology",
                     "keywords": ["AI", "medical", "diagnosis"],
-                    "domain_specificity": 0.85
-                }
+                    "domain_specificity": 0.85,
+                },
             }
 
             mock_content.return_value = {
@@ -378,8 +401,8 @@ class TestAnalysisAgentsIntegration:
                 "metadata": {
                     "domain": "technology",
                     "structure": {"informal": True},
-                    "quality_score": 0.7
-                }
+                    "quality_score": 0.7,
+                },
             }
 
             # Run analysis pipeline

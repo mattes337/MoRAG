@@ -2,33 +2,42 @@
 
 import asyncio
 from abc import ABC, abstractmethod
-from typing import TypeVar, Generic, Optional, Dict, Any, Type, Union
+from typing import Any, Dict, Generic, Optional, Type, TypeVar, Union
+
+import structlog
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent, RunContext
-import structlog
 
-from .exceptions import AgentError, ValidationError, RetryExhaustedError
-from .providers import GeminiProvider, ProviderConfig, OutlinesProvider
+from .exceptions import AgentError, RetryExhaustedError, ValidationError
+from .providers import GeminiProvider, OutlinesProvider, ProviderConfig
 
 logger = structlog.get_logger(__name__)
 
-T = TypeVar('T', bound=BaseModel)
+T = TypeVar("T", bound=BaseModel)
 
 
 class AgentConfig(BaseModel):
     """Configuration for AI agents."""
 
-    model: str = Field(default="google-gla:gemini-1.5-flash", description="Model identifier")
+    model: str = Field(
+        default="google-gla:gemini-1.5-flash", description="Model identifier"
+    )
     timeout: int = Field(default=30, description="Request timeout in seconds")
     max_retries: int = Field(default=3, description="Maximum retry attempts")
-    temperature: float = Field(default=0.1, ge=0.0, le=2.0, description="Model temperature")
-    max_tokens: Optional[int] = Field(default=None, description="Maximum tokens in response")
-    provider_config: Optional[ProviderConfig] = Field(default=None, description="Provider-specific configuration")
+    temperature: float = Field(
+        default=0.1, ge=0.0, le=2.0, description="Model temperature"
+    )
+    max_tokens: Optional[int] = Field(
+        default=None, description="Maximum tokens in response"
+    )
+    provider_config: Optional[ProviderConfig] = Field(
+        default=None, description="Provider-specific configuration"
+    )
 
     # Outlines configuration
     outlines_provider: str = Field(
         default="gemini",
-        description="Provider for Outlines integration (gemini, openai)"
+        description="Provider for Outlines integration (gemini, openai)",
     )
 
 
@@ -38,7 +47,7 @@ class MoRAGBaseAgent(Generic[T], ABC):
     def __init__(
         self,
         config: Optional[AgentConfig] = None,
-        provider: Optional[GeminiProvider] = None
+        provider: Optional[GeminiProvider] = None,
     ):
         """Initialize the base agent.
 
@@ -56,18 +65,15 @@ class MoRAGBaseAgent(Generic[T], ABC):
             self.outlines_provider = OutlinesProvider(
                 config=self.config.provider_config,
                 provider=self.config.outlines_provider,
-                model=self._extract_model_name(self.config.model)
+                model=self._extract_model_name(self.config.model),
             )
             self.logger.info(
                 "Outlines provider initialized",
                 provider=self.config.outlines_provider,
-                model=self.config.model
+                model=self.config.model,
             )
         except Exception as e:
-            self.logger.error(
-                "Failed to initialize Outlines provider",
-                error=str(e)
-            )
+            self.logger.error("Failed to initialize Outlines provider", error=str(e))
             raise AgentError(f"Outlines provider initialization failed: {e}") from e
 
     @property
@@ -82,6 +88,7 @@ class MoRAGBaseAgent(Generic[T], ABC):
         try:
             # Set the API key in environment for PydanticAI if available
             import os
+
             if self.provider.api_key and not os.getenv("GOOGLE_API_KEY"):
                 os.environ["GOOGLE_API_KEY"] = self.provider.api_key
 
@@ -134,12 +141,7 @@ class MoRAGBaseAgent(Generic[T], ABC):
             return model.split(":", 1)[1]
         return model
 
-    async def run(
-        self,
-        user_prompt: str,
-        deps: Optional[Any] = None,
-        **kwargs
-    ) -> T:
+    async def run(self, user_prompt: str, deps: Optional[Any] = None, **kwargs) -> T:
         """Run the agent with structured generation using Outlines.
 
         Args:
@@ -157,7 +159,9 @@ class MoRAGBaseAgent(Generic[T], ABC):
         try:
             self.logger.info(
                 "Running structured generation with Outlines",
-                user_prompt=user_prompt[:100] + "..." if len(user_prompt) > 100 else user_prompt
+                user_prompt=user_prompt[:100] + "..."
+                if len(user_prompt) > 100
+                else user_prompt,
             )
 
             # Get the Outlines generator for our result type
@@ -173,18 +177,10 @@ class MoRAGBaseAgent(Generic[T], ABC):
             return result
 
         except Exception as e:
-            self.logger.error(
-                "Structured generation failed",
-                error=str(e)
-            )
+            self.logger.error("Structured generation failed", error=str(e))
             raise AgentError(f"Structured generation failed: {e}") from e
 
-    def run_sync(
-        self,
-        user_prompt: str,
-        deps: Optional[Any] = None,
-        **kwargs
-    ) -> T:
+    def run_sync(self, user_prompt: str, deps: Optional[Any] = None, **kwargs) -> T:
         """Synchronous version of run().
 
         Args:
@@ -246,8 +242,7 @@ class MoRAGBaseAgent(Generic[T], ABC):
             True if Outlines is available, False otherwise
         """
         return (
-            self.outlines_provider is not None and
-            self.outlines_provider.is_available()
+            self.outlines_provider is not None and self.outlines_provider.is_available()
         )
 
     def get_generation_info(self) -> Dict[str, Any]:
@@ -260,5 +255,5 @@ class MoRAGBaseAgent(Generic[T], ABC):
             "structured_generation_enabled": True,  # Always enabled now
             "outlines_available": self.is_outlines_available(),
             "outlines_provider": self.config.outlines_provider,
-            "model": self.config.model
+            "model": self.config.model,
         }

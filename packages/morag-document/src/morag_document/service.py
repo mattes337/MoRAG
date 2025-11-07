@@ -5,13 +5,12 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Union
 
 import structlog
-
-from morag_core.interfaces.service import BaseService, ServiceConfig, ServiceStatus
-from morag_core.interfaces.processor import ProcessingConfig, ProcessingResult
-from morag_core.interfaces.converter import ChunkingStrategy, ConversionOptions
-from morag_core.models.document import Document
-from morag_core.exceptions import ValidationError, ProcessingError
 from morag_core.config import get_settings
+from morag_core.exceptions import ProcessingError, ValidationError
+from morag_core.interfaces.converter import ChunkingStrategy, ConversionOptions
+from morag_core.interfaces.processor import ProcessingConfig, ProcessingResult
+from morag_core.interfaces.service import BaseService, ServiceConfig, ServiceStatus
+from morag_core.models.document import Document
 from morag_embedding.service import GeminiEmbeddingService
 
 from .processor import DocumentProcessor
@@ -22,7 +21,11 @@ logger = structlog.get_logger(__name__)
 class DocumentService(BaseService):
     """Document processing service implementation."""
 
-    def __init__(self, config: Optional[ServiceConfig] = None, output_dir: Optional[Union[str, Path]] = None):
+    def __init__(
+        self,
+        config: Optional[ServiceConfig] = None,
+        output_dir: Optional[Union[str, Path]] = None,
+    ):
         """Initialize document service.
 
         Args:
@@ -49,9 +52,13 @@ class DocumentService(BaseService):
         """
         try:
             # Initialize embedding service if configured
-            if hasattr(self.config, 'custom_options') and self.config.custom_options.get("enable_embedding", False):
+            if hasattr(
+                self.config, "custom_options"
+            ) and self.config.custom_options.get("enable_embedding", False):
                 embedding_config = self.config.custom_options.get("embedding", {})
-                self.embedding_service = GeminiEmbeddingService(ServiceConfig(**embedding_config))
+                self.embedding_service = GeminiEmbeddingService(
+                    ServiceConfig(**embedding_config)
+                )
                 await self.embedding_service.initialize()
 
             self._status = ServiceStatus.READY
@@ -109,7 +116,7 @@ class DocumentService(BaseService):
         self,
         file_path: Union[str, Path],
         save_output: bool = True,
-        output_format: str = "markdown"
+        output_format: str = "markdown",
     ) -> Dict[str, Any]:
         """Process a document file and optionally save output files.
 
@@ -136,15 +143,15 @@ class DocumentService(BaseService):
                 return {
                     "success": False,
                     "error": result.error_message,
-                    "processing_time": result.processing_time
+                    "processing_time": result.processing_time,
                 }
 
             # Extract content from document
             content = ""
             chunks = []
             if result.document:
-                content = getattr(result.document, 'raw_text', '') or ""
-                chunks = getattr(result.document, 'chunks', [])
+                content = getattr(result.document, "raw_text", "") or ""
+                chunks = getattr(result.document, "chunks", [])
 
             # Prepare response
             response = {
@@ -153,13 +160,15 @@ class DocumentService(BaseService):
                 "result": {
                     "content": content,
                     "metadata": result.metadata,
-                    "chunks": chunks
-                }
+                    "chunks": chunks,
+                },
             }
 
             # Save output files if requested
             if save_output and self.output_dir:
-                output_files = await self._save_output_files(file_path, result, content, output_format)
+                output_files = await self._save_output_files(
+                    file_path, result, content, output_format
+                )
                 response["output_files"] = output_files
 
                 # Add markdown content to response if generated
@@ -169,14 +178,14 @@ class DocumentService(BaseService):
             return response
 
         except Exception as e:
-            logger.error("Document processing failed", error=str(e), file_path=str(file_path))
-            return {
-                "success": False,
-                "error": str(e),
-                "processing_time": 0
-            }
+            logger.error(
+                "Document processing failed", error=str(e), file_path=str(file_path)
+            )
+            return {"success": False, "error": str(e), "processing_time": 0}
 
-    async def process_document(self, file_path: Union[str, Path], **kwargs) -> ProcessingResult:
+    async def process_document(
+        self, file_path: Union[str, Path], **kwargs
+    ) -> ProcessingResult:
         """Process document.
 
         Args:
@@ -213,9 +222,7 @@ class DocumentService(BaseService):
             raise ProcessingError(f"Failed to process document: {str(e)}")
 
     async def process_document_to_json(
-        self,
-        file_path: Union[str, Path],
-        **kwargs
+        self, file_path: Union[str, Path], **kwargs
     ) -> Dict[str, Any]:
         """Process document and return structured JSON.
 
@@ -249,7 +256,7 @@ class DocumentService(BaseService):
                 "filename": str(Path(file_path).name),
                 "metadata": {},
                 "chapters": [],
-                "error": str(e)
+                "error": str(e),
             }
 
     async def process_text(self, text: str, **kwargs) -> ProcessingResult:
@@ -274,14 +281,16 @@ class DocumentService(BaseService):
                     "title": kwargs.get("title", "Text Document"),
                     "file_type": "text",
                     "word_count": len(text.split()),
-                }
+                },
             )
 
             # Get settings for default chunk configuration
             settings = get_settings()
 
             # Apply chunking
-            chunking_strategy = kwargs.get("chunking_strategy", ChunkingStrategy.PARAGRAPH)
+            chunking_strategy = kwargs.get(
+                "chunking_strategy", ChunkingStrategy.PARAGRAPH
+            )
             chunk_size = kwargs.get("chunk_size", settings.default_chunk_size)
             chunk_overlap = kwargs.get("chunk_overlap", settings.default_chunk_overlap)
 
@@ -325,7 +334,9 @@ class DocumentService(BaseService):
             )
             raise ProcessingError(f"Failed to process text: {str(e)}")
 
-    async def _convert_to_json(self, result: ProcessingResult, file_path: Union[str, Path]) -> Dict[str, Any]:
+    async def _convert_to_json(
+        self, result: ProcessingResult, file_path: Union[str, Path]
+    ) -> Dict[str, Any]:
         """Convert document processing result to structured JSON.
 
         Args:
@@ -349,18 +360,20 @@ class DocumentService(BaseService):
                         "content": chunk.content,
                         "page_number": chunk.page_number,
                         "chapter_index": chunk.chunk_index,
-                        "metadata": chunk.metadata
+                        "metadata": chunk.metadata,
                     }
                     chapters.append(chapter_data)
             else:
                 # No chunks - create single chapter from raw text
-                chapters.append({
-                    "title": title,
-                    "content": result.document.raw_text or "",
-                    "page_number": 1,
-                    "chapter_index": 0,
-                    "metadata": {}
-                })
+                chapters.append(
+                    {
+                        "title": title,
+                        "content": result.document.raw_text or "",
+                        "page_number": 1,
+                        "chapter_index": 0,
+                        "metadata": {},
+                    }
+                )
 
             # Build metadata with all required document fields
             metadata = {
@@ -371,27 +384,32 @@ class DocumentService(BaseService):
                 "mime_type": result.document.metadata.mime_type,
                 "file_size": result.document.metadata.file_size,
                 "checksum": result.document.metadata.checksum,  # Add checksum field
-
                 # Document-specific metadata
-                "source_type": result.document.metadata.source_type.value if result.document.metadata.source_type else "unknown",
+                "source_type": result.document.metadata.source_type.value
+                if result.document.metadata.source_type
+                else "unknown",
                 "page_count": result.document.metadata.page_count,
                 "word_count": result.document.metadata.word_count,
                 "author": result.document.metadata.author,
-                "created_at": result.document.metadata.created_at.isoformat() if result.document.metadata.created_at else None,
-                "modified_at": result.document.metadata.modified_at.isoformat() if result.document.metadata.modified_at else None,
+                "created_at": result.document.metadata.created_at.isoformat()
+                if result.document.metadata.created_at
+                else None,
+                "modified_at": result.document.metadata.modified_at.isoformat()
+                if result.document.metadata.modified_at
+                else None,
                 "language": result.document.metadata.language,
                 "quality_score": result.metadata.get("quality_score", 0.0),
                 "quality_issues": result.metadata.get("quality_issues", []),
                 "warnings": result.metadata.get("warnings", []),
                 "chunks_count": len(result.document.chunks),
-                "processing_time": getattr(result, 'processing_time', 0.0)
+                "processing_time": getattr(result, "processing_time", 0.0),
             }
 
             return {
                 "title": title,
                 "filename": filename,
                 "metadata": metadata,
-                "chapters": chapters
+                "chapters": chapters,
             }
 
         except Exception as e:
@@ -401,7 +419,7 @@ class DocumentService(BaseService):
                 "filename": str(Path(file_path).name),
                 "metadata": {},
                 "chapters": [],
-                "error": str(e)
+                "error": str(e),
             }
 
     async def _generate_embeddings(self, document: Document) -> None:
@@ -488,7 +506,7 @@ class DocumentService(BaseService):
         file_path: Path,
         result: ProcessingResult,
         content: str,
-        output_format: str
+        output_format: str,
     ) -> Dict[str, str]:
         """Save processing results to output files.
 
@@ -516,33 +534,39 @@ class DocumentService(BaseService):
 
         # Save chunks as JSON if available
         chunks = []
-        if result.document and hasattr(result.document, 'chunks'):
+        if result.document and hasattr(result.document, "chunks"):
             chunks = result.document.chunks
 
         if chunks:
             import json
+
             chunks_path = file_output_dir / f"{base_name}_chunks.json"
             chunks_data = []
 
             for chunk in chunks:
                 chunk_data = {
-                    "content": getattr(chunk, 'content', ''),
-                    "metadata": getattr(chunk, 'metadata', {}),
-                    "chunk_index": getattr(chunk, 'chunk_index', None),
-                    "start_char": getattr(chunk, 'start_char', None),
-                    "end_char": getattr(chunk, 'end_char', None)
+                    "content": getattr(chunk, "content", ""),
+                    "metadata": getattr(chunk, "metadata", {}),
+                    "chunk_index": getattr(chunk, "chunk_index", None),
+                    "start_char": getattr(chunk, "start_char", None),
+                    "end_char": getattr(chunk, "end_char", None),
                 }
                 chunks_data.append(chunk_data)
 
-            chunks_path.write_text(json.dumps(chunks_data, indent=2, ensure_ascii=False))
+            chunks_path.write_text(
+                json.dumps(chunks_data, indent=2, ensure_ascii=False)
+            )
             output_files["chunks"] = str(chunks_path)
 
-            logger.info("Saved chunks file",
-                       chunks_count=len(chunks_data),
-                       chunks_path=str(chunks_path))
+            logger.info(
+                "Saved chunks file",
+                chunks_count=len(chunks_data),
+                chunks_path=str(chunks_path),
+            )
 
         # Save metadata as JSON
         import json
+
         metadata_path = file_output_dir / f"{base_name}_metadata.json"
         metadata_dict = {
             "file_path": str(file_path),
@@ -550,13 +574,17 @@ class DocumentService(BaseService):
             "processing_time": result.processing_time,
             "content_length": len(content) if content else 0,
             "chunks_count": len(chunks) if chunks else 0,
-            "metadata": result.metadata
+            "metadata": result.metadata,
         }
-        metadata_path.write_text(json.dumps(metadata_dict, indent=2, ensure_ascii=False))
+        metadata_path.write_text(
+            json.dumps(metadata_dict, indent=2, ensure_ascii=False)
+        )
         output_files["metadata"] = str(metadata_path)
 
-        logger.info("Saved document output files",
-                   output_dir=str(file_output_dir),
-                   files_created=list(output_files.keys()))
+        logger.info(
+            "Saved document output files",
+            output_dir=str(file_output_dir),
+            files_created=list(output_files.keys()),
+        )
 
         return output_files

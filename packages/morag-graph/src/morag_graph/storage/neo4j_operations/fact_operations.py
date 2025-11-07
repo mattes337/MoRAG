@@ -1,6 +1,7 @@
 """Neo4j operations for fact storage and retrieval."""
 
-from typing import List, Dict, Any, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
+
 import structlog
 from neo4j import AsyncDriver
 
@@ -37,18 +38,16 @@ class FactOperations(BaseOperations):
         """
 
         results = await self._execute_query(
-            query,
-            {
-                "id": fact.id,
-                "properties": fact.get_neo4j_properties()
-            }
+            query, {"id": fact.id, "properties": fact.get_neo4j_properties()}
         )
 
         if results:
             self.logger.debug(
                 "Fact stored successfully",
                 fact_id=fact.id,
-                fact_text=fact.fact_text[:50] + "..." if len(fact.fact_text) > 50 else fact.fact_text
+                fact_text=fact.fact_text[:50] + "..."
+                if len(fact.fact_text) > 50
+                else fact.fact_text,
             )
             return results[0]["fact_id"]
 
@@ -68,11 +67,7 @@ class FactOperations(BaseOperations):
 
         # Prepare batch data
         fact_data = [
-            {
-                'id': fact.id,
-                'properties': fact.get_neo4j_properties()
-            }
-            for fact in facts
+            {"id": fact.id, "properties": fact.get_neo4j_properties()} for fact in facts
         ]
 
         query = """
@@ -86,9 +81,7 @@ class FactOperations(BaseOperations):
         fact_ids = [record["fact_id"] for record in results]
 
         self.logger.info(
-            "Facts stored successfully",
-            num_facts=len(facts),
-            stored_ids=len(fact_ids)
+            "Facts stored successfully", num_facts=len(facts), stored_ids=len(fact_ids)
         )
 
         return fact_ids
@@ -116,7 +109,7 @@ class FactOperations(BaseOperations):
                 source_id=relation.source_fact_id,
                 target_id=relation.target_fact_id,
                 rel_id=relation.id,
-                properties=relation.get_neo4j_properties()
+                properties=relation.get_neo4j_properties(),
             )
 
             record = await result.single()
@@ -124,7 +117,7 @@ class FactOperations(BaseOperations):
                 self.logger.debug(
                     "Fact relation stored successfully",
                     relation_id=relation.id,
-                    relation_type=relation.relation_type
+                    relation_type=relation.relation_type,
                 )
                 return record["relation_id"]
 
@@ -146,10 +139,10 @@ class FactOperations(BaseOperations):
             # Prepare batch data
             relation_data = [
                 {
-                    'source_id': rel.source_fact_id,
-                    'target_id': rel.target_fact_id,
-                    'rel_id': rel.id,
-                    'properties': rel.get_neo4j_properties()
+                    "source_id": rel.source_fact_id,
+                    "target_id": rel.target_fact_id,
+                    "rel_id": rel.id,
+                    "properties": rel.get_neo4j_properties(),
                 }
                 for rel in relations
             ]
@@ -169,12 +162,14 @@ class FactOperations(BaseOperations):
             self.logger.info(
                 "Fact relations stored successfully",
                 num_relations=len(relations),
-                stored_ids=len(relation_ids)
+                stored_ids=len(relation_ids),
             )
 
             return relation_ids
 
-    async def create_chunk_contains_fact_relation(self, chunk_id: str, fact_id: str, context: str = "") -> None:
+    async def create_chunk_contains_fact_relation(
+        self, chunk_id: str, fact_id: str, context: str = ""
+    ) -> None:
         """Create a CONTAINS relationship between a chunk and a fact.
 
         Args:
@@ -191,16 +186,18 @@ class FactOperations(BaseOperations):
         RETURN c.id as chunk_id, f.id as fact_id
         """
 
-        result = await self._execute_query(query, {
-            "chunk_id": chunk_id,
-            "fact_id": fact_id,
-            "context": context
-        })
+        result = await self._execute_query(
+            query, {"chunk_id": chunk_id, "fact_id": fact_id, "context": context}
+        )
 
         if not result:
-            self.logger.warning(f"Failed to create chunk-fact relationship: chunk {chunk_id} or fact {fact_id} not found")
+            self.logger.warning(
+                f"Failed to create chunk-fact relationship: chunk {chunk_id} or fact {fact_id} not found"
+            )
         else:
-            self.logger.debug(f"Created CONTAINS relationship: chunk {chunk_id} -> fact {fact_id}")
+            self.logger.debug(
+                f"Created CONTAINS relationship: chunk {chunk_id} -> fact {fact_id}"
+            )
 
     async def get_fact_by_id(self, fact_id: str) -> Optional[Fact]:
         """Retrieve a fact by ID.
@@ -290,7 +287,7 @@ class FactOperations(BaseOperations):
         fact_type: Optional[str] = None,
         domain: Optional[str] = None,
         min_confidence: float = 0.0,
-        limit: int = 50
+        limit: int = 50,
     ) -> List[Fact]:
         """Search facts by text content.
 
@@ -308,18 +305,18 @@ class FactOperations(BaseOperations):
             # Build dynamic query
             where_clauses = ["f.confidence >= $min_confidence"]
             params = {
-                'query_text': query_text.lower(),
-                'min_confidence': min_confidence,
-                'limit': limit
+                "query_text": query_text.lower(),
+                "min_confidence": min_confidence,
+                "limit": limit,
             }
 
             if fact_type:
                 where_clauses.append("f.fact_type = $fact_type")
-                params['fact_type'] = fact_type
+                params["fact_type"] = fact_type
 
             if domain:
                 where_clauses.append("f.domain = $domain")
-                params['domain'] = domain
+                params["domain"] = domain
 
             where_clause = " AND ".join(where_clauses)
 
@@ -353,7 +350,7 @@ class FactOperations(BaseOperations):
         self,
         fact_id: str,
         relation_types: Optional[List[str]] = None,
-        max_depth: int = 2
+        max_depth: int = 2,
     ) -> List[Tuple[Fact, str, float]]:
         """Get facts related to a given fact.
 
@@ -368,11 +365,11 @@ class FactOperations(BaseOperations):
         async with self.driver.session() as session:
             # Build relation type filter
             relation_filter = ""
-            params = {'fact_id': fact_id, 'max_depth': max_depth}
+            params = {"fact_id": fact_id, "max_depth": max_depth}
 
             if relation_types:
                 relation_filter = "AND r.relation_type IN $relation_types"
-                params['relation_types'] = relation_types
+                params["relation_types"] = relation_types
 
             query = f"""
             MATCH path = (source:Fact {{id: $fact_id}})-[r:FACT_RELATION*1..$max_depth]-(target:Fact)
@@ -452,13 +449,13 @@ class FactOperations(BaseOperations):
 
             if record:
                 return {
-                    'total_facts': record['total_facts'],
-                    'total_relations': record['total_relations'],
-                    'fact_types': [ft for ft in record['fact_types'] if ft],
-                    'domains': [d for d in record['domains'] if d],
-                    'avg_confidence': record['avg_confidence'],
-                    'min_confidence': record['min_confidence'],
-                    'max_confidence': record['max_confidence']
+                    "total_facts": record["total_facts"],
+                    "total_relations": record["total_relations"],
+                    "fact_types": [ft for ft in record["fact_types"] if ft],
+                    "domains": [d for d in record["domains"] if d],
+                    "avg_confidence": record["avg_confidence"],
+                    "min_confidence": record["min_confidence"],
+                    "max_confidence": record["max_confidence"],
                 }
 
             return {}
@@ -474,35 +471,44 @@ class FactOperations(BaseOperations):
         """
         try:
             # Handle keywords conversion
-            keywords_str = fact_data.get('keywords', '')
-            keywords = [k.strip() for k in keywords_str.split(',') if k.strip()] if keywords_str else []
+            keywords_str = fact_data.get("keywords", "")
+            keywords = (
+                [k.strip() for k in keywords_str.split(",") if k.strip()]
+                if keywords_str
+                else []
+            )
 
             # Handle datetime conversion
             from datetime import datetime
-            created_at_str = fact_data.get('created_at')
-            created_at = datetime.fromisoformat(created_at_str) if created_at_str else datetime.utcnow()
+
+            created_at_str = fact_data.get("created_at")
+            created_at = (
+                datetime.fromisoformat(created_at_str)
+                if created_at_str
+                else datetime.utcnow()
+            )
 
             return Fact(
-                id=fact_data['id'],
-                subject=fact_data['subject'],
-                object=fact_data['object'],
-                approach=fact_data.get('approach'),
-                solution=fact_data.get('solution'),
-                remarks=fact_data.get('remarks'),
-                source_chunk_id=fact_data['source_chunk_id'],
-                source_document_id=fact_data['source_document_id'],
-                extraction_confidence=float(fact_data.get('confidence', 0.0)),
-                fact_type=fact_data.get('fact_type', 'definition'),
-                domain=fact_data.get('domain'),
+                id=fact_data["id"],
+                subject=fact_data["subject"],
+                object=fact_data["object"],
+                approach=fact_data.get("approach"),
+                solution=fact_data.get("solution"),
+                remarks=fact_data.get("remarks"),
+                source_chunk_id=fact_data["source_chunk_id"],
+                source_document_id=fact_data["source_document_id"],
+                extraction_confidence=float(fact_data.get("confidence", 0.0)),
+                fact_type=fact_data.get("fact_type", "definition"),
+                domain=fact_data.get("domain"),
                 keywords=keywords,
                 created_at=created_at,
-                language=fact_data.get('language', 'en')
+                language=fact_data.get("language", "en"),
             )
 
         except Exception as e:
             self.logger.warning(
                 "Failed to convert Neo4j data to Fact",
                 error=str(e),
-                fact_data=fact_data
+                fact_data=fact_data,
             )
             return None

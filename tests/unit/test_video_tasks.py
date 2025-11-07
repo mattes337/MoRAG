@@ -1,15 +1,16 @@
 """Unit tests for video tasks."""
 
-import pytest
-from unittest.mock import Mock, patch, AsyncMock
 from pathlib import Path
+from unittest.mock import AsyncMock, Mock, patch
 
-from morag_video.tasks import (
-    process_video_file,
-    extract_video_audio,
-    generate_video_thumbnails
-)
+import pytest
 from morag_video import VideoMetadata, VideoProcessingResult
+from morag_video.tasks import (
+    extract_video_audio,
+    generate_video_thumbnails,
+    process_video_file,
+)
+
 
 class TestVideoTasks:
     """Test cases for video processing tasks."""
@@ -28,7 +29,7 @@ class TestVideoTasks:
             format="mp4",
             has_audio=True,
             audio_codec="aac",
-            creation_time="2024-01-01T00:00:00Z"
+            creation_time="2024-01-01T00:00:00Z",
         )
 
     @pytest.fixture
@@ -40,13 +41,15 @@ class TestVideoTasks:
             keyframes=[Path("/tmp/key1.jpg")],
             metadata=mock_video_metadata,
             processing_time=5.0,
-            temp_files=[Path("/tmp/audio.wav"), Path("/tmp/thumb1.jpg")]
+            temp_files=[Path("/tmp/audio.wav"), Path("/tmp/thumb1.jpg")],
         )
 
     @pytest.mark.asyncio
-    @patch('morag.tasks.video_tasks.video_processor')
-    @patch('morag.tasks.video_tasks.process_audio_file')
-    async def test_process_video_file_success(self, mock_audio_task, mock_processor, mock_video_result):
+    @patch("morag.tasks.video_tasks.video_processor")
+    @patch("morag.tasks.video_tasks.process_audio_file")
+    async def test_process_video_file_success(
+        self, mock_audio_task, mock_processor, mock_video_result
+    ):
         """Test successful video file processing."""
         # Mock video processor
         mock_processor.process_video.return_value = mock_video_result
@@ -56,7 +59,7 @@ class TestVideoTasks:
         mock_audio_task.return_value = {
             "text": "Transcribed audio content",
             "chunks": ["chunk1", "chunk2"],
-            "embeddings_stored": 2
+            "embeddings_stored": 2,
         }
 
         # Create mock task instance
@@ -69,7 +72,7 @@ class TestVideoTasks:
             "/path/to/video.mp4",
             "test_task_id",
             config={"extract_audio": True, "generate_thumbnails": True},
-            process_audio=True
+            process_audio=True,
         )
 
         # Verify results
@@ -91,8 +94,10 @@ class TestVideoTasks:
         task_instance.update_status.assert_called()
 
     @pytest.mark.asyncio
-    @patch('morag.tasks.video_tasks.video_processor')
-    async def test_process_video_file_no_audio_processing(self, mock_processor, mock_video_result):
+    @patch("morag.tasks.video_tasks.video_processor")
+    async def test_process_video_file_no_audio_processing(
+        self, mock_processor, mock_video_result
+    ):
         """Test video processing without audio processing."""
         mock_processor.process_video.return_value = mock_video_result
         mock_processor.cleanup_temp_files = Mock()
@@ -101,17 +106,14 @@ class TestVideoTasks:
         task_instance.update_status = AsyncMock()
 
         result = await process_video_file(
-            task_instance,
-            "/path/to/video.mp4",
-            "test_task_id",
-            process_audio=False
+            task_instance, "/path/to/video.mp4", "test_task_id", process_audio=False
         )
 
         assert result["audio_processing_result"] is None
         mock_processor.cleanup_temp_files.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch('morag.tasks.video_tasks.video_processor')
+    @patch("morag.tasks.video_tasks.video_processor")
     async def test_process_video_file_no_audio_track(self, mock_processor):
         """Test video processing with no audio track."""
         # Create video result without audio
@@ -126,7 +128,7 @@ class TestVideoTasks:
             format="mp4",
             has_audio=False,
             audio_codec=None,
-            creation_time=None
+            creation_time=None,
         )
 
         video_result = VideoProcessingResult(
@@ -135,7 +137,7 @@ class TestVideoTasks:
             keyframes=[],
             metadata=video_metadata,
             processing_time=3.0,
-            temp_files=[]
+            temp_files=[],
         )
 
         mock_processor.process_video.return_value = video_result
@@ -145,17 +147,14 @@ class TestVideoTasks:
         task_instance.update_status = AsyncMock()
 
         result = await process_video_file(
-            task_instance,
-            "/path/to/video.mp4",
-            "test_task_id",
-            process_audio=True
+            task_instance, "/path/to/video.mp4", "test_task_id", process_audio=True
         )
 
         assert result["audio_processing_result"] is None
         assert result["video_metadata"]["has_audio"] is False
 
     @pytest.mark.asyncio
-    @patch('morag.tasks.video_tasks.video_processor')
+    @patch("morag.tasks.video_tasks.video_processor")
     async def test_process_video_file_failure(self, mock_processor):
         """Test video processing failure."""
         mock_processor.process_video.side_effect = Exception("Processing failed")
@@ -165,36 +164,30 @@ class TestVideoTasks:
 
         with pytest.raises(Exception, match="Processing failed"):
             await process_video_file(
-                task_instance,
-                "/path/to/video.mp4",
-                "test_task_id"
+                task_instance, "/path/to/video.mp4", "test_task_id"
             )
 
         # Verify failure status was set
         task_instance.update_status.assert_called_with(
-            "FAILURE",
-            {"error": "Video processing failed: Processing failed"}
+            "FAILURE", {"error": "Video processing failed: Processing failed"}
         )
 
     @pytest.mark.asyncio
-    @patch('morag.tasks.video_tasks.ffmpeg_service')
+    @patch("morag.tasks.video_tasks.ffmpeg_service")
     async def test_extract_video_audio_success(self, mock_service):
         """Test successful video audio extraction."""
         mock_audio_path = Path("/tmp/extracted_audio.wav")
         mock_service.extract_audio.return_value = mock_audio_path
 
         # Mock file stats
-        with patch('pathlib.Path.stat') as mock_stat:
+        with patch("pathlib.Path.stat") as mock_stat:
             mock_stat.return_value.st_size = 1000000
 
             task_instance = Mock()
             task_instance.update_status = AsyncMock()
 
             result = await extract_video_audio(
-                task_instance,
-                "/path/to/video.mp4",
-                "test_task_id",
-                "wav"
+                task_instance, "/path/to/video.mp4", "test_task_id", "wav"
             )
 
             assert result["audio_path"] == str(mock_audio_path)
@@ -202,14 +195,13 @@ class TestVideoTasks:
             assert result["file_size"] == 1000000
 
             mock_service.extract_audio.assert_called_once_with(
-                Path("/path/to/video.mp4"),
-                output_format="wav"
+                Path("/path/to/video.mp4"), output_format="wav"
             )
 
             task_instance.update_status.assert_called()
 
     @pytest.mark.asyncio
-    @patch('morag.tasks.video_tasks.ffmpeg_service')
+    @patch("morag.tasks.video_tasks.ffmpeg_service")
     async def test_extract_video_audio_failure(self, mock_service):
         """Test video audio extraction failure."""
         mock_service.extract_audio.side_effect = Exception("Extraction failed")
@@ -219,24 +211,21 @@ class TestVideoTasks:
 
         with pytest.raises(Exception, match="Extraction failed"):
             await extract_video_audio(
-                task_instance,
-                "/path/to/video.mp4",
-                "test_task_id"
+                task_instance, "/path/to/video.mp4", "test_task_id"
             )
 
         task_instance.update_status.assert_called_with(
-            "FAILURE",
-            {"error": "Video audio extraction failed: Extraction failed"}
+            "FAILURE", {"error": "Video audio extraction failed: Extraction failed"}
         )
 
     @pytest.mark.asyncio
-    @patch('morag.tasks.video_tasks.ffmpeg_service')
+    @patch("morag.tasks.video_tasks.ffmpeg_service")
     async def test_generate_video_thumbnails_success(self, mock_service):
         """Test successful video thumbnail generation."""
         mock_thumbnails = [
             Path("/tmp/thumb1.jpg"),
             Path("/tmp/thumb2.jpg"),
-            Path("/tmp/thumb3.jpg")
+            Path("/tmp/thumb3.jpg"),
         ]
         mock_service.generate_thumbnails.return_value = mock_thumbnails
 
@@ -248,7 +237,7 @@ class TestVideoTasks:
             "/path/to/video.mp4",
             "test_task_id",
             count=3,
-            size=[640, 480]
+            size=[640, 480],
         )
 
         assert len(result["thumbnails"]) == 3
@@ -256,15 +245,13 @@ class TestVideoTasks:
         assert result["size"] == [640, 480]
 
         mock_service.generate_thumbnails.assert_called_once_with(
-            Path("/path/to/video.mp4"),
-            count=3,
-            size=(640, 480)
+            Path("/path/to/video.mp4"), count=3, size=(640, 480)
         )
 
         task_instance.update_status.assert_called()
 
     @pytest.mark.asyncio
-    @patch('morag.tasks.video_tasks.ffmpeg_service')
+    @patch("morag.tasks.video_tasks.ffmpeg_service")
     async def test_generate_video_thumbnails_default_size(self, mock_service):
         """Test thumbnail generation with default size."""
         mock_thumbnails = [Path("/tmp/thumb1.jpg")]
@@ -274,44 +261,41 @@ class TestVideoTasks:
         task_instance.update_status = AsyncMock()
 
         result = await generate_video_thumbnails(
-            task_instance,
-            "/path/to/video.mp4",
-            "test_task_id",
-            count=1
+            task_instance, "/path/to/video.mp4", "test_task_id", count=1
         )
 
         assert result["size"] == [320, 240]  # Default size
 
         mock_service.generate_thumbnails.assert_called_once_with(
-            Path("/path/to/video.mp4"),
-            count=1,
-            size=(320, 240)
+            Path("/path/to/video.mp4"), count=1, size=(320, 240)
         )
 
     @pytest.mark.asyncio
-    @patch('morag.tasks.video_tasks.ffmpeg_service')
+    @patch("morag.tasks.video_tasks.ffmpeg_service")
     async def test_generate_video_thumbnails_failure(self, mock_service):
         """Test video thumbnail generation failure."""
-        mock_service.generate_thumbnails.side_effect = Exception("Thumbnail generation failed")
+        mock_service.generate_thumbnails.side_effect = Exception(
+            "Thumbnail generation failed"
+        )
 
         task_instance = Mock()
         task_instance.update_status = AsyncMock()
 
         with pytest.raises(Exception, match="Thumbnail generation failed"):
             await generate_video_thumbnails(
-                task_instance,
-                "/path/to/video.mp4",
-                "test_task_id"
+                task_instance, "/path/to/video.mp4", "test_task_id"
             )
 
         task_instance.update_status.assert_called_with(
             "FAILURE",
-            {"error": "Video thumbnail generation failed: Thumbnail generation failed"}
+            {"error": "Video thumbnail generation failed: Thumbnail generation failed"},
         )
 
     @pytest.mark.asyncio
-    @patch('morag.tasks.video_tasks.video_processor')
-    async def test_process_video_file_config_parsing(self, mock_processor, mock_video_result):
+    @patch("morag.tasks.video_tasks.video_processor")
+    async def test_process_video_file_config_parsing(
+        self, mock_processor, mock_video_result
+    ):
         """Test video configuration parsing."""
         mock_processor.process_video.return_value = mock_video_result
         mock_processor.cleanup_temp_files = Mock()
@@ -324,7 +308,7 @@ class TestVideoTasks:
             "generate_thumbnails": True,
             "thumbnail_count": 10,
             "extract_keyframes": True,
-            "max_keyframes": 15
+            "max_keyframes": 15,
         }
 
         await process_video_file(
@@ -332,7 +316,7 @@ class TestVideoTasks:
             "/path/to/video.mp4",
             "test_task_id",
             config=config,
-            process_audio=False
+            process_audio=False,
         )
 
         # Verify processor was called with correct config

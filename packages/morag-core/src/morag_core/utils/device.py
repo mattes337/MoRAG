@@ -28,7 +28,7 @@ def get_safe_device(prefer_gpu: bool = True) -> str:
             return device
 
         # Check for MPS (Apple Silicon)
-        if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+        if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
             device = "mps"
             logger.info("Using MPS device (Apple Silicon)")
             return device
@@ -53,7 +53,7 @@ def get_device_info() -> dict:
         "cuda": False,
         "mps": False,
         "cuda_devices": [],
-        "memory_info": {}
+        "memory_info": {},
     }
 
     try:
@@ -74,7 +74,7 @@ def get_device_info() -> dict:
             ]
 
         # MPS info
-        if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+        if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
             info["mps"] = True
 
     except ImportError:
@@ -94,7 +94,7 @@ def clear_gpu_memory():
             torch.cuda.empty_cache()
             logger.info("Cleared CUDA memory cache")
 
-        if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+        if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
             torch.mps.empty_cache()
             logger.info("Cleared MPS memory cache")
 
@@ -104,7 +104,9 @@ def clear_gpu_memory():
         logger.warning(f"Error clearing GPU memory: {e}")
 
 
-def get_optimal_batch_size(base_batch_size: int = 32, device: Optional[str] = None) -> int:
+def get_optimal_batch_size(
+    base_batch_size: int = 32, device: Optional[str] = None
+) -> int:
     """Get optimal batch size based on available memory.
 
     Args:

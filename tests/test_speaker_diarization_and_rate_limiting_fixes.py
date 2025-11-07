@@ -16,7 +16,7 @@ import sys
 import tempfile
 import time
 from pathlib import Path
-from unittest.mock import Mock, patch, AsyncMock
+from unittest.mock import AsyncMock, Mock, patch
 
 # Add the project root to the Python path
 project_root = Path(__file__).parent.parent
@@ -33,16 +33,16 @@ async def test_speaker_diarization_fix():
     print("\n🎯 Testing Speaker Diarization Fix...")
 
     try:
-        from morag_audio.processor import AudioProcessor
         from morag_audio.models import AudioConfig
-        from morag_audio.services.speaker_diarization import DiarizationResult, SpeakerInfo, SpeakerSegment
+        from morag_audio.processor import AudioProcessor
+        from morag_audio.services.speaker_diarization import (
+            DiarizationResult,
+            SpeakerInfo,
+            SpeakerSegment,
+        )
 
         # Create a mock audio processor with diarization enabled
-        config = AudioConfig(
-            enable_diarization=True,
-            min_speakers=1,
-            max_speakers=3
-        )
+        config = AudioConfig(enable_diarization=True, min_speakers=1, max_speakers=3)
 
         processor = AudioProcessor(config)
 
@@ -59,7 +59,7 @@ async def test_speaker_diarization_fix():
                 speaker_overlap_time=0.0,
                 processing_time=1.0,
                 model_used="mock",
-                confidence_threshold=0.5
+                confidence_threshold=0.5,
             )
 
         mock_diarization_service.diarize_audio = mock_diarize_audio
@@ -67,6 +67,7 @@ async def test_speaker_diarization_fix():
 
         # Create mock audio segments
         from morag_audio.models import AudioSegment
+
         segments = [
             AudioSegment(
                 start=0.0,
@@ -75,13 +76,15 @@ async def test_speaker_diarization_fix():
                 speaker=None,
                 confidence=0.9,
                 topic_id=None,
-                topic_label=None
+                topic_label=None,
             )
         ]
 
         # Test the _apply_diarization method
         with tempfile.NamedTemporaryFile(suffix=".mp3") as temp_file:
-            result_segments = await processor._apply_diarization(temp_file.name, segments)
+            result_segments = await processor._apply_diarization(
+                temp_file.name, segments
+            )
 
             # Verify the method completed without errors
             assert len(result_segments) == 1
@@ -100,13 +103,12 @@ async def test_rate_limiting_fix():
     print("\n🎯 Testing Rate Limiting Fix...")
 
     try:
-        from morag_services.embedding import GeminiEmbeddingService
         from morag_core.exceptions import RateLimitError
+        from morag_services.embedding import GeminiEmbeddingService
 
         # Create a service instance
         service = GeminiEmbeddingService(
-            api_key="test_key",
-            embedding_model="text-embedding-004"
+            api_key="test_key", embedding_model="text-embedding-004"
         )
 
         # Mock the client to simulate rate limiting
@@ -121,7 +123,9 @@ async def test_rate_limiting_fix():
             call_count += 1
 
             if call_count <= 2:  # First two calls fail with rate limit
-                raise Exception("429 RESOURCE_EXHAUSTED: Quota exceeded for quota metric 'Batch Embed Content API requests'")
+                raise Exception(
+                    "429 RESOURCE_EXHAUSTED: Quota exceeded for quota metric 'Batch Embed Content API requests'"
+                )
             else:  # Third call succeeds
                 mock_response = Mock()
                 mock_response.embeddings = [Mock()]
@@ -142,7 +146,9 @@ async def test_rate_limiting_fix():
 
             # Verify exponential backoff was applied (should take at least 3 seconds)
             elapsed_time = time.time() - start_time
-            assert elapsed_time >= 3.0, f"Expected at least 3 seconds for backoff, got {elapsed_time}"
+            assert (
+                elapsed_time >= 3.0
+            ), f"Expected at least 3 seconds for backoff, got {elapsed_time}"
 
             print("✅ Rate limiting fix working correctly with exponential backoff")
             return True
@@ -166,8 +172,7 @@ async def test_batch_processing_delays():
 
         # Create a service instance
         service = GeminiEmbeddingService(
-            api_key="test_key",
-            embedding_model="text-embedding-004"
+            api_key="test_key", embedding_model="text-embedding-004"
         )
 
         # Mock the generate_embedding method to track timing
@@ -176,10 +181,11 @@ async def test_batch_processing_delays():
         async def mock_generate_embedding(text, task_type):
             call_times.append(time.time())
             from morag_services.embedding import EmbeddingResult
+
             return EmbeddingResult(
                 embedding=[0.1] * 768,
                 token_count=len(text.split()),
-                model="text-embedding-004"
+                model="text-embedding-004",
             )
 
         service.generate_embedding = mock_generate_embedding
@@ -188,7 +194,9 @@ async def test_batch_processing_delays():
         texts = ["text1", "text2", "text3"]
         start_time = time.time()
 
-        results = await service.generate_embeddings_batch(texts, batch_size=3, delay_between_batches=0.5)
+        results = await service.generate_embeddings_batch(
+            texts, batch_size=3, delay_between_batches=0.5
+        )
 
         # Verify results
         assert len(results) == 3
@@ -196,8 +204,10 @@ async def test_batch_processing_delays():
 
         # Verify delays between calls (should be at least 0.1 seconds each)
         for i in range(1, len(call_times)):
-            delay = call_times[i] - call_times[i-1]
-            assert delay >= 0.1, f"Expected at least 0.1s delay between calls, got {delay}"
+            delay = call_times[i] - call_times[i - 1]
+            assert (
+                delay >= 0.1
+            ), f"Expected at least 0.1s delay between calls, got {delay}"
 
         print("✅ Batch processing delays working correctly")
         return True
@@ -215,7 +225,7 @@ async def main():
     tests = [
         test_speaker_diarization_fix,
         test_rate_limiting_fix,
-        test_batch_processing_delays
+        test_batch_processing_delays,
     ]
 
     results = []

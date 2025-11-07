@@ -1,17 +1,22 @@
 """Basic functionality tests for the agents framework."""
 
-import pytest
 import asyncio
-from unittest.mock import Mock, AsyncMock, patch
 import os
+from unittest.mock import AsyncMock, Mock, patch
+
+import pytest
 
 # Set up test environment
 os.environ["GEMINI_API_KEY"] = "test-key"
 
-from agents.base.config import AgentConfig, PromptConfig, ModelConfig
+from agents.base.config import AgentConfig, ModelConfig, PromptConfig
 from agents.base.template import ConfigurablePromptTemplate
 from agents.extraction.fact_extraction import FactExtractionAgent
-from agents.extraction.models import FactExtractionResult, ExtractedFact, ConfidenceLevel
+from agents.extraction.models import (
+    ConfidenceLevel,
+    ExtractedFact,
+    FactExtractionResult,
+)
 from agents.factory.utils import create_agent, get_agent
 
 
@@ -28,9 +33,7 @@ class TestAgentConfig:
     def test_config_with_overrides(self):
         """Test configuration with overrides."""
         config = AgentConfig(
-            name="test_agent",
-            timeout=60,
-            model=ModelConfig(temperature=0.5)
+            name="test_agent", timeout=60, model=ModelConfig(temperature=0.5)
         )
         assert config.timeout == 60
         assert config.model.temperature == 0.5
@@ -50,9 +53,7 @@ class TestPromptTemplate:
         """Test creating a prompt template."""
         config = PromptConfig()
         template = ConfigurablePromptTemplate(
-            config,
-            "System: {{ config.domain }}",
-            "User: {{ input }}"
+            config, "System: {{ config.domain }}", "User: {{ input }}"
         )
         assert template.config == config
 
@@ -60,9 +61,7 @@ class TestPromptTemplate:
         """Test template rendering."""
         config = PromptConfig(domain="test")
         template = ConfigurablePromptTemplate(
-            config,
-            "System: {{ config.domain }}",
-            "User: {{ input }}"
+            config, "System: {{ config.domain }}", "User: {{ input }}"
         )
 
         result = template.render_template("Hello {{ name }}", name="World")
@@ -74,7 +73,7 @@ class TestPromptTemplate:
         template = ConfigurablePromptTemplate(
             config,
             "System: You are a {{ config.domain }} expert.",
-            "User: Process {{ input }}"
+            "User: Process {{ input }}",
         )
 
         prompts = template.generate_full_prompt("test input")
@@ -97,7 +96,7 @@ class TestFactExtractionAgent:
         assert agent.get_result_type() == FactExtractionResult
 
     @pytest.mark.asyncio
-    @patch('agents.base.agent.BaseAgent._call_model')
+    @patch("agents.base.agent.BaseAgent._call_model")
     async def test_fact_extraction_execution(self, mock_call_model):
         """Test fact extraction execution."""
         # Mock the model response
@@ -157,8 +156,7 @@ class TestAgentFactory:
     def test_create_agent_with_config(self):
         """Test creating agent with custom config."""
         config = AgentConfig(
-            name="test_fact_extraction",
-            agent_config={"max_facts": 50}
+            name="test_fact_extraction", agent_config={"max_facts": 50}
         )
 
         agent = FactExtractionAgent(config)
@@ -171,10 +169,7 @@ class TestConfigurationValidation:
 
     def test_valid_configuration(self):
         """Test valid configuration passes validation."""
-        config = AgentConfig(
-            name="test_agent",
-            model=ModelConfig(api_key="test-key")
-        )
+        config = AgentConfig(name="test_agent", model=ModelConfig(api_key="test-key"))
 
         agent = FactExtractionAgent(config)
         # Should not raise exception
@@ -183,17 +178,14 @@ class TestConfigurationValidation:
     def test_invalid_configuration(self):
         """Test invalid configuration raises error."""
         with pytest.raises(Exception):  # ValidationError expected from Pydantic
-            config = AgentConfig(
-                name="test_agent",
-                timeout=-1  # Invalid timeout
-            )
+            config = AgentConfig(name="test_agent", timeout=-1)  # Invalid timeout
 
 
 class TestErrorHandling:
     """Test error handling."""
 
     @pytest.mark.asyncio
-    @patch('agents.base.agent.BaseAgent._call_model')
+    @patch("agents.base.agent.BaseAgent._call_model")
     async def test_model_error_handling(self, mock_call_model):
         """Test handling of model errors."""
         mock_call_model.side_effect = Exception("Model error")
@@ -204,7 +196,7 @@ class TestErrorHandling:
             await agent.extract_facts("Test text")
 
     @pytest.mark.asyncio
-    @patch('agents.base.agent.BaseAgent._call_model')
+    @patch("agents.base.agent.BaseAgent._call_model")
     async def test_invalid_json_handling(self, mock_call_model):
         """Test handling of invalid JSON responses."""
         mock_call_model.return_value = "Invalid JSON response"
@@ -221,13 +213,13 @@ async def test_async_functionality():
     agent = FactExtractionAgent()
 
     # Test that the agent can be created and has async methods
-    assert hasattr(agent, 'extract_facts')
+    assert hasattr(agent, "extract_facts")
     assert asyncio.iscoroutinefunction(agent.extract_facts)
 
 
 def test_imports():
     """Test that all necessary imports work."""
-    from agents.base import BaseAgent, AgentConfig, PromptTemplate
+    from agents.base import AgentConfig, BaseAgent, PromptTemplate
     from agents.extraction import FactExtractionAgent
     from agents.factory import create_agent, get_agent
 

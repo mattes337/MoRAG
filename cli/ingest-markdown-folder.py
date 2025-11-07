@@ -47,8 +47,9 @@ sys.path.insert(0, str(cli_dir))
 
 # Load environment variables from .env file
 from dotenv import load_dotenv
+
 project_root = Path(__file__).parent.parent
-env_path = project_root / '.env'
+env_path = project_root / ".env"
 load_dotenv(env_path)
 
 from morag.api import MoRAGAPI
@@ -59,26 +60,26 @@ class ServiceResultWrapper:
     """Wrapper to convert service dictionary results to object-like interface."""
 
     def __init__(self, result_dict):
-        self.success = result_dict.get('success', True)
-        self.processing_time = result_dict.get('processing_time', 0.0)
-        self.metadata = result_dict.get('metadata', {})
-        self.error_message = result_dict.get('error', None)
-        self.content = result_dict.get('content', '')
-        self.text_content = result_dict.get('content', '')
+        self.success = result_dict.get("success", True)
+        self.processing_time = result_dict.get("processing_time", 0.0)
+        self.metadata = result_dict.get("metadata", {})
+        self.error_message = result_dict.get("error", None)
+        self.content = result_dict.get("content", "")
+        self.text_content = result_dict.get("content", "")
         # Handle document-specific results
-        if 'document' in result_dict:
-            self.document = result_dict['document']
+        if "document" in result_dict:
+            self.document = result_dict["document"]
 
 
 def get_markdown_extensions() -> Set[str]:
     """Get supported markdown file extensions."""
-    return {'.md', '.markdown'}
+    return {".md", ".markdown"}
 
 
 def is_intermediate_file(file_path: Path) -> bool:
     """Check if a file is an intermediate file that should be skipped."""
     stem = file_path.stem
-    return stem.endswith('_intermediate')
+    return stem.endswith("_intermediate")
 
 
 def find_markdown_files(folder_path: Path, recursive: bool = True) -> List[Path]:
@@ -92,21 +93,25 @@ def find_markdown_files(folder_path: Path, recursive: bool = True) -> List[Path]
         pattern = "*"
 
     for file_path in folder_path.glob(pattern):
-        if (file_path.is_file() and
-            file_path.suffix.lower() in markdown_extensions and
-            not is_intermediate_file(file_path)):
+        if (
+            file_path.is_file()
+            and file_path.suffix.lower() in markdown_extensions
+            and not is_intermediate_file(file_path)
+        ):
             files.append(file_path)
 
     return sorted(files)
 
 
-def should_skip_file(file_path: Path, force_reprocess: bool = False) -> tuple[bool, str]:
+def should_skip_file(
+    file_path: Path, force_reprocess: bool = False
+) -> tuple[bool, str]:
     """Check if a file should be skipped based on existing output files."""
     if force_reprocess:
         return False, "force reprocess enabled"
 
     # Check for ingest_result.json (indicates completed ingestion)
-    ingest_result_path = file_path.with_suffix(file_path.suffix + '_ingest_result.json')
+    ingest_result_path = file_path.with_suffix(file_path.suffix + "_ingest_result.json")
     if ingest_result_path.exists():
         return True, "already ingested (ingest_result.json exists)"
 
@@ -118,7 +123,7 @@ async def process_single_markdown_file(
     database_configs: List[DatabaseConfig],
     metadata: Optional[Dict] = None,
     language: str = "de",
-    force_reprocess: bool = False
+    force_reprocess: bool = False,
 ) -> Dict[str, any]:
     """Process a single markdown file."""
 
@@ -128,11 +133,7 @@ async def process_single_markdown_file(
     should_skip, skip_reason = should_skip_file(file_path, force_reprocess)
     if should_skip:
         print(f"   [SKIP] Skipping: {skip_reason}")
-        return {
-            'file': str(file_path),
-            'status': 'skipped',
-            'reason': skip_reason
-        }
+        return {"file": str(file_path), "status": "skipped", "reason": skip_reason}
 
     try:
         # Initialize MoRAG API
@@ -140,86 +141,86 @@ async def process_single_markdown_file(
 
         # Initialize ingestion coordinator separately
         from morag.ingestion_coordinator import IngestionCoordinator
+
         coordinator = IngestionCoordinator()
 
         # Enhanced metadata for markdown files
         enhanced_metadata = {
-            'source_type': 'markdown',
-            'file_extension': file_path.suffix,
-            'file_size': file_path.stat().st_size,
-            'language': language,
-            **(metadata or {})
+            "source_type": "markdown",
+            "file_extension": file_path.suffix,
+            "file_size": file_path.stat().st_size,
+            "language": language,
+            **(metadata or {}),
         }
 
         # Check for existing ingest_data.json file (intermediate processing result)
-        ingest_data_path = file_path.with_suffix(file_path.suffix + '_ingest_data.json')
+        ingest_data_path = file_path.with_suffix(file_path.suffix + "_ingest_data.json")
         if ingest_data_path.exists() and not force_reprocess:
-            print(f"   [RESUME] Found existing ingest_data.json, resuming from ingestion step")
+            print(
+                f"   [RESUME] Found existing ingest_data.json, resuming from ingestion step"
+            )
             try:
                 # Load existing ingest data
-                with open(ingest_data_path, 'r', encoding='utf-8') as f:
+                with open(ingest_data_path, "r", encoding="utf-8") as f:
                     ingest_data = json.load(f)
 
                 # Create a mock processing result from the ingest data
-                result = ServiceResultWrapper({
-                    'success': True,
-                    'content': ingest_data.get('content', ''),
-                    'metadata': ingest_data.get('metadata', {}),
-                    'processing_time': 0.0
-                })
+                result = ServiceResultWrapper(
+                    {
+                        "success": True,
+                        "content": ingest_data.get("content", ""),
+                        "metadata": ingest_data.get("metadata", {}),
+                        "processing_time": 0.0,
+                    }
+                )
 
                 # Perform comprehensive ingestion
                 ingestion_result = await coordinator.ingest_content(
                     content=result.content,
                     source_path=str(file_path),
-                    content_type='text/markdown',
+                    content_type="text/markdown",
                     metadata=enhanced_metadata,
                     processing_result=result,
                     databases=database_configs,
                     document_id=None,
                     replace_existing=False,
-                    language=language
+                    language=language,
                 )
 
                 print(f"   [SUCCESS] Content ingested successfully from ingest_data!")
                 return {
-                    'file': str(file_path),
-                    'status': 'success_from_ingest_data',
-                    'reason': 'Used existing ingest_data file'
+                    "file": str(file_path),
+                    "status": "success_from_ingest_data",
+                    "reason": "Used existing ingest_data file",
                 }
             except Exception as e:
-                print(f"   [WARNING] Failed to use existing ingest_data, will reprocess: {e}")
+                print(
+                    f"   [WARNING] Failed to use existing ingest_data, will reprocess: {e}"
+                )
                 # Fall through to normal processing
 
         # Process the markdown file
         print(f"   [PROCESS] Processing markdown file...")
         result = await api.process_document(
-            file_path=str(file_path),
-            options={
-                'metadata': enhanced_metadata
-            }
+            file_path=str(file_path), options={"metadata": enhanced_metadata}
         )
 
         if not result.success:
-            error_msg = getattr(result, 'error_message', 'Unknown processing error')
+            error_msg = getattr(result, "error_message", "Unknown processing error")
             print(f"   [ERROR] Processing failed: {error_msg}")
-            return {
-                'file': str(file_path),
-                'status': 'error',
-                'error': error_msg
-            }
+            return {"file": str(file_path), "status": "error", "error": error_msg}
 
         if database_configs:
             # Extract content from result (handle different ProcessingResult types)
             content = ""
-            if hasattr(result, 'text_content') and result.text_content:
+            if hasattr(result, "text_content") and result.text_content:
                 content = result.text_content
-            elif hasattr(result, 'content') and result.content:
+            elif hasattr(result, "content") and result.content:
                 content = result.content
-            elif hasattr(result, 'document') and result.document:
-                if hasattr(result.document, 'raw_text'):
+            elif hasattr(result, "document") and result.document:
+                if hasattr(result.document, "raw_text"):
                     content = result.document.raw_text
-                elif hasattr(result.document, 'content'):
+                elif hasattr(result.document, "content"):
                     content = result.document.content
 
             if not content:
@@ -229,7 +230,7 @@ async def process_single_markdown_file(
             ingestion_result = await coordinator.ingest_content(
                 content=content,
                 source_path=str(file_path),
-                content_type='text/markdown',
+                content_type="text/markdown",
                 metadata=enhanced_metadata,
                 processing_result=result,
                 databases=database_configs,
@@ -237,26 +238,23 @@ async def process_single_markdown_file(
                 chunk_overlap=200,  # Default overlap
                 document_id=None,  # Let coordinator generate unified ID
                 replace_existing=True,
-                language=language
+                language=language,
             )
 
         print(f"   [SUCCESS] Success: {file_path}")
         return {
-            'file': str(file_path),
-            'status': 'success',
-            'task_id': getattr(result, 'task_id', None),
-            'processing_time': getattr(result, 'processing_time', None)
+            "file": str(file_path),
+            "status": "success",
+            "task_id": getattr(result, "task_id", None),
+            "processing_time": getattr(result, "processing_time", None),
         }
 
     except Exception as e:
         print(f"   [ERROR] Error processing {file_path}: {e}")
         import traceback
+
         traceback.print_exc()
-        return {
-            'file': str(file_path),
-            'status': 'error',
-            'error': str(e)
-        }
+        return {"file": str(file_path), "status": "error", "error": str(e)}
 
 
 async def process_markdown_folder(
@@ -267,7 +265,7 @@ async def process_markdown_folder(
     recursive: bool = True,
     dry_run: bool = False,
     max_concurrent: int = 3,
-    force_reprocess: bool = False
+    force_reprocess: bool = False,
 ) -> Dict[str, any]:
     """Process all markdown files in a folder."""
 
@@ -282,11 +280,11 @@ async def process_markdown_folder(
 
     if not files:
         return {
-            'total_files': 0,
-            'processed': 0,
-            'skipped': 0,
-            'errors': 0,
-            'results': []
+            "total_files": 0,
+            "processed": 0,
+            "skipped": 0,
+            "errors": 0,
+            "results": [],
         }
 
     if dry_run:
@@ -301,11 +299,11 @@ async def process_markdown_folder(
                 would_process += 1
 
         return {
-            'total_files': len(files),
-            'would_process': would_process,
-            'skipped': len(files) - would_process,
-            'errors': 0,
-            'results': []
+            "total_files": len(files),
+            "would_process": would_process,
+            "skipped": len(files) - would_process,
+            "errors": 0,
+            "results": [],
         }
 
     # Process files with concurrency control
@@ -317,7 +315,9 @@ async def process_markdown_folder(
                 file_path, database_configs, metadata, language, force_reprocess
             )
 
-    print(f"\n[INFO] Processing {len(files)} markdown files with max concurrency: {max_concurrent}")
+    print(
+        f"\n[INFO] Processing {len(files)} markdown files with max concurrency: {max_concurrent}"
+    )
 
     # Process all files
     tasks = [process_with_semaphore(file_path) for file_path in files]
@@ -327,26 +327,30 @@ async def process_markdown_folder(
     processed_results = []
     for i, result in enumerate(results):
         if isinstance(result, Exception):
-            processed_results.append({
-                'file': str(files[i]),
-                'status': 'error',
-                'error': str(result)
-            })
+            processed_results.append(
+                {"file": str(files[i]), "status": "error", "error": str(result)}
+            )
         else:
             processed_results.append(result)
 
     # Calculate summary statistics
     total_files = len(files)
-    processed = len([r for r in processed_results if r['status'] in ['success', 'success_from_ingest_data']])
-    skipped = len([r for r in processed_results if r['status'] == 'skipped'])
-    errors = len([r for r in processed_results if r['status'] == 'error'])
+    processed = len(
+        [
+            r
+            for r in processed_results
+            if r["status"] in ["success", "success_from_ingest_data"]
+        ]
+    )
+    skipped = len([r for r in processed_results if r["status"] == "skipped"])
+    errors = len([r for r in processed_results if r["status"] == "error"])
 
     return {
-        'total_files': total_files,
-        'processed': processed,
-        'skipped': skipped,
-        'errors': errors,
-        'results': processed_results
+        "total_files": total_files,
+        "processed": processed,
+        "skipped": skipped,
+        "errors": errors,
+        "results": processed_results,
     }
 
 
@@ -354,18 +358,17 @@ def setup_neo4j_config(args) -> List[DatabaseConfig]:
     """Set up Neo4j database configuration."""
     database_configs = []
 
-    neo4j_database = (
-        args.neo4j_database or
-        os.getenv('NEO4J_DATABASE', 'neo4j')
-    )
+    neo4j_database = args.neo4j_database or os.getenv("NEO4J_DATABASE", "neo4j")
 
-    database_configs.append(DatabaseConfig(
-        type=DatabaseType.NEO4J,
-        hostname=os.getenv('NEO4J_URI', 'bolt://localhost:7687'),
-        username=os.getenv('NEO4J_USERNAME', 'neo4j'),
-        password=os.getenv('NEO4J_PASSWORD', 'password'),
-        database_name=neo4j_database
-    ))
+    database_configs.append(
+        DatabaseConfig(
+            type=DatabaseType.NEO4J,
+            hostname=os.getenv("NEO4J_URI", "bolt://localhost:7687"),
+            username=os.getenv("NEO4J_USERNAME", "neo4j"),
+            password=os.getenv("NEO4J_PASSWORD", "password"),
+            database_name=neo4j_database,
+        )
+    )
 
     return database_configs
 
@@ -373,25 +376,48 @@ def setup_neo4j_config(args) -> List[DatabaseConfig]:
 def main():
     """Main function."""
     parser = argparse.ArgumentParser(
-        description='Ingest all markdown files in a folder into Neo4j graph database',
+        description="Ingest all markdown files in a folder into Neo4j graph database",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=__doc__
+        epilog=__doc__,
     )
 
-    parser.add_argument('folder', help='Path to folder containing markdown files')
-    parser.add_argument('--language', default='de', help='Language code for processing (default: de)')
-    parser.add_argument('--neo4j-database', help='Neo4j database name (default: from environment or neo4j)')
-    parser.add_argument('--metadata', help='Additional metadata as JSON string')
-    parser.add_argument('--recursive', action='store_true', default=True,
-                       help='Process files recursively (default: True)')
-    parser.add_argument('--no-recursive', action='store_false', dest='recursive',
-                       help='Do not process files recursively')
-    parser.add_argument('--dry-run', action='store_true',
-                       help='Show what files would be processed without actually processing them')
-    parser.add_argument('--max-concurrent', type=int, default=3,
-                       help='Maximum number of files to process concurrently (default: 3)')
-    parser.add_argument('--force-reprocess', action='store_true',
-                       help='Force reprocessing of files even if output files exist')
+    parser.add_argument("folder", help="Path to folder containing markdown files")
+    parser.add_argument(
+        "--language", default="de", help="Language code for processing (default: de)"
+    )
+    parser.add_argument(
+        "--neo4j-database",
+        help="Neo4j database name (default: from environment or neo4j)",
+    )
+    parser.add_argument("--metadata", help="Additional metadata as JSON string")
+    parser.add_argument(
+        "--recursive",
+        action="store_true",
+        default=True,
+        help="Process files recursively (default: True)",
+    )
+    parser.add_argument(
+        "--no-recursive",
+        action="store_false",
+        dest="recursive",
+        help="Do not process files recursively",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show what files would be processed without actually processing them",
+    )
+    parser.add_argument(
+        "--max-concurrent",
+        type=int,
+        default=3,
+        help="Maximum number of files to process concurrently (default: 3)",
+    )
+    parser.add_argument(
+        "--force-reprocess",
+        action="store_true",
+        help="Force reprocessing of files even if output files exist",
+    )
 
     args = parser.parse_args()
 
@@ -425,16 +451,18 @@ def main():
 
     # Run the processing
     try:
-        summary = asyncio.run(process_markdown_folder(
-            folder_path=folder_path,
-            database_configs=database_configs,
-            metadata=metadata,
-            language=args.language,
-            recursive=args.recursive,
-            dry_run=args.dry_run,
-            max_concurrent=args.max_concurrent,
-            force_reprocess=args.force_reprocess
-        ))
+        summary = asyncio.run(
+            process_markdown_folder(
+                folder_path=folder_path,
+                database_configs=database_configs,
+                metadata=metadata,
+                language=args.language,
+                recursive=args.recursive,
+                dry_run=args.dry_run,
+                max_concurrent=args.max_concurrent,
+                force_reprocess=args.force_reprocess,
+            )
+        )
 
         # Print summary
         print(f"\n[SUMMARY] Processing Summary:")
@@ -447,14 +475,14 @@ def main():
         print(f"   Errors: {summary['errors']}")
 
         # Show errors if any
-        errors = [r for r in summary['results'] if r['status'] == 'error']
+        errors = [r for r in summary["results"] if r["status"] == "error"]
         if errors:
             print(f"\n[ERRORS] Errors encountered:")
             for error in errors:
                 print(f"   {error['file']}: {error['error']}")
 
         # Exit with error code if there were errors
-        if summary['errors'] > 0:
+        if summary["errors"] > 0:
             sys.exit(1)
 
     except KeyboardInterrupt:
@@ -463,9 +491,10 @@ def main():
     except Exception as e:
         print(f"\n[ERROR] Unexpected error: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

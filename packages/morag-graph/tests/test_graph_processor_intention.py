@@ -1,9 +1,11 @@
 """Test intention generation functionality."""
 
-import pytest
 import asyncio
 import os
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+
 
 # Create a simple test class to test intention generation logic
 class MockGraphProcessor:
@@ -53,7 +55,7 @@ Provide only the intention summary (maximum {max_length} characters):
 
             # Ensure it's within max length
             if len(intention) > max_length:
-                intention = intention[:max_length-3] + "..."
+                intention = intention[: max_length - 3] + "..."
 
             return intention
 
@@ -85,9 +87,9 @@ class TestIntentionGeneration:
         mock_response = MagicMock()
         mock_response.text = "Heal the pineal gland for spiritual enlightenment"
 
-        with patch('google.generativeai.configure'), \
-             patch('google.generativeai.GenerativeModel') as mock_model_class:
-
+        with patch("google.generativeai.configure"), patch(
+            "google.generativeai.GenerativeModel"
+        ) as mock_model_class:
             mock_model = MagicMock()
             mock_model.generate_content.return_value = mock_response
             mock_model_class.return_value = mock_model
@@ -118,18 +120,23 @@ class TestIntentionGeneration:
 
         # Mock the Gemini API response
         mock_response = MagicMock()
-        mock_response.text = "Document explaining the structure of the organization/company"
+        mock_response.text = (
+            "Document explaining the structure of the organization/company"
+        )
 
-        with patch('google.generativeai.configure'), \
-             patch('google.generativeai.GenerativeModel') as mock_model_class:
-
+        with patch("google.generativeai.configure"), patch(
+            "google.generativeai.GenerativeModel"
+        ) as mock_model_class:
             mock_model = MagicMock()
             mock_model.generate_content.return_value = mock_response
             mock_model_class.return_value = mock_model
 
             intention = await graph_processor.generate_document_intention(content)
 
-            assert intention == "Document explaining the structure of the organization/company"
+            assert (
+                intention
+                == "Document explaining the structure of the organization/company"
+            )
 
     @pytest.mark.asyncio
     async def test_generate_document_intention_truncation(self, graph_processor):
@@ -141,14 +148,16 @@ class TestIntentionGeneration:
         mock_response = MagicMock()
         mock_response.text = long_intention
 
-        with patch('google.generativeai.configure'), \
-             patch('google.generativeai.GenerativeModel') as mock_model_class:
-
+        with patch("google.generativeai.configure"), patch(
+            "google.generativeai.GenerativeModel"
+        ) as mock_model_class:
             mock_model = MagicMock()
             mock_model.generate_content.return_value = mock_response
             mock_model_class.return_value = mock_model
 
-            intention = await graph_processor.generate_document_intention(content, max_length=50)
+            intention = await graph_processor.generate_document_intention(
+                content, max_length=50
+            )
 
             assert len(intention) <= 50
             assert intention.endswith("...")
@@ -158,9 +167,9 @@ class TestIntentionGeneration:
         """Test intention generation with API error."""
         content = "Test content"
 
-        with patch('google.generativeai.configure'), \
-             patch('google.generativeai.GenerativeModel') as mock_model_class:
-
+        with patch("google.generativeai.configure"), patch(
+            "google.generativeai.GenerativeModel"
+        ) as mock_model_class:
             mock_model = MagicMock()
             mock_model.generate_content.side_effect = Exception("API Error")
             mock_model_class.return_value = mock_model
@@ -177,8 +186,6 @@ class TestIntentionGeneration:
         intention = await processor.generate_document_intention("Test content")
 
         assert intention is None
-
-
 
 
 if __name__ == "__main__":

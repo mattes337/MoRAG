@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """Test CLI script for the intelligent entity retrieval using direct code calls."""
 
+import argparse
 import asyncio
 import json
-import argparse
-import sys
 import os
+import sys
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
+
 import structlog
 from dotenv import load_dotenv
 
@@ -15,19 +16,25 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Add the packages to the path
-sys.path.insert(0, str(Path(__file__).parent.parent / "packages" / "morag-reasoning" / "src"))
-sys.path.insert(0, str(Path(__file__).parent.parent / "packages" / "morag-graph" / "src"))
-sys.path.insert(0, str(Path(__file__).parent.parent / "packages" / "morag-vector" / "src"))
+sys.path.insert(
+    0, str(Path(__file__).parent.parent / "packages" / "morag-reasoning" / "src")
+)
+sys.path.insert(
+    0, str(Path(__file__).parent.parent / "packages" / "morag-graph" / "src")
+)
+sys.path.insert(
+    0, str(Path(__file__).parent.parent / "packages" / "morag-vector" / "src")
+)
 
+from morag_graph.storage.neo4j_storage import Neo4jConfig, Neo4jStorage
+from morag_graph.storage.qdrant_storage import QdrantConfig, QdrantStorage
 from morag_reasoning import (
-    IntelligentRetrievalService,
     IntelligentRetrievalRequest,
     IntelligentRetrievalResponse,
+    IntelligentRetrievalService,
     LLMClient,
-    LLMConfig
+    LLMConfig,
 )
-from morag_graph.storage.neo4j_storage import Neo4jStorage, Neo4jConfig
-from morag_graph.storage.qdrant_storage import QdrantStorage, QdrantConfig
 
 # Configure logging
 structlog.configure(
@@ -40,7 +47,7 @@ structlog.configure(
         structlog.processors.StackInfoRenderer(),
         structlog.processors.format_exc_info,
         structlog.processors.UnicodeDecoder(),
-        structlog.processors.JSONRenderer()
+        structlog.processors.JSONRenderer(),
     ],
     context_class=dict,
     logger_factory=structlog.stdlib.LoggerFactory(),
@@ -64,7 +71,7 @@ class IntelligentRetrievalTester:
         qdrant_port: int = None,
         qdrant_collection: str = None,
         gemini_api_key: Optional[str] = None,
-        gemini_model: str = None
+        gemini_model: str = None,
     ):
         """Initialize the tester.
 
@@ -90,18 +97,25 @@ class IntelligentRetrievalTester:
         if qdrant_url and not qdrant_host:
             # Extract host and port from URL
             from urllib.parse import urlparse
+
             parsed = urlparse(qdrant_url)
             self.qdrant_host = parsed.hostname
-            self.qdrant_port = parsed.port or (443 if parsed.scheme == "https" else 6333)
+            self.qdrant_port = parsed.port or (
+                443 if parsed.scheme == "https" else 6333
+            )
             self.qdrant_use_ssl = parsed.scheme == "https"
         else:
             self.qdrant_host = qdrant_host or os.getenv("QDRANT_HOST", "localhost")
             self.qdrant_port = qdrant_port or int(os.getenv("QDRANT_PORT", "6333"))
             self.qdrant_use_ssl = False
 
-        self.qdrant_collection = qdrant_collection or os.getenv("MORAG_QDRANT_COLLECTION", "morag_chunks")
+        self.qdrant_collection = qdrant_collection or os.getenv(
+            "MORAG_QDRANT_COLLECTION", "morag_chunks"
+        )
         self.gemini_api_key = gemini_api_key or os.getenv("GEMINI_API_KEY")
-        self.gemini_model = gemini_model or os.getenv("MORAG_GEMINI_MODEL", "gemini-1.5-flash")
+        self.gemini_model = gemini_model or os.getenv(
+            "MORAG_GEMINI_MODEL", "gemini-1.5-flash"
+        )
 
         self.service = None
 
@@ -117,10 +131,7 @@ class IntelligentRetrievalTester:
                 logger.error("Gemini API key not provided")
                 return False
 
-            llm_config = LLMConfig(
-                api_key=self.gemini_api_key,
-                model=self.gemini_model
-            )
+            llm_config = LLMConfig(api_key=self.gemini_api_key, model=self.gemini_model)
             llm_client = LLMClient(llm_config)
 
             # Initialize Neo4j storage
@@ -128,7 +139,7 @@ class IntelligentRetrievalTester:
                 uri=self.neo4j_uri,
                 user=self.neo4j_user,
                 password=self.neo4j_password,
-                database=self.neo4j_database
+                database=self.neo4j_database,
             )
             neo4j_storage = Neo4jStorage(neo4j_config)
             await neo4j_storage.connect()
@@ -139,7 +150,7 @@ class IntelligentRetrievalTester:
                 port=self.qdrant_port,
                 collection_name=self.qdrant_collection,
                 api_key=os.getenv("QDRANT_API_KEY"),
-                use_ssl=self.qdrant_use_ssl
+                use_ssl=self.qdrant_use_ssl,
             )
             qdrant_storage = QdrantStorage(qdrant_config)
             await qdrant_storage.connect()
@@ -148,7 +159,7 @@ class IntelligentRetrievalTester:
             self.service = IntelligentRetrievalService(
                 llm_client=llm_client,
                 neo4j_storage=neo4j_storage,
-                qdrant_storage=qdrant_storage
+                qdrant_storage=qdrant_storage,
             )
 
             logger.info("Intelligent retrieval service initialized successfully")
@@ -165,15 +176,9 @@ class IntelligentRetrievalTester:
             Health status information
         """
         if not self.service:
-            return {
-                "status": "unhealthy",
-                "error": "Service not initialized"
-            }
+            return {"status": "unhealthy", "error": "Service not initialized"}
 
-        health = {
-            "status": "healthy",
-            "services": {}
-        }
+        health = {"status": "healthy", "services": {}}
 
         try:
             # Check Neo4j connection
@@ -220,7 +225,7 @@ class IntelligentRetrievalTester:
                 "Recursive graph path following with LLM decisions",
                 "Key fact extraction with source tracking",
                 "Configurable iteration limits and thresholds",
-                "Support for multiple Neo4j databases and Qdrant collections"
+                "Support for multiple Neo4j databases and Qdrant collections",
             ],
             "parameters": {
                 "query": "User query/prompt (required)",
@@ -232,8 +237,8 @@ class IntelligentRetrievalTester:
                 "include_debug_info": "Include debug information (default: false)",
                 "neo4j_database": "Neo4j database name (optional)",
                 "qdrant_collection": "Qdrant collection name (optional)",
-                "language": "Language for processing (optional)"
-            }
+                "language": "Language for processing (optional)",
+            },
         }
 
     async def test_intelligent_retrieval(
@@ -245,7 +250,7 @@ class IntelligentRetrievalTester:
         max_depth: int = 2,
         min_relevance_threshold: float = 0.3,
         include_debug_info: bool = True,
-        language: Optional[str] = None
+        language: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Test the intelligent retrieval service.
 
@@ -263,10 +268,7 @@ class IntelligentRetrievalTester:
             Response from the service
         """
         if not self.service:
-            return {
-                "success": False,
-                "error": "Service not initialized"
-            }
+            return {"success": False, "error": "Service not initialized"}
 
         try:
             # Create request
@@ -280,31 +282,25 @@ class IntelligentRetrievalTester:
                 include_debug_info=include_debug_info,
                 neo4j_database=self.neo4j_database,
                 qdrant_collection=self.qdrant_collection,
-                language=language
+                language=language,
             )
 
             # Run intelligent retrieval
             response = await self.service.retrieve_intelligently(request)
 
-            return {
-                "success": True,
-                "data": response.model_dump()
-            }
+            return {"success": True, "data": response.model_dump()}
 
         except Exception as e:
             logger.error("Intelligent retrieval test failed", error=str(e))
-            return {
-                "success": False,
-                "error": str(e)
-            }
+            return {"success": False, "error": str(e)}
 
     async def cleanup(self):
         """Clean up resources."""
         if self.service:
             try:
-                if hasattr(self.service.neo4j_storage, 'close'):
+                if hasattr(self.service.neo4j_storage, "close"):
                     await self.service.neo4j_storage.close()
-                if hasattr(self.service.qdrant_storage, 'close'):
+                if hasattr(self.service.qdrant_storage, "close"):
                     await self.service.qdrant_storage.close()
             except Exception as e:
                 logger.warning("Error during cleanup", error=str(e))
@@ -335,66 +331,115 @@ class IntelligentRetrievalTester:
         print(f"   Confidence score: {data['confidence_score']:.2f}")
         print(f"   Completeness score: {data['completeness_score']:.2f}")
 
-        if data['initial_entities']:
+        if data["initial_entities"]:
             print(f"   Initial entities: {', '.join(data['initial_entities'])}")
 
         # Print key facts
-        if data['key_facts']:
+        if data["key_facts"]:
             print("\n[INFO] Key Facts:")
-            for i, fact in enumerate(data['key_facts'], 1):
+            for i, fact in enumerate(data["key_facts"], 1):
                 print(f"   {i}. {fact['fact']}")
                 print(f"      Type: {fact['fact_type']}")
                 print(f"      Confidence: {fact['confidence']:.2f}")
                 print(f"      Relevance: {fact['relevance_to_query']:.2f}")
                 print(f"      Sources: {len(fact['sources'])} documents")
-                if verbose and fact['sources']:
-                    for j, source in enumerate(fact['sources'][:2], 1):  # Show first 2 sources
+                if verbose and fact["sources"]:
+                    for j, source in enumerate(
+                        fact["sources"][:2], 1
+                    ):  # Show first 2 sources
                         print(f"        Source {j}: {source['document_name']}")
                 print()
 
         # Print iteration details if verbose
-        if verbose and data['iterations']:
+        if verbose and data["iterations"]:
             print("\n[PROCESSING] Iteration Details:")
-            for iteration in data['iterations']:
+            for iteration in data["iterations"]:
                 print(f"   Iteration {iteration['iteration']}:")
-                print(f"     Entities explored: {', '.join(iteration['entities_explored'])}")
+                print(
+                    f"     Entities explored: {', '.join(iteration['entities_explored'])}"
+                )
                 print(f"     Paths found: {len(iteration['paths_found'])}")
                 print(f"     Paths followed: {len(iteration['paths_followed'])}")
                 print(f"     Chunks retrieved: {iteration['chunks_retrieved']}")
-                if iteration['llm_stop_reason']:
+                if iteration["llm_stop_reason"]:
                     print(f"     Stop reason: {iteration['llm_stop_reason']}")
                 print()
 
 
 async def main():
     """Main function."""
-    parser = argparse.ArgumentParser(description="Test intelligent entity retrieval using direct code calls")
+    parser = argparse.ArgumentParser(
+        description="Test intelligent entity retrieval using direct code calls"
+    )
     parser.add_argument("query", help="Query to test")
 
     # Database configuration
-    parser.add_argument("--neo4j-uri", default=os.getenv("NEO4J_URI", "bolt://localhost:7687"), help="Neo4j URI")
-    parser.add_argument("--neo4j-user", default=os.getenv("NEO4J_USERNAME", "neo4j"), help="Neo4j username")
-    parser.add_argument("--neo4j-password", default=os.getenv("NEO4J_PASSWORD", "password"), help="Neo4j password")
-    parser.add_argument("--neo4j-database", default=os.getenv("NEO4J_DATABASE", "neo4j"), help="Neo4j database")
-    parser.add_argument("--qdrant-host", help="Qdrant host (auto-detected from QDRANT_URL if not specified)")
-    parser.add_argument("--qdrant-port", type=int, help="Qdrant port (auto-detected from QDRANT_URL if not specified)")
-    parser.add_argument("--qdrant-collection", default=os.getenv("MORAG_QDRANT_COLLECTION", "morag_chunks"), help="Qdrant collection")
+    parser.add_argument(
+        "--neo4j-uri",
+        default=os.getenv("NEO4J_URI", "bolt://localhost:7687"),
+        help="Neo4j URI",
+    )
+    parser.add_argument(
+        "--neo4j-user",
+        default=os.getenv("NEO4J_USERNAME", "neo4j"),
+        help="Neo4j username",
+    )
+    parser.add_argument(
+        "--neo4j-password",
+        default=os.getenv("NEO4J_PASSWORD", "password"),
+        help="Neo4j password",
+    )
+    parser.add_argument(
+        "--neo4j-database",
+        default=os.getenv("NEO4J_DATABASE", "neo4j"),
+        help="Neo4j database",
+    )
+    parser.add_argument(
+        "--qdrant-host",
+        help="Qdrant host (auto-detected from QDRANT_URL if not specified)",
+    )
+    parser.add_argument(
+        "--qdrant-port",
+        type=int,
+        help="Qdrant port (auto-detected from QDRANT_URL if not specified)",
+    )
+    parser.add_argument(
+        "--qdrant-collection",
+        default=os.getenv("MORAG_QDRANT_COLLECTION", "morag_chunks"),
+        help="Qdrant collection",
+    )
 
     # LLM configuration
-    parser.add_argument("--gemini-api-key", default=os.getenv("GEMINI_API_KEY"), help="Gemini API key (or set GEMINI_API_KEY env var)")
-    parser.add_argument("--gemini-model", default=os.getenv("MORAG_GEMINI_MODEL", "gemini-1.5-flash"), help="Gemini model")
+    parser.add_argument(
+        "--gemini-api-key",
+        default=os.getenv("GEMINI_API_KEY"),
+        help="Gemini API key (or set GEMINI_API_KEY env var)",
+    )
+    parser.add_argument(
+        "--gemini-model",
+        default=os.getenv("MORAG_GEMINI_MODEL", "gemini-1.5-flash"),
+        help="Gemini model",
+    )
 
     # Retrieval parameters
-    parser.add_argument("--max-iterations", type=int, default=3, help="Maximum iterations")
-    parser.add_argument("--max-entities", type=int, default=5, help="Max entities per iteration")
+    parser.add_argument(
+        "--max-iterations", type=int, default=3, help="Maximum iterations"
+    )
+    parser.add_argument(
+        "--max-entities", type=int, default=5, help="Max entities per iteration"
+    )
     parser.add_argument("--max-paths", type=int, default=3, help="Max paths per entity")
     parser.add_argument("--max-depth", type=int, default=2, help="Maximum path depth")
-    parser.add_argument("--min-relevance", type=float, default=0.3, help="Minimum relevance threshold")
+    parser.add_argument(
+        "--min-relevance", type=float, default=0.3, help="Minimum relevance threshold"
+    )
     parser.add_argument("--language", help="Language for processing")
 
     # Output options
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
-    parser.add_argument("--check-health", action="store_true", help="Check service health")
+    parser.add_argument(
+        "--check-health", action="store_true", help="Check service health"
+    )
     parser.add_argument("--output-json", help="Save results to JSON file")
 
     args = parser.parse_args()
@@ -409,7 +454,7 @@ async def main():
         qdrant_port=args.qdrant_port,
         qdrant_collection=args.qdrant_collection,
         gemini_api_key=args.gemini_api_key,
-        gemini_model=args.gemini_model
+        gemini_model=args.gemini_model,
     )
 
     try:
@@ -424,11 +469,13 @@ async def main():
             print("🏥 Checking service health...")
             health = await tester.check_health()
             print(f"Health status: {health.get('status', 'unknown')}")
-            if health.get('services'):
-                for service, status in health['services'].items():
+            if health.get("services"):
+                for service, status in health["services"].items():
                     status_icon = "[OK]" if status else "[FAIL]"
-                    print(f"  {status_icon} {service}: {'available' if status else 'unavailable'}")
-            if health.get('error'):
+                    print(
+                        f"  {status_icon} {service}: {'available' if status else 'unavailable'}"
+                    )
+            if health.get("error"):
                 print(f"Error: {health['error']}")
             print()
 
@@ -475,7 +522,7 @@ async def main():
             max_depth=args.max_depth,
             min_relevance_threshold=args.min_relevance,
             include_debug_info=args.verbose,
-            language=args.language
+            language=args.language,
         )
 
         # Print results
@@ -483,7 +530,7 @@ async def main():
 
         # Save to JSON if requested
         if args.output_json:
-            with open(args.output_json, 'w') as f:
+            with open(args.output_json, "w") as f:
                 json.dump(results, f, indent=2)
             print(f"\n💾 Results saved to {args.output_json}")
 

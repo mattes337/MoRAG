@@ -15,7 +15,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any, Dict
 
 
 def run_command(cmd: str) -> tuple[int, str, str]:
@@ -84,11 +84,11 @@ Das KI-System erreichte eine Genauigkeit von 92% bei der Erkennung von Lungenkre
     test_docs = {
         "simple_test.md": simple_doc,
         "complex_test.md": complex_doc,
-        "german_test.md": german_doc
+        "german_test.md": german_doc,
     }
 
     for filename, content in test_docs.items():
-        with open(filename, 'w', encoding='utf-8') as f:
+        with open(filename, "w", encoding="utf-8") as f:
             f.write(content)
 
     return list(test_docs.keys())
@@ -96,61 +96,67 @@ Das KI-System erreichte eine Genauigkeit von 92% bei der Erkennung von Lungenkre
 
 def analyze_extraction_results(filename: str) -> Dict[str, Any]:
     """Analyze extraction results from a JSON file."""
-    json_file = Path(filename).with_suffix('.graph.json')
+    json_file = Path(filename).with_suffix(".graph.json")
 
     if not json_file.exists():
         return {"error": f"Results file not found: {json_file}"}
 
     try:
-        with open(json_file, 'r', encoding='utf-8') as f:
+        with open(json_file, "r", encoding="utf-8") as f:
             data = json.load(f)
 
-        analysis = data.get('analysis', {})
-        extraction_results = data.get('extraction_results', {})
+        analysis = data.get("analysis", {})
+        extraction_results = data.get("extraction_results", {})
 
         # Extract entity and relation details
-        entities = extraction_results.get('entities', [])
-        relations = extraction_results.get('relations', [])
+        entities = extraction_results.get("entities", [])
+        relations = extraction_results.get("relations", [])
 
         # Analyze entity types and confidence
         entity_analysis = {}
         for entity in entities:
-            entity_type = entity.get('type', 'UNKNOWN')
-            confidence = entity.get('confidence', 0.0)
+            entity_type = entity.get("type", "UNKNOWN")
+            confidence = entity.get("confidence", 0.0)
 
             if entity_type not in entity_analysis:
                 entity_analysis[entity_type] = {
-                    'count': 0,
-                    'confidences': [],
-                    'examples': []
+                    "count": 0,
+                    "confidences": [],
+                    "examples": [],
                 }
 
-            entity_analysis[entity_type]['count'] += 1
-            entity_analysis[entity_type]['confidences'].append(confidence)
-            entity_analysis[entity_type]['examples'].append(entity.get('name', ''))
+            entity_analysis[entity_type]["count"] += 1
+            entity_analysis[entity_type]["confidences"].append(confidence)
+            entity_analysis[entity_type]["examples"].append(entity.get("name", ""))
 
         # Analyze relation types and confidence
         relation_analysis = {}
         for relation in relations:
-            relation_type = relation.get('relation_type', 'UNKNOWN')
-            confidence = relation.get('confidence', 0.0)
+            relation_type = relation.get("relation_type", "UNKNOWN")
+            confidence = relation.get("confidence", 0.0)
 
             if relation_type not in relation_analysis:
                 relation_analysis[relation_type] = {
-                    'count': 0,
-                    'confidences': [],
-                    'examples': []
+                    "count": 0,
+                    "confidences": [],
+                    "examples": [],
                 }
 
-            relation_analysis[relation_type]['count'] += 1
-            relation_analysis[relation_type]['confidences'].append(confidence)
+            relation_analysis[relation_type]["count"] += 1
+            relation_analysis[relation_type]["confidences"].append(confidence)
 
             # Create relation example
-            source_id = relation.get('source_entity_id', '')
-            target_id = relation.get('target_entity_id', '')
-            source_name = next((e['name'] for e in entities if e['id'] == source_id), source_id)
-            target_name = next((e['name'] for e in entities if e['id'] == target_id), target_id)
-            relation_analysis[relation_type]['examples'].append(f"{source_name} -> {target_name}")
+            source_id = relation.get("source_entity_id", "")
+            target_id = relation.get("target_entity_id", "")
+            source_name = next(
+                (e["name"] for e in entities if e["id"] == source_id), source_id
+            )
+            target_name = next(
+                (e["name"] for e in entities if e["id"] == target_id), target_id
+            )
+            relation_analysis[relation_type]["examples"].append(
+                f"{source_name} -> {target_name}"
+            )
 
         return {
             "filename": filename,
@@ -158,9 +164,9 @@ def analyze_extraction_results(filename: str) -> Dict[str, Any]:
             "total_relations": len(relations),
             "entity_analysis": entity_analysis,
             "relation_analysis": relation_analysis,
-            "confidence_stats": analysis.get('confidence_stats', {}),
-            "language": data.get('language'),
-            "content_length": data.get('content_length', 0)
+            "confidence_stats": analysis.get("confidence_stats", {}),
+            "language": data.get("language"),
+            "content_length": data.get("content_length", 0),
         }
 
     except Exception as e:
@@ -182,33 +188,49 @@ def print_analysis_report(analysis: Dict[str, Any]):
     print(f"   - Total relations: {analysis['total_relations']}")
 
     print(f"\n[ENTITIES] Entity Analysis:")
-    for entity_type, data in analysis['entity_analysis'].items():
-        avg_conf = sum(data['confidences']) / len(data['confidences']) if data['confidences'] else 0
-        examples = ', '.join(data['examples'][:3])
-        if len(data['examples']) > 3:
+    for entity_type, data in analysis["entity_analysis"].items():
+        avg_conf = (
+            sum(data["confidences"]) / len(data["confidences"])
+            if data["confidences"]
+            else 0
+        )
+        examples = ", ".join(data["examples"][:3])
+        if len(data["examples"]) > 3:
             examples += f" (and {len(data['examples']) - 3} more)"
-        print(f"   - {entity_type}: {data['count']} entities, avg confidence: {avg_conf:.2f}")
+        print(
+            f"   - {entity_type}: {data['count']} entities, avg confidence: {avg_conf:.2f}"
+        )
         print(f"     Examples: {examples}")
 
     print(f"\n[RELATIONS] Relation Analysis:")
-    for relation_type, data in analysis['relation_analysis'].items():
-        avg_conf = sum(data['confidences']) / len(data['confidences']) if data['confidences'] else 0
-        examples = ', '.join(data['examples'][:2])
-        if len(data['examples']) > 2:
+    for relation_type, data in analysis["relation_analysis"].items():
+        avg_conf = (
+            sum(data["confidences"]) / len(data["confidences"])
+            if data["confidences"]
+            else 0
+        )
+        examples = ", ".join(data["examples"][:2])
+        if len(data["examples"]) > 2:
             examples += f" (and {len(data['examples']) - 2} more)"
-        print(f"   - {relation_type}: {data['count']} relations, avg confidence: {avg_conf:.2f}")
+        print(
+            f"   - {relation_type}: {data['count']} relations, avg confidence: {avg_conf:.2f}"
+        )
         print(f"     Examples: {examples}")
 
     # Confidence statistics
-    conf_stats = analysis.get('confidence_stats', {})
+    conf_stats = analysis.get("confidence_stats", {})
     if conf_stats:
         print(f"\n[CONFIDENCE] Statistics:")
-        if 'entity_confidence' in conf_stats:
-            ec = conf_stats['entity_confidence']
-            print(f"   - Entity confidence: {ec.get('avg', 0):.2f} (range: {ec.get('min', 0):.2f}-{ec.get('max', 0):.2f})")
-        if 'relation_confidence' in conf_stats:
-            rc = conf_stats['relation_confidence']
-            print(f"   - Relation confidence: {rc.get('avg', 0):.2f} (range: {rc.get('min', 0):.2f}-{rc.get('max', 0):.2f})")
+        if "entity_confidence" in conf_stats:
+            ec = conf_stats["entity_confidence"]
+            print(
+                f"   - Entity confidence: {ec.get('avg', 0):.2f} (range: {ec.get('min', 0):.2f}-{ec.get('max', 0):.2f})"
+            )
+        if "relation_confidence" in conf_stats:
+            rc = conf_stats["relation_confidence"]
+            print(
+                f"   - Relation confidence: {rc.get('avg', 0):.2f} (range: {rc.get('min', 0):.2f}-{rc.get('max', 0):.2f})"
+            )
 
 
 def main():
@@ -222,7 +244,7 @@ def main():
     print(f"[OK] Created {len(test_files)} test documents")
 
     # Check if we can run real extractions or just dry-run
-    has_api_key = bool(os.getenv('GEMINI_API_KEY'))
+    has_api_key = bool(os.getenv("GEMINI_API_KEY"))
     mode = "real extraction" if has_api_key else "dry-run mode"
     print(f"[MODE] Running in {mode}")
 
@@ -248,7 +270,7 @@ def main():
             print(f"[OK] Extraction completed for {test_file}")
 
             # Validate output
-            json_file = Path(test_file).with_suffix('.graph.json')
+            json_file = Path(test_file).with_suffix(".graph.json")
             validate_cmd = f"python scripts/validate_graph_output.py {json_file}"
             val_exit_code, val_stdout, val_stderr = run_command(validate_cmd)
 

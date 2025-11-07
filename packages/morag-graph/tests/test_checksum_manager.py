@@ -1,10 +1,10 @@
 """Tests for DocumentChecksumManager."""
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock
 
-from morag_graph.updates.checksum_manager import DocumentChecksumManager
+import pytest
 from morag_graph.storage.base import BaseStorage
+from morag_graph.updates.checksum_manager import DocumentChecksumManager
 
 
 class MockStorage(BaseStorage):
@@ -24,28 +24,73 @@ class MockStorage(BaseStorage):
             del self.checksums[document_id]
 
     # Required abstract methods (not used in tests)
-    async def connect(self): pass
-    async def disconnect(self): pass
-    async def store_entity(self, entity): pass
-    async def store_entities(self, entities): return []
-    async def get_entity(self, entity_id): pass
-    async def get_entities(self, entity_ids): pass
-    async def search_entities(self, query, entity_type=None, limit=10): return []
-    async def update_entity(self, entity): pass
-    async def delete_entity(self, entity_id): pass
-    async def store_relation(self, relation): pass
-    async def store_relations(self, relations): return []
-    async def get_relation(self, relation_id): pass
-    async def get_relations(self, relation_ids): pass
-    async def get_entity_relations(self, entity_id, relation_type=None, direction="both"): pass
-    async def update_relation(self, relation): pass
-    async def delete_relation(self, relation_id): pass
-    async def get_neighbors(self, entity_id, relation_type=None, max_depth=1): pass
-    async def find_path(self, source_entity_id, target_entity_id, max_depth=3): pass
-    async def store_graph(self, graph): pass
-    async def get_graph(self, entity_ids=None): pass
-    async def clear(self): pass
-    async def get_statistics(self): pass
+    async def connect(self):
+        pass
+
+    async def disconnect(self):
+        pass
+
+    async def store_entity(self, entity):
+        pass
+
+    async def store_entities(self, entities):
+        return []
+
+    async def get_entity(self, entity_id):
+        pass
+
+    async def get_entities(self, entity_ids):
+        pass
+
+    async def search_entities(self, query, entity_type=None, limit=10):
+        return []
+
+    async def update_entity(self, entity):
+        pass
+
+    async def delete_entity(self, entity_id):
+        pass
+
+    async def store_relation(self, relation):
+        pass
+
+    async def store_relations(self, relations):
+        return []
+
+    async def get_relation(self, relation_id):
+        pass
+
+    async def get_relations(self, relation_ids):
+        pass
+
+    async def get_entity_relations(
+        self, entity_id, relation_type=None, direction="both"
+    ):
+        pass
+
+    async def update_relation(self, relation):
+        pass
+
+    async def delete_relation(self, relation_id):
+        pass
+
+    async def get_neighbors(self, entity_id, relation_type=None, max_depth=1):
+        pass
+
+    async def find_path(self, source_entity_id, target_entity_id, max_depth=3):
+        pass
+
+    async def store_graph(self, graph):
+        pass
+
+    async def get_graph(self, entity_ids=None):
+        pass
+
+    async def clear(self):
+        pass
+
+    async def get_statistics(self):
+        pass
 
 
 @pytest.fixture
@@ -78,7 +123,9 @@ class TestDocumentChecksumManager:
         content = "This is test content"
         metadata = {"author": "test", "version": 1}
 
-        checksum_with_meta = checksum_manager.calculate_document_checksum(content, metadata)
+        checksum_with_meta = checksum_manager.calculate_document_checksum(
+            content, metadata
+        )
         checksum_without_meta = checksum_manager.calculate_document_checksum(content)
 
         # Checksums should be different
@@ -139,7 +186,9 @@ class TestDocumentChecksumManager:
         assert result is True
 
     @pytest.mark.asyncio
-    async def test_needs_update_unchanged_document(self, checksum_manager, mock_storage):
+    async def test_needs_update_unchanged_document(
+        self, checksum_manager, mock_storage
+    ):
         """Test needs_update for unchanged document."""
         document_id = "existing_doc"
         content = "Existing content"
@@ -167,7 +216,9 @@ class TestDocumentChecksumManager:
         assert result is True
 
     @pytest.mark.asyncio
-    async def test_needs_update_with_metadata_change(self, checksum_manager, mock_storage):
+    async def test_needs_update_with_metadata_change(
+        self, checksum_manager, mock_storage
+    ):
         """Test needs_update when metadata changes."""
         document_id = "existing_doc"
         content = "Same content"
@@ -175,7 +226,9 @@ class TestDocumentChecksumManager:
         new_metadata = {"version": 2}
 
         # Store checksum with old metadata
-        old_checksum = checksum_manager.calculate_document_checksum(content, old_metadata)
+        old_checksum = checksum_manager.calculate_document_checksum(
+            content, old_metadata
+        )
         mock_storage.checksums[document_id] = old_checksum
 
         # Check with new metadata

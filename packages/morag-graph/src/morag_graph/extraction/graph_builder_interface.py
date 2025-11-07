@@ -3,9 +3,10 @@
 import asyncio
 import traceback
 from typing import List, Optional
-from morag_core.utils.logging import get_logger
 
+from morag_core.utils.logging import get_logger
 from morag_reasoning.llm import LLMClient, LLMConfig
+
 from ..models.fact import Fact
 from ..models.graph import Graph
 from .fact_graph_operations import FactGraphOperations
@@ -22,7 +23,7 @@ class FactGraphBuilder:
         min_relation_confidence: float = 0.6,
         max_relations_per_fact: int = 5,
         language: str = "en",
-        processing_timeout: int = 300
+        processing_timeout: int = 300,
     ):
         """Initialize fact graph builder.
 
@@ -49,7 +50,7 @@ class FactGraphBuilder:
             model=model_id,
             api_key=api_key,
             temperature=0.1,
-            max_tokens=2000
+            max_tokens=2000,
         )
         self.llm_client = LLMClient(self.llm_config)
 
@@ -67,9 +68,7 @@ class FactGraphBuilder:
             # Create relationships and build graph with timeout
             async with asyncio.timeout(self.processing_timeout):
                 relationships = await self.operations.create_fact_relationships(
-                    facts,
-                    self.min_relation_confidence,
-                    self.max_relations_per_fact
+                    facts, self.min_relation_confidence, self.max_relations_per_fact
                 )
 
                 # Build graph structure
@@ -87,7 +86,9 @@ class FactGraphBuilder:
             self.logger.error("Graph building timed out", num_facts=len(facts))
             return self.utilities.build_graph_structure(facts, relationships)
         except Exception as e:
-            self.logger.error("Graph building failed", error=str(e), traceback=traceback.format_exc())
+            self.logger.error(
+                "Graph building failed", error=str(e), traceback=traceback.format_exc()
+            )
             raise  # Let caller handle - don't hide errors
 
     async def _index_facts(self, facts: List[Fact]):
@@ -97,7 +98,7 @@ class FactGraphBuilder:
     async def close(self):
         """Close the graph builder and clean up resources."""
         try:
-            if hasattr(self.llm_client, 'close'):
+            if hasattr(self.llm_client, "close"):
                 await self.llm_client.close()
         except Exception as e:
             self.logger.warning("Error closing LLM client", error=str(e))

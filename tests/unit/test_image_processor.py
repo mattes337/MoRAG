@@ -1,12 +1,18 @@
 """Unit tests for image processor."""
 
-import pytest
-from unittest.mock import Mock, patch
 from pathlib import Path
+from unittest.mock import Mock, patch
+
+import pytest
+from morag_core.exceptions import ProcessingError
+from morag_image import (
+    ImageConfig,
+    ImageMetadata,
+    ImageProcessingResult,
+    ImageProcessor,
+)
 from PIL import Image
 
-from morag_image import ImageProcessor, ImageConfig, ImageMetadata, ImageProcessingResult
-from morag_core.exceptions import ProcessingError
 
 class TestImageProcessor:
     """Test cases for ImageProcessor."""
@@ -21,8 +27,8 @@ class TestImageProcessor:
         """Create mock image file."""
         image_file = tmp_path / "test_image.jpg"
         # Create a simple test image
-        test_image = Image.new('RGB', (100, 100), color='red')
-        test_image.save(image_file, 'JPEG')
+        test_image = Image.new("RGB", (100, 100), color="red")
+        test_image.save(image_file, "JPEG")
         return image_file
 
     @pytest.fixture
@@ -32,7 +38,7 @@ class TestImageProcessor:
             generate_caption=True,
             extract_text=True,
             extract_metadata=True,
-            resize_max_dimension=512
+            resize_max_dimension=512,
         )
 
     @pytest.fixture
@@ -48,17 +54,23 @@ class TestImageProcessor:
             exif_data={},
             creation_time=None,
             camera_make=None,
-            camera_model=None
+            camera_model=None,
         )
 
     @pytest.mark.asyncio
-    async def test_process_image_success(self, image_processor, mock_image_file, image_config, mock_metadata):
+    async def test_process_image_success(
+        self, image_processor, mock_image_file, image_config, mock_metadata
+    ):
         """Test successful image processing."""
-        with patch.object(image_processor, '_extract_metadata', return_value=mock_metadata), \
-             patch.object(image_processor, '_preprocess_image', return_value=mock_image_file), \
-             patch.object(image_processor, '_generate_caption', return_value=("Test caption", 0.9)), \
-             patch.object(image_processor, '_extract_text', return_value=("Test text", 0.8)):
-
+        with patch.object(
+            image_processor, "_extract_metadata", return_value=mock_metadata
+        ), patch.object(
+            image_processor, "_preprocess_image", return_value=mock_image_file
+        ), patch.object(
+            image_processor, "_generate_caption", return_value=("Test caption", 0.9)
+        ), patch.object(
+            image_processor, "_extract_text", return_value=("Test text", 0.8)
+        ):
             result = await image_processor.process_image(mock_image_file, image_config)
 
             assert isinstance(result, ImageProcessingResult)
@@ -94,11 +106,11 @@ class TestImageProcessor:
         """Test metadata extraction with EXIF data."""
         # Create image with EXIF data
         image_file = tmp_path / "test_with_exif.jpg"
-        test_image = Image.new('RGB', (200, 150), color='blue')
+        test_image = Image.new("RGB", (200, 150), color="blue")
 
         # Add some fake EXIF data
         exif_dict = {"0th": {}, "Exif": {}, "GPS": {}, "1st": {}, "thumbnail": None}
-        test_image.save(image_file, 'JPEG')
+        test_image.save(image_file, "JPEG")
 
         metadata = await image_processor._extract_metadata(image_file)
 
@@ -107,7 +119,9 @@ class TestImageProcessor:
         assert metadata.format == "JPEG"
 
     @pytest.mark.asyncio
-    async def test_preprocess_image_no_resize_needed(self, image_processor, mock_image_file):
+    async def test_preprocess_image_no_resize_needed(
+        self, image_processor, mock_image_file
+    ):
         """Test image preprocessing when no resize is needed."""
         config = ImageConfig(resize_max_dimension=1024)  # Larger than test image
 
@@ -121,8 +135,8 @@ class TestImageProcessor:
         """Test image preprocessing with resizing."""
         # Create large image
         large_image_file = tmp_path / "large_image.jpg"
-        large_image = Image.new('RGB', (2000, 1500), color='green')
-        large_image.save(large_image_file, 'JPEG')
+        large_image = Image.new("RGB", (2000, 1500), color="green")
+        large_image.save(large_image_file, "JPEG")
 
         config = ImageConfig(resize_max_dimension=1024)
 
@@ -140,8 +154,10 @@ class TestImageProcessor:
         result_path.unlink()
 
     @pytest.mark.asyncio
-    @patch('google.generativeai.GenerativeModel')
-    async def test_generate_caption_success(self, mock_model_class, image_processor, mock_image_file):
+    @patch("google.generativeai.GenerativeModel")
+    async def test_generate_caption_success(
+        self, mock_model_class, image_processor, mock_image_file
+    ):
         """Test successful caption generation."""
         # Mock Gemini response
         mock_model = Mock()
@@ -150,11 +166,14 @@ class TestImageProcessor:
         mock_model.generate_content.return_value = mock_response
         mock_model_class.return_value = mock_model
 
-        with patch('asyncio.to_thread', return_value=mock_response):
+        with patch("asyncio.to_thread", return_value=mock_response):
             # Create a config with the new model
             from morag_image.processor import ImageConfig
+
             config = ImageConfig()
-            caption, confidence = await image_processor._generate_caption(mock_image_file, config)
+            caption, confidence = await image_processor._generate_caption(
+                mock_image_file, config
+            )
 
             assert caption == "A red square image"
             assert confidence > 0
@@ -162,11 +181,16 @@ class TestImageProcessor:
     @pytest.mark.asyncio
     async def test_generate_caption_failure(self, image_processor, mock_image_file):
         """Test caption generation failure."""
-        with patch('google.generativeai.GenerativeModel', side_effect=Exception("API error")):
+        with patch(
+            "google.generativeai.GenerativeModel", side_effect=Exception("API error")
+        ):
             # Create a config with the new model
             from morag_image.processor import ImageConfig
+
             config = ImageConfig()
-            caption, confidence = await image_processor._generate_caption(mock_image_file, config)
+            caption, confidence = await image_processor._generate_caption(
+                mock_image_file, config
+            )
 
             assert caption == ""
             assert confidence == 0.0
@@ -174,8 +198,14 @@ class TestImageProcessor:
     @pytest.mark.asyncio
     async def test_extract_text_tesseract(self, image_processor, mock_image_file):
         """Test text extraction with Tesseract."""
-        with patch.object(image_processor, '_extract_text_tesseract', return_value=("Extracted text", 0.85)):
-            text, confidence = await image_processor._extract_text(mock_image_file, "tesseract")
+        with patch.object(
+            image_processor,
+            "_extract_text_tesseract",
+            return_value=("Extracted text", 0.85),
+        ):
+            text, confidence = await image_processor._extract_text(
+                mock_image_file, "tesseract"
+            )
 
             assert text == "Extracted text"
             assert confidence == 0.85
@@ -183,8 +213,14 @@ class TestImageProcessor:
     @pytest.mark.asyncio
     async def test_extract_text_easyocr(self, image_processor, mock_image_file):
         """Test text extraction with EasyOCR."""
-        with patch.object(image_processor, '_extract_text_easyocr', return_value=("EasyOCR text", 0.92)):
-            text, confidence = await image_processor._extract_text(mock_image_file, "easyocr")
+        with patch.object(
+            image_processor,
+            "_extract_text_easyocr",
+            return_value=("EasyOCR text", 0.92),
+        ):
+            text, confidence = await image_processor._extract_text(
+                mock_image_file, "easyocr"
+            )
 
             assert text == "EasyOCR text"
             assert confidence == 0.92
@@ -192,61 +228,86 @@ class TestImageProcessor:
     @pytest.mark.asyncio
     async def test_extract_text_unknown_engine(self, image_processor, mock_image_file):
         """Test text extraction with unknown OCR engine."""
-        with patch.object(image_processor, '_extract_text_tesseract', return_value=("Fallback text", 0.7)):
-            text, confidence = await image_processor._extract_text(mock_image_file, "unknown_engine")
+        with patch.object(
+            image_processor,
+            "_extract_text_tesseract",
+            return_value=("Fallback text", 0.7),
+        ):
+            text, confidence = await image_processor._extract_text(
+                mock_image_file, "unknown_engine"
+            )
 
             # Should fallback to tesseract
             assert text == "Fallback text"
             assert confidence == 0.7
 
     @pytest.mark.asyncio
-    @patch('pytesseract.image_to_data')
-    async def test_extract_text_tesseract_success(self, mock_tesseract, image_processor, mock_image_file):
+    @patch("pytesseract.image_to_data")
+    async def test_extract_text_tesseract_success(
+        self, mock_tesseract, image_processor, mock_image_file
+    ):
         """Test successful Tesseract text extraction."""
         # Mock Tesseract response
         mock_tesseract.return_value = {
-            'text': ['', 'Hello', 'World', ''],
-            'conf': [0, 85, 90, 0]
+            "text": ["", "Hello", "World", ""],
+            "conf": [0, 85, 90, 0],
         }
 
-        with patch('asyncio.to_thread', return_value=mock_tesseract.return_value):
-            text, confidence = await image_processor._extract_text_tesseract(mock_image_file)
+        with patch("asyncio.to_thread", return_value=mock_tesseract.return_value):
+            text, confidence = await image_processor._extract_text_tesseract(
+                mock_image_file
+            )
 
             assert "Hello World" in text
             assert confidence > 0
 
     @pytest.mark.asyncio
-    async def test_extract_text_tesseract_not_available(self, image_processor, mock_image_file):
+    async def test_extract_text_tesseract_not_available(
+        self, image_processor, mock_image_file
+    ):
         """Test Tesseract text extraction when not available."""
-        with patch('pytesseract.image_to_data', side_effect=ImportError("pytesseract not available")):
-            text, confidence = await image_processor._extract_text_tesseract(mock_image_file)
+        with patch(
+            "pytesseract.image_to_data",
+            side_effect=ImportError("pytesseract not available"),
+        ):
+            text, confidence = await image_processor._extract_text_tesseract(
+                mock_image_file
+            )
 
             assert text == ""
             assert confidence == 0.0
 
     @pytest.mark.asyncio
-    @patch('easyocr.Reader')
-    async def test_extract_text_easyocr_success(self, mock_reader_class, image_processor, mock_image_file):
+    @patch("easyocr.Reader")
+    async def test_extract_text_easyocr_success(
+        self, mock_reader_class, image_processor, mock_image_file
+    ):
         """Test successful EasyOCR text extraction."""
         # Mock EasyOCR response
         mock_reader = Mock()
         mock_reader.readtext.return_value = [
-            ([[0, 0], [100, 0], [100, 50], [0, 50]], 'Hello', 0.95),
-            ([[0, 60], [100, 60], [100, 100], [0, 100]], 'World', 0.88)
+            ([[0, 0], [100, 0], [100, 50], [0, 50]], "Hello", 0.95),
+            ([[0, 60], [100, 60], [100, 100], [0, 100]], "World", 0.88),
         ]
         mock_reader_class.return_value = mock_reader
 
-        with patch('asyncio.to_thread', return_value=mock_reader.readtext.return_value):
-            text, confidence = await image_processor._extract_text_easyocr(mock_image_file)
+        with patch("asyncio.to_thread", return_value=mock_reader.readtext.return_value):
+            text, confidence = await image_processor._extract_text_easyocr(
+                mock_image_file
+            )
 
             assert "Hello World" in text
             assert confidence > 0
 
     @pytest.mark.asyncio
-    async def test_extract_text_easyocr_not_available(self, image_processor, mock_image_file):
+    async def test_extract_text_easyocr_not_available(
+        self, image_processor, mock_image_file
+    ):
         """Test EasyOCR text extraction when not available."""
-        with patch('easyocr.Reader', side_effect=ImportError("easyocr not available")):
-            text, confidence = await image_processor._extract_text_easyocr(mock_image_file)
+        with patch("easyocr.Reader", side_effect=ImportError("easyocr not available")):
+            text, confidence = await image_processor._extract_text_easyocr(
+                mock_image_file
+            )
 
             assert text == ""
             assert confidence == 0.0
@@ -277,28 +338,38 @@ class TestImageProcessor:
         image_processor.cleanup_temp_files([non_existent_file])
 
     @pytest.mark.asyncio
-    async def test_process_image_no_caption(self, image_processor, mock_image_file, mock_metadata):
+    async def test_process_image_no_caption(
+        self, image_processor, mock_image_file, mock_metadata
+    ):
         """Test image processing without caption generation."""
         config = ImageConfig(generate_caption=False, extract_text=True)
 
-        with patch.object(image_processor, '_extract_metadata', return_value=mock_metadata), \
-             patch.object(image_processor, '_preprocess_image', return_value=mock_image_file), \
-             patch.object(image_processor, '_extract_text', return_value=("Test text", 0.8)):
-
+        with patch.object(
+            image_processor, "_extract_metadata", return_value=mock_metadata
+        ), patch.object(
+            image_processor, "_preprocess_image", return_value=mock_image_file
+        ), patch.object(
+            image_processor, "_extract_text", return_value=("Test text", 0.8)
+        ):
             result = await image_processor.process_image(mock_image_file, config)
 
             assert result.caption is None
             assert result.extracted_text == "Test text"
 
     @pytest.mark.asyncio
-    async def test_process_image_no_text_extraction(self, image_processor, mock_image_file, mock_metadata):
+    async def test_process_image_no_text_extraction(
+        self, image_processor, mock_image_file, mock_metadata
+    ):
         """Test image processing without text extraction."""
         config = ImageConfig(generate_caption=True, extract_text=False)
 
-        with patch.object(image_processor, '_extract_metadata', return_value=mock_metadata), \
-             patch.object(image_processor, '_preprocess_image', return_value=mock_image_file), \
-             patch.object(image_processor, '_generate_caption', return_value=("Test caption", 0.9)):
-
+        with patch.object(
+            image_processor, "_extract_metadata", return_value=mock_metadata
+        ), patch.object(
+            image_processor, "_preprocess_image", return_value=mock_image_file
+        ), patch.object(
+            image_processor, "_generate_caption", return_value=("Test caption", 0.9)
+        ):
             result = await image_processor.process_image(mock_image_file, config)
 
             assert result.caption == "Test caption"

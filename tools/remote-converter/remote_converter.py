@@ -8,16 +8,17 @@ using existing MoRAG components.
 
 import asyncio
 import os
-import sys
-import time
-import signal
-import tempfile
 import shutil
-from pathlib import Path
-from typing import Optional, Dict, Any, List
+import signal
+import sys
+import tempfile
+import time
 from dataclasses import dataclass
-import structlog
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
 import httpx
+import structlog
 from dotenv import load_dotenv
 
 # Add MoRAG packages to path
@@ -32,14 +33,17 @@ sys.path.insert(0, str(project_root / "packages" / "morag-youtube" / "src"))
 
 try:
     # Import processors directly from their modules to avoid __init__.py issues
-    from morag_audio.processor import AudioProcessor, AudioProcessingResult
-    from morag_video.processor import VideoProcessor, VideoProcessingResult
-    from morag_document.processor import DocumentProcessor
-    from morag_image.processor import ImageProcessor, ImageProcessingResult
-    from morag_web.processor import WebProcessor, WebScrapingResult as WebProcessingResult
-    from morag_youtube.processor import YouTubeProcessor, YouTubeDownloadResult as YouTubeProcessingResult
+    from morag_audio.processor import AudioProcessingResult, AudioProcessor
+
     # Import base result types
     from morag_core.interfaces.processor import ProcessingResult as BaseProcessingResult
+    from morag_document.processor import DocumentProcessor
+    from morag_image.processor import ImageProcessingResult, ImageProcessor
+    from morag_video.processor import VideoProcessingResult, VideoProcessor
+    from morag_web.processor import WebProcessor
+    from morag_web.processor import WebScrapingResult as WebProcessingResult
+    from morag_youtube.processor import YouTubeDownloadResult as YouTubeProcessingResult
+    from morag_youtube.processor import YouTubeProcessor
 except ImportError as e:
     print(f"Error importing MoRAG packages: {e}")
     print("Please ensure MoRAG packages are installed:")
@@ -50,16 +54,19 @@ except ImportError as e:
 
 try:
     from morag_core.utils.logging import get_logger
+
     logger = get_logger(__name__)
 except ImportError:
     # Fallback for environments without morag-core
     import structlog
+
     logger = structlog.get_logger(__name__)
 
 
 @dataclass
 class ProcessingResult:
     """Unified processing result for remote converter."""
+
     success: bool
     text_content: str
     metadata: Dict[str, Any]
@@ -67,7 +74,9 @@ class ProcessingResult:
     error_message: Optional[str] = None
 
 
-def convert_to_unified_result(result: Any, processing_time: float = None) -> ProcessingResult:
+def convert_to_unified_result(
+    result: Any, processing_time: float = None
+) -> ProcessingResult:
     """Convert processor-specific result to unified ProcessingResult."""
     if isinstance(result, AudioProcessingResult):
         return ProcessingResult(
@@ -75,34 +84,39 @@ def convert_to_unified_result(result: Any, processing_time: float = None) -> Pro
             text_content=result.transcript,
             metadata=result.metadata,
             processing_time=processing_time or result.processing_time,
-            error_message=result.error_message
+            error_message=result.error_message,
         )
     elif isinstance(result, VideoProcessingResult):
         # VideoProcessingResult doesn't have transcript directly, extract from audio processing result
         text_content = ""
-        if hasattr(result, 'audio_processing_result') and result.audio_processing_result:
-            text_content = getattr(result.audio_processing_result, 'transcript', "")
+        if (
+            hasattr(result, "audio_processing_result")
+            and result.audio_processing_result
+        ):
+            text_content = getattr(result.audio_processing_result, "transcript", "")
 
         return ProcessingResult(
             success=True,  # VideoProcessingResult doesn't have success field
             text_content=text_content,
-            metadata=result.metadata.__dict__ if hasattr(result.metadata, '__dict__') else {},
+            metadata=result.metadata.__dict__
+            if hasattr(result.metadata, "__dict__")
+            else {},
             processing_time=processing_time or result.processing_time,
-            error_message=None
+            error_message=None,
         )
     elif isinstance(result, BaseProcessingResult):
         # Handle BaseProcessingResult from processors that use the interface
         text_content = ""
 
         # Extract text content from metadata or document
-        if hasattr(result, 'document') and result.document:
-            text_content = getattr(result.document, 'content', "")
-        elif hasattr(result, 'metadata') and result.metadata:
+        if hasattr(result, "document") and result.document:
+            text_content = getattr(result.document, "content", "")
+        elif hasattr(result, "metadata") and result.metadata:
             # For image processing, combine caption and extracted text from metadata
             metadata = result.metadata
-            if 'caption' in metadata and metadata['caption']:
+            if "caption" in metadata and metadata["caption"]:
                 text_content += f"Caption: {metadata['caption']}\n"
-            if 'extracted_text' in metadata and metadata['extracted_text']:
+            if "extracted_text" in metadata and metadata["extracted_text"]:
                 text_content += f"Extracted Text: {metadata['extracted_text']}"
 
         return ProcessingResult(
@@ -110,52 +124,60 @@ def convert_to_unified_result(result: Any, processing_time: float = None) -> Pro
             text_content=text_content.strip(),
             metadata=result.metadata,
             processing_time=processing_time or result.processing_time,
-            error_message=result.error_message
+            error_message=result.error_message,
         )
     elif isinstance(result, ImageProcessingResult):
         # Specific ImageProcessingResult (when called directly)
         text_content = ""
-        if hasattr(result, 'caption') and result.caption:
+        if hasattr(result, "caption") and result.caption:
             text_content += f"Caption: {result.caption}\n"
-        if hasattr(result, 'extracted_text') and result.extracted_text:
+        if hasattr(result, "extracted_text") and result.extracted_text:
             text_content += f"Extracted Text: {result.extracted_text}"
 
         return ProcessingResult(
             success=True,  # ImageProcessingResult doesn't have success field
             text_content=text_content.strip(),
-            metadata=result.metadata.__dict__ if hasattr(result.metadata, '__dict__') else result.metadata,
+            metadata=result.metadata.__dict__
+            if hasattr(result.metadata, "__dict__")
+            else result.metadata,
             processing_time=processing_time or result.processing_time,
-            error_message=None
+            error_message=None,
         )
     elif isinstance(result, WebProcessingResult):
         # WebScrapingResult has content field with WebContent
         text_content = ""
-        if hasattr(result, 'content') and result.content:
-            text_content = getattr(result.content, 'markdown_content', "") or getattr(result.content, 'content', "")
+        if hasattr(result, "content") and result.content:
+            text_content = getattr(result.content, "markdown_content", "") or getattr(
+                result.content, "content", ""
+            )
 
         return ProcessingResult(
             success=result.success,
             text_content=text_content,
             metadata=result.metadata,
             processing_time=processing_time or result.processing_time,
-            error_message=result.error_message
+            error_message=result.error_message,
         )
     elif isinstance(result, YouTubeProcessingResult):
         # YouTubeDownloadResult - extract metadata as text content
         text_content = ""
-        if hasattr(result, 'metadata') and result.metadata:
+        if hasattr(result, "metadata") and result.metadata:
             metadata = result.metadata
             text_content = f"Title: {getattr(metadata, 'title', 'Unknown')}\n"
-            text_content += f"Description: {getattr(metadata, 'description', 'No description')}\n"
+            text_content += (
+                f"Description: {getattr(metadata, 'description', 'No description')}\n"
+            )
             text_content += f"Uploader: {getattr(metadata, 'uploader', 'Unknown')}\n"
             text_content += f"Duration: {getattr(metadata, 'duration', 0)} seconds"
 
         return ProcessingResult(
             success=result.success,
             text_content=text_content,
-            metadata=result.metadata.__dict__ if hasattr(result.metadata, '__dict__') else {},
+            metadata=result.metadata.__dict__
+            if hasattr(result.metadata, "__dict__")
+            else {},
             processing_time=processing_time or result.processing_time,
-            error_message=getattr(result, 'error_message', None)
+            error_message=getattr(result, "error_message", None),
         )
     else:
         # Fallback for unknown result types
@@ -164,7 +186,7 @@ def convert_to_unified_result(result: Any, processing_time: float = None) -> Pro
             text_content="",
             metadata={},
             processing_time=processing_time or 0.0,
-            error_message=f"Unknown result type: {type(result)}"
+            error_message=f"Unknown result type: {type(result)}",
         )
 
 
@@ -173,13 +195,13 @@ class RemoteConverter:
 
     def __init__(self, config: Dict[str, Any]):
         self.config = config
-        self.worker_id = config['worker_id']
-        self.api_base_url = config['api_base_url'].rstrip('/')
-        self.api_key = config.get('api_key')
-        self.content_types = config['content_types']
-        self.poll_interval = config.get('poll_interval', 10)
-        self.max_concurrent_jobs = config.get('max_concurrent_jobs', 2)
-        self.temp_dir = config.get('temp_dir', '/tmp/morag_remote')
+        self.worker_id = config["worker_id"]
+        self.api_base_url = config["api_base_url"].rstrip("/")
+        self.api_key = config.get("api_key")
+        self.content_types = config["content_types"]
+        self.poll_interval = config.get("poll_interval", 10)
+        self.max_concurrent_jobs = config.get("max_concurrent_jobs", 2)
+        self.temp_dir = config.get("temp_dir", "/tmp/morag_remote")
         self.running = False
         self.active_jobs = {}
 
@@ -189,27 +211,29 @@ class RemoteConverter:
         # Initialize processors
         self.processors = {}
         try:
-            if 'audio' in self.content_types:
-                self.processors['audio'] = AudioProcessor()
-            if 'video' in self.content_types:
-                self.processors['video'] = VideoProcessor()
-            if 'document' in self.content_types:
-                self.processors['document'] = DocumentProcessor()
-            if 'image' in self.content_types:
-                self.processors['image'] = ImageProcessor()
-            if 'web' in self.content_types:
-                self.processors['web'] = WebProcessor()
-            if 'youtube' in self.content_types:
-                self.processors['youtube'] = YouTubeProcessor()
+            if "audio" in self.content_types:
+                self.processors["audio"] = AudioProcessor()
+            if "video" in self.content_types:
+                self.processors["video"] = VideoProcessor()
+            if "document" in self.content_types:
+                self.processors["document"] = DocumentProcessor()
+            if "image" in self.content_types:
+                self.processors["image"] = ImageProcessor()
+            if "web" in self.content_types:
+                self.processors["web"] = WebProcessor()
+            if "youtube" in self.content_types:
+                self.processors["youtube"] = YouTubeProcessor()
         except Exception as e:
             logger.error("Failed to initialize processors", error=str(e))
             raise
 
-        logger.info("Remote converter initialized",
-                   worker_id=self.worker_id,
-                   content_types=self.content_types,
-                   api_base_url=self.api_base_url,
-                   temp_dir=self.temp_dir)
+        logger.info(
+            "Remote converter initialized",
+            worker_id=self.worker_id,
+            content_types=self.content_types,
+            api_base_url=self.api_base_url,
+            temp_dir=self.temp_dir,
+        )
 
     def start(self):
         """Start the remote converter."""
@@ -252,7 +276,7 @@ class RemoteConverter:
                     if job:
                         # Start processing job asynchronously
                         task = asyncio.create_task(self._process_job(job))
-                        self.active_jobs[job['job_id']] = task
+                        self.active_jobs[job["job_id"]] = task
 
                 # Wait before next poll
                 await asyncio.sleep(self.poll_interval)
@@ -263,7 +287,9 @@ class RemoteConverter:
 
         # Wait for active jobs to complete
         if self.active_jobs:
-            logger.info("Waiting for active jobs to complete", count=len(self.active_jobs))
+            logger.info(
+                "Waiting for active jobs to complete", count=len(self.active_jobs)
+            )
             await asyncio.gather(*self.active_jobs.values(), return_exceptions=True)
 
     async def _cleanup_completed_jobs(self):
@@ -281,25 +307,27 @@ class RemoteConverter:
         try:
             url = f"{self.api_base_url}/api/v1/remote-jobs/poll"
             params = {
-                'worker_id': self.worker_id,
-                'content_types': ','.join(self.content_types),
-                'max_jobs': 1
+                "worker_id": self.worker_id,
+                "content_types": ",".join(self.content_types),
+                "max_jobs": 1,
             }
 
             headers = {}
             if self.api_key:
-                headers['Authorization'] = f'Bearer {self.api_key}'
+                headers["Authorization"] = f"Bearer {self.api_key}"
 
             response = httpx.get(url, params=params, headers=headers, timeout=30)
 
             if response.status_code == 200:
                 data = response.json()
-                if data.get('job_id'):
+                if data.get("job_id"):
                     return data
             elif response.status_code != 204:  # 204 = no jobs available
-                logger.warning("Failed to poll for jobs",
-                             status_code=response.status_code,
-                             response=response.text)
+                logger.warning(
+                    "Failed to poll for jobs",
+                    status_code=response.status_code,
+                    response=response.text,
+                )
 
             return None
 
@@ -309,22 +337,24 @@ class RemoteConverter:
 
     async def _process_job(self, job: Dict[str, Any]):
         """Process a single job."""
-        job_id = job['job_id']
-        content_type = job['content_type']
-        task_options = job.get('task_options', {})
+        job_id = job["job_id"]
+        content_type = job["content_type"]
+        task_options = job.get("task_options", {})
 
-        logger.info("Starting job processing",
-                   job_id=job_id,
-                   content_type=content_type)
+        logger.info("Starting job processing", job_id=job_id, content_type=content_type)
 
         start_time = time.time()
 
         try:
             # Download source file
             logger.info("Downloading source file", job_id=job_id)
-            file_path = await self._download_source_file(job_id, job.get('source_file_url'))
+            file_path = await self._download_source_file(
+                job_id, job.get("source_file_url")
+            )
             if not file_path:
-                await self._submit_error_result(job_id, "Failed to download source file")
+                await self._submit_error_result(
+                    job_id, "Failed to download source file"
+                )
                 return
 
             # Process the file
@@ -333,8 +363,14 @@ class RemoteConverter:
 
             # Submit result
             if result and result.success:
-                logger.info("Job processing completed successfully", job_id=job_id, processing_time=time.time() - start_time)
-                await self._submit_success_result(job_id, result, time.time() - start_time)
+                logger.info(
+                    "Job processing completed successfully",
+                    job_id=job_id,
+                    processing_time=time.time() - start_time,
+                )
+                await self._submit_success_result(
+                    job_id, result, time.time() - start_time
+                )
             else:
                 error_msg = result.error_message if result else "Processing failed"
                 logger.warning("Job processing failed", job_id=job_id, error=error_msg)
@@ -347,12 +383,14 @@ class RemoteConverter:
         finally:
             # Clean up temporary files
             try:
-                if 'file_path' in locals() and file_path and os.path.exists(file_path):
+                if "file_path" in locals() and file_path and os.path.exists(file_path):
                     os.unlink(file_path)
             except Exception as e:
                 logger.warning("Failed to clean up temp file", error=str(e))
 
-    async def _download_source_file(self, job_id: str, source_file_url: str) -> Optional[str]:
+    async def _download_source_file(
+        self, job_id: str, source_file_url: str
+    ) -> Optional[str]:
         """Download source file for processing."""
         try:
             if not source_file_url:
@@ -362,15 +400,13 @@ class RemoteConverter:
             url = f"{self.api_base_url}{source_file_url}"
             headers = {}
             if self.api_key:
-                headers['Authorization'] = f'Bearer {self.api_key}'
+                headers["Authorization"] = f"Bearer {self.api_key}"
 
             with httpx.stream("GET", url, headers=headers, timeout=300) as response:
                 if response.status_code == 200:
                     # Create temporary file
                     temp_file = tempfile.NamedTemporaryFile(
-                        dir=self.temp_dir,
-                        delete=False,
-                        suffix=f"_{job_id}"
+                        dir=self.temp_dir, delete=False, suffix=f"_{job_id}"
                     )
 
                     # Download file in chunks
@@ -381,61 +417,69 @@ class RemoteConverter:
                     temp_file.close()
                     return temp_file.name
                 else:
-                    logger.error("Failed to download source file",
-                               job_id=job_id,
-                               status_code=response.status_code)
+                    logger.error(
+                        "Failed to download source file",
+                        job_id=job_id,
+                        status_code=response.status_code,
+                    )
                     return None
 
         except Exception as e:
-            logger.error("Exception downloading source file",
-                        job_id=job_id,
-                        error=str(e))
+            logger.error(
+                "Exception downloading source file", job_id=job_id, error=str(e)
+            )
             return None
 
-    async def _process_file(self, file_path: str, content_type: str, options: Dict[str, Any]) -> Optional[ProcessingResult]:
+    async def _process_file(
+        self, file_path: str, content_type: str, options: Dict[str, Any]
+    ) -> Optional[ProcessingResult]:
         """Process file using appropriate MoRAG processor."""
         start_time = time.time()
 
         try:
             processor = self.processors.get(content_type)
             if not processor:
-                logger.error("No processor available for content type", content_type=content_type)
+                logger.error(
+                    "No processor available for content type", content_type=content_type
+                )
                 return ProcessingResult(
                     success=False,
                     text_content="",
                     metadata={},
                     processing_time=0.0,
-                    error_message=f"No processor available for content type: {content_type}"
+                    error_message=f"No processor available for content type: {content_type}",
                 )
 
             # Create a simple progress callback for logging
             def progress_callback(progress: float, message: str = None):
                 if message:
-                    logger.info(f"Processing progress: {message} ({int(progress * 100)}%)")
+                    logger.info(
+                        f"Processing progress: {message} ({int(progress * 100)}%)"
+                    )
 
             # Process the file based on content type using correct method names
-            if content_type == 'audio':
+            if content_type == "audio":
                 # AudioProcessor has process() method
                 result = await processor.process(file_path, progress_callback)
-            elif content_type == 'video':
+            elif content_type == "video":
                 # VideoProcessor has process_video() method
                 result = await processor.process_video(file_path, progress_callback)
-            elif content_type == 'document':
+            elif content_type == "document":
                 # DocumentProcessor has process_file() method - need to pass via options
-                options['progress_callback'] = progress_callback
+                options["progress_callback"] = progress_callback
                 result = await processor.process_file(file_path, **options)
-            elif content_type == 'image':
+            elif content_type == "image":
                 # ImageProcessor has process() method
                 result = await processor.process(file_path, progress_callback)
-            elif content_type == 'web':
+            elif content_type == "web":
                 # For web content, file_path would contain the URL
-                with open(file_path, 'r') as f:
+                with open(file_path, "r") as f:
                     url = f.read().strip()
                 # WebProcessor has process_url() method
                 result = await processor.process_url(url)
-            elif content_type == 'youtube':
+            elif content_type == "youtube":
                 # For YouTube content, file_path would contain the URL
-                with open(file_path, 'r') as f:
+                with open(file_path, "r") as f:
                     url = f.read().strip()
                 # YouTubeProcessor has process_url() method
                 result = await processor.process_url(url)
@@ -447,42 +491,48 @@ class RemoteConverter:
             return convert_to_unified_result(result, processing_time)
 
         except Exception as e:
-            logger.error("Exception processing file",
-                        file_path=file_path,
-                        content_type=content_type,
-                        error=str(e))
+            logger.error(
+                "Exception processing file",
+                file_path=file_path,
+                content_type=content_type,
+                error=str(e),
+            )
             processing_time = time.time() - start_time
             return ProcessingResult(
                 success=False,
                 text_content="",
                 metadata={},
                 processing_time=processing_time,
-                error_message=f"Processing exception: {str(e)}"
+                error_message=f"Processing exception: {str(e)}",
             )
 
-    async def _submit_success_result(self, job_id: str, result: ProcessingResult, processing_time: float):
+    async def _submit_success_result(
+        self, job_id: str, result: ProcessingResult, processing_time: float
+    ):
         """Submit successful processing result."""
         try:
             url = f"{self.api_base_url}/api/v1/remote-jobs/{job_id}/result"
 
             payload = {
-                'success': True,
-                'content': result.text_content or "",
-                'metadata': result.metadata or {},
-                'processing_time': processing_time
+                "success": True,
+                "content": result.text_content or "",
+                "metadata": result.metadata or {},
+                "processing_time": processing_time,
             }
 
-            headers = {'Content-Type': 'application/json'}
+            headers = {"Content-Type": "application/json"}
             if self.api_key:
-                headers['Authorization'] = f'Bearer {self.api_key}'
+                headers["Authorization"] = f"Bearer {self.api_key}"
 
             response = httpx.put(url, json=payload, headers=headers, timeout=60)
 
             if response.status_code != 200:
-                logger.error("Failed to submit result",
-                           job_id=job_id,
-                           status_code=response.status_code,
-                           response=response.text)
+                logger.error(
+                    "Failed to submit result",
+                    job_id=job_id,
+                    status_code=response.status_code,
+                    response=response.text,
+                )
 
         except Exception as e:
             logger.error("Exception submitting result", job_id=job_id, error=str(e))
@@ -492,24 +542,25 @@ class RemoteConverter:
         try:
             url = f"{self.api_base_url}/api/v1/remote-jobs/{job_id}/result"
 
-            payload = {
-                'success': False,
-                'error_message': error_message
-            }
+            payload = {"success": False, "error_message": error_message}
 
-            headers = {'Content-Type': 'application/json'}
+            headers = {"Content-Type": "application/json"}
             if self.api_key:
-                headers['Authorization'] = f'Bearer {self.api_key}'
+                headers["Authorization"] = f"Bearer {self.api_key}"
 
             response = httpx.put(url, json=payload, headers=headers, timeout=60)
 
             if response.status_code != 200:
-                logger.error("Failed to submit error result",
-                           job_id=job_id,
-                           status_code=response.status_code)
+                logger.error(
+                    "Failed to submit error result",
+                    job_id=job_id,
+                    status_code=response.status_code,
+                )
 
         except Exception as e:
-            logger.error("Exception submitting error result", job_id=job_id, error=str(e))
+            logger.error(
+                "Exception submitting error result", job_id=job_id, error=str(e)
+            )
 
     def test_connection(self) -> bool:
         """Test connection to the MoRAG API."""
@@ -517,7 +568,7 @@ class RemoteConverter:
             url = f"{self.api_base_url}/health"
             headers = {}
             if self.api_key:
-                headers['Authorization'] = f'Bearer {self.api_key}'
+                headers["Authorization"] = f"Bearer {self.api_key}"
 
             response = httpx.get(url, headers=headers, timeout=10)
 
@@ -525,15 +576,17 @@ class RemoteConverter:
                 logger.info("API connection test successful", api_url=self.api_base_url)
                 return True
             else:
-                logger.error("API connection test failed",
-                           api_url=self.api_base_url,
-                           status_code=response.status_code)
+                logger.error(
+                    "API connection test failed",
+                    api_url=self.api_base_url,
+                    status_code=response.status_code,
+                )
                 return False
 
         except Exception as e:
-            logger.error("API connection test exception",
-                        api_url=self.api_base_url,
-                        error=str(e))
+            logger.error(
+                "API connection test exception", api_url=self.api_base_url, error=str(e)
+            )
             return False
 
     def _cleanup(self):

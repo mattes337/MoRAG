@@ -1,13 +1,14 @@
 """Base interfaces for storage."""
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union
-from dataclasses import dataclass
 
 
 class StorageType(str, Enum):
     """Storage type enum."""
+
     LOCAL = "local"
     S3 = "s3"
     AZURE = "azure"
@@ -19,6 +20,7 @@ class StorageType(str, Enum):
 @dataclass
 class StorageMetadata:
     """Storage metadata."""
+
     content_type: Optional[str] = None
     content_length: Optional[int] = None
     created_at: Optional[str] = None
@@ -30,6 +32,7 @@ class StorageMetadata:
 @dataclass
 class StorageObject:
     """Storage object information."""
+
     key: str
     storage_type: StorageType
     metadata: Optional[StorageMetadata] = None
@@ -67,7 +70,7 @@ class BaseStorage(ABC):
         self,
         key: str,
         data: Union[bytes, str, Dict[str, Any]],
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> StorageObject:
         """Store an object.
 
@@ -150,7 +153,7 @@ class VectorStorage(BaseStorage):
         self,
         vectors: List[List[float]],
         metadata: List[Dict[str, Any]],
-        ids: Optional[List[str]] = None
+        ids: Optional[List[str]] = None,
     ) -> List[str]:
         """Add vectors to storage.
 
@@ -169,7 +172,7 @@ class VectorStorage(BaseStorage):
         self,
         query_vector: List[float],
         limit: int = 10,
-        filter_expr: Optional[Dict[str, Any]] = None
+        filter_expr: Optional[Dict[str, Any]] = None,
     ) -> List[Dict[str, Any]]:
         """Search for similar vectors.
 
@@ -197,10 +200,7 @@ class VectorStorage(BaseStorage):
 
     @abstractmethod
     async def update_vector_metadata(
-        self,
-        id: str,
-        metadata: Dict[str, Any],
-        upsert: bool = False
+        self, id: str, metadata: Dict[str, Any], upsert: bool = False
     ) -> bool:
         """Update vector metadata.
 

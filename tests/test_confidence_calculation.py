@@ -3,12 +3,13 @@
 Automated test for confidence calculation issues in fact generation.
 Based on test_confidence_issue.py
 """
+import json
+import os
+import tempfile
+from pathlib import Path
+
 import pytest
 import requests
-import json
-import tempfile
-import os
-from pathlib import Path
 
 
 class TestConfidenceCalculation:
@@ -38,7 +39,9 @@ AI and ML are used in various industries including healthcare, finance, transpor
 
 The field of AI continues to evolve rapidly with new breakthroughs in areas like generative AI, reinforcement learning, and quantum computing. These advances promise to revolutionize how we work, communicate, and solve complex problems.
 """
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False, encoding='utf-8') as f:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".md", delete=False, encoding="utf-8"
+        ) as f:
             f.write(content)
             return f.name
 
@@ -49,33 +52,45 @@ The field of AI continues to evolve rapidly with new breakthroughs in areas like
                 files = {"file": ("test.md", f, "text/markdown")}
                 data = {
                     "stages": '["markdown-conversion", "chunker", "fact-generator"]',
-                    "stage_configs": json.dumps({
-                        "fact-generator": {
-                            "min_confidence": 0.1,  # Very low threshold
-                            "strict_validation": False,
-                            "allow_vague_language": True,
-                            "require_entities": False,
-                            "min_fact_length": 5
+                    "stage_configs": json.dumps(
+                        {
+                            "fact-generator": {
+                                "min_confidence": 0.1,  # Very low threshold
+                                "strict_validation": False,
+                                "allow_vague_language": True,
+                                "require_entities": False,
+                                "min_fact_length": 5,
+                            }
                         }
-                    })
+                    ),
                 }
 
                 response = requests.post(api_url, files=files, data=data, timeout=180)
 
-                assert response.status_code == 200, f"Request failed: {response.status_code}"
+                assert (
+                    response.status_code == 200
+                ), f"Request failed: {response.status_code}"
 
                 result = response.json()
                 facts_extracted = self._extract_facts_from_response(result)
 
                 # With lenient settings, we should extract some facts
-                assert len(facts_extracted) > 0, "No facts extracted despite lenient settings"
+                assert (
+                    len(facts_extracted) > 0
+                ), "No facts extracted despite lenient settings"
 
                 # Check that facts have reasonable confidence scores
-                confidences = [fact.get("extraction_confidence", 0) for fact in facts_extracted]
-                avg_confidence = sum(confidences) / len(confidences) if confidences else 0
+                confidences = [
+                    fact.get("extraction_confidence", 0) for fact in facts_extracted
+                ]
+                avg_confidence = (
+                    sum(confidences) / len(confidences) if confidences else 0
+                )
 
                 assert avg_confidence > 0, "Average confidence is zero"
-                assert any(conf > 0.1 for conf in confidences), "No facts meet minimum confidence threshold"
+                assert any(
+                    conf > 0.1 for conf in confidences
+                ), "No facts meet minimum confidence threshold"
 
         finally:
             os.unlink(test_document)
@@ -92,7 +107,9 @@ The field of AI continues to evolve rapidly with new breakthroughs in areas like
 
                 response = requests.post(api_url, files=files, data=data, timeout=180)
 
-                assert response.status_code == 200, f"Request failed: {response.status_code}"
+                assert (
+                    response.status_code == 200
+                ), f"Request failed: {response.status_code}"
 
                 result = response.json()
                 facts_extracted = self._extract_facts_from_response(result)
@@ -100,15 +117,20 @@ The field of AI continues to evolve rapidly with new breakthroughs in areas like
                 # Default settings should still extract some facts from good content
                 # If this fails, it indicates confidence calculation issues
                 if len(facts_extracted) == 0:
-                    pytest.fail("No facts extracted with default settings - confidence calculation may be flawed")
+                    pytest.fail(
+                        "No facts extracted with default settings - confidence calculation may be flawed"
+                    )
 
                 # Check confidence distribution
-                confidences = [fact.get("extraction_confidence", 0) for fact in facts_extracted]
+                confidences = [
+                    fact.get("extraction_confidence", 0) for fact in facts_extracted
+                ]
                 high_confidence_facts = [conf for conf in confidences if conf > 0.7]
 
                 # At least some facts should have reasonable confidence
-                assert len(high_confidence_facts) > 0 or len(facts_extracted) > 5, \
-                    "Either high confidence facts or sufficient quantity expected"
+                assert (
+                    len(high_confidence_facts) > 0 or len(facts_extracted) > 5
+                ), "Either high confidence facts or sufficient quantity expected"
 
         finally:
             os.unlink(test_document)
@@ -120,39 +142,53 @@ The field of AI continues to evolve rapidly with new breakthroughs in areas like
                 files = {"file": ("test.md", f, "text/markdown")}
                 data = {
                     "stages": '["markdown-conversion", "chunker", "fact-generator"]',
-                    "stage_configs": json.dumps({
-                        "fact-generator": {
-                            "min_confidence": 0.2,
-                            "strict_validation": False,
-                            "allow_vague_language": True,
-                            "require_entities": False,
-                            "min_fact_length": 10
+                    "stage_configs": json.dumps(
+                        {
+                            "fact-generator": {
+                                "min_confidence": 0.2,
+                                "strict_validation": False,
+                                "allow_vague_language": True,
+                                "require_entities": False,
+                                "min_fact_length": 10,
+                            }
                         }
-                    })
+                    ),
                 }
 
                 response = requests.post(api_url, files=files, data=data, timeout=180)
 
-                assert response.status_code == 200, f"Request failed: {response.status_code}"
+                assert (
+                    response.status_code == 200
+                ), f"Request failed: {response.status_code}"
 
                 result = response.json()
                 facts_extracted = self._extract_facts_from_response(result)
 
                 if len(facts_extracted) == 0:
-                    pytest.skip("No facts extracted - cannot test confidence distribution")
+                    pytest.skip(
+                        "No facts extracted - cannot test confidence distribution"
+                    )
 
-                confidences = [fact.get("extraction_confidence", 0) for fact in facts_extracted]
+                confidences = [
+                    fact.get("extraction_confidence", 0) for fact in facts_extracted
+                ]
 
                 # Check that confidences are not all the same (indicating proper calculation)
                 unique_confidences = set(confidences)
-                assert len(unique_confidences) > 1, "All facts have identical confidence - calculation may be broken"
+                assert (
+                    len(unique_confidences) > 1
+                ), "All facts have identical confidence - calculation may be broken"
 
                 # Check that confidences are in valid range
-                assert all(0 <= conf <= 1 for conf in confidences), "Confidence scores outside valid range [0,1]"
+                assert all(
+                    0 <= conf <= 1 for conf in confidences
+                ), "Confidence scores outside valid range [0,1]"
 
                 # Check that we don't have suspiciously low confidences for all facts
                 avg_confidence = sum(confidences) / len(confidences)
-                assert avg_confidence > 0.1, f"Average confidence too low: {avg_confidence}"
+                assert (
+                    avg_confidence > 0.1
+                ), f"Average confidence too low: {avg_confidence}"
 
         finally:
             os.unlink(test_document)
@@ -188,28 +224,33 @@ class TestConfidenceCalculationIntegration:
             files = {"file": ("Broers.md", f, "text/markdown")}
             data = {
                 "stages": '["markdown-conversion", "chunker", "fact-generator"]',
-                "stage_configs": json.dumps({
-                    "fact-generator": {
-                        "min_confidence": 0.3,
-                        "strict_validation": False,
-                        "allow_vague_language": True,
-                        "require_entities": False,
-                        "min_fact_length": 10
+                "stage_configs": json.dumps(
+                    {
+                        "fact-generator": {
+                            "min_confidence": 0.3,
+                            "strict_validation": False,
+                            "allow_vague_language": True,
+                            "require_entities": False,
+                            "min_fact_length": 10,
+                        }
                     }
-                })
+                ),
             }
 
             response = requests.post(api_url, files=files, data=data, timeout=180)
 
-            assert response.status_code == 200, f"Request failed: {response.status_code}"
+            assert (
+                response.status_code == 200
+            ), f"Request failed: {response.status_code}"
 
             result = response.json()
             facts_extracted = self._extract_facts_from_response(result)
 
             # A substantial document like Broers.md should produce many facts
             # If it doesn't, confidence calculation is likely broken
-            assert len(facts_extracted) > 10, \
-                f"Expected many facts from substantial document, got {len(facts_extracted)}"
+            assert (
+                len(facts_extracted) > 10
+            ), f"Expected many facts from substantial document, got {len(facts_extracted)}"
 
     def _extract_facts_from_response(self, result):
         """Extract facts from API response."""

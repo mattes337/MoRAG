@@ -1,11 +1,12 @@
 """Integration tests for the modular MoRAG system."""
 
-import pytest
 import asyncio
+import json
+import tempfile
 from pathlib import Path
 from unittest.mock import Mock, patch
-import tempfile
-import json
+
+import pytest
 
 # Test imports for all packages
 IMPORTS_AVAILABLE = True
@@ -14,15 +15,17 @@ IMPORT_ERROR = None
 try:
     from morag import MoRAGAPI, MoRAGOrchestrator
     from morag_core.models import Document, DocumentChunk, ProcessingResult
-    from morag_services import MoRAGServices, ServiceConfig, ContentType
-    from morag_web import WebProcessor, WebConverter
+    from morag_services import ContentType, MoRAGServices, ServiceConfig
+    from morag_web import WebConverter, WebProcessor
     from morag_youtube import YouTubeProcessor
 except ImportError as e:
     IMPORTS_AVAILABLE = False
     IMPORT_ERROR = str(e)
 
 
-@pytest.mark.skipif(not IMPORTS_AVAILABLE, reason=f"Package imports failed: {IMPORT_ERROR}")
+@pytest.mark.skipif(
+    not IMPORTS_AVAILABLE, reason=f"Package imports failed: {IMPORT_ERROR}"
+)
 class TestModularIntegration:
     """Test integration between modular packages."""
 
@@ -33,7 +36,7 @@ class TestModularIntegration:
             gemini_api_key="test-key",
             qdrant_host="localhost",
             qdrant_port=6333,
-            redis_url="redis://localhost:6379/0"
+            redis_url="redis://localhost:6379/0",
         )
 
     @pytest.fixture
@@ -49,23 +52,22 @@ class TestModularIntegration:
     def test_package_imports(self):
         """Test that all packages can be imported."""
         # Core package
-        from morag_core.interfaces.processor import BaseProcessor
+        # Main package
+        from morag import MoRAGAPI, MoRAGOrchestrator
         from morag_core.interfaces.converter import BaseConverter
+        from morag_core.interfaces.processor import BaseProcessor
         from morag_core.models import Document
 
         # Services package
         from morag_services import MoRAGServices
-        from morag_services.storage import QdrantVectorStorage
         from morag_services.embedding import GeminiEmbeddingService
+        from morag_services.storage import QdrantVectorStorage
 
         # Web package
-        from morag_web import WebProcessor, WebConverter
+        from morag_web import WebConverter, WebProcessor
 
         # YouTube package
         from morag_youtube import YouTubeProcessor
-
-        # Main package
-        from morag import MoRAGAPI, MoRAGOrchestrator
 
         assert True  # If we get here, all imports succeeded
 
@@ -94,7 +96,10 @@ class TestModularIntegration:
         assert morag_api._detect_content_type("http://test.org") == "web"
 
         # YouTube URLs
-        assert morag_api._detect_content_type("https://youtube.com/watch?v=123") == "youtube"
+        assert (
+            morag_api._detect_content_type("https://youtube.com/watch?v=123")
+            == "youtube"
+        )
         assert morag_api._detect_content_type("https://youtu.be/123") == "youtube"
 
         # File paths
@@ -105,7 +110,7 @@ class TestModularIntegration:
     @pytest.mark.asyncio
     async def test_web_processing_integration(self, morag_orchestrator):
         """Test web processing integration."""
-        with patch.object(morag_orchestrator.web_processor, 'process') as mock_process:
+        with patch.object(morag_orchestrator.web_processor, "process") as mock_process:
             # Mock web processing result
             mock_result = Mock()
             mock_result.content.markdown_content = "# Test Content"
@@ -117,7 +122,9 @@ class TestModularIntegration:
             mock_result.error_message = None
             mock_process.return_value = mock_result
 
-            result = await morag_orchestrator._process_web_content("https://example.com", {})
+            result = await morag_orchestrator._process_web_content(
+                "https://example.com", {}
+            )
 
             assert result.success
             assert result.content == "# Test Content"
@@ -127,7 +134,9 @@ class TestModularIntegration:
     @pytest.mark.asyncio
     async def test_youtube_processing_integration(self, morag_orchestrator):
         """Test YouTube processing integration."""
-        with patch.object(morag_orchestrator.youtube_processor, 'process') as mock_process:
+        with patch.object(
+            morag_orchestrator.youtube_processor, "process"
+        ) as mock_process:
             # Mock YouTube processing result
             mock_metadata = Mock()
             mock_metadata.id = "test123"
@@ -147,7 +156,9 @@ class TestModularIntegration:
             mock_result.success = True
             mock_process.return_value = mock_result
 
-            result = await morag_orchestrator._process_youtube_content("https://youtube.com/watch?v=123", {})
+            result = await morag_orchestrator._process_youtube_content(
+                "https://youtube.com/watch?v=123", {}
+            )
 
             assert result.success
             assert "Test Video" in result.content
@@ -157,25 +168,25 @@ class TestModularIntegration:
     @pytest.mark.asyncio
     async def test_batch_processing(self, morag_orchestrator):
         """Test batch processing functionality."""
-        with patch.object(morag_orchestrator, 'process_content') as mock_process:
+        with patch.object(morag_orchestrator, "process_content") as mock_process:
             # Mock individual processing results
             mock_result1 = ProcessingResult(
                 content="Content 1",
                 metadata={"source": "item1"},
                 processing_time=1.0,
-                success=True
+                success=True,
             )
             mock_result2 = ProcessingResult(
                 content="Content 2",
                 metadata={"source": "item2"},
                 processing_time=1.5,
-                success=True
+                success=True,
             )
             mock_process.side_effect = [mock_result1, mock_result2]
 
             items = [
                 {"content": "https://example1.com", "content_type": "web"},
-                {"content": "https://example2.com", "content_type": "web"}
+                {"content": "https://example2.com", "content_type": "web"},
             ]
 
             results = await morag_orchestrator.process_batch(items)
@@ -188,7 +199,7 @@ class TestModularIntegration:
     @pytest.mark.asyncio
     async def test_error_handling(self, morag_orchestrator):
         """Test error handling in processing."""
-        with patch.object(morag_orchestrator.web_processor, 'process') as mock_process:
+        with patch.object(morag_orchestrator.web_processor, "process") as mock_process:
             mock_process.side_effect = Exception("Test error")
 
             with pytest.raises(Exception, match="Test error"):
@@ -197,12 +208,14 @@ class TestModularIntegration:
     @pytest.mark.asyncio
     async def test_cleanup(self, morag_api):
         """Test cleanup functionality."""
-        with patch.object(morag_api.orchestrator, 'cleanup') as mock_cleanup:
+        with patch.object(morag_api.orchestrator, "cleanup") as mock_cleanup:
             await morag_api.cleanup()
             mock_cleanup.assert_called_once()
 
 
-@pytest.mark.skipif(not IMPORTS_AVAILABLE, reason=f"Package imports failed: {IMPORT_ERROR}")
+@pytest.mark.skipif(
+    not IMPORTS_AVAILABLE, reason=f"Package imports failed: {IMPORT_ERROR}"
+)
 class TestPackageInterfaces:
     """Test interfaces between packages."""
 
@@ -213,8 +226,8 @@ class TestPackageInterfaces:
 
         processor = WebProcessor()
         assert isinstance(processor, BaseProcessor)
-        assert hasattr(processor, 'process')
-        assert hasattr(processor, 'supports_format')
+        assert hasattr(processor, "process")
+        assert hasattr(processor, "supports_format")
 
     def test_web_converter_interface(self):
         """Test web converter implements correct interface."""
@@ -223,8 +236,8 @@ class TestPackageInterfaces:
 
         converter = WebConverter()
         assert isinstance(converter, BaseConverter)
-        assert hasattr(converter, 'convert')
-        assert hasattr(converter, 'supports_format')
+        assert hasattr(converter, "convert")
+        assert hasattr(converter, "supports_format")
 
     def test_youtube_processor_interface(self):
         """Test YouTube processor implements correct interface."""
@@ -233,8 +246,8 @@ class TestPackageInterfaces:
 
         processor = YouTubeProcessor()
         assert isinstance(processor, BaseProcessor)
-        assert hasattr(processor, 'process')
-        assert hasattr(processor, 'supports_format')
+        assert hasattr(processor, "process")
+        assert hasattr(processor, "supports_format")
 
     def test_storage_interface(self):
         """Test storage service implements correct interface."""
@@ -243,8 +256,8 @@ class TestPackageInterfaces:
 
         storage = QdrantVectorStorage()
         assert isinstance(storage, BaseVectorStorage)
-        assert hasattr(storage, 'store_vectors')
-        assert hasattr(storage, 'search_similar')
+        assert hasattr(storage, "store_vectors")
+        assert hasattr(storage, "search_similar")
 
     def test_embedding_interface(self):
         """Test embedding service implements correct interface."""
@@ -253,10 +266,12 @@ class TestPackageInterfaces:
 
         service = GeminiEmbeddingService("test-key")
         assert isinstance(service, BaseEmbeddingService)
-        assert hasattr(service, 'generate_embedding')
+        assert hasattr(service, "generate_embedding")
 
 
-@pytest.mark.skipif(not IMPORTS_AVAILABLE, reason=f"Package imports failed: {IMPORT_ERROR}")
+@pytest.mark.skipif(
+    not IMPORTS_AVAILABLE, reason=f"Package imports failed: {IMPORT_ERROR}"
+)
 class TestConfigurationManagement:
     """Test configuration management across packages."""
 
@@ -265,9 +280,7 @@ class TestConfigurationManagement:
         from morag_services import ServiceConfig
 
         config = ServiceConfig(
-            gemini_api_key="test-key",
-            qdrant_host="localhost",
-            qdrant_port=6333
+            gemini_api_key="test-key", qdrant_host="localhost", qdrant_port=6333
         )
 
         # Test dict conversion
@@ -291,10 +304,10 @@ class TestConfigurationManagement:
             "gemini_api_key": "file-key",
             "qdrant_host": "remote-host",
             "qdrant_port": 6333,
-            "redis_url": "redis://remote:6379/0"
+            "redis_url": "redis://remote:6379/0",
         }
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             json.dump(config_data, f)
             config_file = f.name
 

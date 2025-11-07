@@ -1,23 +1,25 @@
 """Response generation system for synthesizing facts into coherent responses."""
 
 import time
-from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 from enum import Enum
-import structlog
+from typing import Any, Dict, List, Optional
 
+import structlog
 from morag_core.config import get_settings
-from .llm import LLMClient
-from .citation_manager import CitedFact, CitationFormat
 
 # Import agents framework
 from agents import get_agent
+
+from .citation_manager import CitationFormat, CitedFact
+from .llm import LLMClient
 
 logger = structlog.get_logger(__name__)
 
 # Optional imports for enhanced functionality
 try:
     import google.generativeai as genai
+
     GEMINI_AVAILABLE = True
 except ImportError:
     GEMINI_AVAILABLE = False
@@ -25,6 +27,7 @@ except ImportError:
 
 class ResponseFormat(Enum):
     """Response format options."""
+
     DETAILED = "detailed"
     SUMMARY = "summary"
     BULLET_POINTS = "bullet_points"
@@ -35,6 +38,7 @@ class ResponseFormat(Enum):
 
 class ResponseStructure(Enum):
     """Response structure templates."""
+
     STANDARD = "standard"
     ANALYTICAL = "analytical"
     COMPARATIVE = "comparative"
@@ -45,6 +49,7 @@ class ResponseStructure(Enum):
 @dataclass
 class ResponseOptions:
     """Options for response generation."""
+
     format: ResponseFormat = ResponseFormat.DETAILED
     structure: ResponseStructure = ResponseStructure.STANDARD
     max_length: int = 2000
@@ -59,6 +64,7 @@ class ResponseOptions:
 @dataclass
 class GeneratedResponse:
     """Generated response with metadata."""
+
     content: str
     summary: str
     key_points: List[str]
@@ -76,7 +82,7 @@ class ResponseGenerator:
     def __init__(
         self,
         llm_client: Optional[LLMClient] = None,
-        config: Optional[Dict[str, Any]] = None
+        config: Optional[Dict[str, Any]] = None,
     ):
         """Initialize the response generator.
 
@@ -92,22 +98,26 @@ class ResponseGenerator:
         self.settings = get_settings()
 
         # Generation parameters
-        self.default_max_length = self.config.get('default_max_length', 2000)
-        self.min_facts_required = self.config.get('min_facts_required', 1)
-        self.max_facts_to_use = self.config.get('max_facts_to_use', 10000)
+        self.default_max_length = self.config.get("default_max_length", 2000)
+        self.min_facts_required = self.config.get("min_facts_required", 1)
+        self.max_facts_to_use = self.config.get("max_facts_to_use", 10000)
 
         # LLM configuration
-        self.llm_enabled = self.config.get('llm_enabled', True) and GEMINI_AVAILABLE
-        self.model_name = self.config.get('model_name', 'gemini-1.5-pro')
-        self.temperature = self.config.get('temperature', 0.3)
-        self.max_tokens = self.config.get('max_tokens', 4000)
+        self.llm_enabled = self.config.get("llm_enabled", True) and GEMINI_AVAILABLE
+        self.model_name = self.config.get("model_name", "gemini-1.5-pro")
+        self.temperature = self.config.get("temperature", 0.3)
+        self.max_tokens = self.config.get("max_tokens", 4000)
 
         # Quality settings
-        self.enable_fact_verification = self.config.get('enable_fact_verification', True)
-        self.enable_consistency_check = self.config.get('enable_consistency_check', True)
-        self.enable_reasoning_explanation = self.config.get('enable_reasoning_explanation', True)
-
-
+        self.enable_fact_verification = self.config.get(
+            "enable_fact_verification", True
+        )
+        self.enable_consistency_check = self.config.get(
+            "enable_consistency_check", True
+        )
+        self.enable_reasoning_explanation = self.config.get(
+            "enable_reasoning_explanation", True
+        )
 
         # Initialize components
         self._llm_client = None
@@ -118,7 +128,7 @@ class ResponseGenerator:
             llm_enabled=self.llm_enabled,
             model_name=self.model_name,
             default_max_length=self.default_max_length,
-            enable_fact_verification=self.enable_fact_verification
+            enable_fact_verification=self.enable_fact_verification,
         )
 
     async def initialize(self) -> None:
@@ -145,7 +155,7 @@ class ResponseGenerator:
         self,
         facts: List[CitedFact],
         query: str,
-        options: Optional[ResponseOptions] = None
+        options: Optional[ResponseOptions] = None,
     ) -> GeneratedResponse:
         """Generate comprehensive response from gathered facts.
 
@@ -158,7 +168,9 @@ class ResponseGenerator:
             Generated response with metadata
         """
         if not facts:
-            return self._create_empty_response(query, "No facts available for response generation")
+            return self._create_empty_response(
+                query, "No facts available for response generation"
+            )
 
         start_time = time.time()
         options = options or ResponseOptions()
@@ -169,7 +181,7 @@ class ResponseGenerator:
                 query=query,
                 num_facts=len(facts),
                 format=options.format.value,
-                structure=options.structure.value
+                structure=options.structure.value,
             )
 
             # Initialize LLM if needed
@@ -181,7 +193,7 @@ class ResponseGenerator:
             if len(prepared_facts) < self.min_facts_required:
                 return self._create_empty_response(
                     query,
-                    f"Insufficient facts for response generation (need {self.min_facts_required}, got {len(prepared_facts)})"
+                    f"Insufficient facts for response generation (need {self.min_facts_required}, got {len(prepared_facts)})",
                 )
 
             # Generate response using LLM
@@ -196,11 +208,11 @@ class ResponseGenerator:
             response.generation_time = generation_time
             response.facts_used = [fact.fact.fact_id for fact in prepared_facts]
             response.metadata = {
-                'generation_method': 'llm' if self.llm_enabled else 'fallback',
-                'options_used': options.__dict__,
-                'num_facts_used': len(prepared_facts),
-                'query_length': len(query),
-                'response_length': len(response.content)
+                "generation_method": "llm" if self.llm_enabled else "fallback",
+                "options_used": options.__dict__,
+                "num_facts_used": len(prepared_facts),
+                "query_length": len(query),
+                "response_length": len(response.content),
             }
 
             logger.info(
@@ -208,7 +220,7 @@ class ResponseGenerator:
                 query=query,
                 response_length=len(response.content),
                 confidence_score=response.confidence_score,
-                generation_time=generation_time
+                generation_time=generation_time,
             )
 
             return response
@@ -226,36 +238,33 @@ class ResponseGenerator:
                 word_count=0,
                 generation_time=generation_time,
                 facts_used=[],
-                metadata={'error': str(e)}
+                metadata={"error": str(e)},
             )
 
     def _prepare_facts(
-        self,
-        facts: List[CitedFact],
-        options: ResponseOptions
+        self, facts: List[CitedFact], options: ResponseOptions
     ) -> List[CitedFact]:
         """Prepare and filter facts for response generation."""
         # Sort facts by score (highest first)
         sorted_facts = sorted(facts, key=lambda f: f.score, reverse=True)
 
         # Limit number of facts
-        limited_facts = sorted_facts[:self.max_facts_to_use]
+        limited_facts = sorted_facts[: self.max_facts_to_use]
 
         # Filter by minimum score if needed
-        min_score = self.config.get('min_fact_score', 0.1)
+        min_score = self.config.get("min_fact_score", 0.1)
         filtered_facts = [f for f in limited_facts if f.score >= min_score]
 
         return filtered_facts
 
     async def _generate_with_llm(
-        self,
-        query: str,
-        facts: List[CitedFact],
-        options: ResponseOptions
+        self, query: str, facts: List[CitedFact], options: ResponseOptions
     ) -> GeneratedResponse:
         """Generate response using response generation agent."""
         # Format facts for agent
-        formatted_facts = [f"{fact.fact.fact_text} (confidence: {fact.score})" for fact in facts]
+        formatted_facts = [
+            f"{fact.fact.fact_text} (confidence: {fact.score})" for fact in facts
+        ]
 
         # Use response generation agent - ALWAYS
         result = await self.response_agent.execute(
@@ -264,24 +273,28 @@ class ResponseGenerator:
             sources=formatted_facts,
             max_length=options.max_length,
             format=options.format.value,
-            language=options.language
+            language=options.language,
         )
 
         # Convert agent result to GeneratedResponse
         return GeneratedResponse(
             content=result.response,
-            summary=result.response[:200] + "..." if len(result.response) > 200 else result.response,
+            summary=result.response[:200] + "..."
+            if len(result.response) > 200
+            else result.response,
             key_points=formatted_facts[:3],  # Use top 3 facts as key points
             reasoning="Generated using response generation agent",
-            confidence_score=result.confidence.value if hasattr(result.confidence, 'value') else 0.8,
+            confidence_score=result.confidence.value
+            if hasattr(result.confidence, "value")
+            else 0.8,
             word_count=len(result.response.split()),
             generation_time=0.0,  # Agent handles timing internally
             facts_used=[fact.fact.fact_text for fact in facts],
             metadata={
-                'generation_method': 'agent',
-                'sources_used': len(result.sources),
-                'agent_confidence': result.confidence
-            }
+                "generation_method": "agent",
+                "sources_used": len(result.sources),
+                "agent_confidence": result.confidence,
+            },
         )
 
     # REMOVED: _create_generation_prompt - now using agents framework
@@ -289,12 +302,12 @@ class ResponseGenerator:
     def _analyze_facts_for_synthesis(self, facts: List[CitedFact]) -> Dict[str, str]:
         """Analyze facts to guide synthesis and identify conflicts."""
         analysis = {
-            'summary': '',
-            'conflict_guidance': 'No significant conflicts detected'
+            "summary": "",
+            "conflict_guidance": "No significant conflicts detected",
         }
 
         if not facts:
-            analysis['summary'] = "No facts available for analysis"
+            analysis["summary"] = "No facts available for analysis"
             return analysis
 
         # Analyze fact distribution
@@ -320,18 +333,22 @@ class ResponseGenerator:
             f"Medium confidence (0.5-0.8): {len(medium_confidence_facts)}",
             f"Low confidence (<0.5): {len(low_confidence_facts)}",
             f"Unique sources: {len(all_sources)}",
-            f"Fact types: {', '.join([f'{k}({v})' for k, v in fact_types.items()])}"
+            f"Fact types: {', '.join([f'{k}({v})' for k, v in fact_types.items()])}",
         ]
-        analysis['summary'] = " | ".join(summary_parts)
+        analysis["summary"] = " | ".join(summary_parts)
 
         # Detect potential conflicts
         conflicts = self._detect_fact_conflicts(facts)
         if conflicts:
-            analysis['conflict_guidance'] = f"Address {len(conflicts)} potential conflicts by weighing evidence quality and source reliability"
+            analysis[
+                "conflict_guidance"
+            ] = f"Address {len(conflicts)} potential conflicts by weighing evidence quality and source reliability"
 
         return analysis
 
-    def _format_facts_for_prompt(self, facts: List[CitedFact], analysis: Dict[str, str]) -> str:
+    def _format_facts_for_prompt(
+        self, facts: List[CitedFact], analysis: Dict[str, str]
+    ) -> str:
         """Format facts with enhanced context for the prompt."""
         formatted_facts = []
 
@@ -346,15 +363,21 @@ class ResponseGenerator:
             source_text = f"Sources: {source_count}"
 
             # Add fact type and context
-            fact_type = fact.fact.fact_type.value if hasattr(fact.fact.fact_type, 'value') else fact.fact.fact_type
+            fact_type = (
+                fact.fact.fact_type.value
+                if hasattr(fact.fact.fact_type, "value")
+                else fact.fact.fact_type
+            )
             type_text = f"Type: {fact_type}"
 
             # Add extraction context if available
             context_parts = []
-            if hasattr(fact.fact, 'context') and fact.fact.context:
-                if fact.fact.context.get('semantic_context'):
-                    context_parts.append(f"Context: {fact.fact.context['semantic_context']}")
-                if fact.fact.context.get('hop_position') is not None:
+            if hasattr(fact.fact, "context") and fact.fact.context:
+                if fact.fact.context.get("semantic_context"):
+                    context_parts.append(
+                        f"Context: {fact.fact.context['semantic_context']}"
+                    )
+                if fact.fact.context.get("hop_position") is not None:
                     context_parts.append(f"Hop: {fact.fact.context['hop_position']}")
 
             # Combine all information
@@ -370,18 +393,20 @@ class ResponseGenerator:
 
         # Simple conflict detection based on content similarity and opposing statements
         for i, fact1 in enumerate(facts):
-            for j, fact2 in enumerate(facts[i+1:], i+1):
+            for j, fact2 in enumerate(facts[i + 1 :], i + 1):
                 # Check for contradictory statements
                 if self._are_facts_contradictory(fact1, fact2):
-                    conflicts.append({
-                        'fact1_id': i,
-                        'fact2_id': j,
-                        'fact1_content': fact1.fact.fact_text,
-                        'fact2_content': fact2.fact.fact_text,
-                        'fact1_confidence': fact1.score,
-                        'fact2_confidence': fact2.score,
-                        'type': 'contradiction'
-                    })
+                    conflicts.append(
+                        {
+                            "fact1_id": i,
+                            "fact2_id": j,
+                            "fact1_content": fact1.fact.fact_text,
+                            "fact2_content": fact2.fact.fact_text,
+                            "fact1_confidence": fact1.score,
+                            "fact2_confidence": fact2.score,
+                            "type": "contradiction",
+                        }
+                    )
 
         return conflicts
 
@@ -392,7 +417,15 @@ class ResponseGenerator:
         content2 = fact2.fact.fact_text.lower()
 
         # Check for explicit negations
-        negation_words = ['not', 'no', 'never', 'cannot', 'does not', 'is not', 'are not']
+        negation_words = [
+            "not",
+            "no",
+            "never",
+            "cannot",
+            "does not",
+            "is not",
+            "are not",
+        ]
 
         # Extract key terms (simplified approach)
         words1 = set(content1.split())
@@ -414,10 +447,7 @@ class ResponseGenerator:
     # REMOVED: _parse_llm_response - now using agents framework
 
     async def _generate_fallback(
-        self,
-        query: str,
-        facts: List[CitedFact],
-        options: ResponseOptions
+        self, query: str, facts: List[CitedFact], options: ResponseOptions
     ) -> GeneratedResponse:
         """Generate response using fallback method when LLM is not available."""
         # Simple fact concatenation with basic structure
@@ -444,7 +474,9 @@ class ResponseGenerator:
         key_points = [fact.fact.fact_text for fact in facts[:3]]
 
         # Calculate average confidence
-        avg_confidence = sum(fact.score for fact in facts) / len(facts) if facts else 0.0
+        avg_confidence = (
+            sum(fact.score for fact in facts) / len(facts) if facts else 0.0
+        )
 
         return GeneratedResponse(
             content=content,
@@ -455,7 +487,7 @@ class ResponseGenerator:
             word_count=len(content.split()),
             generation_time=0.0,
             facts_used=[],
-            metadata={'generation_method': 'fallback'}
+            metadata={"generation_method": "fallback"},
         )
 
     def _create_empty_response(self, query: str, reason: str) -> GeneratedResponse:
@@ -469,5 +501,5 @@ class ResponseGenerator:
             word_count=0,
             generation_time=0.0,
             facts_used=[],
-            metadata={'empty_response_reason': reason}
+            metadata={"empty_response_reason": reason},
         )

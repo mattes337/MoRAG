@@ -1,16 +1,17 @@
 """YouTube service for high-level YouTube processing operations using external API."""
 
 import asyncio
-from typing import List, Optional, Dict, Any, Union
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Union
+
 import structlog
-
-from morag_core.interfaces.service import BaseService
 from morag_core.exceptions import ProcessingError
+from morag_core.interfaces.service import BaseService
 
-from .processor import YouTubeProcessor, YouTubeConfig, YouTubeDownloadResult
+from .processor import YouTubeConfig, YouTubeDownloadResult, YouTubeProcessor
 
 logger = structlog.get_logger(__name__)
+
 
 class YouTubeService(BaseService):
     """Service for processing YouTube videos using Apify transcription API.
@@ -46,9 +47,11 @@ class YouTubeService(BaseService):
             external_health = await self.external_service.health_check()
 
             return {
-                "status": "healthy" if external_health["status"] == "healthy" else "unhealthy",
+                "status": "healthy"
+                if external_health["status"] == "healthy"
+                else "unhealthy",
                 "external_service": external_health,
-                "processor_available": True
+                "processor_available": True,
             }
 
         except Exception as e:
@@ -57,10 +60,12 @@ class YouTubeService(BaseService):
                 "status": "unhealthy",
                 "error": str(e),
                 "external_service": {"status": "unhealthy", "error": str(e)},
-                "processor_available": False
+                "processor_available": False,
             }
 
-    async def process_video(self, url: str, config: Optional[YouTubeConfig] = None) -> YouTubeDownloadResult:
+    async def process_video(
+        self, url: str, config: Optional[YouTubeConfig] = None
+    ) -> YouTubeDownloadResult:
         """Process a single YouTube video using external service.
 
         Args:
@@ -72,7 +77,9 @@ class YouTubeService(BaseService):
         """
         return await self.processor.process_url(url, config)
 
-    async def process_videos(self, urls: List[str], config: Optional[YouTubeConfig] = None) -> List[Union[YouTubeDownloadResult, BaseException]]:
+    async def process_videos(
+        self, urls: List[str], config: Optional[YouTubeConfig] = None
+    ) -> List[Union[YouTubeDownloadResult, BaseException]]:
         """Process multiple YouTube videos using external service.
 
         Args:
@@ -85,7 +92,9 @@ class YouTubeService(BaseService):
         tasks = [self.process_video(url, config) for url in urls]
         return await asyncio.gather(*tasks, return_exceptions=True)
 
-    async def process_playlist(self, playlist_url: str, config: Optional[YouTubeConfig] = None) -> List[YouTubeDownloadResult]:
+    async def process_playlist(
+        self, playlist_url: str, config: Optional[YouTubeConfig] = None
+    ) -> List[YouTubeDownloadResult]:
         """Process a YouTube playlist.
 
         Args:
@@ -114,29 +123,34 @@ class YouTubeService(BaseService):
 
         # Convert metadata to dictionary
         return {
-            'id': result.metadata.id,
-            'title': result.metadata.title,
-            'description': result.metadata.description,
-            'uploader': result.metadata.uploader,
-            'upload_date': result.metadata.upload_date,
-            'duration': result.metadata.duration,
-            'view_count': result.metadata.view_count,
-            'like_count': result.metadata.like_count,
-            'comment_count': result.metadata.comment_count,
-            'tags': result.metadata.tags,
-            'categories': result.metadata.categories,
-            'thumbnail_url': result.metadata.thumbnail_url,
-            'webpage_url': result.metadata.webpage_url,
-            'channel_id': result.metadata.channel_id,
-            'channel_url': result.metadata.channel_url,
-            'playlist_id': result.metadata.playlist_id,
-            'playlist_title': result.metadata.playlist_title,
-            'playlist_index': result.metadata.playlist_index,
+            "id": result.metadata.id,
+            "title": result.metadata.title,
+            "description": result.metadata.description,
+            "uploader": result.metadata.uploader,
+            "upload_date": result.metadata.upload_date,
+            "duration": result.metadata.duration,
+            "view_count": result.metadata.view_count,
+            "like_count": result.metadata.like_count,
+            "comment_count": result.metadata.comment_count,
+            "tags": result.metadata.tags,
+            "categories": result.metadata.categories,
+            "thumbnail_url": result.metadata.thumbnail_url,
+            "webpage_url": result.metadata.webpage_url,
+            "channel_id": result.metadata.channel_id,
+            "channel_url": result.metadata.channel_url,
+            "playlist_id": result.metadata.playlist_id,
+            "playlist_title": result.metadata.playlist_title,
+            "playlist_index": result.metadata.playlist_index,
         }
 
-    async def download_video(self, url: str, output_dir: Optional[Path] = None,
-                           quality: str = "best", extract_audio: bool = True,
-                           download_subtitles: bool = True) -> YouTubeDownloadResult:
+    async def download_video(
+        self,
+        url: str,
+        output_dir: Optional[Path] = None,
+        quality: str = "best",
+        extract_audio: bool = True,
+        download_subtitles: bool = True,
+    ) -> YouTubeDownloadResult:
         """Download a YouTube video with specified options.
 
         Args:
@@ -152,7 +166,7 @@ class YouTubeService(BaseService):
         config = YouTubeConfig(
             quality=quality,
             extract_audio=extract_audio,
-            download_subtitles=download_subtitles
+            download_subtitles=download_subtitles,
         )
 
         result = await self.process_video(url, config)
@@ -205,9 +219,7 @@ class YouTubeService(BaseService):
             Path to the downloaded audio file
         """
         config = YouTubeConfig(
-            extract_audio=True,
-            download_subtitles=False,
-            download_thumbnails=False
+            extract_audio=True, download_subtitles=False, download_thumbnails=False
         )
 
         result = await self.process_video(url, config)
@@ -226,8 +238,12 @@ class YouTubeService(BaseService):
 
         return result.audio_path
 
-    async def download_subtitles(self, url: str, languages: Optional[List[str]] = None,
-                               output_dir: Optional[Path] = None) -> List[Path]:
+    async def download_subtitles(
+        self,
+        url: str,
+        languages: Optional[List[str]] = None,
+        output_dir: Optional[Path] = None,
+    ) -> List[Path]:
         """Download subtitles for a YouTube video.
 
         Args:
@@ -245,16 +261,20 @@ class YouTubeService(BaseService):
             download_subtitles=True,
             subtitle_languages=languages,
             download_thumbnails=False,
-            extract_metadata_only=False
+            extract_metadata_only=False,
         )
 
         result = await self.process_video(url, config)
 
         if not result.success:
-            raise ProcessingError(f"Failed to download subtitles: {result.error_message}")
+            raise ProcessingError(
+                f"Failed to download subtitles: {result.error_message}"
+            )
 
         if not result.subtitle_paths:
-            logger.warning("No subtitles found for the video", url=url, languages=languages)
+            logger.warning(
+                "No subtitles found for the video", url=url, languages=languages
+            )
             return []
 
         # If output_dir is specified, move files there
@@ -272,7 +292,9 @@ class YouTubeService(BaseService):
 
         return result.subtitle_paths
 
-    async def download_thumbnail(self, url: str, output_dir: Optional[Path] = None) -> Path:
+    async def download_thumbnail(
+        self, url: str, output_dir: Optional[Path] = None
+    ) -> Path:
         """Download thumbnail for a YouTube video.
 
         Args:
@@ -286,13 +308,15 @@ class YouTubeService(BaseService):
             extract_audio=False,
             download_subtitles=False,
             download_thumbnails=True,
-            extract_metadata_only=False
+            extract_metadata_only=False,
         )
 
         result = await self.process_video(url, config)
 
         if not result.success or not result.thumbnail_paths:
-            raise ProcessingError(f"Failed to download thumbnail: {result.error_message}")
+            raise ProcessingError(
+                f"Failed to download thumbnail: {result.error_message}"
+            )
 
         # Get the first thumbnail
         thumbnail_path = result.thumbnail_paths[0]
@@ -308,15 +332,13 @@ class YouTubeService(BaseService):
 
         return thumbnail_path
 
-
-
     async def transcribe_video(
         self,
         url: str,
         config: Optional[YouTubeConfig] = None,
         metadata: Optional[Dict[str, Any]] = None,
         transcript: Optional[str] = None,
-        transcript_segments: Optional[List[Dict[str, Any]]] = None
+        transcript_segments: Optional[List[Dict[str, Any]]] = None,
     ) -> YouTubeDownloadResult:
         """Transcribe a YouTube video using Apify service or process pre-transcribed content.
 
@@ -334,7 +356,11 @@ class YouTubeService(BaseService):
             ProcessingError: If transcription fails or Apify is not configured
         """
         try:
-            logger.info("Starting video transcription", url=url, pre_transcribed=bool(transcript))
+            logger.info(
+                "Starting video transcription",
+                url=url,
+                pre_transcribed=bool(transcript),
+            )
 
             # Create config with pre-transcribed data if provided
             if metadata or transcript or transcript_segments:
@@ -348,9 +374,13 @@ class YouTubeService(BaseService):
             result = await self.processor.process_url(url, config)
 
             if not result.success:
-                raise ProcessingError(f"YouTube transcription failed: {result.error_message}")
+                raise ProcessingError(
+                    f"YouTube transcription failed: {result.error_message}"
+                )
 
-            logger.info("Video transcription completed", url=url, success=result.success)
+            logger.info(
+                "Video transcription completed", url=url, success=result.success
+            )
             return result
 
         except ProcessingError:
@@ -360,11 +390,8 @@ class YouTubeService(BaseService):
             logger.error("Video transcription failed", url=url, error=str(e))
             raise ProcessingError(error_msg)
 
-
     async def transcribe_videos(
-        self,
-        urls: List[str],
-        config: Optional[YouTubeConfig] = None
+        self, urls: List[str], config: Optional[YouTubeConfig] = None
     ) -> List[YouTubeDownloadResult]:
         """Transcribe multiple YouTube videos.
 
@@ -388,7 +415,9 @@ class YouTubeService(BaseService):
                 result = await self.transcribe_video(url, config)
                 results.append(result)
             except Exception as e:
-                logger.error("Failed to transcribe video in batch", url=url, error=str(e))
+                logger.error(
+                    "Failed to transcribe video in batch", url=url, error=str(e)
+                )
                 # Create a failed result
                 failed_result = YouTubeDownloadResult(
                     metadata=None,
@@ -402,17 +431,21 @@ class YouTubeService(BaseService):
                     video_download=None,
                     processing_time=0.0,
                     success=False,
-                    error_message=str(e)
+                    error_message=str(e),
                 )
                 results.append(failed_result)
 
-        logger.info("Batch transcription completed",
-                   video_count=len(urls),
-                   successful_count=sum(1 for r in results if r.success))
+        logger.info(
+            "Batch transcription completed",
+            video_count=len(urls),
+            successful_count=sum(1 for r in results if r.success),
+        )
 
         return results
 
-    def cleanup(self, result: Union[YouTubeDownloadResult, List[YouTubeDownloadResult]]) -> None:
+    def cleanup(
+        self, result: Union[YouTubeDownloadResult, List[YouTubeDownloadResult]]
+    ) -> None:
         """Clean up temporary files.
 
         Args:

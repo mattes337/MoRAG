@@ -1,6 +1,7 @@
 """Configuration utilities for fact filtering."""
 
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
+
 from .fact_filter import DomainFilterConfig
 
 
@@ -11,7 +12,7 @@ class FactFilterConfigBuilder:
     def create_medical_config(
         confidence_threshold: float = 0.6,
         excluded_keywords: Optional[list] = None,
-        language: str = "en"
+        language: str = "en",
     ) -> DomainFilterConfig:
         """Create configuration for medical domain filtering.
 
@@ -39,15 +40,15 @@ class FactFilterConfigBuilder:
                 "medical": 1.3,
                 "clinical": 1.2,
                 "therapeutic": 1.2,
-                "treatment": 1.2
-            }
+                "treatment": 1.2,
+            },
         )
 
     @staticmethod
     def create_herbal_config(
         confidence_threshold: float = 0.7,
         excluded_keywords: Optional[list] = None,
-        language: str = "en"
+        language: str = "en",
     ) -> DomainFilterConfig:
         """Create configuration for herbal/natural medicine domain filtering.
 
@@ -76,15 +77,15 @@ class FactFilterConfigBuilder:
                 "natural": 1.2,
                 "plant": 1.2,
                 "botanical": 1.2,
-                "remedy": 1.1
-            }
+                "remedy": 1.1,
+            },
         )
 
     @staticmethod
     def create_adhd_config(
         confidence_threshold: float = 0.7,
         excluded_keywords: Optional[list] = None,
-        language: str = "en"
+        language: str = "en",
     ) -> DomainFilterConfig:
         """Create configuration for ADHD domain filtering.
 
@@ -113,15 +114,15 @@ class FactFilterConfigBuilder:
                 "attention": 1.3,
                 "focus": 1.3,
                 "concentration": 1.2,
-                "hyperactivity": 1.2
-            }
+                "hyperactivity": 1.2,
+            },
         )
 
     @staticmethod
     def create_general_config(
         confidence_threshold: float = 0.5,
         excluded_keywords: Optional[list] = None,
-        language: str = "en"
+        language: str = "en",
     ) -> DomainFilterConfig:
         """Create configuration for general domain filtering.
 
@@ -145,7 +146,7 @@ class FactFilterConfigBuilder:
             excluded_keywords=base_excluded,
             confidence_threshold=confidence_threshold,
             relevance_threshold=4.0,
-            enable_llm_scoring=False
+            enable_llm_scoring=False,
         )
 
     @staticmethod
@@ -155,7 +156,7 @@ class FactFilterConfigBuilder:
         confidence_threshold: float = 0.3,
         relevance_threshold: float = 5.0,
         domain_multipliers: Dict[str, float] = None,
-        enable_llm_scoring: bool = True
+        enable_llm_scoring: bool = True,
     ) -> DomainFilterConfig:
         """Create a custom domain filter configuration.
 
@@ -176,11 +177,13 @@ class FactFilterConfigBuilder:
             confidence_threshold=confidence_threshold,
             relevance_threshold=relevance_threshold,
             domain_multipliers=domain_multipliers or {},
-            enable_llm_scoring=enable_llm_scoring
+            enable_llm_scoring=enable_llm_scoring,
         )
 
 
-def create_domain_configs_for_language(language: str = "en") -> Dict[str, DomainFilterConfig]:
+def create_domain_configs_for_language(
+    language: str = "en",
+) -> Dict[str, DomainFilterConfig]:
     """Create a standard set of domain configurations for a specific language.
 
     Args:
@@ -197,13 +200,14 @@ def create_domain_configs_for_language(language: str = "en") -> Dict[str, Domain
         "herbal": builder.create_herbal_config(language=language),
         "adhd": builder.create_adhd_config(language=language),
         "adhd_herbal": builder.create_herbal_config(
-            confidence_threshold=0.7,
-            language=language
-        )
+            confidence_threshold=0.7, language=language
+        ),
     }
 
 
-def load_config_from_dict(config_dict: Dict[str, Dict[str, Any]]) -> Dict[str, DomainFilterConfig]:
+def load_config_from_dict(
+    config_dict: Dict[str, Dict[str, Any]]
+) -> Dict[str, DomainFilterConfig]:
     """Load domain filter configurations from a dictionary.
 
     Args:

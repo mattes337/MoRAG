@@ -1,22 +1,20 @@
 """Test error handling decorators."""
 
-import pytest
-from unittest.mock import AsyncMock
 from pathlib import Path
+from unittest.mock import AsyncMock
 
+import pytest
 from morag_stages.error_handling import (
     stage_error_handler,
-    validation_error_handler,
     standalone_validation_handler,
+    validation_error_handler,
 )
-from morag_stages.exceptions import (
-    StageExecutionError,
-    StageValidationError,
-)
+from morag_stages.exceptions import StageExecutionError, StageValidationError
 
 
 class MockStage:
     """Mock stage class for testing."""
+
     def __init__(self):
         self.stage_type = "test_stage"
 
@@ -45,7 +43,9 @@ async def test_stage_error_handler_wraps_generic_errors():
 
     stage = MockStage()
 
-    with pytest.raises(StageExecutionError, match="test_operation failed: Generic error"):
+    with pytest.raises(
+        StageExecutionError, match="test_operation failed: Generic error"
+    ):
         await failing_method(stage)
 
 
@@ -109,7 +109,9 @@ async def test_stage_error_handler_with_sync_function():
 
     stage = MockStage()
 
-    with pytest.raises(StageExecutionError, match="test_sync_operation failed: Sync generic error"):
+    with pytest.raises(
+        StageExecutionError, match="test_sync_operation failed: Sync generic error"
+    ):
         sync_failing_method(stage)
 
 

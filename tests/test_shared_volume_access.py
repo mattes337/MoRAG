@@ -9,9 +9,9 @@ by both the API container and worker containers.
 import tempfile
 import time
 from pathlib import Path
-import pytest
 
-from morag.utils.file_upload import FileUploadHandler, FileUploadConfig
+import pytest
+from morag.utils.file_upload import FileUploadConfig, FileUploadHandler
 
 
 class TestSharedVolumeAccess:
@@ -28,9 +28,9 @@ class TestSharedVolumeAccess:
 
             # Should prefer /app/temp (Docker) or ./temp (local) over system temp
             is_shared_location = (
-                temp_dir_str.startswith('/app/temp') or
-                temp_dir_str.startswith('./temp') or
-                'temp' in temp_dir_str.lower()
+                temp_dir_str.startswith("/app/temp")
+                or temp_dir_str.startswith("./temp")
+                or "temp" in temp_dir_str.lower()
             )
 
             print(f"Temp directory: {temp_dir_str}")
@@ -82,14 +82,12 @@ class TestSharedVolumeAccess:
             temp_dir1_str = str(temp_dir1)
             temp_dir2_str = str(temp_dir2)
 
-            shared_location1 = (
-                temp_dir1_str.startswith('/app/temp') or
-                temp_dir1_str.startswith('./temp')
-            )
-            shared_location2 = (
-                temp_dir2_str.startswith('/app/temp') or
-                temp_dir2_str.startswith('./temp')
-            )
+            shared_location1 = temp_dir1_str.startswith(
+                "/app/temp"
+            ) or temp_dir1_str.startswith("./temp")
+            shared_location2 = temp_dir2_str.startswith(
+                "/app/temp"
+            ) or temp_dir2_str.startswith("./temp")
 
             print(f"Handler 1 using shared location: {shared_location1}")
             print(f"Handler 2 using shared location: {shared_location2}")
@@ -155,10 +153,9 @@ class TestSharedVolumeAccess:
 
             # Verify marker file is in shared location
             marker_path_str = str(marker_file)
-            is_shared = (
-                marker_path_str.startswith('/app/temp') or
-                marker_path_str.startswith('./temp')
-            )
+            is_shared = marker_path_str.startswith(
+                "/app/temp"
+            ) or marker_path_str.startswith("./temp")
 
             print(f"Marker file in shared location: {is_shared}")
 

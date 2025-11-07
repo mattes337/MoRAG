@@ -1,10 +1,16 @@
 """Tests for fact models and validation (no LLM dependencies)."""
 
-import pytest
 from datetime import datetime
 
-from morag_graph.models.fact import Fact, FactRelation, FactType, FactRelationType, StructuredMetadata
+import pytest
 from morag_graph.extraction.fact_validator import FactValidator
+from morag_graph.models.fact import (
+    Fact,
+    FactRelation,
+    FactRelationType,
+    FactType,
+    StructuredMetadata,
+)
 
 
 class TestFactModel:
@@ -20,7 +26,7 @@ class TestFactModel:
             source_chunk_id="chunk_123",
             source_document_id="doc_456",
             extraction_confidence=0.9,
-            fact_type=FactType.RESEARCH
+            fact_type=FactType.RESEARCH,
         )
 
         assert fact.subject == "Machine Learning"
@@ -42,7 +48,7 @@ class TestFactModel:
             source_chunk_id="chunk_1",
             source_document_id="doc_1",
             extraction_confidence=0.8,
-            fact_type=FactType.PROCESS
+            fact_type=FactType.PROCESS,
         )
         assert complete_fact.is_complete()
 
@@ -53,7 +59,7 @@ class TestFactModel:
             source_chunk_id="chunk_1",
             source_document_id="doc_1",
             extraction_confidence=0.8,
-            fact_type=FactType.PROCESS
+            fact_type=FactType.PROCESS,
         )
         assert not incomplete_fact.is_complete()
 
@@ -67,7 +73,7 @@ class TestFactModel:
             source_document_id="doc_1",
             extraction_confidence=0.85,
             fact_type=FactType.DEFINITION,
-            keywords=["test", "example"]
+            keywords=["test", "example"],
         )
 
         props = fact.get_neo4j_properties()
@@ -91,7 +97,7 @@ class TestFactModel:
             source_chunk_id="chunk_1",
             source_document_id="doc_1",
             extraction_confidence=0.9,
-            fact_type=FactType.RESEARCH
+            fact_type=FactType.RESEARCH,
         )
 
         search_text = fact.get_search_text()
@@ -113,7 +119,7 @@ class TestFactModel:
             source_chunk_id="chunk_1",
             source_document_id="doc_1",
             extraction_confidence=0.8,
-            fact_type=FactType.PROCESS
+            fact_type=FactType.PROCESS,
         )
 
         display_text = fact.get_display_text()
@@ -137,12 +143,17 @@ class TestFactValidator:
             structured_metadata=StructuredMetadata(
                 primary_entities=["Machine Learning algorithms", "neural networks"],
                 relationships=["enable", "through", "resulting in"],
-                domain_concepts=["pattern recognition", "supervised learning", "accuracy", "processing time"]
+                domain_concepts=[
+                    "pattern recognition",
+                    "supervised learning",
+                    "accuracy",
+                    "processing time",
+                ],
             ),
             source_chunk_id="chunk_1",
             source_document_id="doc_1",
             extraction_confidence=0.9,
-            fact_type=FactType.RESEARCH
+            fact_type=FactType.RESEARCH,
         )
 
         is_valid, issues = self.validator.validate_fact(fact)
@@ -155,7 +166,7 @@ class TestFactValidator:
         strict_validator = FactValidator(
             min_confidence=0.3,
             allow_vague_language=False,  # Stricter setting
-            require_entities=True  # Stricter setting
+            require_entities=True,  # Stricter setting
         )
 
         fact = Fact(
@@ -163,17 +174,20 @@ class TestFactValidator:
             structured_metadata=StructuredMetadata(
                 primary_entities=[],  # Empty to trigger validation failure
                 relationships=["enables"],
-                domain_concepts=["pattern recognition", "machine learning"]
+                domain_concepts=["pattern recognition", "machine learning"],
             ),
             source_chunk_id="chunk_1",
             source_document_id="doc_1",
             extraction_confidence=0.8,
-            fact_type=FactType.RESEARCH
+            fact_type=FactType.RESEARCH,
         )
 
         is_valid, issues = strict_validator.validate_fact(fact)
         assert not is_valid
-        assert any("Generic subject" in issue or "primary entities" in issue for issue in issues)
+        assert any(
+            "Generic subject" in issue or "primary entities" in issue
+            for issue in issues
+        )
 
     def test_invalid_fact_low_confidence(self):
         """Test validation fails for low confidence."""
@@ -182,17 +196,19 @@ class TestFactValidator:
             structured_metadata=StructuredMetadata(
                 primary_entities=["Machine Learning"],
                 relationships=["enables"],
-                domain_concepts=["pattern recognition", "neural networks"]
+                domain_concepts=["pattern recognition", "neural networks"],
             ),
             source_chunk_id="chunk_1",
             source_document_id="doc_1",
             extraction_confidence=0.2,  # Below threshold of 0.3
-            fact_type=FactType.RESEARCH
+            fact_type=FactType.RESEARCH,
         )
 
         is_valid, issues = self.validator.validate_fact(fact)
         assert not is_valid
-        assert any("Confidence" in issue and "below threshold" in issue for issue in issues)
+        assert any(
+            "Confidence" in issue and "below threshold" in issue for issue in issues
+        )
 
     def test_invalid_fact_missing_actionable_content(self):
         """Test validation fails for missing actionable content."""
@@ -201,12 +217,12 @@ class TestFactValidator:
             structured_metadata=StructuredMetadata(
                 primary_entities=["Something"],
                 relationships=["relates to"],
-                domain_concepts=["something else"]
+                domain_concepts=["something else"],
             ),
             source_chunk_id="chunk_1",
             source_document_id="doc_1",
             extraction_confidence=0.8,
-            fact_type=FactType.RESEARCH
+            fact_type=FactType.RESEARCH,
         )
 
         is_valid, issues = self.validator.validate_fact(fact)
@@ -222,34 +238,34 @@ class TestFactValidator:
                 structured_metadata=StructuredMetadata(
                     primary_entities=["Valid fact"],
                     relationships=["demonstrates"],
-                    domain_concepts=["valid content", "valid approach"]
+                    domain_concepts=["valid content", "valid approach"],
                 ),
                 source_chunk_id="chunk_1",
                 source_document_id="doc_1",
                 extraction_confidence=0.9,
-                fact_type=FactType.RESEARCH
+                fact_type=FactType.RESEARCH,
             ),
             Fact(
                 fact_text="It produces invalid content through some approach.",
                 structured_metadata=StructuredMetadata(
                     primary_entities=[],  # Empty to potentially trigger validation issues
                     relationships=["produces"],
-                    domain_concepts=["invalid content", "some approach"]
+                    domain_concepts=["invalid content", "some approach"],
                 ),
                 source_chunk_id="chunk_2",
                 source_document_id="doc_1",
                 extraction_confidence=0.8,
-                fact_type=FactType.RESEARCH
-            )
+                fact_type=FactType.RESEARCH,
+            ),
         ]
 
         result = self.validator.validate_facts_batch(facts)
 
-        assert result['total_facts'] == 2
+        assert result["total_facts"] == 2
         # With permissive settings, both facts might pass
-        assert result['valid_facts'] >= 1
-        assert result['invalid_facts'] <= 1
-        assert result['validation_rate'] >= 0.5
+        assert result["valid_facts"] >= 1
+        assert result["invalid_facts"] <= 1
+        assert result["validation_rate"] >= 0.5
 
     def test_quality_score(self):
         """Test quality score calculation."""
@@ -257,15 +273,25 @@ class TestFactValidator:
         good_fact = Fact(
             fact_text="Machine Learning achieves image classification through convolutional neural networks with 95% accuracy, tested on ImageNet.",
             structured_metadata=StructuredMetadata(
-                primary_entities=["Machine Learning", "convolutional neural networks", "ImageNet"],
+                primary_entities=[
+                    "Machine Learning",
+                    "convolutional neural networks",
+                    "ImageNet",
+                ],
                 relationships=["achieves", "through", "tested on"],
-                domain_concepts=["image classification", "95% accuracy", "ML", "CNN", "classification"]
+                domain_concepts=[
+                    "image classification",
+                    "95% accuracy",
+                    "ML",
+                    "CNN",
+                    "classification",
+                ],
             ),
             keywords=["ML", "CNN", "classification"],
             source_chunk_id="chunk_1",
             source_document_id="doc_1",
             extraction_confidence=0.9,
-            fact_type=FactType.RESEARCH
+            fact_type=FactType.RESEARCH,
         )
 
         score = self.validator.get_quality_score(good_fact)
@@ -277,12 +303,12 @@ class TestFactValidator:
             structured_metadata=StructuredMetadata(
                 primary_entities=[],  # Empty entities
                 relationships=["does"],
-                domain_concepts=["something"]
+                domain_concepts=["something"],
             ),
             source_chunk_id="chunk_1",
             source_document_id="doc_1",
             extraction_confidence=0.8,
-            fact_type=FactType.RESEARCH
+            fact_type=FactType.RESEARCH,
         )
 
         score = self.validator.get_quality_score(bad_fact)
@@ -299,7 +325,7 @@ class TestFactRelation:
             target_fact_id="fact_2",
             relation_type=FactRelationType.SUPPORTS,
             confidence=0.8,
-            context="Fact 1 provides evidence for Fact 2"
+            context="Fact 1 provides evidence for Fact 2",
         )
 
         assert relation.source_fact_id == "fact_1"
@@ -315,7 +341,7 @@ class TestFactRelation:
             target_fact_id="fact_2",
             relation_type=FactRelationType.ELABORATES,
             confidence=0.75,
-            context="Additional details"
+            context="Additional details",
         )
 
         props = relation.get_neo4j_properties()

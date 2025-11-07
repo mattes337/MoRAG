@@ -1,14 +1,14 @@
 """Context expansion engine for graph-guided retrieval."""
 
 import logging
-from typing import List, Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
-from ..query.models import QueryAnalysis
+from ..models import Entity
 from ..operations import GraphTraversal
 from ..operations.traversal import GraphPath
-from ..models import Entity
+from ..query.models import QueryAnalysis
 from ..storage.base import BaseStorage
-from .models import ExpandedContext, ContextExpansionConfig
+from .models import ContextExpansionConfig, ExpandedContext
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +19,7 @@ class ContextExpansionEngine:
     def __init__(
         self,
         graph_storage: BaseStorage,
-        config: Optional[ContextExpansionConfig] = None
+        config: Optional[ContextExpansionConfig] = None,
     ):
         """Initialize the context expansion engine.
 
@@ -44,7 +44,8 @@ class ContextExpansionEngine:
         try:
             # Get linked entities from query
             linked_entities = [
-                e.linked_entity_id for e in query_analysis.entities
+                e.linked_entity_id
+                for e in query_analysis.entities
                 if e.linked_entity_id
             ]
 
@@ -54,10 +55,12 @@ class ContextExpansionEngine:
                     expanded_entities=[],
                     expansion_paths=[],
                     context_score=0.0,
-                    expansion_reasoning="No linked entities found in query"
+                    expansion_reasoning="No linked entities found in query",
                 )
 
-            self.logger.info(f"Expanding context for {len(linked_entities)} linked entities")
+            self.logger.info(
+                f"Expanding context for {len(linked_entities)} linked entities"
+            )
 
             # Choose expansion strategy based on query type and intent
             strategy = self._select_expansion_strategy(query_analysis)
@@ -72,14 +75,16 @@ class ContextExpansionEngine:
                 query_analysis, expanded_entities, expansion_paths
             )
 
-            self.logger.info(f"Context expansion complete: {len(expanded_entities)} entities, score: {context_score:.3f}")
+            self.logger.info(
+                f"Context expansion complete: {len(expanded_entities)} entities, score: {context_score:.3f}"
+            )
 
             return ExpandedContext(
                 original_entities=linked_entities,
                 expanded_entities=expanded_entities,
                 expansion_paths=expansion_paths,
                 context_score=context_score,
-                expansion_reasoning=f"Used {strategy} strategy based on {query_analysis.query_type} query"
+                expansion_reasoning=f"Used {strategy} strategy based on {query_analysis.query_type} query",
             )
 
         except Exception as e:
@@ -90,7 +95,7 @@ class ContextExpansionEngine:
                 expanded_entities=[],
                 expansion_paths=[],
                 context_score=0.0,
-                expansion_reasoning=f"Context expansion failed: {str(e)}"
+                expansion_reasoning=f"Context expansion failed: {str(e)}",
             )
 
     def _select_expansion_strategy(self, query_analysis: QueryAnalysis) -> str:
@@ -115,10 +120,7 @@ class ContextExpansionEngine:
             return "adaptive"
 
     async def _execute_expansion_strategy(
-        self,
-        entity_ids: List[str],
-        strategy: str,
-        query_analysis: QueryAnalysis
+        self, entity_ids: List[str], strategy: str, query_analysis: QueryAnalysis
     ) -> Tuple[List[Entity], List[GraphPath]]:
         """Execute the selected expansion strategy.
 
@@ -135,20 +137,34 @@ class ContextExpansionEngine:
 
         try:
             if strategy == "direct_neighbors":
-                expanded_entities, expansion_paths = await self._expand_direct_neighbors(entity_ids)
+                (
+                    expanded_entities,
+                    expansion_paths,
+                ) = await self._expand_direct_neighbors(entity_ids)
             elif strategy == "breadth_first":
-                expanded_entities, expansion_paths = await self._expand_breadth_first(entity_ids)
+                expanded_entities, expansion_paths = await self._expand_breadth_first(
+                    entity_ids
+                )
             elif strategy == "shortest_path":
-                expanded_entities, expansion_paths = await self._expand_shortest_paths(entity_ids)
+                expanded_entities, expansion_paths = await self._expand_shortest_paths(
+                    entity_ids
+                )
             elif strategy == "subgraph_extraction":
-                expanded_entities, expansion_paths = await self._extract_subgraph(entity_ids)
+                expanded_entities, expansion_paths = await self._extract_subgraph(
+                    entity_ids
+                )
             elif strategy == "adaptive":
                 expanded_entities, expansion_paths = await self._adaptive_expansion(
                     entity_ids, query_analysis
                 )
             else:
-                self.logger.warning(f"Unknown expansion strategy: {strategy}, using direct_neighbors")
-                expanded_entities, expansion_paths = await self._expand_direct_neighbors(entity_ids)
+                self.logger.warning(
+                    f"Unknown expansion strategy: {strategy}, using direct_neighbors"
+                )
+                (
+                    expanded_entities,
+                    expansion_paths,
+                ) = await self._expand_direct_neighbors(entity_ids)
 
         except Exception as e:
             self.logger.error(f"Error executing expansion strategy {strategy}: {e}")
@@ -157,7 +173,9 @@ class ContextExpansionEngine:
 
         return expanded_entities, expansion_paths
 
-    async def _expand_direct_neighbors(self, entity_ids: List[str]) -> Tuple[List[Entity], List[GraphPath]]:
+    async def _expand_direct_neighbors(
+        self, entity_ids: List[str]
+    ) -> Tuple[List[Entity], List[GraphPath]]:
         """Expand to direct neighbors of given entities.
 
         Args:
@@ -173,24 +191,22 @@ class ContextExpansionEngine:
             try:
                 # Find neighbors using graph traversal
                 neighbors = await self.graph_traversal.find_neighbors(
-                    entity_id,
-                    max_distance=1
+                    entity_id, max_distance=1
                 )
 
                 # Limit results per entity
-                neighbors = neighbors[:self.config.max_entities_per_hop]
+                neighbors = neighbors[: self.config.max_entities_per_hop]
                 all_entities.extend(neighbors)
 
                 # Create simple paths for direct neighbors
                 for neighbor in neighbors:
-                    path = GraphPath(
-                        entities=[neighbor],
-                        relations=[]
-                    )
+                    path = GraphPath(entities=[neighbor], relations=[])
                     all_paths.append(path)
 
             except Exception as e:
-                self.logger.warning(f"Failed to expand neighbors for entity {entity_id}: {e}")
+                self.logger.warning(
+                    f"Failed to expand neighbors for entity {entity_id}: {e}"
+                )
                 continue
 
         # Remove duplicates while preserving order
@@ -198,7 +214,9 @@ class ContextExpansionEngine:
 
         return unique_entities, all_paths
 
-    async def _expand_breadth_first(self, entity_ids: List[str]) -> Tuple[List[Entity], List[GraphPath]]:
+    async def _expand_breadth_first(
+        self, entity_ids: List[str]
+    ) -> Tuple[List[Entity], List[GraphPath]]:
         """Expand using breadth-first traversal.
 
         Args:
@@ -214,29 +232,29 @@ class ContextExpansionEngine:
             try:
                 # Find neighbors at multiple depths
                 neighbors = await self.graph_traversal.find_neighbors(
-                    entity_id,
-                    max_distance=self.config.max_expansion_depth
+                    entity_id, max_distance=self.config.max_expansion_depth
                 )
 
                 # Limit results
-                neighbors = neighbors[:self.config.max_entities_per_hop * 2]
+                neighbors = neighbors[: self.config.max_entities_per_hop * 2]
                 all_entities.extend(neighbors)
 
                 # Create paths (simplified - in real implementation would track actual paths)
                 for neighbor in neighbors:
-                    path = GraphPath(
-                        entities=[neighbor],
-                        relations=[]
-                    )
+                    path = GraphPath(entities=[neighbor], relations=[])
                     all_paths.append(path)
 
             except Exception as e:
-                self.logger.warning(f"Failed breadth-first expansion for entity {entity_id}: {e}")
+                self.logger.warning(
+                    f"Failed breadth-first expansion for entity {entity_id}: {e}"
+                )
                 continue
 
         return self._deduplicate_entities(all_entities), all_paths
 
-    async def _expand_shortest_paths(self, entity_ids: List[str]) -> Tuple[List[Entity], List[GraphPath]]:
+    async def _expand_shortest_paths(
+        self, entity_ids: List[str]
+    ) -> Tuple[List[Entity], List[GraphPath]]:
         """Find shortest paths between all pairs of entities.
 
         Args:
@@ -250,7 +268,7 @@ class ContextExpansionEngine:
 
         # Find paths between all pairs
         for i, entity1 in enumerate(entity_ids):
-            for entity2 in entity_ids[i+1:]:
+            for entity2 in entity_ids[i + 1 :]:
                 try:
                     path = await self.graph_traversal.find_shortest_path(
                         entity1, entity2
@@ -261,12 +279,16 @@ class ContextExpansionEngine:
                         all_paths.append(path)
 
                 except Exception as e:
-                    self.logger.warning(f"Failed to find path between {entity1} and {entity2}: {e}")
+                    self.logger.warning(
+                        f"Failed to find path between {entity1} and {entity2}: {e}"
+                    )
                     continue
 
         return self._deduplicate_entities(all_entities), all_paths
 
-    async def _extract_subgraph(self, entity_ids: List[str]) -> Tuple[List[Entity], List[GraphPath]]:
+    async def _extract_subgraph(
+        self, entity_ids: List[str]
+    ) -> Tuple[List[Entity], List[GraphPath]]:
         """Extract subgraph around given entities.
 
         Args:
@@ -279,9 +301,7 @@ class ContextExpansionEngine:
         return await self._expand_breadth_first(entity_ids)
 
     async def _adaptive_expansion(
-        self,
-        entity_ids: List[str],
-        query_analysis: QueryAnalysis
+        self, entity_ids: List[str], query_analysis: QueryAnalysis
     ) -> Tuple[List[Entity], List[GraphPath]]:
         """Adaptively choose expansion based on query characteristics.
 
@@ -302,7 +322,7 @@ class ContextExpansionEngine:
         self,
         query_analysis: QueryAnalysis,
         entities: List[Entity],
-        paths: List[GraphPath]
+        paths: List[GraphPath],
     ) -> float:
         """Calculate relevance score for expanded context.
 
@@ -334,7 +354,9 @@ class ContextExpansionEngine:
         # Query complexity bonus
         complexity_bonus = query_analysis.complexity_score * 0.2
 
-        return min((entity_score + path_score + diversity_score + complexity_bonus) / 3.0, 1.0)
+        return min(
+            (entity_score + path_score + diversity_score + complexity_bonus) / 3.0, 1.0
+        )
 
     def _deduplicate_entities(self, entities: List[Entity]) -> List[Entity]:
         """Remove duplicate entities while preserving order.

@@ -1,12 +1,18 @@
 """Response builder utilities for enhanced API."""
 
 import uuid
-from typing import Dict, Any, List, Optional
-import structlog
+from typing import Any, Dict, List, Optional
 
+import structlog
 from morag.models.enhanced_query import (
-    EnhancedQueryRequest, EnhancedQueryResponse, EnhancedResult,
-    GraphContext, EntityInfo, RelationInfo, FusionStrategy, ExpansionStrategy
+    EnhancedQueryRequest,
+    EnhancedQueryResponse,
+    EnhancedResult,
+    EntityInfo,
+    ExpansionStrategy,
+    FusionStrategy,
+    GraphContext,
+    RelationInfo,
 )
 
 logger = structlog.get_logger(__name__)
@@ -23,7 +29,7 @@ class EnhancedResponseBuilder:
         query_id: str,
         request: EnhancedQueryRequest,
         retrieval_result: Any,  # Result from hybrid retrieval system
-        processing_time: float
+        processing_time: float,
     ) -> EnhancedQueryResponse:
         """Build enhanced query response from retrieval results.
 
@@ -38,7 +44,7 @@ class EnhancedResponseBuilder:
         """
         try:
             # Extract results from retrieval_result
-            if hasattr(retrieval_result, 'results'):
+            if hasattr(retrieval_result, "results"):
                 raw_results = retrieval_result.results
             elif isinstance(retrieval_result, list):
                 raw_results = retrieval_result
@@ -47,29 +53,35 @@ class EnhancedResponseBuilder:
 
             # Build enhanced results
             enhanced_results = []
-            for i, result in enumerate(raw_results[:request.max_results]):
+            for i, result in enumerate(raw_results[: request.max_results]):
                 enhanced_result = await self._build_enhanced_result(result, i)
                 if enhanced_result.relevance_score >= request.min_relevance_score:
                     enhanced_results.append(enhanced_result)
 
             # Build graph context
             graph_context = await self._build_graph_context(
-                enhanced_results,
-                request,
-                retrieval_result
+                enhanced_results, request, retrieval_result
             )
 
             # Calculate quality metrics
-            confidence_score = self._calculate_confidence_score(enhanced_results, graph_context)
-            completeness_score = self._calculate_completeness_score(enhanced_results, request)
+            confidence_score = self._calculate_confidence_score(
+                enhanced_results, graph_context
+            )
+            completeness_score = self._calculate_completeness_score(
+                enhanced_results, request
+            )
 
             # Determine actual strategies used
-            fusion_strategy_used = self._determine_fusion_strategy_used(request, retrieval_result)
-            expansion_strategy_used = self._determine_expansion_strategy_used(request, retrieval_result)
+            fusion_strategy_used = self._determine_fusion_strategy_used(
+                request, retrieval_result
+            )
+            expansion_strategy_used = self._determine_expansion_strategy_used(
+                request, retrieval_result
+            )
 
             # Build debug info if needed
             debug_info = None
-            if hasattr(retrieval_result, 'debug_info'):
+            if hasattr(retrieval_result, "debug_info"):
                 debug_info = retrieval_result.debug_info
 
             return EnhancedQueryResponse(
@@ -83,7 +95,7 @@ class EnhancedResponseBuilder:
                 expansion_strategy_used=expansion_strategy_used,
                 confidence_score=confidence_score,
                 completeness_score=completeness_score,
-                debug_info=debug_info
+                debug_info=debug_info,
             )
 
         except Exception as e:
@@ -100,28 +112,40 @@ class EnhancedResponseBuilder:
                 expansion_strategy_used=request.expansion_strategy,
                 confidence_score=0.0,
                 completeness_score=0.0,
-                debug_info={"error": str(e)}
+                debug_info={"error": str(e)},
             )
 
-    async def _build_enhanced_result(self, raw_result: Any, index: int) -> EnhancedResult:
+    async def _build_enhanced_result(
+        self, raw_result: Any, index: int
+    ) -> EnhancedResult:
         """Build enhanced result from raw retrieval result."""
         try:
             # Handle different result formats
             if isinstance(raw_result, dict):
-                result_id = raw_result.get('id', f"result_{index}")
-                content = raw_result.get('content', raw_result.get('text', ''))
-                score = raw_result.get('score', raw_result.get('relevance_score', 0.5))
-                document_id = raw_result.get('document_id', raw_result.get('source', f"doc_{index}"))
-                metadata = raw_result.get('metadata', {})
-                source_type = raw_result.get('source_type', 'vector')
+                result_id = raw_result.get("id", f"result_{index}")
+                content = raw_result.get("content", raw_result.get("text", ""))
+                score = raw_result.get("score", raw_result.get("relevance_score", 0.5))
+                document_id = raw_result.get(
+                    "document_id", raw_result.get("source", f"doc_{index}")
+                )
+                metadata = raw_result.get("metadata", {})
+                source_type = raw_result.get("source_type", "vector")
             else:
                 # Handle object-like results
-                result_id = getattr(raw_result, 'id', f"result_{index}")
-                content = getattr(raw_result, 'content', getattr(raw_result, 'text', ''))
-                score = getattr(raw_result, 'score', getattr(raw_result, 'relevance_score', 0.5))
-                document_id = getattr(raw_result, 'document_id', getattr(raw_result, 'source', f"doc_{index}"))
-                metadata = getattr(raw_result, 'metadata', {})
-                source_type = getattr(raw_result, 'source_type', 'vector')
+                result_id = getattr(raw_result, "id", f"result_{index}")
+                content = getattr(
+                    raw_result, "content", getattr(raw_result, "text", "")
+                )
+                score = getattr(
+                    raw_result, "score", getattr(raw_result, "relevance_score", 0.5)
+                )
+                document_id = getattr(
+                    raw_result,
+                    "document_id",
+                    getattr(raw_result, "source", f"doc_{index}"),
+                )
+                metadata = getattr(raw_result, "metadata", {})
+                source_type = getattr(raw_result, "source_type", "vector")
 
             # Extract graph-specific information if available
             connected_entities = []
@@ -129,12 +153,12 @@ class EnhancedResponseBuilder:
             reasoning_path = None
 
             if isinstance(raw_result, dict):
-                connected_entities = raw_result.get('connected_entities', [])
+                connected_entities = raw_result.get("connected_entities", [])
                 relation_context = [
                     RelationInfo(**rel) if isinstance(rel, dict) else rel
-                    for rel in raw_result.get('relation_context', [])
+                    for rel in raw_result.get("relation_context", [])
                 ]
-                reasoning_path = raw_result.get('reasoning_path')
+                reasoning_path = raw_result.get("reasoning_path")
 
             return EnhancedResult(
                 id=result_id,
@@ -145,25 +169,27 @@ class EnhancedResponseBuilder:
                 metadata=metadata,
                 connected_entities=connected_entities,
                 relation_context=relation_context,
-                reasoning_path=reasoning_path
+                reasoning_path=reasoning_path,
             )
 
         except Exception as e:
-            self.logger.warning("Error building enhanced result", error=str(e), index=index)
+            self.logger.warning(
+                "Error building enhanced result", error=str(e), index=index
+            )
             return EnhancedResult(
                 id=f"result_{index}",
                 content="",
                 relevance_score=0.0,
                 source_type="unknown",
                 document_id=f"doc_{index}",
-                metadata={"error": str(e)}
+                metadata={"error": str(e)},
             )
 
     async def _build_graph_context(
         self,
         results: List[EnhancedResult],
         request: EnhancedQueryRequest,
-        retrieval_result: Any
+        retrieval_result: Any,
     ) -> GraphContext:
         """Build graph context from results and request."""
         if not request.include_graph_context:
@@ -184,20 +210,20 @@ class EnhancedResponseBuilder:
                             name=entity_id,  # Simplified - would normally look up actual name
                             type="unknown",
                             relevance_score=0.5,
-                            source_documents=[result.document_id]
+                            source_documents=[result.document_id],
                         )
 
                 # Add relations from result context
                 relations.extend(result.relation_context)
 
             # Extract from retrieval result if available
-            if hasattr(retrieval_result, 'graph_context'):
+            if hasattr(retrieval_result, "graph_context"):
                 graph_ctx = retrieval_result.graph_context
-                if hasattr(graph_ctx, 'entities'):
+                if hasattr(graph_ctx, "entities"):
                     entities.update(graph_ctx.entities)
-                if hasattr(graph_ctx, 'relations'):
+                if hasattr(graph_ctx, "relations"):
                     relations.extend(graph_ctx.relations)
-                if hasattr(graph_ctx, 'expansion_path'):
+                if hasattr(graph_ctx, "expansion_path"):
                     expansion_path = graph_ctx.expansion_path
 
             # Build reasoning steps if requested
@@ -208,7 +234,7 @@ class EnhancedResponseBuilder:
                 entities=entities,
                 relations=relations,
                 expansion_path=expansion_path,
-                reasoning_steps=reasoning_steps
+                reasoning_steps=reasoning_steps,
             )
 
         except Exception as e:
@@ -216,17 +242,19 @@ class EnhancedResponseBuilder:
             return GraphContext()
 
     def _build_reasoning_steps(
-        self,
-        results: List[EnhancedResult],
-        request: EnhancedQueryRequest
+        self, results: List[EnhancedResult], request: EnhancedQueryRequest
     ) -> List[str]:
         """Build reasoning steps for the query."""
         steps = []
 
-        steps.append(f"1. Analyzed query: '{request.query}' (type: {request.query_type})")
+        steps.append(
+            f"1. Analyzed query: '{request.query}' (type: {request.query_type})"
+        )
 
         if request.expansion_strategy != "none":
-            steps.append(f"2. Applied {request.expansion_strategy} expansion strategy with depth {request.expansion_depth}")
+            steps.append(
+                f"2. Applied {request.expansion_strategy} expansion strategy with depth {request.expansion_depth}"
+            )
 
         vector_results = [r for r in results if r.source_type == "vector"]
         graph_results = [r for r in results if r.source_type == "graph"]
@@ -240,15 +268,15 @@ class EnhancedResponseBuilder:
             steps.append(f"5. Found {len(hybrid_results)} hybrid results")
 
         steps.append(f"6. Applied {request.fusion_strategy} fusion strategy")
-        steps.append(f"7. Filtered results by minimum relevance score {request.min_relevance_score}")
+        steps.append(
+            f"7. Filtered results by minimum relevance score {request.min_relevance_score}"
+        )
         steps.append(f"8. Returned top {len(results)} results")
 
         return steps
 
     def _calculate_confidence_score(
-        self,
-        results: List[EnhancedResult],
-        graph_context: GraphContext
+        self, results: List[EnhancedResult], graph_context: GraphContext
     ) -> float:
         """Calculate overall confidence score for the response."""
         if not results:
@@ -275,9 +303,7 @@ class EnhancedResponseBuilder:
         return max(confidence, 0.0)
 
     def _calculate_completeness_score(
-        self,
-        results: List[EnhancedResult],
-        request: EnhancedQueryRequest
+        self, results: List[EnhancedResult], request: EnhancedQueryRequest
     ) -> float:
         """Calculate completeness score based on request fulfillment."""
         score = 0.0
@@ -303,21 +329,17 @@ class EnhancedResponseBuilder:
         return min(score, 1.0)
 
     def _determine_fusion_strategy_used(
-        self,
-        request: EnhancedQueryRequest,
-        retrieval_result: Any
+        self, request: EnhancedQueryRequest, retrieval_result: Any
     ) -> FusionStrategy:
         """Determine which fusion strategy was actually used."""
-        if hasattr(retrieval_result, 'fusion_strategy_used'):
+        if hasattr(retrieval_result, "fusion_strategy_used"):
             return retrieval_result.fusion_strategy_used
         return request.fusion_strategy
 
     def _determine_expansion_strategy_used(
-        self,
-        request: EnhancedQueryRequest,
-        retrieval_result: Any
+        self, request: EnhancedQueryRequest, retrieval_result: Any
     ) -> ExpansionStrategy:
         """Determine which expansion strategy was actually used."""
-        if hasattr(retrieval_result, 'expansion_strategy_used'):
+        if hasattr(retrieval_result, "expansion_strategy_used"):
             return retrieval_result.expansion_strategy_used
         return request.expansion_strategy

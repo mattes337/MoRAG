@@ -5,16 +5,21 @@ and relation IDs from legacy formats to the new unified ID format.
 """
 
 import asyncio
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
+
 from ..storage.neo4j_storage import Neo4jStorage
 from ..storage.qdrant_storage import QdrantStorage
-from .id_generation import UnifiedIDGenerator, IDValidator
+from .id_generation import IDValidator, UnifiedIDGenerator
 
 
 class IDMigrationService:
     """Service for migrating existing IDs to unified format."""
 
-    def __init__(self, neo4j_storage: Neo4jStorage, qdrant_storage: Optional[QdrantStorage] = None):
+    def __init__(
+        self,
+        neo4j_storage: Neo4jStorage,
+        qdrant_storage: Optional[QdrantStorage] = None,
+    ):
         self.neo4j = neo4j_storage
         self.qdrant = qdrant_storage
         self.migration_log: List[Dict[str, Any]] = []
@@ -51,44 +56,45 @@ class IDMigrationService:
                 try:
                     # Generate new unified ID
                     new_id = UnifiedIDGenerator.generate_document_id(
-                        source_file=doc['source_file'],
-                        checksum=doc.get('checksum')
+                        source_file=doc["source_file"], checksum=doc.get("checksum")
                     )
 
                     # Update document ID in Neo4j
                     await self._update_document_id_neo4j(
-                        old_id=doc['old_id'],
-                        new_id=new_id
+                        old_id=doc["old_id"], new_id=new_id
                     )
 
                     # Update references in Qdrant if available
                     if self.qdrant:
                         await self._update_document_id_qdrant(
-                            old_id=doc['old_id'],
-                            new_id=new_id
+                            old_id=doc["old_id"], new_id=new_id
                         )
 
                     migrated_count += 1
-                    self.migration_log.append({
-                        'type': 'document',
-                        'old_id': doc['old_id'],
-                        'new_id': new_id,
-                        'status': 'success'
-                    })
+                    self.migration_log.append(
+                        {
+                            "type": "document",
+                            "old_id": doc["old_id"],
+                            "new_id": new_id,
+                            "status": "success",
+                        }
+                    )
 
                 except Exception as e:
                     error_count += 1
-                    self.migration_log.append({
-                        'type': 'document',
-                        'old_id': doc['old_id'],
-                        'error': str(e),
-                        'status': 'error'
-                    })
+                    self.migration_log.append(
+                        {
+                            "type": "document",
+                            "old_id": doc["old_id"],
+                            "error": str(e),
+                            "status": "error",
+                        }
+                    )
 
         return {
-            'migrated': migrated_count,
-            'errors': error_count,
-            'total_processed': migrated_count + error_count
+            "migrated": migrated_count,
+            "errors": error_count,
+            "total_processed": migrated_count + error_count,
         }
 
     async def migrate_chunk_ids(self, batch_size: int = 100) -> Dict[str, Any]:
@@ -122,44 +128,46 @@ class IDMigrationService:
                 try:
                     # Generate new unified chunk ID
                     new_id = UnifiedIDGenerator.generate_chunk_id(
-                        document_id=chunk['document_id'],
-                        chunk_index=chunk['chunk_index']
+                        document_id=chunk["document_id"],
+                        chunk_index=chunk["chunk_index"],
                     )
 
                     # Update chunk ID in Neo4j
                     await self._update_chunk_id_neo4j(
-                        old_id=chunk['old_id'],
-                        new_id=new_id
+                        old_id=chunk["old_id"], new_id=new_id
                     )
 
                     # Update references in Qdrant if available
                     if self.qdrant:
                         await self._update_chunk_id_qdrant(
-                            old_id=chunk['old_id'],
-                            new_id=new_id
+                            old_id=chunk["old_id"], new_id=new_id
                         )
 
                     migrated_count += 1
-                    self.migration_log.append({
-                        'type': 'chunk',
-                        'old_id': chunk['old_id'],
-                        'new_id': new_id,
-                        'status': 'success'
-                    })
+                    self.migration_log.append(
+                        {
+                            "type": "chunk",
+                            "old_id": chunk["old_id"],
+                            "new_id": new_id,
+                            "status": "success",
+                        }
+                    )
 
                 except Exception as e:
                     error_count += 1
-                    self.migration_log.append({
-                        'type': 'chunk',
-                        'old_id': chunk['old_id'],
-                        'error': str(e),
-                        'status': 'error'
-                    })
+                    self.migration_log.append(
+                        {
+                            "type": "chunk",
+                            "old_id": chunk["old_id"],
+                            "error": str(e),
+                            "status": "error",
+                        }
+                    )
 
         return {
-            'migrated': migrated_count,
-            'errors': error_count,
-            'total_processed': migrated_count + error_count
+            "migrated": migrated_count,
+            "errors": error_count,
+            "total_processed": migrated_count + error_count,
         }
 
     async def migrate_entity_ids(self, batch_size: int = 100) -> Dict[str, Any]:
@@ -193,38 +201,41 @@ class IDMigrationService:
                 try:
                     # Generate new unified entity ID
                     new_id = UnifiedIDGenerator.generate_entity_id(
-                        name=entity['name'],
-                        entity_type=entity['type'],
-                        source_doc_id=entity.get('source_doc_id', '')
+                        name=entity["name"],
+                        entity_type=entity["type"],
+                        source_doc_id=entity.get("source_doc_id", ""),
                     )
 
                     # Update entity ID in Neo4j
                     await self._update_entity_id_neo4j(
-                        old_id=entity['old_id'],
-                        new_id=new_id
+                        old_id=entity["old_id"], new_id=new_id
                     )
 
                     migrated_count += 1
-                    self.migration_log.append({
-                        'type': 'entity',
-                        'old_id': entity['old_id'],
-                        'new_id': new_id,
-                        'status': 'success'
-                    })
+                    self.migration_log.append(
+                        {
+                            "type": "entity",
+                            "old_id": entity["old_id"],
+                            "new_id": new_id,
+                            "status": "success",
+                        }
+                    )
 
                 except Exception as e:
                     error_count += 1
-                    self.migration_log.append({
-                        'type': 'entity',
-                        'old_id': entity['old_id'],
-                        'error': str(e),
-                        'status': 'error'
-                    })
+                    self.migration_log.append(
+                        {
+                            "type": "entity",
+                            "old_id": entity["old_id"],
+                            "error": str(e),
+                            "status": "error",
+                        }
+                    )
 
         return {
-            'migrated': migrated_count,
-            'errors': error_count,
-            'total_processed': migrated_count + error_count
+            "migrated": migrated_count,
+            "errors": error_count,
+            "total_processed": migrated_count + error_count,
         }
 
     async def migrate_relation_ids(self, batch_size: int = 100) -> Dict[str, Any]:
@@ -258,41 +269,45 @@ class IDMigrationService:
                 try:
                     # Generate new unified relation ID
                     new_id = UnifiedIDGenerator.generate_relation_id(
-                        source_entity_id=relation['source_entity_id'],
-                        target_entity_id=relation['target_entity_id'],
-                        relation_type=relation['relation_type']
+                        source_entity_id=relation["source_entity_id"],
+                        target_entity_id=relation["target_entity_id"],
+                        relation_type=relation["relation_type"],
                     )
 
                     # Update relation ID in Neo4j
                     await self._update_relation_id_neo4j(
-                        old_id=relation['old_id'],
+                        old_id=relation["old_id"],
                         new_id=new_id,
-                        source_entity_id=relation['source_entity_id'],
-                        target_entity_id=relation['target_entity_id'],
-                        relation_type=relation['relation_type']
+                        source_entity_id=relation["source_entity_id"],
+                        target_entity_id=relation["target_entity_id"],
+                        relation_type=relation["relation_type"],
                     )
 
                     migrated_count += 1
-                    self.migration_log.append({
-                        'type': 'relation',
-                        'old_id': relation['old_id'],
-                        'new_id': new_id,
-                        'status': 'success'
-                    })
+                    self.migration_log.append(
+                        {
+                            "type": "relation",
+                            "old_id": relation["old_id"],
+                            "new_id": new_id,
+                            "status": "success",
+                        }
+                    )
 
                 except Exception as e:
                     error_count += 1
-                    self.migration_log.append({
-                        'type': 'relation',
-                        'old_id': relation['old_id'],
-                        'error': str(e),
-                        'status': 'error'
-                    })
+                    self.migration_log.append(
+                        {
+                            "type": "relation",
+                            "old_id": relation["old_id"],
+                            "error": str(e),
+                            "status": "error",
+                        }
+                    )
 
         return {
-            'migrated': migrated_count,
-            'errors': error_count,
-            'total_processed': migrated_count + error_count
+            "migrated": migrated_count,
+            "errors": error_count,
+            "total_processed": migrated_count + error_count,
         }
 
     async def _update_document_id_neo4j(self, old_id: str, new_id: str):
@@ -322,9 +337,14 @@ class IDMigrationService:
         """
         await self.neo4j.execute_query(query, old_id=old_id, new_id=new_id)
 
-    async def _update_relation_id_neo4j(self, old_id: str, new_id: str,
-                                       source_entity_id: str, target_entity_id: str,
-                                       relation_type: str):
+    async def _update_relation_id_neo4j(
+        self,
+        old_id: str,
+        new_id: str,
+        source_entity_id: str,
+        target_entity_id: str,
+        relation_type: str,
+    ):
         """Update relation ID in Neo4j."""
         query = f"""
         MATCH (s:Entity {{id: $source_entity_id}})-[r:{relation_type} {{id: $old_id}}]->(t:Entity {{id: $target_entity_id}})
@@ -335,7 +355,7 @@ class IDMigrationService:
             old_id=old_id,
             new_id=new_id,
             source_entity_id=source_entity_id,
-            target_entity_id=target_entity_id
+            target_entity_id=target_entity_id,
         )
 
     async def _update_document_id_qdrant(self, old_id: str, new_id: str):
@@ -348,32 +368,28 @@ class IDMigrationService:
             search_result = await self.qdrant.client.scroll(
                 collection_name=self.qdrant.collection_name,
                 scroll_filter={
-                    "must": [
-                        {
-                            "key": "document_id",
-                            "match": {"value": old_id}
-                        }
-                    ]
+                    "must": [{"key": "document_id", "match": {"value": old_id}}]
                 },
-                limit=1000
+                limit=1000,
             )
 
             # Update metadata for each vector
             for point in search_result[0]:
-                point.payload['document_id'] = new_id
+                point.payload["document_id"] = new_id
                 await self.qdrant.client.upsert(
-                    collection_name=self.qdrant.collection_name,
-                    points=[point]
+                    collection_name=self.qdrant.collection_name, points=[point]
                 )
         except Exception as e:
             # Log error but don't fail the migration
-            self.migration_log.append({
-                'type': 'qdrant_document_update',
-                'old_id': old_id,
-                'new_id': new_id,
-                'error': str(e),
-                'status': 'error'
-            })
+            self.migration_log.append(
+                {
+                    "type": "qdrant_document_update",
+                    "old_id": old_id,
+                    "new_id": new_id,
+                    "error": str(e),
+                    "status": "error",
+                }
+            )
 
     async def _update_chunk_id_qdrant(self, old_id: str, new_id: str):
         """Update chunk ID references in Qdrant."""
@@ -385,44 +401,40 @@ class IDMigrationService:
             search_result = await self.qdrant.client.scroll(
                 collection_name=self.qdrant.collection_name,
                 scroll_filter={
-                    "must": [
-                        {
-                            "key": "chunk_id",
-                            "match": {"value": old_id}
-                        }
-                    ]
+                    "must": [{"key": "chunk_id", "match": {"value": old_id}}]
                 },
-                limit=1000
+                limit=1000,
             )
 
             # Update metadata for each vector
             for point in search_result[0]:
-                point.payload['chunk_id'] = new_id
+                point.payload["chunk_id"] = new_id
                 await self.qdrant.client.upsert(
-                    collection_name=self.qdrant.collection_name,
-                    points=[point]
+                    collection_name=self.qdrant.collection_name, points=[point]
                 )
         except Exception as e:
             # Log error but don't fail the migration
-            self.migration_log.append({
-                'type': 'qdrant_chunk_update',
-                'old_id': old_id,
-                'new_id': new_id,
-                'error': str(e),
-                'status': 'error'
-            })
+            self.migration_log.append(
+                {
+                    "type": "qdrant_chunk_update",
+                    "old_id": old_id,
+                    "new_id": new_id,
+                    "error": str(e),
+                    "status": "error",
+                }
+            )
 
     def get_migration_report(self) -> Dict[str, Any]:
         """Generate migration report."""
-        successful = [log for log in self.migration_log if log['status'] == 'success']
-        errors = [log for log in self.migration_log if log['status'] == 'error']
+        successful = [log for log in self.migration_log if log["status"] == "success"]
+        errors = [log for log in self.migration_log if log["status"] == "error"]
 
         return {
-            'total_migrations': len(self.migration_log),
-            'successful': len(successful),
-            'errors': len(errors),
-            'success_rate': len(successful) / max(len(self.migration_log), 1),
-            'error_details': errors
+            "total_migrations": len(self.migration_log),
+            "successful": len(successful),
+            "errors": len(errors),
+            "success_rate": len(successful) / max(len(self.migration_log), 1),
+            "error_details": errors,
         }
 
     async def migrate_all(self, batch_size: int = 100) -> Dict[str, Any]:
@@ -437,12 +449,12 @@ class IDMigrationService:
         results = {}
 
         # Migrate in order: documents -> chunks -> entities -> relations
-        results['documents'] = await self.migrate_document_ids(batch_size)
-        results['chunks'] = await self.migrate_chunk_ids(batch_size)
-        results['entities'] = await self.migrate_entity_ids(batch_size)
-        results['relations'] = await self.migrate_relation_ids(batch_size)
+        results["documents"] = await self.migrate_document_ids(batch_size)
+        results["chunks"] = await self.migrate_chunk_ids(batch_size)
+        results["entities"] = await self.migrate_entity_ids(batch_size)
+        results["relations"] = await self.migrate_relation_ids(batch_size)
 
         # Generate overall report
-        results['overall'] = self.get_migration_report()
+        results["overall"] = self.get_migration_report()
 
         return results

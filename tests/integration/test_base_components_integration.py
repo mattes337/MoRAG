@@ -1,16 +1,17 @@
 """Integration tests for base components working together."""
 
-import pytest
 import asyncio
 import tempfile
 from pathlib import Path
-from typing import Dict, List, Any
+from typing import Any, Dict, List
+
+import pytest
 
 from tests.utils.mocks import (
-    MockStorage,
     MockEmbeddingService,
     MockProcessor,
-    MockTaskManager
+    MockStorage,
+    MockTaskManager,
 )
 
 
@@ -24,7 +25,7 @@ class TestBaseComponentsIntegration:
             "storage": MockStorage(),
             "embedding": MockEmbeddingService(embedding_dim=384),
             "processor": MockProcessor(supported_formats=[".txt", ".md"]),
-            "task_manager": MockTaskManager()
+            "task_manager": MockTaskManager(),
         }
 
         # Connect storage
@@ -40,18 +41,24 @@ class TestBaseComponentsIntegration:
         """Create sample documents for integration testing."""
         docs = {}
 
-        docs['doc1'] = tmp_path / "document1.txt"
-        docs['doc1'].write_text("This is the first document for testing integration.")
+        docs["doc1"] = tmp_path / "document1.txt"
+        docs["doc1"].write_text("This is the first document for testing integration.")
 
-        docs['doc2'] = tmp_path / "document2.md"
-        docs['doc2'].write_text("# Second Document\n\nThis is markdown content for testing.")
+        docs["doc2"] = tmp_path / "document2.md"
+        docs["doc2"].write_text(
+            "# Second Document\n\nThis is markdown content for testing."
+        )
 
-        docs['doc3'] = tmp_path / "document3.txt"
-        docs['doc3'].write_text("Third document with different content to test processing.")
+        docs["doc3"] = tmp_path / "document3.txt"
+        docs["doc3"].write_text(
+            "Third document with different content to test processing."
+        )
 
         return docs
 
-    async def test_document_processing_workflow(self, integrated_services, sample_documents):
+    async def test_document_processing_workflow(
+        self, integrated_services, sample_documents
+    ):
         """Test complete document processing workflow."""
         storage = integrated_services["storage"]
         embedding_service = integrated_services["embedding"]
@@ -66,31 +73,39 @@ class TestBaseComponentsIntegration:
             assert process_result["success"] is True
 
             # 2. Generate embedding for content
-            embedding = await embedding_service.generate_embedding(process_result["content"])
+            embedding = await embedding_service.generate_embedding(
+                process_result["content"]
+            )
             assert len(embedding) == 384
 
             # 3. Store in vector storage
             vector_id = f"vector_{doc_name}"
-            await storage.store_vector(vector_id, embedding, {
-                "file_path": str(doc_path),
-                "content": process_result["content"],
-                "processed_at": "2024-01-01"
-            })
+            await storage.store_vector(
+                vector_id,
+                embedding,
+                {
+                    "file_path": str(doc_path),
+                    "content": process_result["content"],
+                    "processed_at": "2024-01-01",
+                },
+            )
 
             # 4. Create processing task
             task_id = await task_manager.create_task(
                 "document_processing",
-                {"doc_path": str(doc_path), "vector_id": vector_id}
+                {"doc_path": str(doc_path), "vector_id": vector_id},
             )
 
-            processed_docs.append({
-                "doc_name": doc_name,
-                "doc_path": doc_path,
-                "vector_id": vector_id,
-                "task_id": task_id,
-                "embedding": embedding,
-                "content": process_result["content"]
-            })
+            processed_docs.append(
+                {
+                    "doc_name": doc_name,
+                    "doc_path": doc_path,
+                    "vector_id": vector_id,
+                    "task_id": task_id,
+                    "embedding": embedding,
+                    "content": process_result["content"],
+                }
+            )
 
         # Verify all documents were processed
         assert len(processed_docs) == 3
@@ -111,16 +126,16 @@ class TestBaseComponentsIntegration:
         # Update task statuses
         for doc in processed_docs:
             await task_manager.update_task_status(
-                doc["task_id"],
-                "completed",
-                result={"vector_id": doc["vector_id"]}
+                doc["task_id"], "completed", result={"vector_id": doc["vector_id"]}
             )
 
         # Verify task completion
         completed_tasks = await task_manager.list_tasks(status="completed")
         assert len(completed_tasks) == 3
 
-    async def test_batch_processing_integration(self, integrated_services, sample_documents):
+    async def test_batch_processing_integration(
+        self, integrated_services, sample_documents
+    ):
         """Test batch processing integration."""
         embedding_service = integrated_services["embedding"]
         processor = integrated_services["processor"]
@@ -143,11 +158,15 @@ class TestBaseComponentsIntegration:
         # Batch store vectors
         for i, (embedding, result) in enumerate(zip(embeddings, process_results)):
             vector_id = f"batch_vector_{i}"
-            await storage.store_vector(vector_id, embedding, {
-                "file_path": result["file_path"],
-                "content": result["content"],
-                "batch_index": i
-            })
+            await storage.store_vector(
+                vector_id,
+                embedding,
+                {
+                    "file_path": result["file_path"],
+                    "content": result["content"],
+                    "batch_index": i,
+                },
+            )
 
         # Verify storage
         health = await storage.health_check()
@@ -183,7 +202,9 @@ class TestBaseComponentsIntegration:
         # Reconnect for cleanup
         await storage.connect()
 
-    async def test_concurrent_operations_integration(self, integrated_services, sample_documents):
+    async def test_concurrent_operations_integration(
+        self, integrated_services, sample_documents
+    ):
         """Test concurrent operations across components."""
         embedding_service = integrated_services["embedding"]
         processor = integrated_services["processor"]
@@ -197,19 +218,22 @@ class TestBaseComponentsIntegration:
                 return None
 
             # Generate embedding
-            embedding = await embedding_service.generate_embedding(process_result["content"])
+            embedding = await embedding_service.generate_embedding(
+                process_result["content"]
+            )
 
             # Store vector
             vector_id = f"concurrent_{doc_path.name}"
-            await storage.store_vector(vector_id, embedding, {
-                "file_path": str(doc_path),
-                "content": process_result["content"]
-            })
+            await storage.store_vector(
+                vector_id,
+                embedding,
+                {"file_path": str(doc_path), "content": process_result["content"]},
+            )
 
             return {
                 "vector_id": vector_id,
                 "embedding": embedding,
-                "content": process_result["content"]
+                "content": process_result["content"],
             }
 
         # Run concurrent tasks
@@ -244,12 +268,13 @@ class TestBaseComponentsIntegration:
 
         # Overall system health
         overall_health = all(
-            health.get("status") == "healthy"
-            for health in health_checks.values()
+            health.get("status") == "healthy" for health in health_checks.values()
         )
         assert overall_health is True
 
-    async def test_data_consistency_integration(self, integrated_services, sample_documents):
+    async def test_data_consistency_integration(
+        self, integrated_services, sample_documents
+    ):
         """Test data consistency across components."""
         storage = integrated_services["storage"]
         embedding_service = integrated_services["embedding"]
@@ -265,12 +290,13 @@ class TestBaseComponentsIntegration:
             process_result = await processor.process(doc_path)
 
             # Generate embedding
-            embedding = await embedding_service.generate_embedding(process_result["content"])
+            embedding = await embedding_service.generate_embedding(
+                process_result["content"]
+            )
 
-            results.append({
-                "content": process_result["content"],
-                "embedding": embedding
-            })
+            results.append(
+                {"content": process_result["content"], "embedding": embedding}
+            )
 
         # Verify consistency
         base_content = results[0]["content"]
@@ -278,7 +304,9 @@ class TestBaseComponentsIntegration:
 
         for result in results[1:]:
             assert result["content"] == base_content, "Content should be consistent"
-            assert result["embedding"] == base_embedding, "Embeddings should be deterministic"
+            assert (
+                result["embedding"] == base_embedding
+            ), "Embeddings should be deterministic"
 
     async def test_scalability_simulation(self, integrated_services, tmp_path):
         """Test system behavior with larger data volumes."""
@@ -290,7 +318,9 @@ class TestBaseComponentsIntegration:
         documents = []
         for i in range(20):
             doc_path = tmp_path / f"scale_test_{i}.txt"
-            doc_path.write_text(f"This is scale test document number {i} with unique content.")
+            doc_path.write_text(
+                f"This is scale test document number {i} with unique content."
+            )
             documents.append(doc_path)
 
         # Process all documents
@@ -300,10 +330,14 @@ class TestBaseComponentsIntegration:
         for doc_path in documents:
             process_result = await processor.process(doc_path)
             if process_result["success"]:
-                embedding = await embedding_service.generate_embedding(process_result["content"])
-                await storage.store_vector(f"scale_{processed_count}", embedding, {
-                    "content": process_result["content"]
-                })
+                embedding = await embedding_service.generate_embedding(
+                    process_result["content"]
+                )
+                await storage.store_vector(
+                    f"scale_{processed_count}",
+                    embedding,
+                    {"content": process_result["content"]},
+                )
                 processed_count += 1
 
         end_time = asyncio.get_event_loop().time()
@@ -311,7 +345,9 @@ class TestBaseComponentsIntegration:
 
         # Verify performance
         assert processed_count == 20
-        assert processing_time < 5.0  # Should complete within 5 seconds for mock services
+        assert (
+            processing_time < 5.0
+        )  # Should complete within 5 seconds for mock services
 
         # Check throughput
         throughput = processed_count / processing_time

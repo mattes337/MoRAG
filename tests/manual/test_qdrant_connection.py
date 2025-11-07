@@ -4,16 +4,16 @@ Test script to verify Qdrant connection with HTTPS/TLS configuration.
 """
 
 import asyncio
-import sys
 import os
+import sys
 from pathlib import Path
 
 # Add the src directory to the Python path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
+import structlog
 from morag_core.config import settings
 from morag_services.storage import qdrant_service
-import structlog
 
 # Configure logging
 structlog.configure(
@@ -26,7 +26,7 @@ structlog.configure(
         structlog.processors.StackInfoRenderer(),
         structlog.processors.format_exc_info,
         structlog.processors.UnicodeDecoder(),
-        structlog.processors.JSONRenderer()
+        structlog.processors.JSONRenderer(),
     ],
     context_class=dict,
     logger_factory=structlog.stdlib.LoggerFactory(),
@@ -35,6 +35,7 @@ structlog.configure(
 )
 
 logger = structlog.get_logger()
+
 
 async def test_qdrant_connection():
     """Test Qdrant connection and basic operations."""
@@ -57,10 +58,14 @@ async def test_qdrant_connection():
         collections = await qdrant_service.list_collections()
         print(f"✅ Found {len(collections)} collections:")
         for collection in collections:
-            print(f"   - {collection.get('name', 'Unknown')}: {collection.get('points_count', 0)} points")
+            print(
+                f"   - {collection.get('name', 'Unknown')}: {collection.get('points_count', 0)} points"
+            )
 
         # Test collection info (if collection exists)
-        print(f"\n3. Testing collection info for '{settings.qdrant_collection_name}'...")
+        print(
+            f"\n3. Testing collection info for '{settings.qdrant_collection_name}'..."
+        )
         try:
             collection_info = await qdrant_service.get_collection_info()
             print(f"✅ Collection info retrieved:")
@@ -68,7 +73,9 @@ async def test_qdrant_connection():
             print(f"   - Vectors: {collection_info.get('vectors_count', 0)}")
             print(f"   - Status: {collection_info.get('status', 'Unknown')}")
         except Exception as e:
-            print(f"⚠️  Collection '{settings.qdrant_collection_name}' not found or error: {e}")
+            print(
+                f"⚠️  Collection '{settings.qdrant_collection_name}' not found or error: {e}"
+            )
 
             # Try to create the collection
             print(f"\n4. Creating collection '{settings.qdrant_collection_name}'...")
@@ -88,6 +95,7 @@ async def test_qdrant_connection():
         logger.error("Qdrant connection test failed", error=str(e), exc_info=True)
         return False
 
+
 def test_url_parsing():
     """Test URL parsing logic."""
     print("=== URL Parsing Test ===")
@@ -102,16 +110,17 @@ def test_url_parsing():
     for host, port in test_cases:
         print(f"\nTesting: host='{host}', port={port}")
 
-        if host.startswith(('http://', 'https://')):
+        if host.startswith(("http://", "https://")):
             qdrant_url = host
-            if not qdrant_url.endswith('/'):
-                qdrant_url += '/'
+            if not qdrant_url.endswith("/"):
+                qdrant_url += "/"
             # Remove trailing slash and add port if not in URL
-            if ':' not in qdrant_url.split('://', 1)[1].split('/')[0] and port != 443:
-                qdrant_url = qdrant_url.rstrip('/') + f':{port}'
+            if ":" not in qdrant_url.split("://", 1)[1].split("/")[0] and port != 443:
+                qdrant_url = qdrant_url.rstrip("/") + f":{port}"
             print(f"  → URL connection: {qdrant_url}")
         else:
             print(f"  → Host/Port connection: host={host}, port={port}")
+
 
 if __name__ == "__main__":
     print("Qdrant Connection Test Script")
@@ -128,5 +137,7 @@ if __name__ == "__main__":
         print("\n✅ Qdrant is properly configured and accessible!")
         sys.exit(0)
     else:
-        print("\n❌ Qdrant connection issues detected. Check configuration and network connectivity.")
+        print(
+            "\n❌ Qdrant connection issues detected. Check configuration and network connectivity."
+        )
         sys.exit(1)

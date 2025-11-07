@@ -2,21 +2,22 @@
 """Test script for optimized audio extraction from video files."""
 
 import asyncio
+import logging
 import sys
 import tempfile
 import time
 from pathlib import Path
-import logging
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
+from morag_video import VideoConfig, video_processor
 from morag_video.services import ffmpeg_service
-from morag_video import video_processor, VideoConfig
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
 
 async def test_audio_format_defaults():
     """Test that default audio format is now MP3."""
@@ -26,20 +27,29 @@ async def test_audio_format_defaults():
         # Test VideoConfig default
         config = VideoConfig()
         print(f"VideoConfig default audio_format: {config.audio_format}")
-        assert config.audio_format == "mp3", f"Expected 'mp3', got '{config.audio_format}'"
+        assert (
+            config.audio_format == "mp3"
+        ), f"Expected 'mp3', got '{config.audio_format}'"
         print("✓ VideoConfig defaults to MP3")
 
         # Test FFmpeg service method signature
         import inspect
+
         sig = inspect.signature(ffmpeg_service.extract_audio)
-        output_format_default = sig.parameters['output_format'].default
+        output_format_default = sig.parameters["output_format"].default
         print(f"FFmpeg service default output_format: {output_format_default}")
-        assert output_format_default == "mp3", f"Expected 'mp3', got '{output_format_default}'"
+        assert (
+            output_format_default == "mp3"
+        ), f"Expected 'mp3', got '{output_format_default}'"
         print("✓ FFmpeg service defaults to MP3")
 
-        optimize_for_speed_default = sig.parameters['optimize_for_speed'].default
-        print(f"FFmpeg service default optimize_for_speed: {optimize_for_speed_default}")
-        assert optimize_for_speed_default == True, f"Expected True, got {optimize_for_speed_default}"
+        optimize_for_speed_default = sig.parameters["optimize_for_speed"].default
+        print(
+            f"FFmpeg service default optimize_for_speed: {optimize_for_speed_default}"
+        )
+        assert (
+            optimize_for_speed_default == True
+        ), f"Expected True, got {optimize_for_speed_default}"
         print("✓ FFmpeg service defaults to speed optimization")
 
         return True
@@ -47,6 +57,7 @@ async def test_audio_format_defaults():
     except Exception as e:
         print(f"✗ Test failed: {e}")
         return False
+
 
 async def test_codec_selection_logic():
     """Test codec selection logic for different scenarios."""
@@ -57,17 +68,31 @@ async def test_codec_selection_logic():
         test_cases = [
             {"audio_codec": "mp3", "output_format": "mp3", "expected_codec": "copy"},
             {"audio_codec": "aac", "output_format": "aac", "expected_codec": "copy"},
-            {"audio_codec": "aac", "output_format": "mp3", "expected_codec": "libmp3lame"},
-            {"audio_codec": "mp3", "output_format": "wav", "expected_codec": "pcm_s16le"},
-            {"audio_codec": "unknown", "output_format": "mp3", "expected_codec": "libmp3lame"},
+            {
+                "audio_codec": "aac",
+                "output_format": "mp3",
+                "expected_codec": "libmp3lame",
+            },
+            {
+                "audio_codec": "mp3",
+                "output_format": "wav",
+                "expected_codec": "pcm_s16le",
+            },
+            {
+                "audio_codec": "unknown",
+                "output_format": "mp3",
+                "expected_codec": "libmp3lame",
+            },
         ]
 
         for i, case in enumerate(test_cases):
-            print(f"\nTest case {i+1}: {case['audio_codec']} -> {case['output_format']}")
+            print(
+                f"\nTest case {i+1}: {case['audio_codec']} -> {case['output_format']}"
+            )
 
             # Simulate the codec selection logic
-            source_codec = case['audio_codec'].lower()
-            output_format = case['output_format'].lower()
+            source_codec = case["audio_codec"].lower()
+            output_format = case["output_format"].lower()
 
             if output_format == "mp3" and "mp3" in source_codec:
                 selected_codec = "copy"
@@ -89,8 +114,9 @@ async def test_codec_selection_logic():
             print(f"  Selected codec: {selected_codec}")
             print(f"  Use copy: {use_copy}")
 
-            assert selected_codec == case['expected_codec'], \
-                f"Expected {case['expected_codec']}, got {selected_codec}"
+            assert (
+                selected_codec == case["expected_codec"]
+            ), f"Expected {case['expected_codec']}, got {selected_codec}"
             print(f"  ✓ Correct codec selected")
 
         print("\n✓ All codec selection tests passed")
@@ -99,6 +125,7 @@ async def test_codec_selection_logic():
     except Exception as e:
         print(f"✗ Test failed: {e}")
         return False
+
 
 async def test_file_size_comparison():
     """Test file size differences between formats."""
@@ -118,7 +145,7 @@ async def test_file_size_comparison():
         formats_info = {
             "mp3": "Compressed audio - smaller file size, fast processing",
             "wav": "Uncompressed audio - large file size, minimal processing",
-            "aac": "Compressed audio - smaller file size, fast processing"
+            "aac": "Compressed audio - smaller file size, fast processing",
         }
 
         for format_name, description in formats_info.items():
@@ -126,7 +153,9 @@ async def test_file_size_comparison():
             print(f"  Description: {description}")
 
             if format_name == "wav":
-                print(f"  ⚠️  WARNING: WAV format will create files 5-20x larger than compressed formats")
+                print(
+                    f"  ⚠️  WARNING: WAV format will create files 5-20x larger than compressed formats"
+                )
             else:
                 print(f"  ✓ Recommended for minimal file size")
 
@@ -140,6 +169,7 @@ async def test_file_size_comparison():
         print(f"✗ Test failed: {e}")
         return False
 
+
 async def test_performance_expectations():
     """Test performance expectations for different optimization modes."""
     print("\n=== Testing Performance Expectations ===")
@@ -150,26 +180,26 @@ async def test_performance_expectations():
                 "name": "Stream Copy (MP3 -> MP3)",
                 "description": "Fastest - no re-encoding, just copy audio stream",
                 "processing_time": "Minimal (seconds)",
-                "file_size": "Same as source"
+                "file_size": "Same as source",
             },
             {
                 "name": "Stream Copy (AAC -> AAC)",
                 "description": "Fastest - no re-encoding, just copy audio stream",
                 "processing_time": "Minimal (seconds)",
-                "file_size": "Same as source"
+                "file_size": "Same as source",
             },
             {
                 "name": "MP3 Encoding (AAC -> MP3)",
                 "description": "Fast encoding with 128k bitrate",
                 "processing_time": "Fast (seconds to minutes)",
-                "file_size": "Small (compressed)"
+                "file_size": "Small (compressed)",
             },
             {
                 "name": "WAV Extraction (Any -> WAV)",
                 "description": "Uncompressed audio extraction",
                 "processing_time": "Medium (minutes)",
-                "file_size": "Large (5-20x source size)"
-            }
+                "file_size": "Large (5-20x source size)",
+            },
         ]
 
         for scenario in scenarios:
@@ -184,6 +214,7 @@ async def test_performance_expectations():
     except Exception as e:
         print(f"✗ Test failed: {e}")
         return False
+
 
 async def main():
     """Run all audio extraction optimization tests."""
@@ -231,6 +262,7 @@ async def main():
     else:
         print("❌ Some tests failed. Check the output above for details.")
         return 1
+
 
 if __name__ == "__main__":
     exit_code = asyncio.run(main())

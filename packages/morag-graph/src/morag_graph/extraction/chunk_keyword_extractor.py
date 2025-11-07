@@ -2,7 +2,8 @@
 
 import hashlib
 import re
-from typing import List, Tuple, Optional, Set
+from typing import List, Optional, Set, Tuple
+
 import structlog
 
 from ..models.entity import Entity
@@ -23,16 +24,16 @@ class ChunkKeywordExtractor:
 
         # Initialize LLM agent for intelligent keyword extraction
         from morag_core.agents import AgentRegistry
-        self.agent_registry = AgentRegistry()
-        self.keyword_agent = self.agent_registry.get_agent('keyword_extraction')
 
+        self.agent_registry = AgentRegistry()
+        self.keyword_agent = self.agent_registry.get_agent("keyword_extraction")
 
     def extract_keywords_from_chunk(
         self,
         chunk_text: str,
         chunk_id: str,
         document_id: str,
-        domain: Optional[str] = None
+        domain: Optional[str] = None,
     ) -> Tuple[List[Entity], List[Relation]]:
         """Extract keywords from a document chunk and create entities/relationships.
 
@@ -88,16 +89,18 @@ class ChunkKeywordExtractor:
 
         try:
             # Use LLM agent for intelligent keyword extraction
-            result = self.keyword_agent.process({
-                'text': text,
-                'domain': domain,
-                'max_keywords': 15,
-                'language': 'auto',
-                'focus': 'domain_specific_terms'
-            })
+            result = self.keyword_agent.process(
+                {
+                    "text": text,
+                    "domain": domain,
+                    "max_keywords": 15,
+                    "language": "auto",
+                    "focus": "domain_specific_terms",
+                }
+            )
 
-            if result and 'keywords' in result:
-                return result['keywords']
+            if result and "keywords" in result:
+                return result["keywords"]
             else:
                 self.logger.warning("LLM keyword extraction failed, using fallback")
                 return self._fallback_keyword_extraction(text)
@@ -118,17 +121,29 @@ class ChunkKeywordExtractor:
         # Simple extraction: find words longer than 4 characters, capitalized words, etc.
         import re
 
-        words = re.findall(r'\b[a-zA-ZäöüÄÖÜß]{4,}\b', text)
+        words = re.findall(r"\b[a-zA-ZäöüÄÖÜß]{4,}\b", text)
 
         # Basic filtering: remove very common words and keep meaningful terms
-        basic_stop_words = {'aber', 'auch', 'dann', 'dass', 'wenn', 'wie', 'was', 'wer', 'wo'}
+        basic_stop_words = {
+            "aber",
+            "auch",
+            "dann",
+            "dass",
+            "wenn",
+            "wie",
+            "was",
+            "wer",
+            "wo",
+        }
         keywords = []
 
         for word in words:
             word_lower = word.lower()
-            if (word_lower not in basic_stop_words and
-                not word_lower.isdigit() and
-                len(word) >= 4):
+            if (
+                word_lower not in basic_stop_words
+                and not word_lower.isdigit()
+                and len(word) >= 4
+            ):
                 keywords.append(word_lower)
 
         # Remove duplicates and return top 10
@@ -148,62 +163,163 @@ class ChunkKeywordExtractor:
         # Medical substances and compounds
         medical_terms = [
             # Supplements and herbs (English and German)
-            'ginkgo biloba', 'ginkgo', 'biloba', 'chlorella', 'spirulina', 'ashwagandha',
-            'rhodiola', 'bacopa monnieri', 'bacopa', 'panax ginseng', 'ginseng',
-            'curcumin', 'turmeric', 'omega-3', 'fish oil', 'vitamin d', 'vitamin b6',
-            'vitamin b12', 'magnesium', 'zinc', 'iron', 'selenium', 'chromium',
-            'passionsblume', 'passiflora', 'kräuter', 'pflanzlich', 'extrakt',
-
+            "ginkgo biloba",
+            "ginkgo",
+            "biloba",
+            "chlorella",
+            "spirulina",
+            "ashwagandha",
+            "rhodiola",
+            "bacopa monnieri",
+            "bacopa",
+            "panax ginseng",
+            "ginseng",
+            "curcumin",
+            "turmeric",
+            "omega-3",
+            "fish oil",
+            "vitamin d",
+            "vitamin b6",
+            "vitamin b12",
+            "magnesium",
+            "zinc",
+            "iron",
+            "selenium",
+            "chromium",
+            "passionsblume",
+            "passiflora",
+            "kräuter",
+            "pflanzlich",
+            "extrakt",
             # Medical conditions (English and German)
-            'adhd', 'attention deficit', 'hyperactivity', 'autism', 'depression',
-            'anxiety', 'insomnia', 'fatigue', 'cognitive decline', 'memory loss',
-            'alzheimer', 'dementia', 'parkinson', 'multiple sclerosis',
-            'adhs', 'aufmerksamkeitsdefizit', 'hyperaktivitätsstörung', 'hyperaktivität',
-            'aufmerksamkeit', 'konzentration', 'fokus', 'unruhe', 'müdigkeit',
-
+            "adhd",
+            "attention deficit",
+            "hyperactivity",
+            "autism",
+            "depression",
+            "anxiety",
+            "insomnia",
+            "fatigue",
+            "cognitive decline",
+            "memory loss",
+            "alzheimer",
+            "dementia",
+            "parkinson",
+            "multiple sclerosis",
+            "adhs",
+            "aufmerksamkeitsdefizit",
+            "hyperaktivitätsstörung",
+            "hyperaktivität",
+            "aufmerksamkeit",
+            "konzentration",
+            "fokus",
+            "unruhe",
+            "müdigkeit",
             # Biological processes (English and German)
-            'detoxification', 'detox', 'chelation', 'bioavailability', 'absorption',
-            'metabolism', 'neurotransmitter', 'dopamine', 'serotonin', 'norepinephrine',
-            'acetylcholine', 'gaba', 'glutamate', 'inflammation', 'oxidative stress',
-            'antioxidant', 'neuroprotective', 'adaptogenic', 'nootropic',
-            'entgiftung', 'bioverfügbarkeit', 'stoffwechsel', 'durchblutung',
-            'gehirn', 'kognitiv', 'adaptogen', 'beruhigend',
-
+            "detoxification",
+            "detox",
+            "chelation",
+            "bioavailability",
+            "absorption",
+            "metabolism",
+            "neurotransmitter",
+            "dopamine",
+            "serotonin",
+            "norepinephrine",
+            "acetylcholine",
+            "gaba",
+            "glutamate",
+            "inflammation",
+            "oxidative stress",
+            "antioxidant",
+            "neuroprotective",
+            "adaptogenic",
+            "nootropic",
+            "entgiftung",
+            "bioverfügbarkeit",
+            "stoffwechsel",
+            "durchblutung",
+            "gehirn",
+            "kognitiv",
+            "adaptogen",
+            "beruhigend",
             # Heavy metals and toxins (English and German)
-            'heavy metal', 'mercury', 'aluminum', 'lead', 'cadmium', 'arsenic',
-            'toxin', 'pollutant', 'pesticide', 'herbicide',
-            'schwermetall', 'quecksilber', 'aluminium', 'blei', 'kadmium',
-
+            "heavy metal",
+            "mercury",
+            "aluminum",
+            "lead",
+            "cadmium",
+            "arsenic",
+            "toxin",
+            "pollutant",
+            "pesticide",
+            "herbicide",
+            "schwermetall",
+            "quecksilber",
+            "aluminium",
+            "blei",
+            "kadmium",
             # Body systems (English and German)
-            'thyroid', 'adrenal', 'liver', 'kidney', 'brain', 'nervous system',
-            'immune system', 'cardiovascular', 'digestive system', 'gut microbiome',
-            'schilddrüse', 'leber', 'niere', 'gehirn', 'nervensystem',
-
+            "thyroid",
+            "adrenal",
+            "liver",
+            "kidney",
+            "brain",
+            "nervous system",
+            "immune system",
+            "cardiovascular",
+            "digestive system",
+            "gut microbiome",
+            "schilddrüse",
+            "leber",
+            "niere",
+            "gehirn",
+            "nervensystem",
             # Therapeutic terms (English and German)
-            'standardized extract', 'bioactive compound', 'active ingredient',
-            'therapeutic dose', 'clinical trial', 'placebo-controlled', 'double-blind',
-            'efficacy', 'safety profile', 'contraindication', 'side effect',
-            'drug interaction', 'synergistic effect',
-            'standardisiert', 'extrakt', 'dosierung', 'wirkstoff', 'nebenwirkung',
-            'wechselwirkung', 'kontraindikation', 'sicherheit', 'qualität',
-            'flavonglykoside', 'terpenlactone', 'ginsenoside', 'rosavine', 'salidrosid'
+            "standardized extract",
+            "bioactive compound",
+            "active ingredient",
+            "therapeutic dose",
+            "clinical trial",
+            "placebo-controlled",
+            "double-blind",
+            "efficacy",
+            "safety profile",
+            "contraindication",
+            "side effect",
+            "drug interaction",
+            "synergistic effect",
+            "standardisiert",
+            "extrakt",
+            "dosierung",
+            "wirkstoff",
+            "nebenwirkung",
+            "wechselwirkung",
+            "kontraindikation",
+            "sicherheit",
+            "qualität",
+            "flavonglykoside",
+            "terpenlactone",
+            "ginsenoside",
+            "rosavine",
+            "salidrosid",
         ]
 
         for term in medical_terms:
             if term in text:
                 keywords.add(term)
                 # Also add individual words from multi-word terms
-                if ' ' in term:
+                if " " in term:
                     for word in term.split():
                         if len(word) >= 3:
                             keywords.add(word)
 
         # Extract dosage-related terms
         dosage_patterns = [
-            r'(\d+(?:\.\d+)?)\s*(?:mg|g|ml|mcg|iu|units?)',
-            r'(\d+(?:\.\d+)?)\s*(?:times?|x)\s*(?:daily|per day|weekly)',
-            r'standardized\s+extract',
-            r'(\d+)%\s*(?:extract|concentration)',
+            r"(\d+(?:\.\d+)?)\s*(?:mg|g|ml|mcg|iu|units?)",
+            r"(\d+(?:\.\d+)?)\s*(?:times?|x)\s*(?:daily|per day|weekly)",
+            r"standardized\s+extract",
+            r"(\d+)%\s*(?:extract|concentration)",
         ]
 
         for pattern in dosage_patterns:
@@ -228,10 +344,27 @@ class ChunkKeywordExtractor:
         keywords = set()
 
         technical_terms = [
-            'algorithm', 'database', 'server', 'network', 'api', 'framework',
-            'software', 'hardware', 'programming', 'code', 'system', 'application',
-            'interface', 'protocol', 'security', 'encryption', 'authentication',
-            'authorization', 'scalability', 'performance', 'optimization'
+            "algorithm",
+            "database",
+            "server",
+            "network",
+            "api",
+            "framework",
+            "software",
+            "hardware",
+            "programming",
+            "code",
+            "system",
+            "application",
+            "interface",
+            "protocol",
+            "security",
+            "encryption",
+            "authentication",
+            "authorization",
+            "scalability",
+            "performance",
+            "optimization",
         ]
 
         for term in technical_terms:
@@ -254,32 +387,133 @@ class ChunkKeywordExtractor:
         # Domain-specific terms that should always be considered keywords
         important_terms = {
             # Scientific/Medical terms
-            'toxoplasma', 'gondii', 'parasiten', 'verstandesparasiten', 'biophysik', 'biophysiker',
-            'amygdala', 'dopamin', 'neurotransmitter', 'schizophrenie', 'bewusstsein', 'gehirn',
-            'blut-hirn-schranke', 'immunsystem', 'mikroorganismen', 'parasitologie', 'infektion',
-            'beta-carboline', 'harmene', 'noharmene', 'steppenraute', 'soma', 'upanishaden',
-            'zirbeldrüse', 'ekstase', 'freude', 'emotionen', 'aggressionen', 'neokortex',
-            'reptiliengehirn', 'lymmische', 'systeme', 'metastudie', 'universitäten', 'forschung',
-            'wissenschaft', 'studien', 'ergebnisse', 'statistik', 'prozent', 'weltbevölkerung',
-            'deutschland', 'österreich', 'schweiz', 'island', 'staatspräsident', 'herausforderung',
-            'menschheit', 'gesellschaft', 'kollektiv', 'individuum', 'verhalten', 'psyche',
-            'depression', 'psychopharmaka', 'behandlung', 'therapie', 'therapeut', 'medizin',
-            'nahrung', 'fleisch', 'schinken', 'salami', 'obst', 'gemüse', 'trinkwasser',
-            'katzen', 'mäuse', 'endwirt', 'zwischenwirt', 'evolution', 'übertragung', 'infektion',
-            'schwangerschaft', 'schwangere', 'risiko', 'gefahr', 'prävention', 'schutz',
+            "toxoplasma",
+            "gondii",
+            "parasiten",
+            "verstandesparasiten",
+            "biophysik",
+            "biophysiker",
+            "amygdala",
+            "dopamin",
+            "neurotransmitter",
+            "schizophrenie",
+            "bewusstsein",
+            "gehirn",
+            "blut-hirn-schranke",
+            "immunsystem",
+            "mikroorganismen",
+            "parasitologie",
+            "infektion",
+            "beta-carboline",
+            "harmene",
+            "noharmene",
+            "steppenraute",
+            "soma",
+            "upanishaden",
+            "zirbeldrüse",
+            "ekstase",
+            "freude",
+            "emotionen",
+            "aggressionen",
+            "neokortex",
+            "reptiliengehirn",
+            "lymmische",
+            "systeme",
+            "metastudie",
+            "universitäten",
+            "forschung",
+            "wissenschaft",
+            "studien",
+            "ergebnisse",
+            "statistik",
+            "prozent",
+            "weltbevölkerung",
+            "deutschland",
+            "österreich",
+            "schweiz",
+            "island",
+            "staatspräsident",
+            "herausforderung",
+            "menschheit",
+            "gesellschaft",
+            "kollektiv",
+            "individuum",
+            "verhalten",
+            "psyche",
+            "depression",
+            "psychopharmaka",
+            "behandlung",
+            "therapie",
+            "therapeut",
+            "medizin",
+            "nahrung",
+            "fleisch",
+            "schinken",
+            "salami",
+            "obst",
+            "gemüse",
+            "trinkwasser",
+            "katzen",
+            "mäuse",
+            "endwirt",
+            "zwischenwirt",
+            "evolution",
+            "übertragung",
+            "infektion",
+            "schwangerschaft",
+            "schwangere",
+            "risiko",
+            "gefahr",
+            "prävention",
+            "schutz",
             # Names and proper nouns
-            'dieter', 'broers', 'dirk', 'schumann', 'armin', 'risi', 'pfleger', 'prag',
-            'tschechien', 'iran', 'südamerika', 'griechenland', 'ministerium', 'who',
+            "dieter",
+            "broers",
+            "dirk",
+            "schumann",
+            "armin",
+            "risi",
+            "pfleger",
+            "prag",
+            "tschechien",
+            "iran",
+            "südamerika",
+            "griechenland",
+            "ministerium",
+            "who",
             # Technical terms
-            'elektronenrastermikroskop', 'vergrößerung', 'geometrie', 'kristall', 'oszillator',
-            'schwingkreis', 'widerstand', 'kondensator', 'spule', 'halbmeiter', 'bauteile',
-            'proto-zooinen', 'lebewesen', 'milliarden', 'jahre', 'rna', 'dna', 'klassifizierung',
-            'virologie', 'viren', 'funktionsautomaten', 'intelligenz', 'schwarmbewusstsein',
-            'kommunikation', 'eigenschaften', 'verhalten', 'manipulation', 'kontrolle'
+            "elektronenrastermikroskop",
+            "vergrößerung",
+            "geometrie",
+            "kristall",
+            "oszillator",
+            "schwingkreis",
+            "widerstand",
+            "kondensator",
+            "spule",
+            "halbmeiter",
+            "bauteile",
+            "proto-zooinen",
+            "lebewesen",
+            "milliarden",
+            "jahre",
+            "rna",
+            "dna",
+            "klassifizierung",
+            "virologie",
+            "viren",
+            "funktionsautomaten",
+            "intelligenz",
+            "schwarmbewusstsein",
+            "kommunikation",
+            "eigenschaften",
+            "verhalten",
+            "manipulation",
+            "kontrolle",
         }
 
         # Extract words that appear multiple times and are significant
-        words = re.findall(r'\b[a-zA-ZäöüÄÖÜß]{3,}\b', text)  # Include German umlauts
+        words = re.findall(r"\b[a-zA-ZäöüÄÖÜß]{3,}\b", text)  # Include German umlauts
         word_freq = {}
 
         for word in words:
@@ -294,28 +528,43 @@ class ChunkKeywordExtractor:
 
         # Select words that appear at least twice or are long or are scientifically relevant
         for word, freq in word_freq.items():
-            if (freq >= 2 or len(word) >= 7 or
-                any(scientific in word for scientific in ['parasit', 'toxo', 'neuro', 'bio', 'psych', 'medizin', 'wissenschaft'])):
+            if (
+                freq >= 2
+                or len(word) >= 7
+                or any(
+                    scientific in word
+                    for scientific in [
+                        "parasit",
+                        "toxo",
+                        "neuro",
+                        "bio",
+                        "psych",
+                        "medizin",
+                        "wissenschaft",
+                    ]
+                )
+            ):
                 keywords.add(word)
 
         # Filter out remaining common words that might have slipped through
         filtered_keywords = set()
         for keyword in keywords:
             # Keep if it's a compound word, proper noun, or scientific term
-            if (len(keyword) >= 6 or
-                keyword[0].isupper() or
-                any(sci in keyword for sci in ['parasit', 'toxo', 'neuro', 'bio', 'psych', 'medizin']) or
-                keyword in important_terms):
+            if (
+                len(keyword) >= 6
+                or keyword[0].isupper()
+                or any(
+                    sci in keyword
+                    for sci in ["parasit", "toxo", "neuro", "bio", "psych", "medizin"]
+                )
+                or keyword in important_terms
+            ):
                 filtered_keywords.add(keyword)
 
         return filtered_keywords
 
     def _create_keyword_entity(
-        self,
-        keyword: str,
-        chunk_id: str,
-        document_id: str,
-        domain: str
+        self, keyword: str, chunk_id: str, document_id: str, domain: str
     ) -> Entity:
         """Create a keyword entity.
 
@@ -344,15 +593,12 @@ class ChunkKeywordExtractor:
                 "domain": domain,
                 "source_chunk_id": chunk_id,
                 "normalized_name": normalized_keyword,
-                "original_type": "KEYWORD"  # Keep original semantic type for reference
-            }
+                "original_type": "KEYWORD",  # Keep original semantic type for reference
+            },
         )
 
     def _create_keyword_chunk_relationship(
-        self,
-        keyword_entity_id: str,
-        chunk_id: str,
-        keyword: str
+        self, keyword_entity_id: str, chunk_id: str, keyword: str
     ) -> Relation:
         """Create a relationship between keyword entity and chunk.
 
@@ -376,7 +622,5 @@ class ChunkKeywordExtractor:
             type="DESCRIBES",
             description=f"Keyword '{keyword}' describes content in this chunk",
             confidence=0.8,
-            attributes={
-                "relationship_category": "keyword_chunk"
-            }
+            attributes={"relationship_category": "keyword_chunk"},
         )

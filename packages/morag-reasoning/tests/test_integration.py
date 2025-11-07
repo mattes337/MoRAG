@@ -1,14 +1,18 @@
 """Integration tests for multi-hop reasoning pipeline."""
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock
 
-from morag_reasoning import (
-    LLMClient, LLMConfig, PathSelectionAgent, ReasoningPathFinder,
-    IterativeRetriever, RetrievalContext
-)
-from morag_graph.operations import GraphPath
+import pytest
 from morag_graph.models import Entity, Relation
+from morag_graph.operations import GraphPath
+from morag_reasoning import (
+    IterativeRetriever,
+    LLMClient,
+    LLMConfig,
+    PathSelectionAgent,
+    ReasoningPathFinder,
+    RetrievalContext,
+)
 
 
 class TestMultiHopReasoningIntegration:
@@ -23,7 +27,7 @@ class TestMultiHopReasoningIntegration:
             model="gemini-1.5-flash",
             api_key="test-key",
             temperature=0.1,
-            max_tokens=1000
+            max_tokens=1000,
         )
         llm_client = LLMClient(llm_config)
 
@@ -32,11 +36,13 @@ class TestMultiHopReasoningIntegration:
             # Handle both string prompts and message lists
             if isinstance(prompt, list):
                 # For message lists, check the content of messages
-                prompt_text = " ".join(msg.get("content", "") for msg in prompt if isinstance(msg, dict))
+                prompt_text = " ".join(
+                    msg.get("content", "") for msg in prompt if isinstance(msg, dict)
+                )
             else:
                 prompt_text = str(prompt)
             if "path selection" in prompt_text.lower():
-                return '''
+                return """
                 {
                   "selected_paths": [
                     {
@@ -53,11 +59,11 @@ class TestMultiHopReasoningIntegration:
                     }
                   ]
                 }
-                '''
+                """
             elif "context analysis" in prompt_text.lower():
                 if "iteration" in prompt_text.lower():
                     # Second iteration - sufficient context
-                    return '''
+                    return """
                     {
                       "is_sufficient": true,
                       "confidence": 8.5,
@@ -65,10 +71,10 @@ class TestMultiHopReasoningIntegration:
                       "gaps": [],
                       "suggested_queries": []
                     }
-                    '''
+                    """
                 else:
                     # First iteration - insufficient context
-                    return '''
+                    return """
                     {
                       "is_sufficient": false,
                       "confidence": 6.0,
@@ -88,7 +94,7 @@ class TestMultiHopReasoningIntegration:
                       ],
                       "suggested_queries": ["What products does Apple make?", "When was Apple founded?"]
                     }
-                    '''
+                    """
             else:
                 return "Mock LLM response for integration test"
 
@@ -97,32 +103,38 @@ class TestMultiHopReasoningIntegration:
         # Create graph engine mock
         graph_engine = MagicMock()
         graph_engine.traverse = AsyncMock(return_value={"paths": sample_graph_paths})
-        graph_engine.find_bidirectional_paths = AsyncMock(return_value=sample_graph_paths[:2])
+        graph_engine.find_bidirectional_paths = AsyncMock(
+            return_value=sample_graph_paths[:2]
+        )
         graph_engine.traverse_backward = AsyncMock(return_value=sample_graph_paths[:1])
-        graph_engine.get_entity_details = AsyncMock(return_value={
-            "type": "PRODUCT",
-            "name": "iPhone",
-            "properties": {"category": "smartphone", "manufacturer": "Apple"}
-        })
+        graph_engine.get_entity_details = AsyncMock(
+            return_value={
+                "type": "PRODUCT",
+                "name": "iPhone",
+                "properties": {"category": "smartphone", "manufacturer": "Apple"},
+            }
+        )
         graph_engine.find_neighbors = AsyncMock(return_value=sample_entities[1:])
         graph_engine.find_shortest_path = AsyncMock(return_value=sample_graph_paths[0])
 
         # Create vector retriever mock
         vector_retriever = MagicMock()
-        vector_retriever.search = AsyncMock(return_value=[
-            {
-                "id": "doc_apple_products",
-                "content": "Apple Inc. develops and manufactures consumer electronics including iPhone, iPad, Mac computers, and Apple Watch.",
-                "score": 0.9,
-                "metadata": {"source": "wikipedia", "topic": "apple_products"}
-            },
-            {
-                "id": "doc_apple_founding",
-                "content": "Apple was founded in 1976 by Steve Jobs, Steve Wozniak, and Ronald Wayne in Los Altos, California.",
-                "score": 0.85,
-                "metadata": {"source": "company_history", "topic": "founding"}
-            }
-        ])
+        vector_retriever.search = AsyncMock(
+            return_value=[
+                {
+                    "id": "doc_apple_products",
+                    "content": "Apple Inc. develops and manufactures consumer electronics including iPhone, iPad, Mac computers, and Apple Watch.",
+                    "score": 0.9,
+                    "metadata": {"source": "wikipedia", "topic": "apple_products"},
+                },
+                {
+                    "id": "doc_apple_founding",
+                    "content": "Apple was founded in 1976 by Steve Jobs, Steve Wozniak, and Ronald Wayne in Los Altos, California.",
+                    "score": 0.85,
+                    "metadata": {"source": "company_history", "topic": "founding"},
+                },
+            ]
+        )
 
         # Create reasoning components
         path_selector = PathSelectionAgent(llm_client, max_paths=10)
@@ -132,7 +144,7 @@ class TestMultiHopReasoningIntegration:
             graph_engine=graph_engine,
             vector_retriever=vector_retriever,
             max_iterations=3,
-            sufficiency_threshold=0.8
+            sufficiency_threshold=0.8,
         )
 
         return {
@@ -142,7 +154,7 @@ class TestMultiHopReasoningIntegration:
             "path_selector": path_selector,
             "path_finder": path_finder,
             "iterative_retriever": iterative_retriever,
-            "sample_paths": sample_graph_paths
+            "sample_paths": sample_graph_paths,
         }
 
     @pytest.mark.asyncio
@@ -162,14 +174,14 @@ class TestMultiHopReasoningIntegration:
             start_entities=start_entities,
             target_entities=target_entities,
             strategy="bidirectional",
-            max_paths=20
+            max_paths=20,
         )
 
         # Verify path finding results
         assert len(reasoning_paths) > 0
-        assert all(hasattr(path, 'relevance_score') for path in reasoning_paths)
-        assert all(hasattr(path, 'confidence') for path in reasoning_paths)
-        assert all(hasattr(path, 'reasoning') for path in reasoning_paths)
+        assert all(hasattr(path, "relevance_score") for path in reasoning_paths)
+        assert all(hasattr(path, "confidence") for path in reasoning_paths)
+        assert all(hasattr(path, "reasoning") for path in reasoning_paths)
 
         # Verify paths are sorted by relevance
         scores = [path.relevance_score for path in reasoning_paths]
@@ -180,14 +192,21 @@ class TestMultiHopReasoningIntegration:
             paths=[path.path for path in reasoning_paths[:3]],
             entities={
                 "Apple Inc.": {"type": "ORG", "name": "Apple Inc."},
-                "Steve Jobs": {"type": "PERSON", "name": "Steve Jobs"}
+                "Steve Jobs": {"type": "PERSON", "name": "Steve Jobs"},
             },
             relations=[
-                {"subject": "Apple Inc.", "predicate": "FOUNDED_BY", "object": "Steve Jobs"}
+                {
+                    "subject": "Apple Inc.",
+                    "predicate": "FOUNDED_BY",
+                    "object": "Steve Jobs",
+                }
             ],
             documents=[
-                {"id": "initial_doc", "content": "Apple Inc. is a technology company founded by Steve Jobs."}
-            ]
+                {
+                    "id": "initial_doc",
+                    "content": "Apple Inc. is a technology company founded by Steve Jobs.",
+                }
+            ],
         )
 
         # Step 3: Refine context iteratively
@@ -197,13 +216,13 @@ class TestMultiHopReasoningIntegration:
 
         # Verify context refinement results
         assert refined_context is not None
-        assert 'final_analysis' in refined_context.metadata
-        assert 'iterations_used' in refined_context.metadata
+        assert "final_analysis" in refined_context.metadata
+        assert "iterations_used" in refined_context.metadata
 
-        final_analysis = refined_context.metadata['final_analysis']
-        assert hasattr(final_analysis, 'is_sufficient')
-        assert hasattr(final_analysis, 'confidence')
-        assert hasattr(final_analysis, 'reasoning')
+        final_analysis = refined_context.metadata["final_analysis"]
+        assert hasattr(final_analysis, "is_sufficient")
+        assert hasattr(final_analysis, "confidence")
+        assert hasattr(final_analysis, "reasoning")
 
         # Should have more entities after refinement
         assert len(refined_context.entities) >= len(initial_context.entities)
@@ -216,7 +235,9 @@ class TestMultiHopReasoningIntegration:
         assert len(refined_context.entities) >= 1
 
         # Verify document content exists (relaxed for integration test)
-        all_content = " ".join(doc.get('content', '') for doc in refined_context.documents)
+        all_content = " ".join(
+            doc.get("content", "") for doc in refined_context.documents
+        )
         assert len(all_content) > 0  # Should have some content
 
     @pytest.mark.asyncio
@@ -232,7 +253,7 @@ class TestMultiHopReasoningIntegration:
             query=query,
             start_entities=start_entities,
             strategy="forward_chaining",
-            max_paths=15
+            max_paths=15,
         )
 
         assert len(reasoning_paths) > 0
@@ -258,7 +279,7 @@ class TestMultiHopReasoningIntegration:
             start_entities=start_entities,
             target_entities=target_entities,
             strategy="backward_chaining",
-            max_paths=10
+            max_paths=10,
         )
 
         assert len(reasoning_paths) > 0
@@ -275,7 +296,7 @@ class TestMultiHopReasoningIntegration:
         # Create minimal initial context
         minimal_context = RetrievalContext(
             entities={"Apple": {"type": "ORG"}},
-            documents=[{"id": "minimal", "content": "Apple is a company."}]
+            documents=[{"id": "minimal", "content": "Apple is a company."}],
         )
 
         query = "What is Apple's business model and product strategy?"
@@ -285,8 +306,8 @@ class TestMultiHopReasoningIntegration:
         )
 
         # Should have converged to sufficient context
-        final_analysis = refined_context.metadata['final_analysis']
-        iterations_used = refined_context.metadata['iterations_used']
+        final_analysis = refined_context.metadata["final_analysis"]
+        iterations_used = refined_context.metadata["iterations_used"]
 
         # Should have used multiple iterations but not hit the max
         assert 1 <= iterations_used <= 3
@@ -297,7 +318,9 @@ class TestMultiHopReasoningIntegration:
         assert len(refined_context.documents) >= len(minimal_context.documents)
 
         # Final context should have some content (relaxed for integration test)
-        all_content = " ".join(doc.get('content', '') for doc in refined_context.documents)
+        all_content = " ".join(
+            doc.get("content", "") for doc in refined_context.documents
+        )
         assert len(all_content) > 0  # Should have some content
 
     @pytest.mark.asyncio
@@ -307,16 +330,16 @@ class TestMultiHopReasoningIntegration:
         components = integration_setup
 
         # Simulate LLM failure for path selection
-        components["llm_client"].generate = AsyncMock(side_effect=Exception("LLM API error"))
+        components["llm_client"].generate = AsyncMock(
+            side_effect=Exception("LLM API error")
+        )
 
         query = "Test query with LLM failure"
         start_entities = ["Apple Inc."]
 
         # Should still return results using fallback mechanisms
         reasoning_paths = await components["path_finder"].find_reasoning_paths(
-            query=query,
-            start_entities=start_entities,
-            strategy="forward_chaining"
+            query=query, start_entities=start_entities, strategy="forward_chaining"
         )
 
         # Fallback should provide some results
@@ -326,7 +349,7 @@ class TestMultiHopReasoningIntegration:
         # Test context refinement with LLM failure
         initial_context = RetrievalContext(
             entities={"Apple": {"type": "ORG"}},
-            documents=[{"id": "test", "content": "Test content"}]
+            documents=[{"id": "test", "content": "Test content"}],
         )
 
         refined_context = await components["iterative_retriever"].refine_context(
@@ -335,10 +358,10 @@ class TestMultiHopReasoningIntegration:
 
         # Should return context even with LLM failure
         assert refined_context is not None
-        assert 'final_analysis' in refined_context.metadata
+        assert "final_analysis" in refined_context.metadata
 
         # Fallback analysis should indicate the error
-        final_analysis = refined_context.metadata['final_analysis']
+        final_analysis = refined_context.metadata["final_analysis"]
         assert "Fallback analysis" in final_analysis.reasoning
 
     @pytest.mark.asyncio
@@ -358,7 +381,7 @@ class TestMultiHopReasoningIntegration:
             query=query,
             start_entities=start_entities,
             strategy="forward_chaining",
-            max_paths=50
+            max_paths=50,
         )
         path_finding_time = time.time() - start_time
 
@@ -368,7 +391,7 @@ class TestMultiHopReasoningIntegration:
         # Measure context refinement performance
         initial_context = RetrievalContext(
             entities={"Apple": {"type": "ORG"}},
-            documents=[{"id": "test", "content": "Test"}]
+            documents=[{"id": "test", "content": "Test"}],
         )
 
         start_time = time.time()
@@ -381,5 +404,5 @@ class TestMultiHopReasoningIntegration:
         assert refinement_time < 10.0  # 10 seconds max
 
         # Verify reasonable resource usage
-        iterations_used = refined_context.metadata.get('iterations_used', 0)
+        iterations_used = refined_context.metadata.get("iterations_used", 0)
         assert iterations_used <= 3  # Should not use excessive iterations

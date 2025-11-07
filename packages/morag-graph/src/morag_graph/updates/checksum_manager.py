@@ -24,7 +24,9 @@ class DocumentChecksumManager:
         self.graph_storage = graph_storage
         self.logger = logging.getLogger(__name__)
 
-    def calculate_document_checksum(self, content: str, metadata: Optional[dict] = None) -> str:
+    def calculate_document_checksum(
+        self, content: str, metadata: Optional[dict] = None
+    ) -> str:
         """Calculate SHA-256 checksum of document content.
 
         Args:
@@ -41,7 +43,7 @@ class DocumentChecksumManager:
             metadata_str = str(sorted(metadata.items()))
             combined_content = f"{content}{metadata_str}"
 
-        return hashlib.sha256(combined_content.encode('utf-8')).hexdigest()
+        return hashlib.sha256(combined_content.encode("utf-8")).hexdigest()
 
     async def get_stored_checksum(self, document_id: str) -> Optional[str]:
         """Get stored checksum for a document from graph database.
@@ -54,13 +56,17 @@ class DocumentChecksumManager:
         """
         try:
             # This method needs to be implemented in the storage backends
-            if hasattr(self.graph_storage, 'get_document_checksum'):
+            if hasattr(self.graph_storage, "get_document_checksum"):
                 return await self.graph_storage.get_document_checksum(document_id)
             else:
-                self.logger.warning("Storage backend does not support checksum operations")
+                self.logger.warning(
+                    "Storage backend does not support checksum operations"
+                )
                 return None
         except Exception as e:
-            self.logger.error(f"Error retrieving checksum for document {document_id}: {str(e)}")
+            self.logger.error(
+                f"Error retrieving checksum for document {document_id}: {str(e)}"
+            )
             return None
 
     async def store_document_checksum(self, document_id: str, checksum: str) -> None:
@@ -72,15 +78,21 @@ class DocumentChecksumManager:
         """
         try:
             # This method needs to be implemented in the storage backends
-            if hasattr(self.graph_storage, 'store_document_checksum'):
+            if hasattr(self.graph_storage, "store_document_checksum"):
                 await self.graph_storage.store_document_checksum(document_id, checksum)
             else:
-                self.logger.warning("Storage backend does not support checksum operations")
+                self.logger.warning(
+                    "Storage backend does not support checksum operations"
+                )
         except Exception as e:
-            self.logger.error(f"Error storing checksum for document {document_id}: {str(e)}")
+            self.logger.error(
+                f"Error storing checksum for document {document_id}: {str(e)}"
+            )
             raise
 
-    async def needs_update(self, document_id: str, content: str, metadata: Optional[dict] = None) -> bool:
+    async def needs_update(
+        self, document_id: str, content: str, metadata: Optional[dict] = None
+    ) -> bool:
         """Check if document needs to be updated based on checksum comparison.
 
         Args:
@@ -95,11 +107,15 @@ class DocumentChecksumManager:
         stored_checksum = await self.get_stored_checksum(document_id)
 
         if stored_checksum is None:
-            self.logger.info(f"Document {document_id} not found in graph, needs processing")
+            self.logger.info(
+                f"Document {document_id} not found in graph, needs processing"
+            )
             return True
 
         if current_checksum != stored_checksum:
-            self.logger.info(f"Document {document_id} checksum changed, needs reprocessing")
+            self.logger.info(
+                f"Document {document_id} checksum changed, needs reprocessing"
+            )
             return True
 
         self.logger.info(f"Document {document_id} unchanged, skipping")

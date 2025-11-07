@@ -1,14 +1,15 @@
 """Integration tests for AI error handling with real services."""
 
-import pytest
 import asyncio
-from unittest.mock import patch, AsyncMock
 import time
+from unittest.mock import AsyncMock, patch
 
-from morag_services.embedding import GeminiEmbeddingService
+import pytest
+
 # Note: AI error handlers not yet implemented - using mock for demo
 # from morag_audio.services import whisper_service
-from morag_core.exceptions import RateLimitError, ExternalServiceError
+from morag_core.exceptions import ExternalServiceError, RateLimitError
+from morag_services.embedding import GeminiEmbeddingService
 
 
 @pytest.mark.asyncio
@@ -22,9 +23,9 @@ class TestGeminiServiceResilience:
             result = await gemini_service.generate_embedding("Test text for embedding")
 
             assert result is not None
-            assert hasattr(result, 'embedding')
-            assert hasattr(result, 'token_count')
-            assert hasattr(result, 'model')
+            assert hasattr(result, "embedding")
+            assert hasattr(result, "token_count")
+            assert hasattr(result, "model")
             assert len(result.embedding) > 0
 
             # Check that health metrics were recorded
@@ -49,16 +50,16 @@ class TestGeminiServiceResilience:
             result = await gemini_service.generate_summary(test_text, max_length=50)
 
             assert result is not None
-            assert hasattr(result, 'summary')
-            assert hasattr(result, 'token_count')
-            assert hasattr(result, 'model')
+            assert hasattr(result, "summary")
+            assert hasattr(result, "token_count")
+            assert hasattr(result, "model")
             assert len(result.summary) > 0
 
         except Exception as e:
             # Verify proper error handling
             assert isinstance(e, (ExternalServiceError, RateLimitError))
 
-    @patch('morag.services.embedding.genai.Client')
+    @patch("morag.services.embedding.genai.Client")
     async def test_rate_limit_handling(self, mock_client):
         """Test rate limit error handling and retry behavior."""
         # Mock rate limit error
@@ -67,6 +68,7 @@ class TestGeminiServiceResilience:
 
         # First call fails with rate limit, second succeeds
         call_count = 0
+
         def mock_embed_content(*args, **kwargs):
             nonlocal call_count
             call_count += 1
@@ -82,7 +84,7 @@ class TestGeminiServiceResilience:
         mock_client_instance.models.embed_content = mock_embed_content
 
         # Create new service instance with mocked client
-        with patch.object(gemini_service, 'client', mock_client_instance):
+        with patch.object(gemini_service, "client", mock_client_instance):
             try:
                 result = await gemini_service.generate_embedding("Test text")
                 # Should succeed after retry
@@ -131,7 +133,7 @@ class TestWhisperServiceResilience:
             # Should be properly handled external service error
             assert isinstance(e, ExternalServiceError)
 
-    @patch('morag.services.whisper_service.WhisperModel')
+    @patch("morag.services.whisper_service.WhisperModel")
     async def test_transcription_error_handling(self, mock_whisper_model):
         """Test transcription error handling."""
         # Mock model that fails initially then succeeds
@@ -139,6 +141,7 @@ class TestWhisperServiceResilience:
         mock_whisper_model.return_value = mock_model_instance
 
         call_count = 0
+
         def mock_transcribe(*args, **kwargs):
             nonlocal call_count
             call_count += 1
@@ -164,9 +167,12 @@ class TestWhisperServiceResilience:
         mock_model_instance.transcribe = mock_transcribe
 
         # Test with mocked model
-        with patch.object(whisper_service, '_models', {"base_cpu_int8": mock_model_instance}):
+        with patch.object(
+            whisper_service, "_models", {"base_cpu_int8": mock_model_instance}
+        ):
             try:
                 from morag_audio import AudioConfig
+
                 config = AudioConfig(model_size="base")
 
                 # This should use the resilience framework
@@ -175,7 +181,7 @@ class TestWhisperServiceResilience:
                     whisper_service._transcribe_audio_internal,
                     "/fake/path.wav",
                     config,
-                    timeout=30.0
+                    timeout=30.0,
                 )
 
                 # Should succeed after retry
@@ -201,9 +207,7 @@ class TestCircuitBreakerIntegration:
         for i in range(6):  # More than failure threshold
             try:
                 await execute_with_ai_resilience(
-                    "test_service",
-                    always_failing_operation,
-                    timeout=1.0
+                    "test_service", always_failing_operation, timeout=1.0
                 )
             except Exception:
                 pass  # Expected to fail
@@ -231,9 +235,7 @@ class TestCircuitBreakerIntegration:
         for i in range(6):
             try:
                 await execute_with_ai_resilience(
-                    "recovery_test",
-                    initially_failing_operation,
-                    timeout=1.0
+                    "recovery_test", initially_failing_operation, timeout=1.0
                 )
             except Exception:
                 pass
@@ -244,9 +246,7 @@ class TestCircuitBreakerIntegration:
         # Try operation again - should succeed if circuit breaker allows it
         try:
             result = await execute_with_ai_resilience(
-                "recovery_test",
-                initially_failing_operation,
-                timeout=1.0
+                "recovery_test", initially_failing_operation, timeout=1.0
             )
             # If we get here, circuit breaker allowed the call and it succeeded
             assert result == "success"
@@ -267,9 +267,7 @@ class TestHealthMetricsIntegration:
         for i in range(5):
             try:
                 await execute_with_ai_resilience(
-                    service_name,
-                    lambda: "success",
-                    timeout=1.0
+                    service_name, lambda: "success", timeout=1.0
                 )
             except Exception:
                 pass
@@ -294,11 +292,7 @@ class TestHealthMetricsIntegration:
 
         for operation in error_operations:
             try:
-                await execute_with_ai_resilience(
-                    service_name,
-                    operation,
-                    timeout=1.0
-                )
+                await execute_with_ai_resilience(service_name, operation, timeout=1.0)
             except Exception:
                 pass  # Expected
 
@@ -324,9 +318,7 @@ class TestPerformanceImpact:
         start_time = time.time()
         for _ in range(10):
             await execute_with_ai_resilience(
-                "performance_test",
-                fast_operation,
-                timeout=1.0
+                "performance_test", fast_operation, timeout=1.0
             )
         resilience_time = time.time() - start_time
 
@@ -350,10 +342,7 @@ class TestPerformanceImpact:
         # Run concurrent operations
         tasks = [
             execute_with_ai_resilience(
-                "concurrent_test",
-                concurrent_operation,
-                i,
-                timeout=5.0
+                "concurrent_test", concurrent_operation, i, timeout=5.0
             )
             for i in range(20)
         ]

@@ -1,12 +1,15 @@
 """Tests for enhanced API endpoints."""
 
+import json
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import AsyncMock, MagicMock, patch
-import json
-
 from morag.models.enhanced_query import (
-    EnhancedQueryRequest, QueryType, ExpansionStrategy, FusionStrategy
+    EnhancedQueryRequest,
+    ExpansionStrategy,
+    FusionStrategy,
+    QueryType,
 )
 from morag.server import create_app
 
@@ -24,21 +27,21 @@ def mock_hybrid_system():
     mock = AsyncMock()
     mock.retrieve.return_value = [
         {
-            'id': 'result_1',
-            'content': 'Test content 1',
-            'score': 0.9,
-            'document_id': 'doc_1',
-            'source_type': 'vector',
-            'metadata': {'test': 'data'}
+            "id": "result_1",
+            "content": "Test content 1",
+            "score": 0.9,
+            "document_id": "doc_1",
+            "source_type": "vector",
+            "metadata": {"test": "data"},
         },
         {
-            'id': 'result_2',
-            'content': 'Test content 2',
-            'score': 0.8,
-            'document_id': 'doc_2',
-            'source_type': 'graph',
-            'metadata': {'test': 'data2'}
-        }
+            "id": "result_2",
+            "content": "Test content 2",
+            "score": 0.8,
+            "document_id": "doc_2",
+            "source_type": "graph",
+            "metadata": {"test": "data2"},
+        },
     ]
     return mock
 
@@ -54,10 +57,10 @@ def mock_graph_engine():
     mock_entity.name = "Test Entity"
     mock_entity.type = "CONCEPT"
     mock_entity.dict.return_value = {
-        'id': 'entity_1',
-        'name': 'Test Entity',
-        'type': 'CONCEPT',
-        'properties': {}
+        "id": "entity_1",
+        "name": "Test Entity",
+        "type": "CONCEPT",
+        "properties": {},
     }
 
     mock.get_entity.return_value = mock_entity
@@ -81,15 +84,17 @@ def mock_graph_engine():
 class TestEnhancedQueryEndpoints:
     """Test enhanced query endpoints."""
 
-    @patch('morag.dependencies.get_hybrid_retrieval_coordinator')
-    def test_enhanced_query_basic(self, mock_get_hybrid, test_client, mock_hybrid_system):
+    @patch("morag.dependencies.get_hybrid_retrieval_coordinator")
+    def test_enhanced_query_basic(
+        self, mock_get_hybrid, test_client, mock_hybrid_system
+    ):
         """Test basic enhanced query."""
         mock_get_hybrid.return_value = mock_hybrid_system
 
         request_data = {
             "query": "What is machine learning?",
             "query_type": "simple",
-            "max_results": 5
+            "max_results": 5,
         }
 
         response = test_client.post("/api/v2/query", json=request_data)
@@ -102,8 +107,10 @@ class TestEnhancedQueryEndpoints:
         assert data["query"] == request_data["query"]
         assert len(data["results"]) <= 5
 
-    @patch('morag.dependencies.get_hybrid_retrieval_coordinator')
-    def test_enhanced_query_with_graph_context(self, mock_get_hybrid, test_client, mock_hybrid_system):
+    @patch("morag.dependencies.get_hybrid_retrieval_coordinator")
+    def test_enhanced_query_with_graph_context(
+        self, mock_get_hybrid, test_client, mock_hybrid_system
+    ):
         """Test enhanced query with graph context."""
         mock_get_hybrid.return_value = mock_hybrid_system
 
@@ -112,7 +119,7 @@ class TestEnhancedQueryEndpoints:
             "query_type": "entity_focused",
             "expansion_strategy": "breadth_first",
             "expansion_depth": 2,
-            "include_graph_context": True
+            "include_graph_context": True,
         }
 
         response = test_client.post("/api/v2/query", json=request_data)
@@ -123,7 +130,7 @@ class TestEnhancedQueryEndpoints:
         assert "entities" in data["graph_context"]
         assert "expansion_path" in data["graph_context"]
 
-    @patch('morag.dependencies.get_graph_engine')
+    @patch("morag.dependencies.get_graph_engine")
     def test_entity_query(self, mock_get_graph, test_client, mock_graph_engine):
         """Test entity query endpoint."""
         mock_get_graph.return_value = mock_graph_engine
@@ -131,7 +138,7 @@ class TestEnhancedQueryEndpoints:
         request_data = {
             "entity_name": "machine learning",
             "include_relations": True,
-            "relation_depth": 2
+            "relation_depth": 2,
         }
 
         response = test_client.post("/api/v2/entity/query", json=request_data)
@@ -144,7 +151,7 @@ class TestEnhancedQueryEndpoints:
             assert "relations" in data
             assert "relation_count" in data
 
-    @patch('morag.dependencies.get_graph_engine')
+    @patch("morag.dependencies.get_graph_engine")
     def test_graph_traversal(self, mock_get_graph, test_client, mock_graph_engine):
         """Test graph traversal endpoint."""
         mock_get_graph.return_value = mock_graph_engine
@@ -153,7 +160,7 @@ class TestEnhancedQueryEndpoints:
             "start_entity": "entity_1",
             "end_entity": "entity_2",
             "traversal_type": "shortest_path",
-            "max_depth": 3
+            "max_depth": 3,
         }
 
         response = test_client.post("/api/v2/graph/traverse", json=request_data)
@@ -166,7 +173,7 @@ class TestEnhancedQueryEndpoints:
             assert "processing_time_ms" in data
             assert "total_paths_found" in data
 
-    @patch('morag.dependencies.get_graph_engine')
+    @patch("morag.dependencies.get_graph_engine")
     def test_graph_analytics(self, mock_get_graph, test_client, mock_graph_engine):
         """Test graph analytics endpoint."""
         mock_get_graph.return_value = mock_graph_engine
@@ -183,7 +190,7 @@ class TestEnhancedQueryEndpoints:
         """Test query validation error."""
         request_data = {
             "query": "",  # Empty query should fail validation
-            "max_results": 5
+            "max_results": 5,
         }
 
         response = test_client.post("/api/v2/query", json=request_data)
@@ -194,15 +201,14 @@ class TestEnhancedQueryEndpoints:
 class TestBackwardCompatibility:
     """Test backward compatibility with legacy API."""
 
-    @patch('morag.dependencies.get_hybrid_retrieval_coordinator')
-    def test_legacy_query_compatibility(self, mock_get_hybrid, test_client, mock_hybrid_system):
+    @patch("morag.dependencies.get_hybrid_retrieval_coordinator")
+    def test_legacy_query_compatibility(
+        self, mock_get_hybrid, test_client, mock_hybrid_system
+    ):
         """Test legacy query compatibility."""
         mock_get_hybrid.return_value = mock_hybrid_system
 
-        request_data = {
-            "query": "What is AI?",
-            "max_results": 10
-        }
+        request_data = {"query": "What is AI?", "max_results": 10}
 
         response = test_client.post("/api/v1/query", json=request_data)
         assert response.status_code == 200
@@ -255,20 +261,14 @@ class TestQueryValidation:
 
     def test_query_too_short(self, test_client):
         """Test query too short validation."""
-        request_data = {
-            "query": "AI",  # Very short query
-            "max_results": 5
-        }
+        request_data = {"query": "AI", "max_results": 5}  # Very short query
 
         response = test_client.post("/api/v2/query", json=request_data)
         assert response.status_code == 400
 
     def test_query_too_long(self, test_client):
         """Test query too long validation."""
-        request_data = {
-            "query": "A" * 1001,  # Very long query
-            "max_results": 5
-        }
+        request_data = {"query": "A" * 1001, "max_results": 5}  # Very long query
 
         response = test_client.post("/api/v2/query", json=request_data)
         assert response.status_code == 400

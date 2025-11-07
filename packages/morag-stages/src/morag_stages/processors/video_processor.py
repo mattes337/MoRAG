@@ -2,10 +2,11 @@
 
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any, Dict
+
 import structlog
 
-from .interface import StageProcessor, ProcessorResult
+from .interface import ProcessorResult, StageProcessor
 
 logger = structlog.get_logger(__name__)
 
@@ -13,6 +14,7 @@ logger = structlog.get_logger(__name__)
 try:
     from morag_core.exceptions import ProcessingError
 except ImportError:
+
     class ProcessingError(Exception):  # type: ignore
         pass
 
@@ -29,11 +31,12 @@ class VideoStageProcessor(StageProcessor):
         """Get or create video processor instance."""
         if self._video_processor is None:
             try:
-                from morag_video import VideoProcessor, VideoConfig
+                from morag_video import VideoConfig, VideoProcessor
+
                 config = VideoConfig(
                     extract_audio=True,
                     generate_thumbnails=False,
-                    extract_keyframes=False
+                    extract_keyframes=False,
                 )
                 self._video_processor = VideoProcessor(config)
             except ImportError as e:
@@ -45,6 +48,7 @@ class VideoStageProcessor(StageProcessor):
         if self._services is None:
             try:
                 from morag_services import MoRAGServices
+
                 self._services = MoRAGServices()
             except ImportError as e:
                 raise ProcessingError(f"MoRAG services not available: {e}")
@@ -55,10 +59,7 @@ class VideoStageProcessor(StageProcessor):
         return content_type.upper() == "VIDEO"
 
     async def process(
-        self,
-        input_file: Path,
-        output_file: Path,
-        config: Dict[str, Any]
+        self, input_file: Path, output_file: Path, config: Dict[str, Any]
     ) -> ProcessorResult:
         """Process video file to markdown."""
         logger.info("Processing video file", input_file=str(input_file))
@@ -71,7 +72,9 @@ class VideoStageProcessor(StageProcessor):
 
                 # Extract transcript from audio processing result
                 transcript = ""
-                if result.audio_processing_result and hasattr(result.audio_processing_result, 'transcript'):
+                if result.audio_processing_result and hasattr(
+                    result.audio_processing_result, "transcript"
+                ):
                     transcript = result.audio_processing_result.transcript
 
                 metadata = {
@@ -80,9 +83,11 @@ class VideoStageProcessor(StageProcessor):
                     "type": "video",
                     "duration": result.metadata.duration,
                     "format": result.metadata.format,
-                    "resolution": f"{result.metadata.width}x{result.metadata.height}" if result.metadata.width else None,
+                    "resolution": f"{result.metadata.width}x{result.metadata.height}"
+                    if result.metadata.width
+                    else None,
                     "fps": result.metadata.fps,
-                    "created_at": datetime.now().isoformat()
+                    "created_at": datetime.now().isoformat(),
                 }
 
                 content = f"\n# Video Analysis\n\n"
@@ -98,7 +103,7 @@ class VideoStageProcessor(StageProcessor):
                     content += f"- **FPS**: {result.metadata.fps}\n"
 
                 markdown_content = self.create_markdown_with_metadata(content, metadata)
-                output_file.write_text(markdown_content, encoding='utf-8')
+                output_file.write_text(markdown_content, encoding="utf-8")
 
                 return ProcessorResult(
                     content=content,
@@ -106,36 +111,39 @@ class VideoStageProcessor(StageProcessor):
                     metrics={
                         "duration": result.metadata.duration,
                         "transcript_length": len(transcript),
-                        "has_timestamps": config.get('include_timestamps', True)
+                        "has_timestamps": config.get("include_timestamps", True),
                     },
-                    final_output_file=output_file
+                    final_output_file=output_file,
                 )
 
             except Exception as video_error:
-                logger.warning("morag_video processor failed, trying MoRAG services", error=str(video_error))
+                logger.warning(
+                    "morag_video processor failed, trying MoRAG services",
+                    error=str(video_error),
+                )
 
                 # Fallback to MoRAG services
                 services = self._get_services()
 
                 # Prepare options for video service
                 options = {
-                    'include_timestamps': config.get('include_timestamps', True),
-                    'speaker_diarization': config.get('speaker_diarization', True),
-                    'topic_segmentation': config.get('topic_segmentation', True),
-                    'extract_thumbnails': config.get('extract_thumbnails', False)
+                    "include_timestamps": config.get("include_timestamps", True),
+                    "speaker_diarization": config.get("speaker_diarization", True),
+                    "topic_segmentation": config.get("topic_segmentation", True),
+                    "extract_thumbnails": config.get("extract_thumbnails", False),
                 }
 
                 # Use video service
                 result = await services.process_video(str(input_file), options)
 
                 metadata = {
-                    "title": result.metadata.get('title') or input_file.stem,
+                    "title": result.metadata.get("title") or input_file.stem,
                     "source": str(input_file),
                     "type": "video",
-                    "duration": result.metadata.get('duration'),
-                    "language": result.metadata.get('language'),
+                    "duration": result.metadata.get("duration"),
+                    "language": result.metadata.get("language"),
                     "created_at": datetime.now().isoformat(),
-                    **result.metadata
+                    **result.metadata,
                 }
 
                 content = f"\n# Video Analysis\n\n"
@@ -143,19 +151,21 @@ class VideoStageProcessor(StageProcessor):
                     content += f"## Transcript\n\n{result.text_content}\n\n"
 
                 markdown_content = self.create_markdown_with_metadata(content, metadata)
-                output_file.write_text(markdown_content, encoding='utf-8')
+                output_file.write_text(markdown_content, encoding="utf-8")
 
                 return ProcessorResult(
                     content=content,
                     metadata=metadata,
                     metrics={
-                        "duration": result.metadata.get('duration'),
+                        "duration": result.metadata.get("duration"),
                         "transcript_length": len(result.text_content or ""),
-                        "has_timestamps": config.get('include_timestamps', True)
+                        "has_timestamps": config.get("include_timestamps", True),
                     },
-                    final_output_file=output_file
+                    final_output_file=output_file,
                 )
 
         except Exception as e:
-            logger.error("Video processing failed", input_file=str(input_file), error=str(e))
+            logger.error(
+                "Video processing failed", input_file=str(input_file), error=str(e)
+            )
             raise ProcessingError(f"Video processing failed for {input_file}: {e}")

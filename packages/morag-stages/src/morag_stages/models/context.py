@@ -1,7 +1,8 @@
 """Stage context models."""
 
-from typing import Any, Dict, Optional, List, Union
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Union
+
 from pydantic import BaseModel, Field, field_validator
 
 from .result import StageResult
@@ -10,9 +11,11 @@ from .stage import StageType
 # Import URLPath if available
 try:
     from morag.utils.url_path import URLPath
+
     URL_PATH_AVAILABLE = True
 except ImportError:
     URL_PATH_AVAILABLE = False
+
     # Create a dummy URLPath for type hints
     class URLPath:  # type: ignore
         pass
@@ -23,34 +26,35 @@ class StageContext(BaseModel):
 
     model_config = {
         "arbitrary_types_allowed": True,
-        "json_encoders": {
-            Path: lambda v: str(v),
-            StageType: lambda v: v.value
-        }
+        "json_encoders": {Path: lambda v: str(v), StageType: lambda v: v.value},
     }
 
-    source_path: Union[Path, URLPath] = Field(description="Original source file path or URL")
+    source_path: Union[Path, URLPath] = Field(
+        description="Original source file path or URL"
+    )
     output_dir: Path = Field(description="Output directory for generated files")
-    webhook_url: Optional[str] = Field(default=None, description="Webhook URL for notifications")
-    config: Dict[str, Any] = Field(default_factory=dict, description="Stage configurations")
+    webhook_url: Optional[str] = Field(
+        default=None, description="Webhook URL for notifications"
+    )
+    config: Dict[str, Any] = Field(
+        default_factory=dict, description="Stage configurations"
+    )
 
     # Runtime state
     stage_results: Dict[StageType, StageResult] = Field(
-        default_factory=dict,
-        description="Results from completed stages"
+        default_factory=dict, description="Results from completed stages"
     )
 
     # Global settings
     resume_from_existing: bool = Field(
-        default=True,
-        description="Skip stages if output files already exist"
+        default=True, description="Skip stages if output files already exist"
     )
 
-    @field_validator('source_path', mode='before')
+    @field_validator("source_path", mode="before")
     @classmethod
     def validate_source_path(cls, v):
         """Validate source_path to accept both Path and URLPath objects."""
-        if URL_PATH_AVAILABLE and hasattr(v, 'url_str'):
+        if URL_PATH_AVAILABLE and hasattr(v, "url_str"):
             # URLPath object - return as is
             return v
         elif isinstance(v, (str, Path)):
@@ -59,22 +63,20 @@ class StageContext(BaseModel):
         else:
             # Unknown type - let Pydantic handle the error
             return v
+
     cleanup_intermediate: bool = Field(
         default=False,
-        description="Clean up intermediate files after pipeline completion"
+        description="Clean up intermediate files after pipeline completion",
     )
     max_parallel_stages: int = Field(
-        default=1,
-        description="Maximum number of stages to run in parallel"
+        default=1, description="Maximum number of stages to run in parallel"
     )
 
     # File tracking
     intermediate_files: List[Path] = Field(
         default_factory=list,
-        description="List of intermediate files created during processing"
+        description="List of intermediate files created during processing",
     )
-
-
 
     def get_stage_config(self, stage_type: StageType) -> Dict[str, Any]:
         """Get configuration for a specific stage.
@@ -148,10 +150,17 @@ class StageContext(BaseModel):
         # Get the most recent successful result
         latest_result = None
         for result in self.stage_results.values():
-            if (result.success and result.metadata.end_time is not None and
-                (latest_result is None or
-                 (latest_result.metadata.end_time is not None and
-                  result.metadata.end_time > latest_result.metadata.end_time))):
+            if (
+                result.success
+                and result.metadata.end_time is not None
+                and (
+                    latest_result is None
+                    or (
+                        latest_result.metadata.end_time is not None
+                        and result.metadata.end_time > latest_result.metadata.end_time
+                    )
+                )
+            ):
                 latest_result = result
 
         if latest_result is None:
@@ -162,7 +171,9 @@ class StageContext(BaseModel):
         else:
             return latest_result.output_files
 
-    def get_output_file_for_stage(self, stage_type: StageType, extension: str) -> Optional[Path]:
+    def get_output_file_for_stage(
+        self, stage_type: StageType, extension: str
+    ) -> Optional[Path]:
         """Get output file with specific extension from a stage.
 
         Args:

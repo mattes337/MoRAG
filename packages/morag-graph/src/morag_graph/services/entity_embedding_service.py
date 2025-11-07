@@ -2,12 +2,13 @@
 
 import asyncio
 import logging
-from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple
+
+from morag_services.embedding import GeminiEmbeddingService
 
 from ..models import Entity
 from ..storage.neo4j_storage import Neo4jStorage
-from morag_services.embedding import GeminiEmbeddingService
 
 logger = logging.getLogger(__name__)
 
@@ -16,9 +17,7 @@ class EntityEmbeddingService:
     """Service for generating and managing entity embeddings."""
 
     def __init__(
-        self,
-        neo4j_storage: Neo4jStorage,
-        embedding_service: GeminiEmbeddingService
+        self, neo4j_storage: Neo4jStorage, embedding_service: GeminiEmbeddingService
     ):
         """Initialize entity embedding service.
 
@@ -39,21 +38,21 @@ class EntityEmbeddingService:
         Returns:
             Text representation for embedding
         """
-        name = entity.get('name', '')
-        entity_type = entity.get('type', '')
+        name = entity.get("name", "")
+        entity_type = entity.get("type", "")
 
         # Create base text
         text = f"{name} ({entity_type})"
 
         # Add metadata context if available
-        metadata = entity.get('metadata', {})
+        metadata = entity.get("metadata", {})
         if isinstance(metadata, dict):
-            domain = metadata.get('domain', '')
-            if domain and domain != 'general':
+            domain = metadata.get("domain", "")
+            if domain and domain != "general":
                 text += f" in {domain} domain"
 
             # Add fact component context if derived from fact
-            fact_component = metadata.get('fact_component', '')
+            fact_component = metadata.get("fact_component", "")
             if fact_component:
                 text += f" as {fact_component}"
 
@@ -93,17 +92,19 @@ class EntityEmbeddingService:
                 entity_text, task_type="retrieval_document"
             )
 
-            self.logger.debug(f"Generated embedding for entity {entity_id}: {entity_text}")
+            self.logger.debug(
+                f"Generated embedding for entity {entity_id}: {entity_text}"
+            )
             return embedding
 
         except Exception as e:
-            self.logger.error(f"Failed to generate embedding for entity {entity_id}: {e}")
+            self.logger.error(
+                f"Failed to generate embedding for entity {entity_id}: {e}"
+            )
             return None
 
     async def store_entity_embedding(
-        self,
-        entity_id: str,
-        embedding: List[float]
+        self, entity_id: str, embedding: List[float]
     ) -> bool:
         """Store embedding for an entity in Neo4j.
 
@@ -125,7 +126,7 @@ class EntityEmbeddingService:
             """
 
             # Handle different embedding result types
-            if hasattr(embedding, 'embedding'):
+            if hasattr(embedding, "embedding"):
                 # EmbeddingResult object
                 embedding_vector = embedding.embedding
             elif isinstance(embedding, list):
@@ -135,19 +136,24 @@ class EntityEmbeddingService:
                 self.logger.error(f"Unexpected embedding type: {type(embedding)}")
                 return False
 
-            results = await self.neo4j_storage._connection_ops._execute_query(query, {
-                "entity_id": entity_id,
-                "embedding": embedding_vector,
-                "model": "text-embedding-004",
-                "dimensions": len(embedding_vector),
-                "created_at": datetime.utcnow().isoformat()
-            })
+            results = await self.neo4j_storage._connection_ops._execute_query(
+                query,
+                {
+                    "entity_id": entity_id,
+                    "embedding": embedding_vector,
+                    "model": "text-embedding-004",
+                    "dimensions": len(embedding_vector),
+                    "created_at": datetime.utcnow().isoformat(),
+                },
+            )
 
             if results:
                 self.logger.debug(f"Stored embedding for entity {entity_id}")
                 return True
             else:
-                self.logger.warning(f"Entity not found when storing embedding: {entity_id}")
+                self.logger.warning(
+                    f"Entity not found when storing embedding: {entity_id}"
+                )
                 return False
 
         except Exception as e:
@@ -169,9 +175,7 @@ class EntityEmbeddingService:
         return False
 
     async def process_entities_batch(
-        self,
-        entity_ids: List[str],
-        batch_size: int = 10
+        self, entity_ids: List[str], batch_size: int = 10
     ) -> Dict[str, bool]:
         """Process multiple entities in batches.
 
@@ -185,9 +189,11 @@ class EntityEmbeddingService:
         results = {}
 
         for i in range(0, len(entity_ids), batch_size):
-            batch = entity_ids[i:i + batch_size]
+            batch = entity_ids[i : i + batch_size]
 
-            self.logger.info(f"Processing entity batch {i//batch_size + 1}: {len(batch)} entities")
+            self.logger.info(
+                f"Processing entity batch {i//batch_size + 1}: {len(batch)} entities"
+            )
 
             # Process batch
             batch_tasks = [
@@ -200,7 +206,9 @@ class EntityEmbeddingService:
             # Store results
             for entity_id, result in zip(batch, batch_results):
                 if isinstance(result, Exception):
-                    self.logger.error(f"Exception processing entity {entity_id}: {result}")
+                    self.logger.error(
+                        f"Exception processing entity {entity_id}: {result}"
+                    )
                     results[entity_id] = False
                 else:
                     results[entity_id] = result
@@ -225,13 +233,13 @@ class EntityEmbeddingService:
         """
 
         results = await self.neo4j_storage._connection_ops._execute_query(query)
-        return [result['id'] for result in results]
+        return [result["id"] for result in results]
 
     async def search_similar_entities(
         self,
         query_embedding: List[float],
         limit: int = 10,
-        similarity_threshold: float = 0.3
+        similarity_threshold: float = 0.3,
     ) -> List[Dict[str, Any]]:
         """Search for entities similar to query embedding.
 
@@ -256,10 +264,7 @@ class EntityEmbeddingService:
             return []
 
     async def _manual_similarity_search(
-        self,
-        query_embedding: List[float],
-        limit: int,
-        similarity_threshold: float
+        self, query_embedding: List[float], limit: int, similarity_threshold: float
     ) -> List[Dict[str, Any]]:
         """Manual similarity search using Python calculations.
 
@@ -284,17 +289,19 @@ class EntityEmbeddingService:
         # Calculate similarities
         similarities = []
         for entity in results:
-            similarity = self._cosine_similarity(query_embedding, entity['embedding'])
+            similarity = self._cosine_similarity(query_embedding, entity["embedding"])
             if similarity >= similarity_threshold:
-                similarities.append({
-                    'id': entity['id'],
-                    'name': entity['name'],
-                    'type': entity['type'],
-                    'similarity': similarity
-                })
+                similarities.append(
+                    {
+                        "id": entity["id"],
+                        "name": entity["name"],
+                        "type": entity["type"],
+                        "similarity": similarity,
+                    }
+                )
 
         # Sort by similarity and limit
-        similarities.sort(key=lambda x: x['similarity'], reverse=True)
+        similarities.sort(key=lambda x: x["similarity"], reverse=True)
         return similarities[:limit]
 
     def _cosine_similarity(self, vec1: List[float], vec2: List[float]) -> float:
@@ -340,27 +347,27 @@ class EntityEmbeddingService:
         results = await self.neo4j_storage._connection_ops._execute_query(query)
 
         stats = {
-            'total_entities': 0,
-            'entities_with_embeddings': 0,
-            'entities_without_embeddings': 0,
-            'by_type': {}
+            "total_entities": 0,
+            "entities_with_embeddings": 0,
+            "entities_without_embeddings": 0,
+            "by_type": {},
         }
 
         for result in results:
-            entity_type = result['entity_type']
-            total = result['total_count']
-            with_embeddings = result['with_embeddings'] or 0
+            entity_type = result["entity_type"]
+            total = result["total_count"]
+            with_embeddings = result["with_embeddings"] or 0
             without_embeddings = total - with_embeddings
 
-            stats['total_entities'] += total
-            stats['entities_with_embeddings'] += with_embeddings
-            stats['entities_without_embeddings'] += without_embeddings
+            stats["total_entities"] += total
+            stats["entities_with_embeddings"] += with_embeddings
+            stats["entities_without_embeddings"] += without_embeddings
 
-            stats['by_type'][entity_type] = {
-                'total': total,
-                'with_embeddings': with_embeddings,
-                'without_embeddings': without_embeddings,
-                'avg_dimensions': result['avg_dimensions']
+            stats["by_type"][entity_type] = {
+                "total": total,
+                "with_embeddings": with_embeddings,
+                "without_embeddings": without_embeddings,
+                "avg_dimensions": result["avg_dimensions"],
             }
 
         return stats

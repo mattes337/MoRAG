@@ -1,16 +1,16 @@
-import pytest
 import asyncio
 import time
+
+import pytest
 from morag_services.tasks import process_document_task
-from src.morag.services.task_manager import task_manager, TaskStatus
+from src.morag.services.task_manager import TaskStatus, task_manager
+
 
 def test_task_submission():
     """Test task submission and status tracking."""
     # Submit a test task
     result = process_document_task.delay(
-        file_path="/tmp/test.pdf",
-        source_type="document",
-        metadata={"test": True}
+        file_path="/tmp/test.pdf", source_type="document", metadata={"test": True}
     )
 
     # Check task was submitted
@@ -19,23 +19,27 @@ def test_task_submission():
     # Check initial status
     task_info = task_manager.get_task_status(result.task_id)
     assert task_info.task_id == result.task_id
-    assert task_info.status in [TaskStatus.PENDING, TaskStatus.STARTED, TaskStatus.SUCCESS]
+    assert task_info.status in [
+        TaskStatus.PENDING,
+        TaskStatus.STARTED,
+        TaskStatus.SUCCESS,
+    ]
+
 
 def test_queue_stats():
     """Test queue statistics."""
     stats = task_manager.get_queue_stats()
 
-    assert 'active_tasks' in stats
-    assert 'queues' in stats
-    assert isinstance(stats['workers'], list)
+    assert "active_tasks" in stats
+    assert "queues" in stats
+    assert isinstance(stats["workers"], list)
+
 
 def test_task_progress_tracking():
     """Test task progress tracking functionality."""
     # Submit a test task
     result = process_document_task.delay(
-        file_path="/tmp/test.pdf",
-        source_type="document",
-        metadata={"test": True}
+        file_path="/tmp/test.pdf", source_type="document", metadata={"test": True}
     )
 
     # Wait a moment for task to start
@@ -49,18 +53,18 @@ def test_task_progress_tracking():
     assert task_info.progress is not None
     assert 0.0 <= task_info.progress <= 1.0
 
+
 def test_task_cancellation():
     """Test task cancellation functionality."""
     # Submit a test task
     result = process_document_task.delay(
-        file_path="/tmp/test.pdf",
-        source_type="document",
-        metadata={"test": True}
+        file_path="/tmp/test.pdf", source_type="document", metadata={"test": True}
     )
 
     # Cancel the task
     cancelled = task_manager.cancel_task(result.task_id)
     assert cancelled is True
+
 
 def test_active_tasks_listing():
     """Test listing active tasks."""

@@ -10,7 +10,7 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from morag_core.config import get_settings, validate_chunk_size, reset_settings
+from morag_core.config import get_settings, reset_settings, validate_chunk_size
 
 
 def test_default_chunk_size():
@@ -20,9 +20,15 @@ def test_default_chunk_size():
     print(f"Default chunk overlap: {settings.default_chunk_overlap}")
     print(f"Max tokens per chunk: {settings.max_tokens_per_chunk}")
 
-    assert settings.default_chunk_size == 4000, f"Expected 4000, got {settings.default_chunk_size}"
-    assert settings.default_chunk_overlap == 200, f"Expected 200, got {settings.default_chunk_overlap}"
-    assert settings.max_tokens_per_chunk == 8000, f"Expected 8000, got {settings.max_tokens_per_chunk}"
+    assert (
+        settings.default_chunk_size == 4000
+    ), f"Expected 4000, got {settings.default_chunk_size}"
+    assert (
+        settings.default_chunk_overlap == 200
+    ), f"Expected 200, got {settings.default_chunk_overlap}"
+    assert (
+        settings.max_tokens_per_chunk == 8000
+    ), f"Expected 8000, got {settings.max_tokens_per_chunk}"
 
     print("✅ Default chunk size configuration is correct")
 
@@ -55,8 +61,8 @@ def test_environment_variable_override():
     """Test that environment variables can override defaults."""
 
     # Set environment variables
-    os.environ['MORAG_DEFAULT_CHUNK_SIZE'] = '2000'
-    os.environ['MORAG_DEFAULT_CHUNK_OVERLAP'] = '100'
+    os.environ["MORAG_DEFAULT_CHUNK_SIZE"] = "2000"
+    os.environ["MORAG_DEFAULT_CHUNK_OVERLAP"] = "100"
 
     try:
         # Force reload of settings by resetting the cache
@@ -67,10 +73,17 @@ def test_environment_variable_override():
         print(f"Override chunk overlap: {settings.default_chunk_overlap}")
 
         # Check if the environment variables are being read
-        print(f"Environment MORAG_DEFAULT_CHUNK_SIZE: {os.environ.get('MORAG_DEFAULT_CHUNK_SIZE')}")
-        print(f"Environment MORAG_DEFAULT_CHUNK_OVERLAP: {os.environ.get('MORAG_DEFAULT_CHUNK_OVERLAP')}")
+        print(
+            f"Environment MORAG_DEFAULT_CHUNK_SIZE: {os.environ.get('MORAG_DEFAULT_CHUNK_SIZE')}"
+        )
+        print(
+            f"Environment MORAG_DEFAULT_CHUNK_OVERLAP: {os.environ.get('MORAG_DEFAULT_CHUNK_OVERLAP')}"
+        )
 
-        if settings.default_chunk_size == 2000 and settings.default_chunk_overlap == 100:
+        if (
+            settings.default_chunk_size == 2000
+            and settings.default_chunk_overlap == 100
+        ):
             print("✅ Environment variable override works")
         else:
             print("⚠️  Environment variable override not working as expected")
@@ -78,10 +91,10 @@ def test_environment_variable_override():
 
     finally:
         # Clean up environment variables
-        if 'MORAG_DEFAULT_CHUNK_SIZE' in os.environ:
-            del os.environ['MORAG_DEFAULT_CHUNK_SIZE']
-        if 'MORAG_DEFAULT_CHUNK_OVERLAP' in os.environ:
-            del os.environ['MORAG_DEFAULT_CHUNK_OVERLAP']
+        if "MORAG_DEFAULT_CHUNK_SIZE" in os.environ:
+            del os.environ["MORAG_DEFAULT_CHUNK_SIZE"]
+        if "MORAG_DEFAULT_CHUNK_OVERLAP" in os.environ:
+            del os.environ["MORAG_DEFAULT_CHUNK_OVERLAP"]
         # Reset settings to reload defaults
         reset_settings()
 
@@ -93,8 +106,8 @@ def test_document_converter_uses_settings():
     reset_settings()
 
     try:
-        from morag_document.converters.base import DocumentConverter
         from morag_core.interfaces.converter import ConversionOptions
+        from morag_document.converters.base import DocumentConverter
 
         # Create a test document converter
         converter = DocumentConverter()
@@ -108,7 +121,7 @@ def test_document_converter_uses_settings():
         metadata = DocumentMetadata(
             source_type=DocumentType.TEXT,
             source_name="test.txt",
-            source_path="test.txt"
+            source_path="test.txt",
         )
 
         document = Document(metadata=metadata)
@@ -117,8 +130,16 @@ def test_document_converter_uses_settings():
         # Test chunking logic (this simulates what the converter does)
         # Since ConversionOptions now has None defaults, it should use settings
         settings = get_settings()
-        chunk_size = options.chunk_size if options.chunk_size is not None else settings.default_chunk_size
-        chunk_overlap = options.chunk_overlap if options.chunk_overlap is not None else settings.default_chunk_overlap
+        chunk_size = (
+            options.chunk_size
+            if options.chunk_size is not None
+            else settings.default_chunk_size
+        )
+        chunk_overlap = (
+            options.chunk_overlap
+            if options.chunk_overlap is not None
+            else settings.default_chunk_overlap
+        )
 
         print(f"Converter would use chunk size: {chunk_size}")
         print(f"Converter would use chunk overlap: {chunk_overlap}")
@@ -159,6 +180,7 @@ def main():
     except Exception as e:
         print(f"❌ Test failed: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
 

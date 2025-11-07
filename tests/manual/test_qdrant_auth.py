@@ -4,11 +4,12 @@ Test Qdrant authentication and API key configuration.
 """
 
 import asyncio
-import sys
 import os
-import requests
-import httpx
+import sys
 from pathlib import Path
+
+import httpx
+import requests
 
 # Add the src directory to the Python path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
@@ -17,15 +18,14 @@ from morag_core.config import settings
 from qdrant_client import QdrantClient
 from qdrant_client.http.exceptions import ResponseHandlingException
 
+
 def test_requests_with_auth(url, api_key):
     """Test requests library with API key authentication."""
     print(f"Testing requests with API key authentication...")
 
-    headers = {
-        'api-key': api_key
-    }
+    headers = {"api-key": api_key}
 
-    endpoints = ['health', 'collections']
+    endpoints = ["health", "collections"]
 
     for endpoint in endpoints:
         test_url = f"{url.rstrip('/')}/{endpoint}"
@@ -34,7 +34,7 @@ def test_requests_with_auth(url, api_key):
         try:
             response = requests.get(test_url, headers=headers, timeout=10)
             print(f"    ✅ Status: {response.status_code}")
-            if response.headers.get('content-type', '').startswith('application/json'):
+            if response.headers.get("content-type", "").startswith("application/json"):
                 try:
                     json_data = response.json()
                     print(f"    📄 Response: {json_data}")
@@ -45,15 +45,14 @@ def test_requests_with_auth(url, api_key):
         except Exception as e:
             print(f"    ❌ Failed: {e}")
 
+
 async def test_httpx_with_auth(url, api_key):
     """Test httpx library with API key authentication."""
     print(f"Testing httpx with API key authentication...")
 
-    headers = {
-        'api-key': api_key
-    }
+    headers = {"api-key": api_key}
 
-    endpoints = ['health', 'collections']
+    endpoints = ["health", "collections"]
 
     async with httpx.AsyncClient(timeout=30.0) as client:
         for endpoint in endpoints:
@@ -63,7 +62,9 @@ async def test_httpx_with_auth(url, api_key):
             try:
                 response = await client.get(test_url, headers=headers)
                 print(f"    ✅ Status: {response.status_code}")
-                if response.headers.get('content-type', '').startswith('application/json'):
+                if response.headers.get("content-type", "").startswith(
+                    "application/json"
+                ):
                     try:
                         json_data = response.json()
                         print(f"    📄 Response: {json_data}")
@@ -74,6 +75,7 @@ async def test_httpx_with_auth(url, api_key):
             except Exception as e:
                 print(f"    ❌ Failed: {e}")
 
+
 def test_qdrant_client_direct(url, api_key):
     """Test QdrantClient directly with different configurations."""
     print(f"Testing QdrantClient directly...")
@@ -81,11 +83,7 @@ def test_qdrant_client_direct(url, api_key):
     # Test 1: URL-based connection
     print(f"  Test 1: URL-based connection")
     try:
-        client = QdrantClient(
-            url=url,
-            api_key=api_key,
-            timeout=30
-        )
+        client = QdrantClient(url=url, api_key=api_key, timeout=30)
         collections = client.get_collections()
         print(f"    ✅ Success! Found {len(collections.collections)} collections")
         for collection in collections.collections:
@@ -99,6 +97,7 @@ def test_qdrant_client_direct(url, api_key):
     print(f"  Test 2: Host/port connection")
     try:
         from urllib.parse import urlparse
+
         parsed = urlparse(url)
 
         client = QdrantClient(
@@ -106,7 +105,7 @@ def test_qdrant_client_direct(url, api_key):
             port=parsed.port or 443,
             https=True,
             api_key=api_key,
-            timeout=30
+            timeout=30,
         )
         collections = client.get_collections()
         print(f"    ✅ Success! Found {len(collections.collections)} collections")
@@ -119,6 +118,7 @@ def test_qdrant_client_direct(url, api_key):
 
     return False
 
+
 async def test_qdrant_client_async(url, api_key):
     """Test QdrantClient in async mode."""
     print(f"Testing QdrantClient in async mode...")
@@ -126,11 +126,7 @@ async def test_qdrant_client_async(url, api_key):
     try:
         from qdrant_client import AsyncQdrantClient
 
-        client = AsyncQdrantClient(
-            url=url,
-            api_key=api_key,
-            timeout=30
-        )
+        client = AsyncQdrantClient(url=url, api_key=api_key, timeout=30)
 
         collections = await client.get_collections()
         print(f"    ✅ Success! Found {len(collections.collections)} collections")
@@ -142,6 +138,7 @@ async def test_qdrant_client_async(url, api_key):
     except Exception as e:
         print(f"    ❌ Failed: {e}")
         return False
+
 
 async def main():
     """Main test function."""
@@ -201,6 +198,7 @@ async def main():
         print("   - Server configuration issues")
 
     return client_ok or async_ok
+
 
 if __name__ == "__main__":
     success = asyncio.run(main())

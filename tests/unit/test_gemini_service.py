@@ -1,9 +1,10 @@
 """Unit tests for Gemini service."""
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
-from morag_services.embedding import GeminiService, EmbeddingResult, SummaryResult
 from morag_core.exceptions import ExternalServiceError, RateLimitError
+from morag_services.embedding import EmbeddingResult, GeminiService, SummaryResult
 
 
 class TestGeminiService:
@@ -12,14 +13,14 @@ class TestGeminiService:
     @pytest.fixture
     def mock_settings(self):
         """Mock settings for testing."""
-        with patch('morag.services.embedding.settings') as mock:
+        with patch("morag.services.embedding.settings") as mock:
             mock.gemini_api_key = "AIzaSyTest123"
             yield mock
 
     @pytest.fixture
     def gemini_service(self, mock_settings):
         """Create GeminiService instance for testing."""
-        with patch('google.genai.Client') as mock_client_class:
+        with patch("google.genai.Client") as mock_client_class:
             mock_client = MagicMock()
             mock_client_class.return_value = mock_client
 
@@ -47,8 +48,7 @@ class TestGeminiService:
 
         # Verify the API call
         gemini_service.client.models.embed_content.assert_called_once_with(
-            model="text-embedding-004",
-            contents=text
+            model="text-embedding-004", contents=text
         )
 
     @pytest.mark.asyncio
@@ -63,7 +63,9 @@ class TestGeminiService:
     @pytest.mark.asyncio
     async def test_generate_embedding_rate_limit(self, gemini_service):
         """Test rate limit error handling."""
-        gemini_service.client.models.embed_content.side_effect = Exception("quota exceeded")
+        gemini_service.client.models.embed_content.side_effect = Exception(
+            "quota exceeded"
+        )
 
         with pytest.raises(RateLimitError):
             await gemini_service.generate_embedding("test text")
@@ -86,7 +88,9 @@ class TestGeminiService:
 
         text = "Long text that needs to be summarized for testing purposes."
 
-        result = await gemini_service.generate_summary(text, max_length=50, style="concise")
+        result = await gemini_service.generate_summary(
+            text, max_length=50, style="concise"
+        )
 
         assert isinstance(result, SummaryResult)
         assert result.summary == "This is a concise summary of the input text."
@@ -96,7 +100,9 @@ class TestGeminiService:
     @pytest.mark.asyncio
     async def test_generate_summary_rate_limit(self, gemini_service):
         """Test rate limit error in summary generation."""
-        gemini_service.client.models.generate_content.side_effect = Exception("rate limit")
+        gemini_service.client.models.generate_content.side_effect = Exception(
+            "rate limit"
+        )
 
         with pytest.raises(RateLimitError):
             await gemini_service.generate_summary("test text")
@@ -123,11 +129,11 @@ class TestGeminiService:
     async def test_generate_embeddings_batch_with_errors(self, gemini_service):
         """Test batch embedding with some errors."""
         # Mock generate_embedding to fail on second call
-        with patch.object(gemini_service, 'generate_embedding') as mock_generate:
+        with patch.object(gemini_service, "generate_embedding") as mock_generate:
             mock_generate.side_effect = [
                 EmbeddingResult(embedding=[0.1] * 768, token_count=10, model="test"),
                 Exception("API error"),
-                EmbeddingResult(embedding=[0.2] * 768, token_count=15, model="test")
+                EmbeddingResult(embedding=[0.2] * 768, token_count=15, model="test"),
             ]
 
             texts = ["Text 1", "Text 2", "Text 3"]
@@ -146,11 +152,9 @@ class TestGeminiService:
     async def test_health_check_healthy(self, gemini_service):
         """Test health check when service is healthy."""
         # Mock successful embedding generation
-        with patch.object(gemini_service, 'generate_embedding') as mock_generate:
+        with patch.object(gemini_service, "generate_embedding") as mock_generate:
             mock_generate.return_value = EmbeddingResult(
-                embedding=[0.1] * 768,
-                token_count=3,
-                model="text-embedding-004"
+                embedding=[0.1] * 768, token_count=3, model="text-embedding-004"
             )
 
             health = await gemini_service.health_check()
@@ -173,7 +177,7 @@ class TestGeminiService:
     @pytest.mark.asyncio
     async def test_health_check_api_error(self, gemini_service):
         """Test health check when API call fails."""
-        with patch.object(gemini_service, 'generate_embedding') as mock_generate:
+        with patch.object(gemini_service, "generate_embedding") as mock_generate:
             mock_generate.side_effect = Exception("API error")
 
             health = await gemini_service.health_check()
@@ -205,10 +209,10 @@ class TestGeminiService:
 
     def test_service_initialization_with_api_key(self):
         """Test service initialization with API key."""
-        with patch('morag.services.embedding.settings') as mock_settings:
+        with patch("morag.services.embedding.settings") as mock_settings:
             mock_settings.gemini_api_key = "AIzaSyTest123"
 
-            with patch('google.genai.Client') as mock_client_class:
+            with patch("google.genai.Client") as mock_client_class:
                 mock_client = MagicMock()
                 mock_client_class.return_value = mock_client
 
@@ -222,7 +226,7 @@ class TestGeminiService:
 
     def test_service_initialization_without_api_key(self):
         """Test service initialization without API key."""
-        with patch('morag.services.embedding.settings') as mock_settings:
+        with patch("morag.services.embedding.settings") as mock_settings:
             mock_settings.gemini_api_key = None
 
             service = GeminiService()
@@ -234,9 +238,7 @@ class TestGeminiService:
         """Test EmbeddingResult dataclass."""
         embedding = [0.1, 0.2, 0.3]
         result = EmbeddingResult(
-            embedding=embedding,
-            token_count=10,
-            model="test-model"
+            embedding=embedding, token_count=10, model="test-model"
         )
 
         assert result.embedding == embedding
@@ -246,11 +248,7 @@ class TestGeminiService:
     def test_summary_result_dataclass(self):
         """Test SummaryResult dataclass."""
         summary = "Test summary"
-        result = SummaryResult(
-            summary=summary,
-            token_count=5,
-            model="test-model"
-        )
+        result = SummaryResult(summary=summary, token_count=5, model="test-model")
 
         assert result.summary == summary
         assert result.token_count == 5
@@ -263,10 +261,10 @@ class TestGeminiServiceEdgeCases:
     @pytest.fixture
     def gemini_service(self):
         """Create GeminiService instance for testing."""
-        with patch('morag.services.embedding.settings') as mock_settings:
+        with patch("morag.services.embedding.settings") as mock_settings:
             mock_settings.gemini_api_key = "AIzaSyTest123"
 
-            with patch('google.genai.Client') as mock_client_class:
+            with patch("google.genai.Client") as mock_client_class:
                 mock_client = MagicMock()
                 mock_client_class.return_value = mock_client
 

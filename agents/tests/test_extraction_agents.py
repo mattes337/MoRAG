@@ -1,24 +1,32 @@
 """Tests for extraction agents."""
 
-import pytest
 import asyncio
 import os
-from unittest.mock import Mock, AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
+
+import pytest
 
 # Set up test environment
 os.environ["GEMINI_API_KEY"] = "test-key"
 
-from agents.extraction.fact_extraction import FactExtractionAgent
+from agents.base.config import AgentConfig
 from agents.extraction.entity_extraction import EntityExtractionAgent
-from agents.extraction.relation_extraction import RelationExtractionAgent
+from agents.extraction.fact_extraction import FactExtractionAgent
 from agents.extraction.keyword_extraction import KeywordExtractionAgent
 from agents.extraction.models import (
-    FactExtractionResult, ExtractedFact, ConfidenceLevel,
-    EntityExtractionResult, ExtractedEntity, EntityTypeExamples,
-    RelationExtractionResult, ExtractedRelation, RelationTypeExamples,
-    KeywordExtractionResult, ExtractedKeyword
+    ConfidenceLevel,
+    EntityExtractionResult,
+    EntityTypeExamples,
+    ExtractedEntity,
+    ExtractedFact,
+    ExtractedKeyword,
+    ExtractedRelation,
+    FactExtractionResult,
+    KeywordExtractionResult,
+    RelationExtractionResult,
+    RelationTypeExamples,
 )
-from agents.base.config import AgentConfig
+from agents.extraction.relation_extraction import RelationExtractionAgent
 
 
 class TestFactExtractionAgent:
@@ -59,7 +67,7 @@ class TestFactExtractionAgent:
         Vitamin D deficiency increases risk of respiratory infections.
         """
 
-        with patch.object(fact_agent, '_call_model') as mock_llm:
+        with patch.object(fact_agent, "_call_model") as mock_llm:
             mock_llm.return_value = """{
                 "facts": [
                     {
@@ -108,7 +116,7 @@ class TestEntityExtractionAgent:
         """Test entity extraction."""
         text = "Dr. John Smith works at Mayo Clinic in Rochester, Minnesota."
 
-        with patch.object(entity_agent, '_call_model') as mock_llm:
+        with patch.object(entity_agent, "_call_model") as mock_llm:
             mock_llm.return_value = """{
                 "entities": [
                     {
@@ -168,7 +176,7 @@ class TestRelationExtractionAgent:
                 entity_type="PERSON",
                 confidence=0.9,
                 start_offset=0,
-                end_offset=9
+                end_offset=9,
             ),
             ExtractedEntity(
                 name="Mayo Clinic",
@@ -176,11 +184,11 @@ class TestRelationExtractionAgent:
                 entity_type="ORGANIZATION",
                 confidence=0.9,
                 start_offset=19,
-                end_offset=30
-            )
+                end_offset=30,
+            ),
         ]
 
-        with patch.object(relation_agent, '_call_model') as mock_llm:
+        with patch.object(relation_agent, "_call_model") as mock_llm:
             mock_llm.return_value = """{
                 "relations": [
                     {
@@ -224,7 +232,7 @@ class TestKeywordExtractionAgent:
         Deep neural networks achieve high accuracy on computer vision tasks.
         """
 
-        with patch.object(keyword_agent, '_call_model') as mock_llm:
+        with patch.object(keyword_agent, "_call_model") as mock_llm:
             mock_llm.return_value = """{
                 "keywords": [
                     {
@@ -280,10 +288,11 @@ class TestExtractionAgentsIntegration:
         relation_agent = RelationExtractionAgent(relation_config)
 
         # Mock LLM responses
-        with patch.object(entity_agent, '_call_model') as mock_entity_llm, \
-             patch.object(fact_agent, '_call_model') as mock_fact_llm, \
-             patch.object(relation_agent, '_call_model') as mock_relation_llm:
-
+        with patch.object(entity_agent, "_call_model") as mock_entity_llm, patch.object(
+            fact_agent, "_call_model"
+        ) as mock_fact_llm, patch.object(
+            relation_agent, "_call_model"
+        ) as mock_relation_llm:
             mock_entity_llm.return_value = """{
                 "entities": [
                     {
@@ -338,7 +347,9 @@ class TestExtractionAgentsIntegration:
             assert len(fact_result.facts) == 1
 
             # Extract relations
-            relation_result = await relation_agent.extract_relations(text, entity_result.entities)
+            relation_result = await relation_agent.extract_relations(
+                text, entity_result.entities
+            )
             assert isinstance(relation_result, RelationExtractionResult)
 
             print("✅ Extraction pipeline test completed successfully")

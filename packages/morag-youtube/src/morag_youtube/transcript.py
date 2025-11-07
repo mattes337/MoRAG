@@ -2,15 +2,20 @@
 
 import asyncio
 import re
-from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 from pathlib import Path
-import structlog
+from typing import Any, Dict, List, Optional
 
-from youtube_transcript_api import YouTubeTranscriptApi
-from youtube_transcript_api.formatters import TextFormatter
-from youtube_transcript_api._errors import TranscriptsDisabled, NoTranscriptFound, VideoUnavailable, CouldNotRetrieveTranscript
+import structlog
 from morag_core.exceptions import ProcessingError
+from youtube_transcript_api import YouTubeTranscriptApi
+from youtube_transcript_api._errors import (
+    CouldNotRetrieveTranscript,
+    NoTranscriptFound,
+    TranscriptsDisabled,
+    VideoUnavailable,
+)
+from youtube_transcript_api.formatters import TextFormatter
 
 logger = structlog.get_logger(__name__)
 
@@ -18,6 +23,7 @@ logger = structlog.get_logger(__name__)
 @dataclass
 class TranscriptSegment:
     """Represents a single transcript segment with timing information."""
+
     text: str
     start: float
     duration: float
@@ -31,6 +37,7 @@ class TranscriptSegment:
 @dataclass
 class YouTubeTranscript:
     """Complete transcript data for a YouTube video."""
+
     video_id: str
     language: str
     segments: List[TranscriptSegment]
@@ -52,7 +59,9 @@ class YouTubeTranscriptService:
         """Initialize the transcript service."""
         self.text_formatter = TextFormatter()
 
-    def _get_transcript_with_headers(self, video_id: str, target_language: str) -> List[Dict[str, Any]]:
+    def _get_transcript_with_headers(
+        self, video_id: str, target_language: str
+    ) -> List[Dict[str, Any]]:
         """Get transcript using the correct API with enhanced headers.
 
         Args:
@@ -67,20 +76,22 @@ class YouTubeTranscriptService:
 
         # Create a session with realistic browser headers
         session = requests.Session()
-        session.headers.update({
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'Accept-Encoding': 'gzip, deflate, br',
-            'DNT': '1',
-            'Connection': 'keep-alive',
-            'Upgrade-Insecure-Requests': '1',
-            'Sec-Fetch-Dest': 'document',
-            'Sec-Fetch-Mode': 'navigate',
-            'Sec-Fetch-Site': 'none',
-            'Sec-Fetch-User': '?1',
-            'Cache-Control': 'max-age=0'
-        })
+        session.headers.update(
+            {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.9",
+                "Accept-Encoding": "gzip, deflate, br",
+                "DNT": "1",
+                "Connection": "keep-alive",
+                "Upgrade-Insecure-Requests": "1",
+                "Sec-Fetch-Dest": "document",
+                "Sec-Fetch-Mode": "navigate",
+                "Sec-Fetch-Site": "none",
+                "Sec-Fetch-User": "?1",
+                "Cache-Control": "max-age=0",
+            }
+        )
 
         try:
             # Use the correct new API
@@ -93,12 +104,18 @@ class YouTubeTranscriptService:
             return fetched_transcript.to_raw_data()
 
         except (TranscriptsDisabled, VideoUnavailable) as e:
-            raise ProcessingError(f"Transcript unavailable for video {video_id}: {str(e)}")
+            raise ProcessingError(
+                f"Transcript unavailable for video {video_id}: {str(e)}"
+            )
         except (NoTranscriptFound, CouldNotRetrieveTranscript) as e:
-            raise ProcessingError(f"Could not retrieve transcript for video {video_id} in language {target_language}: {str(e)}")
+            raise ProcessingError(
+                f"Could not retrieve transcript for video {video_id} in language {target_language}: {str(e)}"
+            )
         except Exception as e:
             # For other errors (like XML parsing), provide detailed info
-            raise ProcessingError(f"Failed to extract transcript for video {video_id}: {str(e)}")
+            raise ProcessingError(
+                f"Failed to extract transcript for video {video_id}: {str(e)}"
+            )
 
     def extract_video_id(self, url: str) -> str:
         """Extract video ID from YouTube URL.
@@ -114,9 +131,9 @@ class YouTubeTranscriptService:
         """
         # Common YouTube URL patterns
         patterns = [
-            r'(?:youtube\.com/watch\?v=|youtu\.be/|youtube\.com/embed/)([a-zA-Z0-9_-]{11})',
-            r'youtube\.com/v/([a-zA-Z0-9_-]{11})',
-            r'youtube\.com/watch\?.*v=([a-zA-Z0-9_-]{11})'
+            r"(?:youtube\.com/watch\?v=|youtu\.be/|youtube\.com/embed/)([a-zA-Z0-9_-]{11})",
+            r"youtube\.com/v/([a-zA-Z0-9_-]{11})",
+            r"youtube\.com/watch\?.*v=([a-zA-Z0-9_-]{11})",
         ]
 
         for pattern in patterns:
@@ -125,12 +142,14 @@ class YouTubeTranscriptService:
                 return match.group(1)
 
         # If no pattern matches, assume the URL is just the video ID
-        if re.match(r'^[a-zA-Z0-9_-]{11}$', url):
+        if re.match(r"^[a-zA-Z0-9_-]{11}$", url):
             return url
 
         raise ProcessingError(f"Could not extract video ID from URL: {url}")
 
-    async def get_available_transcripts(self, video_id: str) -> Dict[str, Dict[str, Any]]:
+    async def get_available_transcripts(
+        self, video_id: str
+    ) -> Dict[str, Dict[str, Any]]:
         """Get list of available transcripts for a video.
 
         Args:
@@ -142,37 +161,35 @@ class YouTubeTranscriptService:
         try:
             # Use the correct API
             ytt_api = YouTubeTranscriptApi()
-            transcript_list = await asyncio.to_thread(
-                ytt_api.list, video_id
-            )
+            transcript_list = await asyncio.to_thread(ytt_api.list, video_id)
 
             available = {}
 
             # Add manually created transcripts
             for transcript in transcript_list:
                 available[transcript.language_code] = {
-                    'language': transcript.language,
-                    'language_code': transcript.language_code,
-                    'is_generated': transcript.is_generated,
-                    'is_translatable': transcript.is_translatable
+                    "language": transcript.language,
+                    "language_code": transcript.language_code,
+                    "is_generated": transcript.is_generated,
+                    "is_translatable": transcript.is_translatable,
                 }
 
-            logger.info("Found available transcripts",
-                       video_id=video_id,
-                       languages=list(available.keys()))
+            logger.info(
+                "Found available transcripts",
+                video_id=video_id,
+                languages=list(available.keys()),
+            )
 
             return available
 
         except Exception as e:
-            logger.warning("Failed to get transcript list",
-                          video_id=video_id,
-                          error=str(e))
+            logger.warning(
+                "Failed to get transcript list", video_id=video_id, error=str(e)
+            )
             return {}
 
     async def extract_transcript(
-        self,
-        url: str,
-        language: Optional[str] = None
+        self, url: str, language: Optional[str] = None
     ) -> YouTubeTranscript:
         """Extract transcript from YouTube video.
 
@@ -200,66 +217,76 @@ class YouTubeTranscriptService:
                 available_transcripts, language
             )
 
-            logger.info("Extracting transcript",
-                       video_id=video_id,
-                       target_language=target_language)
+            logger.info(
+                "Extracting transcript",
+                video_id=video_id,
+                target_language=target_language,
+            )
 
-            logger.debug("Calling YouTubeTranscriptApi.get_transcript",
-                        video_id=video_id,
-                        target_language=target_language)
+            logger.debug(
+                "Calling YouTubeTranscriptApi.get_transcript",
+                video_id=video_id,
+                target_language=target_language,
+            )
 
             # Extract the transcript with enhanced headers to bypass bot detection
             transcript_data = await asyncio.to_thread(
-                self._get_transcript_with_headers,
-                video_id,
-                target_language
+                self._get_transcript_with_headers, video_id, target_language
             )
 
-            logger.debug("Raw transcript data received",
-                        video_id=video_id,
-                        data_type=type(transcript_data).__name__,
-                        data_length=len(transcript_data) if transcript_data else 0,
-                        first_few_items=transcript_data[:3] if transcript_data else None)
+            logger.debug(
+                "Raw transcript data received",
+                video_id=video_id,
+                data_type=type(transcript_data).__name__,
+                data_length=len(transcript_data) if transcript_data else 0,
+                first_few_items=transcript_data[:3] if transcript_data else None,
+            )
 
             # Convert to our format
             segments = [
                 TranscriptSegment(
-                    text=item['text'].strip(),
-                    start=item['start'],
-                    duration=item['duration']
+                    text=item["text"].strip(),
+                    start=item["start"],
+                    duration=item["duration"],
                 )
                 for item in transcript_data
-                if item['text'].strip()  # Skip empty segments
+                if item["text"].strip()  # Skip empty segments
             ]
 
             # Generate full text
-            full_text = ' '.join(segment.text for segment in segments)
+            full_text = " ".join(segment.text for segment in segments)
 
             # Check if it's auto-generated
-            is_auto_generated = available_transcripts.get(target_language, {}).get('is_generated', False)
+            is_auto_generated = available_transcripts.get(target_language, {}).get(
+                "is_generated", False
+            )
 
             transcript = YouTubeTranscript(
                 video_id=video_id,
                 language=target_language,
                 segments=segments,
                 full_text=full_text,
-                is_auto_generated=is_auto_generated
+                is_auto_generated=is_auto_generated,
             )
 
-            logger.info("Successfully extracted transcript",
-                       video_id=video_id,
-                       language=target_language,
-                       segments_count=len(segments),
-                       duration=transcript.duration,
-                       is_auto_generated=is_auto_generated)
+            logger.info(
+                "Successfully extracted transcript",
+                video_id=video_id,
+                language=target_language,
+                segments_count=len(segments),
+                duration=transcript.duration,
+                is_auto_generated=is_auto_generated,
+            )
 
             return transcript
 
         except Exception as e:
-            logger.error("Transcript extraction failed",
-                        video_id=video_id,
-                        error=str(e),
-                        error_type=type(e).__name__)
+            logger.error(
+                "Transcript extraction failed",
+                video_id=video_id,
+                error=str(e),
+                error_type=type(e).__name__,
+            )
 
             error_msg = f"Failed to extract transcript for video {video_id}: {str(e)}"
             raise ProcessingError(error_msg)
@@ -267,7 +294,7 @@ class YouTubeTranscriptService:
     async def _determine_target_language(
         self,
         available_transcripts: Dict[str, Dict[str, Any]],
-        preferred_language: Optional[str]
+        preferred_language: Optional[str],
     ) -> str:
         """Determine which language transcript to use.
 
@@ -285,21 +312,25 @@ class YouTubeTranscriptService:
         if not preferred_language:
             # Look for manually created (non-generated) transcripts first
             manual_transcripts = {
-                lang: info for lang, info in available_transcripts.items()
-                if not info.get('is_generated', True)
+                lang: info
+                for lang, info in available_transcripts.items()
+                if not info.get("is_generated", True)
             }
 
             if manual_transcripts:
                 # Use the first manual transcript (likely original language)
                 original_language = next(iter(manual_transcripts.keys()))
-                logger.info("Using original language transcript",
-                           language=original_language)
+                logger.info(
+                    "Using original language transcript", language=original_language
+                )
                 return original_language
 
             # If only auto-generated transcripts, use the first available
             original_language = next(iter(available_transcripts.keys()))
-            logger.info("Using first available auto-generated transcript",
-                       language=original_language)
+            logger.info(
+                "Using first available auto-generated transcript",
+                language=original_language,
+            )
             return original_language
 
         # If language specified, check if it's available
@@ -316,23 +347,27 @@ class YouTubeTranscriptService:
 
         for variation in language_variations:
             if variation in available_transcripts:
-                logger.info("Using language variation",
-                           requested=preferred_language,
-                           found=variation)
+                logger.info(
+                    "Using language variation",
+                    requested=preferred_language,
+                    found=variation,
+                )
                 return variation
 
         # Fallback to original language
         original_language = next(iter(available_transcripts.keys()))
-        logger.warning("Requested language not available, using original",
-                      requested=preferred_language,
-                      fallback=original_language)
+        logger.warning(
+            "Requested language not available, using original",
+            requested=preferred_language,
+            fallback=original_language,
+        )
         return original_language
 
     async def save_transcript_to_file(
         self,
         transcript: YouTubeTranscript,
         output_path: Path,
-        format_type: str = "text"
+        format_type: str = "text",
     ) -> Path:
         """Save transcript to file.
 
@@ -356,12 +391,12 @@ class YouTubeTranscriptService:
         else:
             raise ProcessingError(f"Unsupported format type: {format_type}")
 
-        with open(output_path, 'w', encoding='utf-8') as f:
+        with open(output_path, "w", encoding="utf-8") as f:
             f.write(content)
 
-        logger.info("Transcript saved to file",
-                   path=str(output_path),
-                   format=format_type)
+        logger.info(
+            "Transcript saved to file", path=str(output_path), format=format_type
+        )
 
         return output_path
 

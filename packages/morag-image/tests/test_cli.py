@@ -1,59 +1,72 @@
 """Tests for the CLI module."""
 
-import os
-import json
-import pytest
-from pathlib import Path
 import asyncio
-from unittest.mock import patch, MagicMock, mock_open
+import json
+import os
 import sys
+from pathlib import Path
+from unittest.mock import MagicMock, mock_open, patch
 
-from morag_image.cli import parse_args, process_single_image, process_directory, main
+import pytest
+from morag_image.cli import main, parse_args, process_directory, process_single_image
 from morag_image.service import ImageService
 
 # Skip tests if API key is not available
 pytestmark = pytest.mark.skipif(
-    os.environ.get("GEMINI_API_KEY") is None and os.environ.get("GOOGLE_API_KEY") is None,
-    reason="GEMINI_API_KEY environment variable not set"
+    os.environ.get("GEMINI_API_KEY") is None
+    and os.environ.get("GOOGLE_API_KEY") is None,
+    reason="GEMINI_API_KEY environment variable not set",
 )
+
 
 # Test argument parsing
 def test_parse_args():
     """Test command line argument parsing."""
     # Test with minimal arguments
-    with patch.object(sys, 'argv', ['morag_image', 'test.jpg']):
+    with patch.object(sys, "argv", ["morag_image", "test.jpg"]):
         args = parse_args()
-        assert args.input == 'test.jpg'
+        assert args.input == "test.jpg"
         assert args.output is None
         assert args.caption is False
         assert args.ocr is False
         assert args.metadata is False
-        assert args.ocr_engine == 'tesseract'
+        assert args.ocr_engine == "tesseract"
         assert args.max_dimension == 1024
         assert args.max_concurrency == 3
 
     # Test with all arguments
-    with patch.object(sys, 'argv', [
-        'morag_image', 'test.jpg',
-        '--output', 'results.json',
-        '--caption',
-        '--ocr',
-        '--metadata',
-        '--ocr-engine', 'easyocr',
-        '--api-key', 'test-key',
-        '--max-dimension', '800',
-        '--max-concurrency', '5'
-    ]):
+    with patch.object(
+        sys,
+        "argv",
+        [
+            "morag_image",
+            "test.jpg",
+            "--output",
+            "results.json",
+            "--caption",
+            "--ocr",
+            "--metadata",
+            "--ocr-engine",
+            "easyocr",
+            "--api-key",
+            "test-key",
+            "--max-dimension",
+            "800",
+            "--max-concurrency",
+            "5",
+        ],
+    ):
         args = parse_args()
-        assert args.input == 'test.jpg'
-        assert args.output == 'results.json'
+        assert args.input == "test.jpg"
+        assert args.output == "results.json"
         assert args.caption is True
         assert args.ocr is True
         assert args.metadata is True
-        assert args.ocr_engine == 'easyocr'
-        assert args.api_key == 'test-key'
+        assert args.ocr_engine == "easyocr"
+        assert args.api_key == "test-key"
         assert args.max_dimension == 800
         assert args.max_concurrency == 5
+
 
 # Test processing a single image
 @pytest.mark.asyncio
@@ -64,7 +77,7 @@ async def test_process_single_image():
     mock_service.process_image.return_value = {
         "caption": "Test caption",
         "extracted_text": "Test text",
-        "metadata": {"width": 800, "height": 600}
+        "metadata": {"width": 800, "height": 600},
     }
 
     file_path = Path("/path/to/test.jpg")
@@ -82,6 +95,7 @@ async def test_process_single_image():
     # Check service was called correctly
     mock_service.process_image.assert_called_once_with(file_path, config)
 
+
 # Test processing a directory
 @pytest.mark.asyncio
 async def test_process_directory():
@@ -90,14 +104,14 @@ async def test_process_directory():
     mock_service = MagicMock(spec=ImageService)
     mock_service.process_batch.return_value = [
         {"file_path": "/path/to/image1.jpg", "caption": "Caption 1"},
-        {"file_path": "/path/to/image2.jpg", "caption": "Caption 2"}
+        {"file_path": "/path/to/image2.jpg", "caption": "Caption 2"},
     ]
 
     dir_path = Path("/path/to/images")
     config = {"generate_caption": True}
 
     # Mock Path.glob to return image files
-    with patch.object(Path, 'glob') as mock_glob:
+    with patch.object(Path, "glob") as mock_glob:
         # Set up mock to return different files for different extensions
         def side_effect(pattern):
             if "**/*.jpg" in pattern or "**/*.JPG" in pattern:
@@ -120,6 +134,7 @@ async def test_process_directory():
     assert len(args[0]) == 2  # Two image files
     assert args[1] == config
     assert kwargs["max_concurrency"] == 3
+
 
 # Test main function with file input
 @pytest.mark.asyncio
@@ -145,18 +160,21 @@ async def test_main_with_file():
     # Mock process_single_image
     mock_result = {"file_path": "test.jpg", "caption": "Test caption"}
 
-    with patch("morag_image.cli.parse_args", return_value=mock_args), \
-         patch("morag_image.cli.Path", return_value=mock_path), \
-         patch("morag_image.cli.ImageService"), \
-         patch("morag_image.cli.process_single_image", return_value=mock_result), \
-         patch("builtins.print") as mock_print, \
-         patch("json.dumps", return_value="{\"result\": \"test\"}"):
-
+    with patch("morag_image.cli.parse_args", return_value=mock_args), patch(
+        "morag_image.cli.Path", return_value=mock_path
+    ), patch("morag_image.cli.ImageService"), patch(
+        "morag_image.cli.process_single_image", return_value=mock_result
+    ), patch(
+        "builtins.print"
+    ) as mock_print, patch(
+        "json.dumps", return_value='{"result": "test"}'
+    ):
         # Run main function
         await main()
 
     # Check output
-    mock_print.assert_called_once_with("{\"result\": \"test\"}")
+    mock_print.assert_called_once_with('{"result": "test"}')
+
 
 # Test main function with directory input and output file
 @pytest.mark.asyncio
@@ -184,7 +202,7 @@ async def test_main_with_directory_and_output():
     # Mock process_directory
     mock_results = [
         {"file_path": "images/1.jpg", "extracted_text": "Text 1"},
-        {"file_path": "images/2.jpg", "extracted_text": "Text 2"}
+        {"file_path": "images/2.jpg", "extracted_text": "Text 2"},
     ]
 
     # Create a side effect for Path constructor
@@ -195,13 +213,15 @@ async def test_main_with_directory_and_output():
             return mock_output_path
         return MagicMock(spec=Path)
 
-    with patch("morag_image.cli.parse_args", return_value=mock_args), \
-         patch("morag_image.cli.Path", side_effect=path_side_effect), \
-         patch("morag_image.cli.ImageService"), \
-         patch("morag_image.cli.process_directory", return_value=mock_results), \
-         patch("builtins.open", mock_open()) as mock_file, \
-         patch("json.dump") as mock_json_dump:
-
+    with patch("morag_image.cli.parse_args", return_value=mock_args), patch(
+        "morag_image.cli.Path", side_effect=path_side_effect
+    ), patch("morag_image.cli.ImageService"), patch(
+        "morag_image.cli.process_directory", return_value=mock_results
+    ), patch(
+        "builtins.open", mock_open()
+    ) as mock_file, patch(
+        "json.dump"
+    ) as mock_json_dump:
         # Run main function
         await main()
 

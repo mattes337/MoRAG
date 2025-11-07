@@ -1,13 +1,14 @@
 """Base classes for graph extraction."""
 
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any
 from dataclasses import dataclass
+from typing import Any, Dict, List
 
 
 @dataclass
 class Entity:
     """Represents an entity in the graph."""
+
     name: str
     type: str
     properties: Dict[str, Any]
@@ -17,6 +18,7 @@ class Entity:
 @dataclass
 class Relation:
     """Represents a relation between entities."""
+
     source: str
     target: str
     type: str
@@ -35,7 +37,9 @@ class BaseExtractor(ABC):
         """Extract entities from text."""
 
     @abstractmethod
-    async def extract_relations(self, text: str, entities: List[Entity]) -> List[Relation]:
+    async def extract_relations(
+        self, text: str, entities: List[Entity]
+    ) -> List[Relation]:
         """Extract relations from text given entities."""
 
     async def extract(self, text: str) -> Dict[str, Any]:
@@ -43,11 +47,7 @@ class BaseExtractor(ABC):
         entities = await self.extract_entities(text)
         relations = await self.extract_relations(text, entities)
 
-        return {
-            "entities": entities,
-            "relations": relations,
-            "extractor": self.name
-        }
+        return {"entities": entities, "relations": relations, "extractor": self.name}
 
 
 class DummyExtractor(BaseExtractor):
@@ -60,6 +60,8 @@ class DummyExtractor(BaseExtractor):
         """Extract dummy entities."""
         return []
 
-    async def extract_relations(self, text: str, entities: List[Entity]) -> List[Relation]:
+    async def extract_relations(
+        self, text: str, entities: List[Entity]
+    ) -> List[Relation]:
         """Extract dummy relations."""
         return []

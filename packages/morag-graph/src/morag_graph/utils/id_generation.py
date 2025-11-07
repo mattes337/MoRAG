@@ -6,19 +6,21 @@ of documents, chunks, entities, and relations.
 """
 
 import hashlib
-import uuid
 import re
-from typing import Optional, Union, List
+import uuid
 from datetime import datetime
+from typing import List, Optional, Union
 
 
 class IDValidationError(Exception):
     """Exception raised when ID validation fails."""
+
     pass
 
 
 class IDCollisionError(Exception):
     """Exception raised when ID collision is detected."""
+
     pass
 
 
@@ -44,11 +46,11 @@ class UnifiedIDGenerator:
 
         # Clean the filename to remove invalid characters for IDs
         # Replace spaces and special characters with underscores
-        clean_filename = re.sub(r'[^\w\-.]', '_', filename)
+        clean_filename = re.sub(r"[^\w\-.]", "_", filename)
         # Remove multiple consecutive underscores
-        clean_filename = re.sub(r'_+', '_', clean_filename)
+        clean_filename = re.sub(r"_+", "_", clean_filename)
         # Remove leading/trailing underscores
-        clean_filename = clean_filename.strip('_')
+        clean_filename = clean_filename.strip("_")
 
         if checksum:
             # Use checksum for deterministic ID
@@ -56,6 +58,7 @@ class UnifiedIDGenerator:
         else:
             # Use timestamp for uniqueness
             import time
+
             timestamp = str(int(time.time()))
             return f"doc_{clean_filename}_{timestamp}"
 
@@ -92,10 +95,16 @@ class UnifiedIDGenerator:
 
         # Normalize entity name for consistent ID generation
         # Convert to lowercase, replace special characters and spaces with underscores
-        clean_name = re.sub(r'[^\w\s]', '', name.lower())  # Remove special chars except word chars and spaces
-        clean_name = re.sub(r'\s+', '_', clean_name.strip())  # Replace spaces with underscores
-        clean_name = re.sub(r'_+', '_', clean_name)  # Replace multiple underscores with single
-        clean_name = clean_name.strip('_')  # Remove leading/trailing underscores
+        clean_name = re.sub(
+            r"[^\w\s]", "", name.lower()
+        )  # Remove special chars except word chars and spaces
+        clean_name = re.sub(
+            r"\s+", "_", clean_name.strip()
+        )  # Replace spaces with underscores
+        clean_name = re.sub(
+            r"_+", "_", clean_name
+        )  # Replace multiple underscores with single
+        clean_name = clean_name.strip("_")  # Remove leading/trailing underscores
 
         # If name becomes empty after cleaning, use a hash of the original name
         if not clean_name:
@@ -107,8 +116,9 @@ class UnifiedIDGenerator:
         return f"ent_{clean_name}_{name_hash}"
 
     @staticmethod
-    def generate_relation_id(source_entity_id: str, target_entity_id: str,
-                           relation_type: str) -> str:
+    def generate_relation_id(
+        source_entity_id: str, target_entity_id: str, relation_type: str
+    ) -> str:
         """Generate deterministic relation ID.
 
         Args:
@@ -121,10 +131,10 @@ class UnifiedIDGenerator:
         """
         # Convert to readable format
         # Handle both enum and string types consistently
-        if hasattr(relation_type, 'value'):
+        if hasattr(relation_type, "value"):
             clean_relation = relation_type.value.lower()
         else:
-            clean_relation = str(relation_type).lower().replace('relationtype.', '')
+            clean_relation = str(relation_type).lower().replace("relationtype.", "")
 
         # Generate a simple hash suffix for uniqueness
         entities = sorted([source_entity_id, target_entity_id])
@@ -142,16 +152,16 @@ class UnifiedIDGenerator:
         Returns:
             ID type (doc, chunk, ent, rel)
         """
-        if ':chunk:' in id_value:
-            return 'chunk'
-        elif id_value.startswith('doc_'):
-            return 'document'
-        elif id_value.startswith('ent_'):
-            return 'entity'
-        elif id_value.startswith('rel_'):
-            return 'relation'
+        if ":chunk:" in id_value:
+            return "chunk"
+        elif id_value.startswith("doc_"):
+            return "document"
+        elif id_value.startswith("ent_"):
+            return "entity"
+        elif id_value.startswith("rel_"):
+            return "relation"
         else:
-            return 'unknown'
+            return "unknown"
 
     @staticmethod
     def extract_document_id_from_chunk(chunk_id: str) -> str:
@@ -163,7 +173,7 @@ class UnifiedIDGenerator:
         Returns:
             Document ID
         """
-        return chunk_id.split(':chunk:')[0]
+        return chunk_id.split(":chunk:")[0]
 
     @staticmethod
     def extract_chunk_index_from_chunk(chunk_id: str) -> int:
@@ -175,7 +185,7 @@ class UnifiedIDGenerator:
         Returns:
             Chunk index
         """
-        return int(chunk_id.split(':chunk:')[1])
+        return int(chunk_id.split(":chunk:")[1])
 
     @staticmethod
     def extract_chunk_index_from_chunk_id(chunk_id: str) -> int:
@@ -190,10 +200,10 @@ class UnifiedIDGenerator:
         Raises:
             ValueError: If chunk ID format is invalid
         """
-        if ':chunk:' not in chunk_id:
+        if ":chunk:" not in chunk_id:
             raise ValueError(f"Invalid chunk ID format: {chunk_id}")
         try:
-            return int(chunk_id.split(':chunk:')[1])
+            return int(chunk_id.split(":chunk:")[1])
         except (IndexError, ValueError) as e:
             raise ValueError(f"Invalid chunk ID format: {chunk_id}") from e
 
@@ -204,14 +214,14 @@ class IDValidator:
     @staticmethod
     def validate_document_id(doc_id: str) -> bool:
         """Validate document ID format."""
-        if not doc_id.startswith('doc_'):
+        if not doc_id.startswith("doc_"):
             raise IDValidationError(f"Invalid document ID format: {doc_id}")
         return True
 
     @staticmethod
     def validate_chunk_id(chunk_id: str) -> bool:
         """Validate chunk ID format."""
-        parts = chunk_id.split(':chunk:')
+        parts = chunk_id.split(":chunk:")
         if len(parts) != 2:
             raise IDValidationError(f"Invalid chunk ID format: {chunk_id}")
         doc_id, chunk_idx = parts
@@ -226,14 +236,14 @@ class IDValidator:
     @staticmethod
     def validate_entity_id(entity_id: str) -> bool:
         """Validate entity ID format."""
-        if not entity_id.startswith('ent_'):
+        if not entity_id.startswith("ent_"):
             raise IDValidationError(f"Invalid entity ID format: {entity_id}")
         return True
 
     @staticmethod
     def validate_relation_id(relation_id: str) -> bool:
         """Validate relation ID format."""
-        if not (relation_id.startswith('rel_') or relation_id.startswith('test-')):
+        if not (relation_id.startswith("rel_") or relation_id.startswith("test-")):
             raise IDValidationError(f"Invalid relation ID format: {relation_id}")
         return True
 
@@ -241,16 +251,16 @@ class IDValidator:
     def is_unified_format(id_value: str) -> bool:
         """Check if ID is in unified format."""
         try:
-            if id_value.startswith('doc_'):
+            if id_value.startswith("doc_"):
                 IDValidator.validate_document_id(id_value)
                 return True
-            elif ':chunk:' in id_value:
+            elif ":chunk:" in id_value:
                 IDValidator.validate_chunk_id(id_value)
                 return True
-            elif id_value.startswith('ent_'):
+            elif id_value.startswith("ent_"):
                 IDValidator.validate_entity_id(id_value)
                 return True
-            elif id_value.startswith('rel_'):
+            elif id_value.startswith("rel_"):
                 IDValidator.validate_relation_id(id_value)
                 return True
             else:
@@ -290,7 +300,9 @@ class IDCollisionDetector:
         self.seen_ids.add(id_value)
         return False
 
-    def batch_check_collisions(self, new_ids: List[str], existing_ids: List[str]) -> None:
+    def batch_check_collisions(
+        self, new_ids: List[str], existing_ids: List[str]
+    ) -> None:
         """Check multiple IDs for collisions.
 
         Args:
@@ -309,9 +321,9 @@ class IDCollisionDetector:
     def get_collision_stats(self) -> dict:
         """Get collision statistics."""
         return {
-            'total_ids': len(self.seen_ids),
-            'collisions': self.collision_count,
-            'collision_rate': self.collision_count / max(len(self.seen_ids), 1)
+            "total_ids": len(self.seen_ids),
+            "collisions": self.collision_count,
+            "collision_rate": self.collision_count / max(len(self.seen_ids), 1),
         }
 
     def get_collision_report(self, new_ids: List[str], existing_ids: List[str]) -> dict:
@@ -328,8 +340,8 @@ class IDCollisionDetector:
         collisions = [id_val for id_val in new_ids if id_val in existing_set]
 
         return {
-            'has_collisions': len(collisions) > 0,
-            'collisions': collisions,
-            'total_new_ids': len(new_ids),
-            'total_existing_ids': len(existing_ids)
+            "has_collisions": len(collisions) > 0,
+            "collisions": collisions,
+            "total_new_ids": len(new_ids),
+            "total_existing_ids": len(existing_ids),
         }

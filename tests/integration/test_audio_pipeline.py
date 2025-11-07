@@ -1,15 +1,16 @@
 """Integration tests for audio processing pipeline."""
 
-import pytest
-import tempfile
 import asyncio
+import tempfile
 from pathlib import Path
 from unittest.mock import Mock, patch
-import numpy as np
 
-from morag_audio import AudioProcessor, AudioConfig
+import numpy as np
+import pytest
+from morag_audio import AudioConfig, AudioProcessor
 from morag_audio.services import WhisperService
 from morag_audio.tasks import process_audio_file
+
 
 class TestAudioPipeline:
     """Integration test cases for audio processing pipeline."""
@@ -21,7 +22,7 @@ class TestAudioPipeline:
             model_size="tiny",  # Use smallest model for faster tests
             device="cpu",
             compute_type="int8",
-            max_file_size=10 * 1024 * 1024  # 10MB for testing
+            max_file_size=10 * 1024 * 1024,  # 10MB for testing
         )
 
     @pytest.fixture
@@ -29,25 +30,27 @@ class TestAudioPipeline:
         """Create a proper mock WAV file."""
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
             # Write a minimal but valid WAV header
-            f.write(b'RIFF')
-            f.write((36).to_bytes(4, 'little'))  # File size - 8
-            f.write(b'WAVE')
-            f.write(b'fmt ')
-            f.write((16).to_bytes(4, 'little'))  # Format chunk size
-            f.write((1).to_bytes(2, 'little'))   # Audio format (PCM)
-            f.write((1).to_bytes(2, 'little'))   # Number of channels
-            f.write((44100).to_bytes(4, 'little'))  # Sample rate
-            f.write((88200).to_bytes(4, 'little'))  # Byte rate
-            f.write((2).to_bytes(2, 'little'))   # Block align
-            f.write((16).to_bytes(2, 'little'))  # Bits per sample
-            f.write(b'data')
-            f.write((0).to_bytes(4, 'little'))   # Data chunk size
+            f.write(b"RIFF")
+            f.write((36).to_bytes(4, "little"))  # File size - 8
+            f.write(b"WAVE")
+            f.write(b"fmt ")
+            f.write((16).to_bytes(4, "little"))  # Format chunk size
+            f.write((1).to_bytes(2, "little"))  # Audio format (PCM)
+            f.write((1).to_bytes(2, "little"))  # Number of channels
+            f.write((44100).to_bytes(4, "little"))  # Sample rate
+            f.write((88200).to_bytes(4, "little"))  # Byte rate
+            f.write((2).to_bytes(2, "little"))  # Block align
+            f.write((16).to_bytes(2, "little"))  # Bits per sample
+            f.write(b"data")
+            f.write((0).to_bytes(4, "little"))  # Data chunk size
 
             return Path(f.name)
 
     @pytest.mark.asyncio
-    @patch('morag.processors.audio.WhisperModel')
-    async def test_audio_processor_integration(self, mock_whisper_model, audio_config, mock_wav_file):
+    @patch("morag.processors.audio.WhisperModel")
+    async def test_audio_processor_integration(
+        self, mock_whisper_model, audio_config, mock_wav_file
+    ):
         """Test audio processor integration with mocked Whisper."""
         # Mock Whisper model
         mock_model = Mock()
@@ -82,15 +85,19 @@ class TestAudioPipeline:
         assert result.model_used == "tiny"
 
         # Verify Whisper was called
-        mock_whisper_model.assert_called_once_with("tiny", device="cpu", compute_type="int8")
+        mock_whisper_model.assert_called_once_with(
+            "tiny", device="cpu", compute_type="int8"
+        )
         mock_model.transcribe.assert_called_once()
 
         # Clean up
         mock_wav_file.unlink()
 
     @pytest.mark.asyncio
-    @patch('morag.services.whisper_service.WhisperModel')
-    async def test_whisper_service_integration(self, mock_whisper_model, audio_config, mock_wav_file):
+    @patch("morag.services.whisper_service.WhisperModel")
+    async def test_whisper_service_integration(
+        self, mock_whisper_model, audio_config, mock_wav_file
+    ):
         """Test Whisper service integration."""
         # Mock Whisper model
         mock_model = Mock()
@@ -139,11 +146,11 @@ class TestAudioPipeline:
         mock_wav_file.unlink()
 
     @pytest.mark.asyncio
-    @patch('morag.processors.audio.WhisperModel')
-    @patch('morag.services.chunking.chunking_service')
-    @patch('morag.services.summarization.enhanced_summarization_service')
-    @patch('morag.services.embedding.gemini_service')
-    @patch('morag.services.storage.qdrant_service')
+    @patch("morag.processors.audio.WhisperModel")
+    @patch("morag.services.chunking.chunking_service")
+    @patch("morag.services.summarization.enhanced_summarization_service")
+    @patch("morag.services.embedding.gemini_service")
+    @patch("morag.services.storage.qdrant_service")
     async def test_full_audio_task_pipeline(
         self,
         mock_qdrant,
@@ -151,7 +158,7 @@ class TestAudioPipeline:
         mock_summarization,
         mock_chunking,
         mock_whisper_model,
-        mock_wav_file
+        mock_wav_file,
     ):
         """Test full audio processing task pipeline."""
         # Mock Whisper model
@@ -176,15 +183,15 @@ class TestAudioPipeline:
 
         # Mock chunking service
         from morag_services.processing import TextChunk
+
         mock_chunks = [
             TextChunk(
-                text="This is a longer test transcription",
-                metadata={"chunk_index": 0}
+                text="This is a longer test transcription", metadata={"chunk_index": 0}
             ),
             TextChunk(
                 text="that will be chunked and processed through the full pipeline",
-                metadata={"chunk_index": 1}
-            )
+                metadata={"chunk_index": 1},
+            ),
         ]
         mock_chunking.chunk_text.return_value = mock_chunks
 
@@ -217,7 +224,7 @@ class TestAudioPipeline:
             file_path=str(mock_wav_file),
             task_id="integration_test_123",
             config={"model_size": "tiny", "device": "cpu"},
-            use_enhanced_summary=True
+            use_enhanced_summary=True,
         )
 
         # Verify final result
@@ -263,7 +270,7 @@ class TestAudioPipeline:
             compute_type="float16",
             language="es",
             chunk_duration=600,
-            quality_threshold=0.8
+            quality_threshold=0.8,
         )
         assert custom_config.model_size == "small"
         assert custom_config.device == "cuda"
@@ -273,8 +280,10 @@ class TestAudioPipeline:
         assert custom_config.quality_threshold == 0.8
 
     @pytest.mark.asyncio
-    @patch('morag.services.whisper_service.WhisperModel')
-    async def test_language_detection_integration(self, mock_whisper_model, mock_wav_file):
+    @patch("morag.services.whisper_service.WhisperModel")
+    async def test_language_detection_integration(
+        self, mock_whisper_model, mock_wav_file
+    ):
         """Test language detection integration."""
         # Mock Whisper model
         mock_model = Mock()
@@ -304,7 +313,7 @@ class TestAudioPipeline:
             language=None,  # Auto-detect
             beam_size=1,
             best_of=1,
-            temperature=0.0
+            temperature=0.0,
         )
 
         # Clean up

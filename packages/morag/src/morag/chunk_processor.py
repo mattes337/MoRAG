@@ -5,17 +5,19 @@ separate specialized components.
 """
 
 import asyncio
-from pathlib import Path
-from typing import Dict, List, Any, Optional, Tuple
-from datetime import datetime, timezone
 import uuid
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
 from morag_core.models import ProcessingResult
-from morag_services.embedding import GeminiEmbeddingService
-from morag_graph.services.fact_extraction_service import FactExtractionService
-from morag_graph.services.enhanced_fact_processing_service import EnhancedFactProcessingService
-from morag_graph.utils.id_generation import UnifiedIDGenerator
 from morag_core.utils.logging import get_logger
+from morag_graph.services.enhanced_fact_processing_service import (
+    EnhancedFactProcessingService,
+)
+from morag_graph.services.fact_extraction_service import FactExtractionService
+from morag_graph.utils.id_generation import UnifiedIDGenerator
+from morag_services.embedding import GeminiEmbeddingService
 
 from .chunkers import ContentChunkers
 from .embedding_processor import EmbeddingProcessor
@@ -49,7 +51,14 @@ class ChunkProcessor:
             logger.error("Failed to initialize chunk processor", error=str(e))
             raise
 
-    def create_chunks(self, content: str, chunk_size: int, chunk_overlap: int, content_type: str = 'document', metadata: Dict[str, Any] = None) -> List[str]:
+    def create_chunks(
+        self,
+        content: str,
+        chunk_size: int,
+        chunk_overlap: int,
+        content_type: str = "document",
+        metadata: Dict[str, Any] = None,
+    ) -> List[str]:
         """Create chunks from content based on content type and metadata."""
         if metadata is None:
             metadata = {}
@@ -58,68 +67,101 @@ class ChunkProcessor:
         chunk_type = self._determine_chunk_type(content_type, metadata)
 
         try:
-            if chunk_type == 'topic':
-                return self.chunkers.create_topic_based_chunks(content, chunk_size, chunk_overlap, metadata)
-            elif chunk_type == 'timestamp':
-                return self.chunkers.create_timestamp_chunks(content, chunk_size, chunk_overlap)
-            elif chunk_type == 'image_section':
-                return self.chunkers.create_image_section_chunks(content, chunk_size, chunk_overlap)
-            elif chunk_type == 'web_article':
-                return self.chunkers.create_web_article_chunks(content, chunk_size, chunk_overlap)
-            elif chunk_type == 'text_semantic':
-                return self.chunkers.create_text_semantic_chunks(content, chunk_size, chunk_overlap)
-            elif chunk_type == 'code_structural':
-                return self.chunkers.create_code_structural_chunks(content, chunk_size, chunk_overlap)
-            elif chunk_type == 'archive':
-                return self.chunkers.create_archive_file_chunks(content, chunk_size, chunk_overlap)
-            elif chunk_type == 'document':
-                return self.chunkers.create_document_chunks(content, chunk_size, chunk_overlap)
+            if chunk_type == "topic":
+                return self.chunkers.create_topic_based_chunks(
+                    content, chunk_size, chunk_overlap, metadata
+                )
+            elif chunk_type == "timestamp":
+                return self.chunkers.create_timestamp_chunks(
+                    content, chunk_size, chunk_overlap
+                )
+            elif chunk_type == "image_section":
+                return self.chunkers.create_image_section_chunks(
+                    content, chunk_size, chunk_overlap
+                )
+            elif chunk_type == "web_article":
+                return self.chunkers.create_web_article_chunks(
+                    content, chunk_size, chunk_overlap
+                )
+            elif chunk_type == "text_semantic":
+                return self.chunkers.create_text_semantic_chunks(
+                    content, chunk_size, chunk_overlap
+                )
+            elif chunk_type == "code_structural":
+                return self.chunkers.create_code_structural_chunks(
+                    content, chunk_size, chunk_overlap
+                )
+            elif chunk_type == "archive":
+                return self.chunkers.create_archive_file_chunks(
+                    content, chunk_size, chunk_overlap
+                )
+            elif chunk_type == "document":
+                return self.chunkers.create_document_chunks(
+                    content, chunk_size, chunk_overlap
+                )
             else:
                 # Default to character-based chunking
-                return self.chunkers.create_character_chunks(content, chunk_size, chunk_overlap)
+                return self.chunkers.create_character_chunks(
+                    content, chunk_size, chunk_overlap
+                )
 
         except Exception as e:
-            logger.error("Chunking failed, falling back to character chunking",
-                        chunk_type=chunk_type, error=str(e))
-            return self.chunkers.create_character_chunks(content, chunk_size, chunk_overlap)
+            logger.error(
+                "Chunking failed, falling back to character chunking",
+                chunk_type=chunk_type,
+                error=str(e),
+            )
+            return self.chunkers.create_character_chunks(
+                content, chunk_size, chunk_overlap
+            )
 
     def _determine_chunk_type(self, content_type: str, metadata: Dict[str, Any]) -> str:
         """Determine the best chunking strategy based on content type and metadata."""
         # Audio/video content with topics
-        if content_type in ['audio', 'video']:
-            if metadata.get('topics'):
-                return 'topic'
+        if content_type in ["audio", "video"]:
+            if metadata.get("topics"):
+                return "topic"
             else:
-                return 'timestamp'
+                return "timestamp"
 
         # Image content
-        if content_type == 'image':
-            return 'image_section'
+        if content_type == "image":
+            return "image_section"
 
         # Web content
-        if content_type == 'web' or metadata.get('source_type') == 'web':
-            return 'web_article'
+        if content_type == "web" or metadata.get("source_type") == "web":
+            return "web_article"
 
         # Code content
-        if content_type == 'code' or metadata.get('file_extension') in ['.py', '.js', '.java', '.cpp', '.c']:
-            return 'code_structural'
+        if content_type == "code" or metadata.get("file_extension") in [
+            ".py",
+            ".js",
+            ".java",
+            ".cpp",
+            ".c",
+        ]:
+            return "code_structural"
 
         # Archive content
-        if content_type == 'archive' or metadata.get('file_extension') in ['.zip', '.tar', '.gz']:
-            return 'archive'
+        if content_type == "archive" or metadata.get("file_extension") in [
+            ".zip",
+            ".tar",
+            ".gz",
+        ]:
+            return "archive"
 
         # Document content (PDF, Word, etc.)
-        if content_type in ['document', 'pdf', 'docx', 'doc']:
-            return 'document'
+        if content_type in ["document", "pdf", "docx", "doc"]:
+            return "document"
 
         # Default to semantic text chunking
-        return 'text_semantic'
+        return "text_semantic"
 
     async def generate_embeddings_and_metadata(
         self,
         chunks: List[str],
-        content_type: str = 'document',
-        base_metadata: Dict[str, Any] = None
+        content_type: str = "document",
+        base_metadata: Dict[str, Any] = None,
     ) -> Tuple[List[str], List[List[float]], List[Dict[str, Any]]]:
         """Generate embeddings and metadata for chunks."""
         return await self.embedding_processor.generate_embeddings_and_metadata(
@@ -128,7 +170,9 @@ class ChunkProcessor:
 
     async def _generate_document_summary(self, content: str, content_type: str) -> str:
         """Generate a summary of the document content."""
-        return await self.embedding_processor._generate_document_summary(content, content_type)
+        return await self.embedding_processor._generate_document_summary(
+            content, content_type
+        )
 
     def create_ingest_result(
         self,
@@ -138,18 +182,28 @@ class ChunkProcessor:
         embeddings: List[List[float]],
         chunk_metadata_list: List[Dict[str, Any]],
         summary: str,
-        content_type: str = 'document',
-        base_metadata: Dict[str, Any] = None
+        content_type: str = "document",
+        base_metadata: Dict[str, Any] = None,
     ) -> Dict[str, Any]:
         """Create comprehensive ingest result."""
         return self.result_processor.create_ingest_result(
-            source_path, content, chunks, embeddings, chunk_metadata_list,
-            summary, content_type, base_metadata
+            source_path,
+            content,
+            chunks,
+            embeddings,
+            chunk_metadata_list,
+            summary,
+            content_type,
+            base_metadata,
         )
 
-    def write_ingest_result_file(self, source_path: str, ingest_result: Dict[str, Any]) -> str:
+    def write_ingest_result_file(
+        self, source_path: str, ingest_result: Dict[str, Any]
+    ) -> str:
         """Write ingest result to JSON file."""
-        return self.result_processor.write_ingest_result_file(source_path, ingest_result)
+        return self.result_processor.write_ingest_result_file(
+            source_path, ingest_result
+        )
 
     def create_ingest_data(
         self,
@@ -158,15 +212,21 @@ class ChunkProcessor:
         embeddings: List[List[float]],
         chunk_metadata_list: List[Dict[str, Any]],
         document_id: str = None,
-        collection_name: str = None
+        collection_name: str = None,
     ) -> Dict[str, Any]:
         """Create ingest data for database storage."""
         return self.result_processor.create_ingest_data(
-            source_path, chunks, embeddings, chunk_metadata_list,
-            document_id, collection_name
+            source_path,
+            chunks,
+            embeddings,
+            chunk_metadata_list,
+            document_id,
+            collection_name,
         )
 
-    def write_ingest_data_file(self, source_path: str, ingest_data: Dict[str, Any]) -> str:
+    def write_ingest_data_file(
+        self, source_path: str, ingest_data: Dict[str, Any]
+    ) -> str:
         """Write ingest data to JSON file."""
         return self.result_processor.write_ingest_data_file(source_path, ingest_data)
 

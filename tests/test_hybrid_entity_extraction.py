@@ -1,20 +1,25 @@
 """Tests for hybrid entity extraction with pattern matching."""
 
-import pytest
 import asyncio
-import sys
 import os
+import sys
 from typing import List
 
+import pytest
+
 # Add the packages directory to the Python path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'packages', 'morag-core', 'src'))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'packages', 'morag-graph', 'src'))
+sys.path.insert(
+    0, os.path.join(os.path.dirname(__file__), "..", "packages", "morag-core", "src")
+)
+sys.path.insert(
+    0, os.path.join(os.path.dirname(__file__), "..", "packages", "morag-graph", "src")
+)
 
 from morag_graph.extraction import (
-    EntityPatternMatcher,
     EntityPattern,
+    EntityPatternMatcher,
+    HybridEntityExtractor,
     PatternType,
-    HybridEntityExtractor
 )
 from morag_graph.models import Entity
 
@@ -29,7 +34,14 @@ class TestEntityPatternMatcher:
 
         # Check that we have patterns for different entity types
         pattern_types = set(pattern.entity_type for pattern in matcher.patterns)
-        expected_types = {"TECHNOLOGY", "ORGANIZATION", "LOCATION", "DATE", "MONEY", "PRODUCT"}
+        expected_types = {
+            "TECHNOLOGY",
+            "ORGANIZATION",
+            "LOCATION",
+            "DATE",
+            "MONEY",
+            "PRODUCT",
+        }
         assert expected_types.issubset(pattern_types)
 
     def test_add_custom_pattern(self):
@@ -42,7 +54,7 @@ class TestEntityPatternMatcher:
             entity_type="CUSTOM",
             pattern_type=PatternType.REGEX,
             confidence=0.9,
-            description="Custom test pattern"
+            description="Custom test pattern",
         )
 
         matcher.add_pattern(custom_pattern)
@@ -102,7 +114,9 @@ class TestEntityPatternMatcher:
     def test_money_pattern_extraction(self):
         """Test extraction of money entities."""
         matcher = EntityPatternMatcher()
-        text = "The project costs $1,500.00 and the company is worth 2.5 billion dollars."
+        text = (
+            "The project costs $1,500.00 and the company is worth 2.5 billion dollars."
+        )
 
         entities = matcher.extract_entities(text, min_confidence=0.9)
 
@@ -123,13 +137,13 @@ class TestEntityPatternMatcher:
             pattern=r"\bPython\b",
             entity_type="TECHNOLOGY",
             pattern_type=PatternType.REGEX,
-            confidence=0.9
+            confidence=0.9,
         )
         pattern2 = EntityPattern(
             pattern=r"\bPython programming\b",
             entity_type="TECHNOLOGY",
             pattern_type=PatternType.REGEX,
-            confidence=0.8
+            confidence=0.8,
         )
 
         matcher.add_pattern(pattern1)
@@ -201,7 +215,7 @@ class TestHybridEntityExtractor:
                 name="Python",
                 type="TECHNOLOGY",
                 confidence=0.8,
-                attributes={"source": "ai"}
+                attributes={"source": "ai"},
             )
         ]
 
@@ -210,13 +224,15 @@ class TestHybridEntityExtractor:
                 name="Python",
                 type="TECHNOLOGY",
                 confidence=0.9,
-                attributes={"source": "pattern"}
+                attributes={"source": "pattern"},
             )
         ]
 
         results = [
             ExtractionResult(entities=ai_entities, method="ai", confidence_boost=0.0),
-            ExtractionResult(entities=pattern_entities, method="pattern", confidence_boost=0.1)
+            ExtractionResult(
+                entities=pattern_entities, method="pattern", confidence_boost=0.1
+            ),
         ]
 
         merged = extractor._merge_extraction_results(results)
@@ -233,9 +249,7 @@ class TestHybridEntityExtractor:
     def test_extraction_stats(self):
         """Test getting extraction statistics."""
         extractor = HybridEntityExtractor(
-            min_confidence=0.7,
-            chunk_size=5000,
-            pattern_confidence_boost=0.15
+            min_confidence=0.7, chunk_size=5000, pattern_confidence_boost=0.15
         )
 
         stats = extractor.get_extraction_stats()
@@ -260,7 +274,7 @@ class TestPatternTypes:
             entity_type="PERSON",
             pattern_type=PatternType.REGEX,
             confidence=0.8,
-            description="Person names"
+            description="Person names",
         )
         matcher.add_pattern(pattern)
 
@@ -291,7 +305,7 @@ class TestPatternTypes:
             entity_type="ORGANIZATION",
             pattern_type=PatternType.EXACT,
             confidence=0.95,
-            description="OpenAI company"
+            description="OpenAI company",
         )
         matcher.add_pattern(pattern)
 

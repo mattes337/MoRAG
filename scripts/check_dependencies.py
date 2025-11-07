@@ -8,6 +8,7 @@ from pathlib import Path
 # Add the src directory to the path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
+
 def check_dependency(module_name, package_name=None, description=""):
     """Check if a dependency is available."""
     if package_name is None:
@@ -18,13 +19,17 @@ def check_dependency(module_name, package_name=None, description=""):
         print(f"✅ {description or module_name} - Available")
         return True
     except ImportError:
-        print(f"❌ {description or module_name} - Missing (install with: pip install {package_name})")
+        print(
+            f"❌ {description or module_name} - Missing (install with: pip install {package_name})"
+        )
         return False
+
 
 def check_pyannote_audio():
     """Check pyannote.audio specifically."""
     try:
         import pyannote.audio
+
         print("✅ pyannote.audio - Available")
         return True
     except ImportError:
@@ -33,15 +38,18 @@ def check_pyannote_audio():
         print("   Note: Requires authentication token from Hugging Face")
         return False
 
+
 def check_playwright():
     """Check Playwright specifically."""
     try:
         import playwright
+
         print("✅ Playwright - Available")
 
         # Check if browsers are installed
         try:
             from playwright.sync_api import sync_playwright
+
             with sync_playwright() as p:
                 # Try to get chromium
                 browser = p.chromium.launch(headless=True)
@@ -55,6 +63,7 @@ def check_playwright():
         print("❌ Playwright - Missing (install with: pip install playwright)")
         return False
 
+
 def main():
     """Check all dependencies."""
     print("🔍 Checking MoRAG Transcription Dependencies")
@@ -64,26 +73,21 @@ def main():
         # Core transcription
         ("whisper", "openai-whisper", "Whisper (Speech-to-Text)"),
         ("faster_whisper", "faster-whisper", "Faster Whisper"),
-
         # Audio processing
         ("librosa", "librosa", "Librosa (Audio Processing)"),
         ("soundfile", "soundfile", "SoundFile (Audio I/O)"),
         ("pydub", "pydub", "PyDub (Audio Manipulation)"),
-
         # Speaker diarization
         ("pyannote.audio", None, "pyannote.audio (Speaker Diarization)"),
-
         # Topic segmentation
         ("sentence_transformers", "sentence-transformers", "Sentence Transformers"),
         ("sklearn", "scikit-learn", "Scikit-learn"),
         ("nltk", "nltk", "NLTK"),
         ("spacy", "spacy", "spaCy"),
-
         # Web scraping
         ("trafilatura", "trafilatura", "Trafilatura (Content Extraction)"),
         ("readability", "readability", "Readability (Content Cleaning)"),
         ("newspaper3k", "newspaper3k", "Newspaper3k (Article Extraction)"),
-
         # OCR and image processing
         ("pytesseract", "pytesseract", "PyTesseract (OCR)"),
         ("easyocr", "easyocr", "EasyOCR"),
@@ -131,6 +135,7 @@ def main():
     else:
         print("✅ All dependencies are available!")
         return True
+
 
 if __name__ == "__main__":
     success = main()

@@ -6,8 +6,8 @@ Use document_converters.MarkitdownConverter instead.
 
 # Re-export the split components for backward compatibility
 from .base_converter import BaseMarkitdownConverter
-from .document_converters import MarkitdownConverter
 from .chunking_processor import ChunkingProcessor
+from .document_converters import MarkitdownConverter
 
 # Maintain backward compatibility
 __all__ = ["MarkitdownConverter", "BaseMarkitdownConverter", "ChunkingProcessor"]

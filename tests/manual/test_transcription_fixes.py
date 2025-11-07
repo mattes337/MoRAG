@@ -12,24 +12,21 @@ import logging
 import sys
 import time
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any, Dict
 
 # Add the src directory to the path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 import structlog
-from morag_core.config import settings
-from morag_audio import AudioProcessor, AudioConfig
-from morag_video import VideoProcessor, VideoConfig
-from morag_audio import AudioConverter
-from morag_video import VideoConverter
-from morag_core.models import ConversionOptions, ChunkingStrategy
+from morag_audio import AudioConfig, AudioConverter, AudioProcessor
 from morag_audio.services import EnhancedTopicSegmentation
+from morag_core.config import settings
+from morag_core.models import ChunkingStrategy, ConversionOptions
+from morag_video import VideoConfig, VideoConverter, VideoProcessor
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 
 logger = structlog.get_logger(__name__)
@@ -54,41 +51,49 @@ class TranscriptionFixValidator:
             config = AudioConfig(
                 model_size="base",  # Use smaller model for faster testing
                 enable_diarization=True,
-                enable_topic_segmentation=True
+                enable_topic_segmentation=True,
             )
 
             result = await self.audio_processor.process_audio_file(
                 audio_file,
                 config,
                 enable_diarization=True,
-                enable_topic_segmentation=True
+                enable_topic_segmentation=True,
             )
 
             # Check if we have topic segmentation results
             if result.topic_segmentation and result.topic_segmentation.topics:
-                logger.info("✅ Topic segmentation completed",
-                           topics_count=len(result.topic_segmentation.topics))
+                logger.info(
+                    "✅ Topic segmentation completed",
+                    topics_count=len(result.topic_segmentation.topics),
+                )
 
                 # Check timestamps for each topic
                 timestamp_issues = 0
                 for i, topic in enumerate(result.topic_segmentation.topics):
                     if topic.start_time is None or topic.start_time == 0:
                         timestamp_issues += 1
-                        logger.warning(f"⚠️  Topic {i+1} has timestamp issue",
-                                     topic_id=topic.topic_id,
-                                     start_time=topic.start_time,
-                                     end_time=topic.end_time)
+                        logger.warning(
+                            f"⚠️  Topic {i+1} has timestamp issue",
+                            topic_id=topic.topic_id,
+                            start_time=topic.start_time,
+                            end_time=topic.end_time,
+                        )
                     else:
-                        logger.info(f"✅ Topic {i+1} has valid timestamp",
-                                   topic_id=topic.topic_id,
-                                   start_time=topic.start_time,
-                                   end_time=topic.end_time)
+                        logger.info(
+                            f"✅ Topic {i+1} has valid timestamp",
+                            topic_id=topic.topic_id,
+                            start_time=topic.start_time,
+                            end_time=topic.end_time,
+                        )
 
                 if timestamp_issues == 0:
                     logger.info("🎉 All topics have valid timestamps!")
                     return True
                 else:
-                    logger.warning(f"⚠️  {timestamp_issues} topics have timestamp issues")
+                    logger.warning(
+                        f"⚠️  {timestamp_issues} topics have timestamp issues"
+                    )
                     return False
             else:
                 logger.warning("❌ No topic segmentation results found")
@@ -107,19 +112,20 @@ class TranscriptionFixValidator:
             options = ConversionOptions(
                 chunking_strategy=ChunkingStrategy.SEMANTIC,
                 include_metadata=True,
-                extract_images=False
+                extract_images=False,
             )
 
             conversion_result = await self.audio_converter.convert(audio_file, options)
 
             if not conversion_result.success:
-                logger.error("❌ Audio conversion failed",
-                           error=conversion_result.error_message)
+                logger.error(
+                    "❌ Audio conversion failed", error=conversion_result.error_message
+                )
                 return False
 
             # Analyze content for repetition
             content = conversion_result.content
-            lines = content.split('\n')
+            lines = content.split("\n")
 
             # Check for consecutive repeated lines
             consecutive_repeats = 0
@@ -129,10 +135,14 @@ class TranscriptionFixValidator:
                 line_clean = line.strip()
                 if line_clean and line_clean == last_line:
                     consecutive_repeats += 1
-                    if consecutive_repeats > 2:  # Allow some repetition but not excessive
-                        logger.warning("⚠️  Excessive repetition detected",
-                                     line=line_clean[:50],
-                                     consecutive_count=consecutive_repeats)
+                    if (
+                        consecutive_repeats > 2
+                    ):  # Allow some repetition but not excessive
+                        logger.warning(
+                            "⚠️  Excessive repetition detected",
+                            line=line_clean[:50],
+                            consecutive_count=consecutive_repeats,
+                        )
                 else:
                     consecutive_repeats = 0
                 last_line = line_clean
@@ -143,9 +153,11 @@ class TranscriptionFixValidator:
                 unique_last_lines = set(last_10_lines)
 
                 if len(unique_last_lines) < len(last_10_lines) / 2:
-                    logger.warning("⚠️  Repetitive pattern detected at end",
-                                 total_lines=len(last_10_lines),
-                                 unique_lines=len(unique_last_lines))
+                    logger.warning(
+                        "⚠️  Repetitive pattern detected at end",
+                        total_lines=len(last_10_lines),
+                        unique_lines=len(unique_last_lines),
+                    )
                     return False
 
             logger.info("✅ No excessive repetition detected")
@@ -166,26 +178,27 @@ class TranscriptionFixValidator:
                 include_metadata=True,
                 extract_images=False,
                 format_options={
-                    'include_audio': True,
-                    'enable_enhanced_audio': True,
-                    'enable_speaker_diarization': True,
-                    'enable_topic_segmentation': True
-                }
+                    "include_audio": True,
+                    "enable_enhanced_audio": True,
+                    "enable_speaker_diarization": True,
+                    "enable_topic_segmentation": True,
+                },
             )
 
             conversion_result = await self.video_converter.convert(video_file, options)
 
             if not conversion_result.success:
-                logger.error("❌ Video conversion failed",
-                           error=conversion_result.error_message)
+                logger.error(
+                    "❌ Video conversion failed", error=conversion_result.error_message
+                )
                 return False
 
             # Check for timestamp format in content
             content = conversion_result.content
             timestamp_pattern_found = False
 
-            for line in content.split('\n'):
-                if '[' in line and ']' in line and line.startswith('#'):
+            for line in content.split("\n"):
+                if "[" in line and "]" in line and line.startswith("#"):
                     # Found a topic header with timestamp
                     timestamp_pattern_found = True
                     logger.info("✅ Found timestamp pattern", line=line.strip())
@@ -204,19 +217,27 @@ class TranscriptionFixValidator:
 
     def analyze_content_quality(self, content: str) -> Dict[str, Any]:
         """Analyze the quality of generated content."""
-        lines = content.split('\n')
+        lines = content.split("\n")
         non_empty_lines = [line for line in lines if line.strip()]
 
         # Count different types of content
-        topic_headers = sum(1 for line in lines if line.startswith('#') and '[' in line)
-        speaker_lines = sum(1 for line in lines if ':' in line and any(speaker in line for speaker in ['Speaker_', 'SPEAKER_']))
+        topic_headers = sum(1 for line in lines if line.startswith("#") and "[" in line)
+        speaker_lines = sum(
+            1
+            for line in lines
+            if ":" in line
+            and any(speaker in line for speaker in ["Speaker_", "SPEAKER_"])
+        )
 
         return {
-            'total_lines': len(lines),
-            'non_empty_lines': len(non_empty_lines),
-            'topic_headers': topic_headers,
-            'speaker_lines': speaker_lines,
-            'avg_line_length': sum(len(line) for line in non_empty_lines) / len(non_empty_lines) if non_empty_lines else 0
+            "total_lines": len(lines),
+            "non_empty_lines": len(non_empty_lines),
+            "topic_headers": topic_headers,
+            "speaker_lines": speaker_lines,
+            "avg_line_length": sum(len(line) for line in non_empty_lines)
+            / len(non_empty_lines)
+            if non_empty_lines
+            else 0,
         }
 
 
@@ -226,33 +247,33 @@ async def main():
 
     # Look for test files
     test_files = {
-        'audio': [
+        "audio": [
             Path("test_audio.wav"),
             Path("test_audio.mp3"),
             Path("sample.wav"),
             Path("sample.mp3"),
             Path("audio.wav"),
-            Path("audio.mp3")
+            Path("audio.mp3"),
         ],
-        'video': [
+        "video": [
             Path("test_video.mp4"),
             Path("test_video.avi"),
             Path("sample.mp4"),
             Path("sample.avi"),
             Path("video.mp4"),
-            Path("video.avi")
-        ]
+            Path("video.avi"),
+        ],
     }
 
     audio_file = None
     video_file = None
 
-    for test_file in test_files['audio']:
+    for test_file in test_files["audio"]:
         if test_file.exists():
             audio_file = test_file
             break
 
-    for test_file in test_files['video']:
+    for test_file in test_files["video"]:
         if test_file.exists():
             video_file = test_file
             break
@@ -275,17 +296,17 @@ async def main():
         logger.info(f"🎵 Testing with audio file: {audio_file}")
 
         timestamp_result = await validator.test_timestamp_fixes(audio_file)
-        test_results.append(('Timestamp Fixes', timestamp_result))
+        test_results.append(("Timestamp Fixes", timestamp_result))
 
         repetition_result = await validator.test_repetition_fixes(audio_file)
-        test_results.append(('Repetition Prevention', repetition_result))
+        test_results.append(("Repetition Prevention", repetition_result))
 
     # Test video processing
     if video_file:
         logger.info(f"🎬 Testing with video file: {video_file}")
 
         video_result = await validator.test_video_processing(video_file)
-        test_results.append(('Video Processing', video_result))
+        test_results.append(("Video Processing", video_result))
 
     # Summary
     logger.info("=" * 60)
@@ -307,7 +328,9 @@ async def main():
         logger.info("🎉 All tests passed! Transcription fixes are working correctly.")
         return True
     else:
-        logger.warning(f"⚠️  {total_tests - passed_tests} tests failed. Please review the issues above.")
+        logger.warning(
+            f"⚠️  {total_tests - passed_tests} tests failed. Please review the issues above."
+        )
         return False
 
 

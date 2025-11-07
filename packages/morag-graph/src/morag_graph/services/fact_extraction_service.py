@@ -1,18 +1,19 @@
 """Fact extraction service that integrates with the existing pipeline."""
 
 import asyncio
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
+
 import structlog
+from morag_services.embedding import GeminiEmbeddingService
 
 from ..extraction.fact_extractor import FactExtractor
 from ..extraction.fact_graph_builder import FactGraphBuilder
-from ..models.fact import Fact, FactRelation
 from ..models.document_chunk import DocumentChunk
+from ..models.fact import Fact, FactRelation
 from ..storage.neo4j_operations.fact_operations import FactOperations
 from ..storage.neo4j_storage import Neo4jStorage
 from ..storage.qdrant_operations.fact_vector_operations import FactVectorOperations
 from ..storage.qdrant_storage import QdrantStorage
-from morag_services.embedding import GeminiEmbeddingService
 
 
 class FactExtractionService:
@@ -29,7 +30,7 @@ class FactExtractionService:
         max_facts_per_chunk: int = 10,
         enable_relationships: bool = True,
         enable_vector_storage: bool = True,
-        language: str = "en"
+        language: str = "en",
     ):
         """Initialize fact extraction service.
 
@@ -49,7 +50,9 @@ class FactExtractionService:
         self.qdrant_storage = qdrant_storage
         self.embedding_service = embedding_service
         self.enable_relationships = enable_relationships
-        self.enable_vector_storage = enable_vector_storage and qdrant_storage is not None
+        self.enable_vector_storage = (
+            enable_vector_storage and qdrant_storage is not None
+        )
         self.language = language
 
         self.logger = structlog.get_logger(__name__)
@@ -60,14 +63,12 @@ class FactExtractionService:
             api_key=api_key,
             min_confidence=min_confidence,
             max_facts_per_chunk=max_facts_per_chunk,
-            language=language
+            language=language,
         )
 
         if enable_relationships:
             self.graph_builder = FactGraphBuilder(
-                model_id=model_id,
-                api_key=api_key,
-                language=language
+                model_id=model_id, api_key=api_key, language=language
             )
 
         # Initialize storage operations
@@ -78,7 +79,7 @@ class FactExtractionService:
             self.fact_vector_operations = FactVectorOperations(
                 client=qdrant_storage.client,
                 collection_name=f"{qdrant_storage.collection_name}_facts",
-                embedding_service=embedding_service
+                embedding_service=embedding_service,
             )
 
     async def extract_facts_from_chunks(
@@ -86,7 +87,7 @@ class FactExtractionService:
         chunks: List[DocumentChunk],
         domain: Optional[str] = None,
         language: str = "en",
-        query_context: Optional[str] = None
+        query_context: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Extract facts from document chunks.
 
@@ -100,47 +101,48 @@ class FactExtractionService:
         """
         if not chunks:
             return {
-                'facts': [],
-                'relationships': [],
-                'statistics': {
-                    'chunks_processed': 0,
-                    'facts_extracted': 0,
-                    'relationships_created': 0
-                }
+                "facts": [],
+                "relationships": [],
+                "statistics": {
+                    "chunks_processed": 0,
+                    "facts_extracted": 0,
+                    "relationships_created": 0,
+                },
             }
 
         self.logger.info(
             "Starting fact extraction from chunks",
             num_chunks=len(chunks),
             domain=domain,
-            language=language
+            language=language,
         )
 
         try:
             # Extract facts from all chunks
             all_facts = []
             extraction_context = {
-                'domain': domain,
-                'language': language,
-                'query_context': query_context
+                "domain": domain,
+                "language": language,
+                "query_context": query_context,
             }
 
             # Process chunks in parallel batches
             batch_size = 5
             for i in range(0, len(chunks), batch_size):
-                batch = chunks[i:i + batch_size]
+                batch = chunks[i : i + batch_size]
                 batch_tasks = [
                     self._extract_facts_from_chunk(chunk, extraction_context)
                     for chunk in batch
                 ]
 
-                batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
+                batch_results = await asyncio.gather(
+                    *batch_tasks, return_exceptions=True
+                )
 
                 for result in batch_results:
                     if isinstance(result, Exception):
                         self.logger.warning(
-                            "Chunk fact extraction failed",
-                            error=str(result)
+                            "Chunk fact extraction failed", error=str(result)
                         )
                         continue
 
@@ -156,17 +158,21 @@ class FactExtractionService:
                 # Store facts in vector database if enabled
                 if self.enable_vector_storage:
                     try:
-                        vector_point_ids = await self.fact_vector_operations.store_facts_batch(all_facts)
+                        vector_point_ids = (
+                            await self.fact_vector_operations.store_facts_batch(
+                                all_facts
+                            )
+                        )
                         self.logger.debug(
                             "Facts stored in vector database",
                             num_facts=len(all_facts),
-                            num_vectors=len(vector_point_ids)
+                            num_vectors=len(vector_point_ids),
                         )
                     except Exception as e:
                         self.logger.warning(
                             "Vector storage failed for facts",
                             error=str(e),
-                            num_facts=len(all_facts)
+                            num_facts=len(all_facts),
                         )
 
             # Extract relationships if enabled
@@ -180,43 +186,35 @@ class FactExtractionService:
                         await self.fact_operations.store_fact_relations(relationships)
 
                 except Exception as e:
-                    self.logger.warning(
-                        "Relationship extraction failed",
-                        error=str(e)
-                    )
+                    self.logger.warning("Relationship extraction failed", error=str(e))
 
             statistics = {
-                'chunks_processed': len(chunks),
-                'facts_extracted': len(all_facts),
-                'facts_stored': len(stored_fact_ids),
-                'facts_vectorized': len(vector_point_ids),
-                'relationships_created': len(relationships),
-                'vector_storage_enabled': self.enable_vector_storage
+                "chunks_processed": len(chunks),
+                "facts_extracted": len(all_facts),
+                "facts_stored": len(stored_fact_ids),
+                "facts_vectorized": len(vector_point_ids),
+                "relationships_created": len(relationships),
+                "vector_storage_enabled": self.enable_vector_storage,
             }
 
-            self.logger.info(
-                "Fact extraction completed",
-                **statistics
-            )
+            self.logger.info("Fact extraction completed", **statistics)
 
             return {
-                'facts': all_facts,
-                'relationships': relationships,
-                'statistics': statistics
+                "facts": all_facts,
+                "relationships": relationships,
+                "statistics": statistics,
             }
 
         except Exception as e:
             self.logger.error(
                 "Fact extraction service failed",
                 error=str(e),
-                error_type=type(e).__name__
+                error_type=type(e).__name__,
             )
             raise
 
     async def _extract_facts_from_chunk(
-        self,
-        chunk: DocumentChunk,
-        context: Dict[str, Any]
+        self, chunk: DocumentChunk, context: Dict[str, Any]
     ) -> List[Fact]:
         """Extract facts from a single chunk.
 
@@ -232,32 +230,30 @@ class FactExtractionService:
             enhanced_context = {
                 **context,
                 **chunk.metadata,  # Include all chunk metadata
-                'source_text_excerpt': chunk.text[:500] + "..." if len(chunk.text) > 500 else chunk.text,  # Truncated excerpt
-                'chunk_type': chunk.chunk_type,
-                'start_position': chunk.start_position,
-                'end_position': chunk.end_position
+                "source_text_excerpt": chunk.text[:500] + "..."
+                if len(chunk.text) > 500
+                else chunk.text,  # Truncated excerpt
+                "chunk_type": chunk.chunk_type,
+                "start_position": chunk.start_position,
+                "end_position": chunk.end_position,
             }
 
             facts = await self.fact_extractor.extract_facts(
                 chunk_text=chunk.text,
                 chunk_id=chunk.id,
                 document_id=chunk.document_id,
-                context=enhanced_context
+                context=enhanced_context,
             )
 
             self.logger.debug(
-                "Facts extracted from chunk",
-                chunk_id=chunk.id,
-                facts_count=len(facts)
+                "Facts extracted from chunk", chunk_id=chunk.id, facts_count=len(facts)
             )
 
             return facts
 
         except Exception as e:
             self.logger.warning(
-                "Failed to extract facts from chunk",
-                chunk_id=chunk.id,
-                error=str(e)
+                "Failed to extract facts from chunk", chunk_id=chunk.id, error=str(e)
             )
             return []
 
@@ -279,26 +275,21 @@ class FactExtractionService:
                     source_fact_id=edge.source,
                     target_fact_id=edge.target,
                     relation_type=edge.type,
-                    confidence=edge.properties.get('confidence', 0.7),
-                    context=edge.properties.get('context', '')
+                    confidence=edge.properties.get("confidence", 0.7),
+                    context=edge.properties.get("context", ""),
                 )
                 relationships.append(relation)
 
             except Exception as e:
                 self.logger.warning(
-                    "Failed to convert graph edge to relation",
-                    edge=edge,
-                    error=str(e)
+                    "Failed to convert graph edge to relation", edge=edge, error=str(e)
                 )
                 continue
 
         return relationships
 
     async def extract_facts_from_document(
-        self,
-        document_id: str,
-        domain: Optional[str] = None,
-        language: str = "en"
+        self, document_id: str, domain: Optional[str] = None, language: str = "en"
     ) -> Dict[str, Any]:
         """Extract facts from all chunks of a document.
 
@@ -314,18 +305,15 @@ class FactExtractionService:
         chunks = await self._get_document_chunks(document_id)
 
         if not chunks:
-            self.logger.warning(
-                "No chunks found for document",
-                document_id=document_id
-            )
+            self.logger.warning("No chunks found for document", document_id=document_id)
             return {
-                'facts': [],
-                'relationships': [],
-                'statistics': {
-                    'chunks_processed': 0,
-                    'facts_extracted': 0,
-                    'relationships_created': 0
-                }
+                "facts": [],
+                "relationships": [],
+                "statistics": {
+                    "chunks_processed": 0,
+                    "facts_extracted": 0,
+                    "relationships_created": 0,
+                },
             }
 
         return await self.extract_facts_from_chunks(chunks, domain, language)
@@ -354,11 +342,11 @@ class FactExtractionService:
                 async for record in result:
                     chunk_data = dict(record["c"])
                     chunk = DocumentChunk(
-                        id=chunk_data['id'],
-                        document_id=chunk_data['document_id'],
-                        content=chunk_data['content'],
-                        index=chunk_data.get('index', 0),
-                        metadata=chunk_data.get('metadata', {})
+                        id=chunk_data["id"],
+                        document_id=chunk_data["document_id"],
+                        content=chunk_data["content"],
+                        index=chunk_data.get("index", 0),
+                        metadata=chunk_data.get("metadata", {}),
                     )
                     chunks.append(chunk)
 
@@ -366,9 +354,7 @@ class FactExtractionService:
 
         except Exception as e:
             self.logger.error(
-                "Failed to get document chunks",
-                document_id=document_id,
-                error=str(e)
+                "Failed to get document chunks", document_id=document_id, error=str(e)
             )
             return []
 
@@ -389,7 +375,7 @@ class FactExtractionService:
         fact_type: Optional[str] = None,
         domain: Optional[str] = None,
         min_confidence: float = 0.0,
-        limit: int = 50
+        limit: int = 50,
     ) -> List[Fact]:
         """Search facts by text content.
 
@@ -408,7 +394,7 @@ class FactExtractionService:
             fact_type=fact_type,
             domain=domain,
             min_confidence=min_confidence,
-            limit=limit
+            limit=limit,
         )
 
     async def get_fact_statistics(self) -> Dict[str, Any]:
@@ -445,14 +431,11 @@ class FactExtractionService:
                 self.logger.info(
                     "Low quality facts cleaned up",
                     deleted_count=deleted_count,
-                    min_confidence=min_confidence
+                    min_confidence=min_confidence,
                 )
 
                 return deleted_count
 
         except Exception as e:
-            self.logger.error(
-                "Failed to cleanup low quality facts",
-                error=str(e)
-            )
+            self.logger.error("Failed to cleanup low quality facts", error=str(e))
             return 0

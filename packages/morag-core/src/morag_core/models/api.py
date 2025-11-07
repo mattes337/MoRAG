@@ -1,14 +1,15 @@
 """API models for MoRAG."""
 
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union
-import uuid
 
 
 class SourceType(str, Enum):
     """Source type enum."""
+
     DOCUMENT = "document"
     AUDIO = "audio"
     VIDEO = "video"
@@ -20,6 +21,7 @@ class SourceType(str, Enum):
 @dataclass
 class ErrorResponse:
     """API error response."""
+
     error: str
     error_type: Optional[str] = None
     status_code: int = 400
@@ -48,6 +50,7 @@ class ErrorResponse:
 @dataclass
 class TaskStatusResponse:
     """Task status response."""
+
     task_id: str
     status: str
     progress: float = 0.0  # 0.0 to 1.0
@@ -86,6 +89,7 @@ class TaskStatusResponse:
 @dataclass
 class IngestionResponse:
     """Ingestion response."""
+
     task_id: str
     status: str = "pending"
     message: str = "Ingestion task created"
@@ -106,6 +110,7 @@ class IngestionResponse:
 @dataclass
 class BatchIngestionResponse:
     """Batch ingestion response."""
+
     task_ids: List[str]
     status: str = "pending"
     message: str = "Batch ingestion tasks created"

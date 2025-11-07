@@ -1,21 +1,24 @@
 """Image processing service for MoRAG."""
 
-from pathlib import Path
-from typing import List, Optional, Dict, Any
 import asyncio
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
 import structlog
-
-from morag_core.interfaces.service import BaseService
 from morag_core.exceptions import ProcessingError
+from morag_core.interfaces.service import BaseService
 
-from .processor import ImageProcessor, ImageConfig, ImageProcessingResult
+from .processor import ImageConfig, ImageProcessingResult, ImageProcessor
 
 logger = structlog.get_logger()
+
 
 class ImageService(BaseService):
     """Service for processing images with OCR and captioning."""
 
-    def __init__(self, api_key: Optional[str] = None, output_dir: Optional[Path] = None):
+    def __init__(
+        self, api_key: Optional[str] = None, output_dir: Optional[Path] = None
+    ):
         """Initialize the image service.
 
         Args:
@@ -52,10 +55,7 @@ class ImageService(BaseService):
         return {"status": "healthy", "processor": "ready"}
 
     async def process_file(
-        self,
-        file_path: Path,
-        save_output: bool = True,
-        output_format: str = "markdown"
+        self, file_path: Path, save_output: bool = True, output_format: str = "markdown"
     ) -> Dict[str, Any]:
         """Process an image file and optionally save output files.
 
@@ -77,9 +77,7 @@ class ImageService(BaseService):
         try:
             # Create default config
             config = ImageConfig(
-                extract_metadata=True,
-                extract_text=True,
-                generate_caption=True
+                extract_metadata=True, extract_text=True, generate_caption=True
             )
 
             # Process the image
@@ -96,29 +94,29 @@ class ImageService(BaseService):
                     "caption": result.caption,
                     "extracted_text": result.extracted_text,
                     "metadata": result.metadata.__dict__ if result.metadata else {},
-                    "confidence_scores": result.confidence_scores
+                    "confidence_scores": result.confidence_scores,
                 },
-                "content": markdown_content
+                "content": markdown_content,
             }
 
             # Save output files if requested
             if save_output and self.output_dir:
-                output_files = await self._save_output_files(file_path, result, markdown_content, output_format)
+                output_files = await self._save_output_files(
+                    file_path, result, markdown_content, output_format
+                )
                 response["output_files"] = output_files
 
             return response
 
         except Exception as e:
-            logger.error("Image processing failed", error=str(e), file_path=str(file_path))
-            return {
-                "success": False,
-                "error": str(e),
-                "processing_time": 0
-            }
+            logger.error(
+                "Image processing failed", error=str(e), file_path=str(file_path)
+            )
+            return {"success": False, "error": str(e), "processing_time": 0}
 
-    async def process_image(self,
-                          file_path: Path,
-                          config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    async def process_image(
+        self, file_path: Path, config: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """Process a single image file.
 
         Args:
@@ -143,15 +141,17 @@ class ImageService(BaseService):
             return self._result_to_dict(result, file_path)
 
         except Exception as e:
-            logger.error("Image processing failed",
-                        file_path=str(file_path),
-                        error=str(e))
+            logger.error(
+                "Image processing failed", file_path=str(file_path), error=str(e)
+            )
             raise ProcessingError(f"Image processing failed: {str(e)}") from e
 
-    async def process_batch(self,
-                           file_paths: List[Path],
-                           config: Optional[Dict[str, Any]] = None,
-                           max_concurrency: int = 3) -> List[Dict[str, Any]]:
+    async def process_batch(
+        self,
+        file_paths: List[Path],
+        config: Optional[Dict[str, Any]] = None,
+        max_concurrency: int = 3,
+    ) -> List[Dict[str, Any]]:
         """Process multiple image files concurrently.
 
         Args:
@@ -172,21 +172,23 @@ class ImageService(BaseService):
 
             # Process images in batch
             results = await self.processor.process_images(
-                file_paths,
-                image_config,
-                max_concurrency=max_concurrency
+                file_paths, image_config, max_concurrency=max_concurrency
             )
 
             # Convert results to dictionaries
             return [self._result_to_dict(result) for result in results]
 
         except Exception as e:
-            logger.error("Batch image processing failed",
-                        file_count=len(file_paths),
-                        error=str(e))
+            logger.error(
+                "Batch image processing failed",
+                file_count=len(file_paths),
+                error=str(e),
+            )
             raise ProcessingError(f"Batch image processing failed: {str(e)}") from e
 
-    def _result_to_dict(self, result: ImageProcessingResult, file_path: Optional[Path] = None) -> Dict[str, Any]:
+    def _result_to_dict(
+        self, result: ImageProcessingResult, file_path: Optional[Path] = None
+    ) -> Dict[str, Any]:
         """Convert ImageProcessingResult to a dictionary."""
         # Convert metadata to dictionary with required document fields
         metadata_dict = {
@@ -200,18 +202,20 @@ class ImageService(BaseService):
             "exif_data": result.metadata.exif_data,
             "creation_time": result.metadata.creation_time,
             "camera_make": result.metadata.camera_make,
-            "camera_model": result.metadata.camera_model
+            "camera_model": result.metadata.camera_model,
         }
 
         # Add core document metadata fields if file_path is provided
         if file_path:
-            metadata_dict.update({
-                "source_path": str(file_path.absolute()),
-                "source_name": file_path.name,
-                "file_name": file_path.name,
-                "mime_type": self._get_image_mime_type(file_path),
-                "checksum": self._calculate_file_checksum(file_path)
-            })
+            metadata_dict.update(
+                {
+                    "source_path": str(file_path.absolute()),
+                    "source_name": file_path.name,
+                    "file_name": file_path.name,
+                    "mime_type": self._get_image_mime_type(file_path),
+                    "checksum": self._calculate_file_checksum(file_path),
+                }
+            )
 
         # Add legacy filename field for compatibility
         if file_path:
@@ -223,29 +227,30 @@ class ImageService(BaseService):
             "extracted_text": result.extracted_text,
             "metadata": metadata_dict,
             "processing_time": result.processing_time,
-            "confidence_scores": result.confidence_scores
+            "confidence_scores": result.confidence_scores,
         }
 
     def _get_image_mime_type(self, file_path: Path) -> str:
         """Get MIME type for image file based on extension."""
         ext = file_path.suffix.lower()
         mime_type_map = {
-            '.jpg': 'image/jpeg',
-            '.jpeg': 'image/jpeg',
-            '.png': 'image/png',
-            '.gif': 'image/gif',
-            '.bmp': 'image/bmp',
-            '.tiff': 'image/tiff',
-            '.tif': 'image/tiff',
-            '.webp': 'image/webp',
-            '.svg': 'image/svg+xml'
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+            ".png": "image/png",
+            ".gif": "image/gif",
+            ".bmp": "image/bmp",
+            ".tiff": "image/tiff",
+            ".tif": "image/tiff",
+            ".webp": "image/webp",
+            ".svg": "image/svg+xml",
         }
-        return mime_type_map.get(ext, 'image/jpeg')
+        return mime_type_map.get(ext, "image/jpeg")
 
     def _calculate_file_checksum(self, file_path: Path) -> Optional[str]:
         """Calculate SHA256 checksum of file."""
         try:
             import hashlib
+
             sha256_hash = hashlib.sha256()
             with open(file_path, "rb") as f:
                 # Read file in chunks to handle large files efficiently
@@ -256,7 +261,9 @@ class ImageService(BaseService):
             logger.warning(f"Failed to calculate checksum for {file_path}: {e}")
             return None
 
-    def _create_markdown_content(self, file_path: Path, result: ImageProcessingResult) -> str:
+    def _create_markdown_content(
+        self, file_path: Path, result: ImageProcessingResult
+    ) -> str:
         """Create unified markdown content for the image."""
         lines = []
 
@@ -270,7 +277,9 @@ class ImageService(BaseService):
         lines.append("|----------|-------|")
 
         if result.metadata:
-            lines.append(f"| Dimensions | {result.metadata.width}x{result.metadata.height} |")
+            lines.append(
+                f"| Dimensions | {result.metadata.width}x{result.metadata.height} |"
+            )
             lines.append(f"| Format | {result.metadata.format} |")
             lines.append(f"| Mode | {result.metadata.mode} |")
             lines.append(f"| File Size | {result.metadata.file_size} bytes |")
@@ -310,7 +319,7 @@ class ImageService(BaseService):
         file_path: Path,
         result: ImageProcessingResult,
         markdown_content: str,
-        output_format: str
+        output_format: str,
     ) -> Dict[str, str]:
         """Save processing results to output files."""
         output_files = {}
@@ -318,7 +327,9 @@ class ImageService(BaseService):
 
         # Sanitize the base name for directory creation
         # Remove problematic characters and limit length
-        sanitized_name = "".join(c for c in base_name if c.isalnum() or c in (' ', '-', '_')).strip()
+        sanitized_name = "".join(
+            c for c in base_name if c.isalnum() or c in (" ", "-", "_")
+        ).strip()
         if len(sanitized_name) > 100:  # Limit directory name length
             sanitized_name = sanitized_name[:100].strip()
         if not sanitized_name:  # Fallback if name becomes empty
@@ -330,9 +341,11 @@ class ImageService(BaseService):
             file_output_dir.mkdir(exist_ok=True, parents=True)
             logger.debug("Created output directory", output_dir=str(file_output_dir))
         except Exception as e:
-            logger.error("Failed to create output directory",
-                        output_dir=str(file_output_dir),
-                        error=str(e))
+            logger.error(
+                "Failed to create output directory",
+                output_dir=str(file_output_dir),
+                error=str(e),
+            )
             raise ProcessingError(f"Failed to create output directory: {str(e)}")
 
         # Save markdown content
@@ -344,12 +357,13 @@ class ImageService(BaseService):
                 output_files["markdown"] = str(markdown_path)
                 logger.debug("Saved markdown", path=str(markdown_path))
             except Exception as e:
-                logger.error("Failed to save markdown",
-                           path=str(markdown_path),
-                           error=str(e))
+                logger.error(
+                    "Failed to save markdown", path=str(markdown_path), error=str(e)
+                )
 
         # Save metadata as JSON
         import json
+
         metadata_path = file_output_dir / f"{sanitized_name}_metadata.json"
         metadata_dict = {
             "file_path": str(file_path),
@@ -358,19 +372,24 @@ class ImageService(BaseService):
             "caption": result.caption,
             "extracted_text": result.extracted_text,
             "confidence_scores": result.confidence_scores,
-            "image_metadata": result.metadata.__dict__ if result.metadata else {}
+            "image_metadata": result.metadata.__dict__ if result.metadata else {},
         }
         try:
-            metadata_path.write_text(json.dumps(metadata_dict, indent=2, ensure_ascii=False), encoding='utf-8')
+            metadata_path.write_text(
+                json.dumps(metadata_dict, indent=2, ensure_ascii=False),
+                encoding="utf-8",
+            )
             output_files["metadata"] = str(metadata_path)
             logger.debug("Saved metadata", path=str(metadata_path))
         except Exception as e:
-            logger.error("Failed to save metadata",
-                       path=str(metadata_path),
-                       error=str(e))
+            logger.error(
+                "Failed to save metadata", path=str(metadata_path), error=str(e)
+            )
 
-        logger.info("Saved image output files",
-                   output_dir=str(file_output_dir),
-                   files_created=list(output_files.keys()))
+        logger.info(
+            "Saved image output files",
+            output_dir=str(file_output_dir),
+            files_created=list(output_files.keys()),
+        )
 
         return output_files

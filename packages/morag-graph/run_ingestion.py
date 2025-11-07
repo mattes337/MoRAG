@@ -4,28 +4,30 @@ This script loads facts and relationships from a JSON file and uses the FactExtr
 to properly ingest them with Document and DocumentChunk structure.
 """
 
-import json
 import argparse
 import asyncio
-from pathlib import Path
-from typing import Dict, Any, List
+import json
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List
 
-from morag_graph.storage.neo4j_storage import Neo4jStorage, Neo4jConfig
 from morag_graph.models.fact import Fact, FactRelation
 from morag_graph.storage.neo4j_operations.fact_operations import FactOperations
+from morag_graph.storage.neo4j_storage import Neo4jConfig, Neo4jStorage
 
 
 def load_extracted_data(file_path: Path) -> Dict[str, Any]:
     """Load extracted facts and relationships from JSON file."""
     try:
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, "r", encoding="utf-8") as f:
             return json.load(f)
     except Exception as e:
         raise Exception(f"Failed to load data from {file_path}: {e}")
 
 
-def parse_facts_and_relationships(data: Dict[str, Any]) -> tuple[List[Fact], List[FactRelation]]:
+def parse_facts_and_relationships(
+    data: Dict[str, Any]
+) -> tuple[List[Fact], List[FactRelation]]:
     """Parse facts and relationships from loaded data."""
     facts = []
     relationships = []
@@ -46,8 +48,10 @@ def parse_facts_and_relationships(data: Dict[str, Any]) -> tuple[List[Fact], Lis
                 fact_type=fact_data.get("fact_type", "general"),
                 domain=fact_data.get("domain"),
                 keywords=fact_data.get("keywords", []),
-                created_at=datetime.fromisoformat(fact_data.get("created_at", datetime.utcnow().isoformat())),
-                language=fact_data.get("language", "en")
+                created_at=datetime.fromisoformat(
+                    fact_data.get("created_at", datetime.utcnow().isoformat())
+                ),
+                language=fact_data.get("language", "en"),
             )
             facts.append(fact)
 
@@ -55,20 +59,21 @@ def parse_facts_and_relationships(data: Dict[str, Any]) -> tuple[List[Fact], Lis
     if "relationships" in data:
         for rel_data in data["relationships"]:
             relationship = FactRelation(
-                id=rel_data.get("id", f"{rel_data['source_fact_id']}-{rel_data['target_fact_id']}"),
+                id=rel_data.get(
+                    "id", f"{rel_data['source_fact_id']}-{rel_data['target_fact_id']}"
+                ),
                 source_fact_id=rel_data["source_fact_id"],
                 target_fact_id=rel_data["target_fact_id"],
                 relationship_type=rel_data.get("relationship_type", "RELATED"),
                 confidence=rel_data.get("confidence", 1.0),
                 description=rel_data.get("description", ""),
-                created_at=datetime.fromisoformat(rel_data.get("created_at", datetime.utcnow().isoformat()))
+                created_at=datetime.fromisoformat(
+                    rel_data.get("created_at", datetime.utcnow().isoformat())
+                ),
             )
             relationships.append(relationship)
 
     return facts, relationships
-
-
-
 
 
 async def ingest_to_neo4j(
@@ -78,14 +83,10 @@ async def ingest_to_neo4j(
     neo4j_uri: str,
     neo4j_user: str,
     neo4j_password: str,
-    clear_existing: bool = False
+    clear_existing: bool = False,
 ) -> None:
     """Ingest facts and relationships into Neo4j using FactOperations."""
-    config = Neo4jConfig(
-        uri=neo4j_uri,
-        username=neo4j_user,
-        password=neo4j_password
-    )
+    config = Neo4jConfig(uri=neo4j_uri, username=neo4j_user, password=neo4j_password)
     storage = Neo4jStorage(config)
 
     try:
@@ -127,12 +128,21 @@ async def ingest_to_neo4j(
 
 
 async def main():
-    parser = argparse.ArgumentParser(description="Ingest extracted fact data into Neo4j")
-    parser.add_argument("input_file", help="Path to JSON file containing extracted facts and relationships")
-    parser.add_argument("--neo4j-uri", default="bolt://localhost:7687", help="Neo4j URI")
+    parser = argparse.ArgumentParser(
+        description="Ingest extracted fact data into Neo4j"
+    )
+    parser.add_argument(
+        "input_file",
+        help="Path to JSON file containing extracted facts and relationships",
+    )
+    parser.add_argument(
+        "--neo4j-uri", default="bolt://localhost:7687", help="Neo4j URI"
+    )
     parser.add_argument("--neo4j-user", default="neo4j", help="Neo4j username")
     parser.add_argument("--neo4j-password", required=True, help="Neo4j password")
-    parser.add_argument("--clear", action="store_true", help="Clear existing data before ingestion")
+    parser.add_argument(
+        "--clear", action="store_true", help="Clear existing data before ingestion"
+    )
 
     args = parser.parse_args()
 
@@ -160,7 +170,7 @@ async def main():
             neo4j_uri=args.neo4j_uri,
             neo4j_user=args.neo4j_user,
             neo4j_password=args.neo4j_password,
-            clear_existing=args.clear
+            clear_existing=args.clear,
         )
 
         print("\n✓ Ingestion completed successfully!")

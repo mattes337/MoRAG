@@ -3,11 +3,11 @@
 import asyncio
 import time
 from datetime import datetime, timezone
-from typing import Dict, Any, Optional, List
-import structlog
-import httpx
+from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
+import httpx
+import structlog
 from morag.api_models.models import WebhookProgressNotification
 
 logger = structlog.get_logger(__name__)
@@ -40,15 +40,23 @@ class EnhancedWebhookService:
             parsed = urlparse(url)
 
             # Must be HTTP or HTTPS
-            if parsed.scheme not in ['http', 'https']:
-                logger.warning("Invalid webhook URL scheme", url=url, scheme=parsed.scheme)
+            if parsed.scheme not in ["http", "https"]:
+                logger.warning(
+                    "Invalid webhook URL scheme", url=url, scheme=parsed.scheme
+                )
                 return False
 
             # Check for localhost/internal IPs unless explicitly allowed
             if not allow_localhost:
                 hostname = parsed.hostname
-                if hostname in ['localhost', '127.0.0.1', '0.0.0.0'] or hostname.startswith('192.168.') or hostname.startswith('10.'):
-                    logger.warning("Webhook URL points to internal/localhost address", url=url)
+                if (
+                    hostname in ["localhost", "127.0.0.1", "0.0.0.0"]
+                    or hostname.startswith("192.168.")
+                    or hostname.startswith("10.")
+                ):
+                    logger.warning(
+                        "Webhook URL points to internal/localhost address", url=url
+                    )
                     return False
 
             return True
@@ -67,7 +75,7 @@ class EnhancedWebhookService:
         progress_percent: float,
         data: Optional[Dict[str, Any]] = None,
         error_message: Optional[str] = None,
-        auth_token: Optional[str] = None
+        auth_token: Optional[str] = None,
     ) -> bool:
         """Send progress notification webhook.
 
@@ -97,13 +105,13 @@ class EnhancedWebhookService:
             progress_percent=progress_percent,
             timestamp=datetime.now(timezone.utc).isoformat(),
             data=data,
-            error_message=error_message
+            error_message=error_message,
         )
 
         # Prepare headers
         headers = {
             "Content-Type": "application/json",
-            "User-Agent": "MoRAG-Webhook-Service/1.0"
+            "User-Agent": "MoRAG-Webhook-Service/1.0",
         }
 
         if auth_token:
@@ -112,12 +120,14 @@ class EnhancedWebhookService:
         # Send with retries
         for attempt in range(self.max_retries + 1):
             try:
-                logger.info("Sending webhook notification",
-                           webhook_url=webhook_url,
-                           task_id=task_id,
-                           step=step,
-                           status=status,
-                           attempt=attempt + 1)
+                logger.info(
+                    "Sending webhook notification",
+                    webhook_url=webhook_url,
+                    task_id=task_id,
+                    step=step,
+                    status=status,
+                    attempt=attempt + 1,
+                )
 
                 # Use asyncio to run requests in thread pool
                 loop = asyncio.get_event_loop()
@@ -127,53 +137,67 @@ class EnhancedWebhookService:
                         webhook_url,
                         json=notification.dict(),
                         headers=headers,
-                        timeout=self.timeout_seconds
-                    )
+                        timeout=self.timeout_seconds,
+                    ),
                 )
 
                 if response.status_code in [200, 201, 202]:
-                    logger.info("Webhook notification sent successfully",
-                               webhook_url=webhook_url,
-                               task_id=task_id,
-                               status_code=response.status_code)
+                    logger.info(
+                        "Webhook notification sent successfully",
+                        webhook_url=webhook_url,
+                        task_id=task_id,
+                        status_code=response.status_code,
+                    )
                     return True
                 else:
-                    logger.warning("Webhook notification failed",
-                                  webhook_url=webhook_url,
-                                  task_id=task_id,
-                                  status_code=response.status_code,
-                                  response_text=response.text[:200])
+                    logger.warning(
+                        "Webhook notification failed",
+                        webhook_url=webhook_url,
+                        task_id=task_id,
+                        status_code=response.status_code,
+                        response_text=response.text[:200],
+                    )
 
             except httpx.TimeoutException:
-                logger.warning("Webhook notification timeout",
-                              webhook_url=webhook_url,
-                              task_id=task_id,
-                              attempt=attempt + 1)
+                logger.warning(
+                    "Webhook notification timeout",
+                    webhook_url=webhook_url,
+                    task_id=task_id,
+                    attempt=attempt + 1,
+                )
             except httpx.ConnectError:
-                logger.warning("Webhook notification connection error",
-                              webhook_url=webhook_url,
-                              task_id=task_id,
-                              attempt=attempt + 1)
+                logger.warning(
+                    "Webhook notification connection error",
+                    webhook_url=webhook_url,
+                    task_id=task_id,
+                    attempt=attempt + 1,
+                )
             except Exception as e:
-                logger.error("Webhook notification error",
-                            webhook_url=webhook_url,
-                            task_id=task_id,
-                            error=str(e),
-                            attempt=attempt + 1)
+                logger.error(
+                    "Webhook notification error",
+                    webhook_url=webhook_url,
+                    task_id=task_id,
+                    error=str(e),
+                    attempt=attempt + 1,
+                )
 
             # Wait before retry (exponential backoff)
             if attempt < self.max_retries:
-                wait_time = 2 ** attempt
-                logger.info("Retrying webhook notification",
-                           webhook_url=webhook_url,
-                           task_id=task_id,
-                           wait_seconds=wait_time)
-                await asyncio.sleep(wait_time)
-
-        logger.error("Webhook notification failed after all retries",
+                wait_time = 2**attempt
+                logger.info(
+                    "Retrying webhook notification",
                     webhook_url=webhook_url,
                     task_id=task_id,
-                    max_retries=self.max_retries)
+                    wait_seconds=wait_time,
+                )
+                await asyncio.sleep(wait_time)
+
+        logger.error(
+            "Webhook notification failed after all retries",
+            webhook_url=webhook_url,
+            task_id=task_id,
+            max_retries=self.max_retries,
+        )
         return False
 
     async def send_step_started(
@@ -183,7 +207,7 @@ class EnhancedWebhookService:
         document_id: Optional[str],
         step: str,
         progress_percent: float,
-        auth_token: Optional[str] = None
+        auth_token: Optional[str] = None,
     ) -> bool:
         """Send step started notification."""
         return await self.send_progress_notification(
@@ -193,7 +217,7 @@ class EnhancedWebhookService:
             step=step,
             status="started",
             progress_percent=progress_percent,
-            auth_token=auth_token
+            auth_token=auth_token,
         )
 
     async def send_step_completed(
@@ -204,7 +228,7 @@ class EnhancedWebhookService:
         step: str,
         progress_percent: float,
         data: Optional[Dict[str, Any]] = None,
-        auth_token: Optional[str] = None
+        auth_token: Optional[str] = None,
     ) -> bool:
         """Send step completed notification."""
         return await self.send_progress_notification(
@@ -215,7 +239,7 @@ class EnhancedWebhookService:
             status="completed",
             progress_percent=progress_percent,
             data=data,
-            auth_token=auth_token
+            auth_token=auth_token,
         )
 
     async def send_step_failed(
@@ -226,7 +250,7 @@ class EnhancedWebhookService:
         step: str,
         progress_percent: float,
         error_message: str,
-        auth_token: Optional[str] = None
+        auth_token: Optional[str] = None,
     ) -> bool:
         """Send step failed notification."""
         return await self.send_progress_notification(
@@ -237,7 +261,7 @@ class EnhancedWebhookService:
             status="failed",
             progress_percent=progress_percent,
             error_message=error_message,
-            auth_token=auth_token
+            auth_token=auth_token,
         )
 
 

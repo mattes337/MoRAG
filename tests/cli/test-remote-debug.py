@@ -4,26 +4,28 @@ Comprehensive test script for debugging markdown conversion issues.
 Tests each processing stage for different input types against remote server.
 """
 
-import requests
-import json
-import time
-import sys
-import os
-from pathlib import Path
-from typing import Dict, Any, List, Optional
-from urllib.parse import urlparse, quote_plus
 import argparse
+import json
+import os
+import sys
+import time
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+from urllib.parse import quote_plus, urlparse
+
+import requests
 
 # Configuration
 REMOTE_SERVER = "http://morag.drydev.de:8000"
 LOCAL_SERVER = "http://localhost:8000"
 OUTPUT_DIR = Path("./test_outputs")
 
+
 class MoRAGTester:
     """Comprehensive tester for MoRAG processing stages."""
 
     def __init__(self, server_url: str = REMOTE_SERVER):
-        self.server_url = server_url.rstrip('/')
+        self.server_url = server_url.rstrip("/")
         self.session = requests.Session()
         self.session.timeout = 300  # 5 minutes timeout
 
@@ -53,18 +55,20 @@ class MoRAGTester:
             print(f"❌ Server connection failed: {e}")
             return False
 
-    def execute_stage(self, stage_name: str, input_files: List[str], config: Dict[str, Any] = None) -> Dict[str, Any]:
+    def execute_stage(
+        self, stage_name: str, input_files: List[str], config: Dict[str, Any] = None
+    ) -> Dict[str, Any]:
         """Execute a single stage with given inputs."""
         url = f"{self.server_url}/api/v1/stages/{stage_name}/execute"
 
         data = {
-            'input_files': json.dumps(input_files),
-            'output_dir': str(OUTPUT_DIR),
-            'return_content': 'true'
+            "input_files": json.dumps(input_files),
+            "output_dir": str(OUTPUT_DIR),
+            "return_content": "true",
         }
 
         if config:
-            data['config'] = json.dumps(config)
+            data["config"] = json.dumps(config)
 
         print(f"📤 POST {url}")
         print(f"   Input files: {input_files}")
@@ -83,14 +87,11 @@ class MoRAGTester:
                 return {
                     "success": False,
                     "error": response.text,
-                    "status_code": response.status_code
+                    "status_code": response.status_code,
                 }
         except Exception as e:
             print(f"❌ Request failed: {e}")
-            return {
-                "success": False,
-                "error": str(e)
-            }
+            return {"success": False, "error": str(e)}
 
     def download_output_files(self, session_id: str) -> List[Path]:
         """Download all output files for a session."""
@@ -105,23 +106,23 @@ class MoRAGTester:
                 return []
 
             files_data = response.json()
-            files = files_data.get('files', [])
+            files = files_data.get("files", [])
             print(f"📋 Found {len(files)} files")
 
             downloaded_files = []
             for file_info in files:
-                filename = file_info['filename']
+                filename = file_info["filename"]
                 download_url = f"{self.server_url}/api/v1/files/download"
 
                 try:
                     response = self.session.get(
                         download_url,
-                        params={"session_id": session_id, "filename": filename}
+                        params={"session_id": session_id, "filename": filename},
                     )
 
                     if response.status_code == 200:
                         local_path = OUTPUT_DIR / f"{session_id}_{filename}"
-                        with open(local_path, 'wb') as f:
+                        with open(local_path, "wb") as f:
                             f.write(response.content)
                         print(f"✅ Downloaded: {local_path}")
                         downloaded_files.append(local_path)
@@ -141,11 +142,7 @@ class MoRAGTester:
         """Verify downloaded output files."""
         print(f"\n🔍 Verifying {len(files)} output files...")
 
-        verification = {
-            "total_files": len(files),
-            "files": [],
-            "issues": []
-        }
+        verification = {"total_files": len(files), "files": [], "issues": []}
 
         for file_path in files:
             file_info = {
@@ -153,28 +150,41 @@ class MoRAGTester:
                 "exists": file_path.exists(),
                 "size": file_path.stat().st_size if file_path.exists() else 0,
                 "extension": file_path.suffix,
-                "content_preview": None
+                "content_preview": None,
             }
 
             if file_path.exists() and file_path.stat().st_size > 0:
                 try:
                     # Try to read content preview
-                    if file_path.suffix in ['.md', '.txt', '.json']:
-                        with open(file_path, 'r', encoding='utf-8') as f:
+                    if file_path.suffix in [".md", ".txt", ".json"]:
+                        with open(file_path, "r", encoding="utf-8") as f:
                             content = f.read()
-                            file_info["content_preview"] = content[:500] + "..." if len(content) > 500 else content
+                            file_info["content_preview"] = (
+                                content[:500] + "..." if len(content) > 500 else content
+                            )
 
                             # Check for common issues
-                            if file_path.suffix == '.md' and len(content.strip()) < 50:
-                                verification["issues"].append(f"Markdown file {file_path.name} seems too short")
+                            if file_path.suffix == ".md" and len(content.strip()) < 50:
+                                verification["issues"].append(
+                                    f"Markdown file {file_path.name} seems too short"
+                                )
 
-                            if "error" in content.lower() or "failed" in content.lower():
-                                verification["issues"].append(f"File {file_path.name} contains error messages")
+                            if (
+                                "error" in content.lower()
+                                or "failed" in content.lower()
+                            ):
+                                verification["issues"].append(
+                                    f"File {file_path.name} contains error messages"
+                                )
 
                 except Exception as e:
-                    verification["issues"].append(f"Could not read {file_path.name}: {e}")
+                    verification["issues"].append(
+                        f"Could not read {file_path.name}: {e}"
+                    )
             else:
-                verification["issues"].append(f"File {file_path.name} is empty or missing")
+                verification["issues"].append(
+                    f"File {file_path.name} is empty or missing"
+                )
 
             verification["files"].append(file_info)
             print(f"📄 {file_path.name}: {file_info['size']} bytes")
@@ -188,7 +198,9 @@ class MoRAGTester:
 
         return verification
 
-    def test_input_type(self, input_type: str, test_inputs: List[str], config: Dict[str, Any] = None):
+    def test_input_type(
+        self, input_type: str, test_inputs: List[str], config: Dict[str, Any] = None
+    ):
         """Test a specific input type through all processing stages."""
         print(f"\n🧪 Testing {input_type.upper()} Processing")
         print("=" * 50)
@@ -197,13 +209,15 @@ class MoRAGTester:
             "input_type": input_type,
             "test_inputs": test_inputs,
             "stages": {},
-            "overall_success": True
+            "overall_success": True,
         }
 
         # Stage 1: Markdown Conversion
         print(f"\n📝 Stage 1: Markdown Conversion")
         stage_config = config or {}
-        conversion_result = self.execute_stage("markdown-conversion", test_inputs, stage_config)
+        conversion_result = self.execute_stage(
+            "markdown-conversion", test_inputs, stage_config
+        )
         results["stages"]["markdown-conversion"] = conversion_result
 
         if not conversion_result.get("success"):
@@ -216,7 +230,9 @@ class MoRAGTester:
         if session_id:
             downloaded_files = self.download_output_files(session_id)
             verification = self.verify_output_files(downloaded_files)
-            results["stages"]["markdown-conversion"]["downloaded_files"] = [str(f) for f in downloaded_files]
+            results["stages"]["markdown-conversion"]["downloaded_files"] = [
+                str(f) for f in downloaded_files
+            ]
             results["stages"]["markdown-conversion"]["verification"] = verification
 
         # Continue with next stages if markdown conversion succeeded
@@ -224,11 +240,19 @@ class MoRAGTester:
 
         return results
 
+
 def main():
-    parser = argparse.ArgumentParser(description="Debug MoRAG markdown conversion issues")
+    parser = argparse.ArgumentParser(
+        description="Debug MoRAG markdown conversion issues"
+    )
     parser.add_argument("--server", default=REMOTE_SERVER, help="Server URL")
     parser.add_argument("--local", action="store_true", help="Use local server")
-    parser.add_argument("--type", choices=["youtube", "web", "all"], default="all", help="Test specific type")
+    parser.add_argument(
+        "--type",
+        choices=["youtube", "web", "all"],
+        default="all",
+        help="Test specific type",
+    )
 
     args = parser.parse_args()
 
@@ -249,17 +273,14 @@ def main():
             "config": {
                 "extract_metadata": True,
                 "extract_transcript": True,
-                "use_proxy": True
-            }
+                "use_proxy": True,
+            },
         }
 
     if args.type in ["web", "all"]:
         test_cases["web"] = {
             "inputs": ["https://example.com"],
-            "config": {
-                "extract_metadata": True,
-                "clean_content": True
-            }
+            "config": {"extract_metadata": True, "clean_content": True},
         }
 
     # Run tests
@@ -267,15 +288,13 @@ def main():
     for input_type, test_data in test_cases.items():
         try:
             result = tester.test_input_type(
-                input_type,
-                test_data["inputs"],
-                test_data["config"]
+                input_type, test_data["inputs"], test_data["config"]
             )
             all_results[input_type] = result
 
             # Save individual result
             result_file = OUTPUT_DIR / f"{input_type}_test_result.json"
-            with open(result_file, 'w') as f:
+            with open(result_file, "w") as f:
                 json.dump(result, f, indent=2)
             print(f"💾 Saved results to {result_file}")
 
@@ -285,7 +304,7 @@ def main():
 
     # Save combined results
     combined_file = OUTPUT_DIR / "combined_test_results.json"
-    with open(combined_file, 'w') as f:
+    with open(combined_file, "w") as f:
         json.dump(all_results, f, indent=2)
 
     print(f"\n📊 Test Summary")
@@ -295,9 +314,12 @@ def main():
             print(f"❌ {input_type}: {result['error']}")
         else:
             success = result.get("overall_success", False)
-            print(f"{'✅' if success else '❌'} {input_type}: {'Success' if success else 'Failed'}")
+            print(
+                f"{'✅' if success else '❌'} {input_type}: {'Success' if success else 'Failed'}"
+            )
 
     print(f"\n💾 All results saved to {OUTPUT_DIR}")
+
 
 if __name__ == "__main__":
     main()

@@ -1,16 +1,16 @@
 """Tests for YouTube transcript functionality."""
 
-import pytest
-from unittest.mock import Mock, patch, AsyncMock
-from pathlib import Path
 import tempfile
+from pathlib import Path
+from unittest.mock import AsyncMock, Mock, patch
 
-from morag_youtube.transcript import (
-    YouTubeTranscriptService,
-    YouTubeTranscript,
-    TranscriptSegment
-)
+import pytest
 from morag_core.exceptions import ProcessingError
+from morag_youtube.transcript import (
+    TranscriptSegment,
+    YouTubeTranscript,
+    YouTubeTranscriptService,
+)
 from youtube_transcript_api import YouTubeTranscriptApi
 
 
@@ -51,13 +51,13 @@ class TestYouTubeTranscriptService:
             transcript_service.extract_video_id("https://example.com/invalid")
 
     @pytest.mark.asyncio
-    @patch.object(YouTubeTranscriptApi, 'list')
+    @patch.object(YouTubeTranscriptApi, "list")
     async def test_get_available_transcripts(self, mock_list, transcript_service):
         """Test getting available transcripts."""
         # Mock transcript list
         mock_transcript = Mock()
-        mock_transcript.language_code = 'en'
-        mock_transcript.language = 'English (auto-generated)'
+        mock_transcript.language_code = "en"
+        mock_transcript.language = "English (auto-generated)"
         mock_transcript.is_generated = True
         mock_transcript.is_translatable = True
 
@@ -69,46 +69,40 @@ class TestYouTubeTranscriptService:
         video_id = "dQw4w9WgXcQ"
         available = await transcript_service.get_available_transcripts(video_id)
 
-        assert 'en' in available
-        assert available['en']['language'] == 'English (auto-generated)'
-        assert available['en']['is_generated'] is True
-        assert available['en']['is_translatable'] is True
+        assert "en" in available
+        assert available["en"]["language"] == "English (auto-generated)"
+        assert available["en"]["is_generated"] is True
+        assert available["en"]["is_translatable"] is True
 
     @pytest.mark.asyncio
     async def test_determine_target_language_no_preference(self, transcript_service):
         """Test language determination with no preference."""
         available = {
-            'en': {'is_generated': True},
-            'de': {'is_generated': False}  # Manual transcript
+            "en": {"is_generated": True},
+            "de": {"is_generated": False},  # Manual transcript
         }
 
         # Should prefer manual transcript
         target = await transcript_service._determine_target_language(available, None)
-        assert target == 'de'
+        assert target == "de"
 
     @pytest.mark.asyncio
     async def test_determine_target_language_with_preference(self, transcript_service):
         """Test language determination with preference."""
-        available = {
-            'en': {'is_generated': True},
-            'de': {'is_generated': False}
-        }
+        available = {"en": {"is_generated": True}, "de": {"is_generated": False}}
 
         # Should use preferred language if available
-        target = await transcript_service._determine_target_language(available, 'en')
-        assert target == 'en'
+        target = await transcript_service._determine_target_language(available, "en")
+        assert target == "en"
 
     @pytest.mark.asyncio
     async def test_determine_target_language_fallback(self, transcript_service):
         """Test language determination with unavailable preference."""
-        available = {
-            'en': {'is_generated': True},
-            'de': {'is_generated': False}
-        }
+        available = {"en": {"is_generated": True}, "de": {"is_generated": False}}
 
         # Should fallback to available language
-        target = await transcript_service._determine_target_language(available, 'fr')
-        assert target in ['en', 'de']  # Should pick one of the available
+        target = await transcript_service._determine_target_language(available, "fr")
+        assert target in ["en", "de"]  # Should pick one of the available
 
     def test_seconds_to_srt_time(self, transcript_service):
         """Test SRT time formatting."""
@@ -128,14 +122,14 @@ class TestYouTubeTranscriptService:
         # Create sample transcript
         segments = [
             TranscriptSegment("Hello world", 0.0, 2.0),
-            TranscriptSegment("This is a test", 2.0, 3.0)
+            TranscriptSegment("This is a test", 2.0, 3.0),
         ]
         transcript = YouTubeTranscript(
             video_id="test123",
             language="en",
             segments=segments,
             full_text="Hello world This is a test",
-            is_auto_generated=True
+            is_auto_generated=True,
         )
 
         # Test saving to temp file
@@ -146,7 +140,7 @@ class TestYouTubeTranscriptService:
             )
 
             assert result_path.exists()
-            content = result_path.read_text(encoding='utf-8')
+            content = result_path.read_text(encoding="utf-8")
             assert content == "Hello world This is a test"
 
     @pytest.mark.asyncio
@@ -155,14 +149,14 @@ class TestYouTubeTranscriptService:
         # Create sample transcript
         segments = [
             TranscriptSegment("Hello world", 0.0, 2.0),
-            TranscriptSegment("This is a test", 2.0, 3.0)
+            TranscriptSegment("This is a test", 2.0, 3.0),
         ]
         transcript = YouTubeTranscript(
             video_id="test123",
             language="en",
             segments=segments,
             full_text="Hello world This is a test",
-            is_auto_generated=True
+            is_auto_generated=True,
         )
 
         # Test saving to temp file
@@ -173,7 +167,7 @@ class TestYouTubeTranscriptService:
             )
 
             assert result_path.exists()
-            content = result_path.read_text(encoding='utf-8')
+            content = result_path.read_text(encoding="utf-8")
             assert "1" in content
             assert "00:00:00,000 --> 00:00:02,000" in content
             assert "Hello world" in content
@@ -203,7 +197,7 @@ class TestYouTubeTranscript:
         """Test creating a YouTube transcript."""
         segments = [
             TranscriptSegment("Hello", 0.0, 1.0),
-            TranscriptSegment("World", 1.0, 2.0)
+            TranscriptSegment("World", 1.0, 2.0),
         ]
 
         transcript = YouTubeTranscript(
@@ -211,7 +205,7 @@ class TestYouTubeTranscript:
             language="en",
             segments=segments,
             full_text="Hello World",
-            is_auto_generated=False
+            is_auto_generated=False,
         )
 
         assert transcript.video_id == "test123"
@@ -224,7 +218,7 @@ class TestYouTubeTranscript:
         """Test the duration property calculation."""
         segments = [
             TranscriptSegment("Hello", 0.0, 1.0),  # ends at 1.0
-            TranscriptSegment("World", 1.0, 2.5)   # ends at 3.5
+            TranscriptSegment("World", 1.0, 2.5),  # ends at 3.5
         ]
 
         transcript = YouTubeTranscript(
@@ -232,7 +226,7 @@ class TestYouTubeTranscript:
             language="en",
             segments=segments,
             full_text="Hello World",
-            is_auto_generated=False
+            is_auto_generated=False,
         )
 
         assert transcript.duration == 3.5
@@ -244,7 +238,7 @@ class TestYouTubeTranscript:
             language="en",
             segments=[],
             full_text="",
-            is_auto_generated=False
+            is_auto_generated=False,
         )
 
         assert transcript.duration == 0.0

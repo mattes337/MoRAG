@@ -1,12 +1,13 @@
 """Unit tests for Whisper service."""
 
-import pytest
 import tempfile
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from morag_audio import AudioService, AudioConfig, AudioProcessingResult
+import pytest
+from morag_audio import AudioConfig, AudioProcessingResult, AudioService
 from morag_core.exceptions import ExternalServiceError
+
 
 class TestAudioService:
     """Test cases for AudioService."""
@@ -19,11 +20,7 @@ class TestAudioService:
     @pytest.fixture
     def audio_config(self):
         """Create audio config."""
-        return AudioConfig(
-            model_size="tiny",
-            device="cpu",
-            compute_type="int8"
-        )
+        return AudioConfig(model_size="tiny", device="cpu", compute_type="int8")
 
     @pytest.fixture
     def mock_audio_file(self):
@@ -37,7 +34,7 @@ class TestAudioService:
         assert whisper_service._models == {}
         assert whisper_service._default_config is not None
 
-    @patch('morag.services.whisper_service.WhisperModel')
+    @patch("morag.services.whisper_service.WhisperModel")
     def test_get_model_success(self, mock_whisper_model, whisper_service):
         """Test successful model loading."""
         mock_model = Mock()
@@ -46,14 +43,16 @@ class TestAudioService:
         result = whisper_service._get_model("tiny", "cpu", "int8")
 
         assert result == mock_model
-        mock_whisper_model.assert_called_once_with("tiny", device="cpu", compute_type="int8")
+        mock_whisper_model.assert_called_once_with(
+            "tiny", device="cpu", compute_type="int8"
+        )
 
         # Test caching - should not create new model
         result2 = whisper_service._get_model("tiny", "cpu", "int8")
         assert result2 == mock_model
         assert mock_whisper_model.call_count == 1  # Still only called once
 
-    @patch('morag.services.whisper_service.WhisperModel')
+    @patch("morag.services.whisper_service.WhisperModel")
     def test_get_model_failure(self, mock_whisper_model, whisper_service):
         """Test model loading failure."""
         mock_whisper_model.side_effect = Exception("Model loading failed")
@@ -62,8 +61,10 @@ class TestAudioService:
             whisper_service._get_model("tiny", "cpu", "int8")
 
     @pytest.mark.asyncio
-    @patch('morag.services.whisper_service.WhisperService._get_model')
-    async def test_transcribe_audio_success(self, mock_get_model, whisper_service, mock_audio_file, audio_config):
+    @patch("morag.services.whisper_service.WhisperService._get_model")
+    async def test_transcribe_audio_success(
+        self, mock_get_model, whisper_service, mock_audio_file, audio_config
+    ):
         """Test successful audio transcription."""
         # Mock model and transcription results
         mock_model = Mock()
@@ -83,8 +84,14 @@ class TestAudioService:
         mock_info.all_language_probs = {"en": 0.95, "es": 0.05}
 
         # Mock the _transcribe_sync method
-        with patch.object(whisper_service, '_transcribe_sync', return_value=([mock_segment], mock_info)):
-            result = await whisper_service.transcribe_audio(mock_audio_file, audio_config)
+        with patch.object(
+            whisper_service,
+            "_transcribe_sync",
+            return_value=([mock_segment], mock_info),
+        ):
+            result = await whisper_service.transcribe_audio(
+                mock_audio_file, audio_config
+            )
 
         assert isinstance(result, AudioProcessingResult)
         assert result.text == "Hello world"
@@ -94,11 +101,15 @@ class TestAudioService:
         assert result.segments[0].text == "Hello world"
         assert result.segments[0].start_time == 0.0
         assert result.segments[0].end_time == 2.0
-        assert 0.0 <= result.segments[0].confidence <= 1.0  # Confidence should be normalized
+        assert (
+            0.0 <= result.segments[0].confidence <= 1.0
+        )  # Confidence should be normalized
 
     @pytest.mark.asyncio
-    @patch('morag.services.whisper_service.WhisperService._get_model')
-    async def test_transcribe_audio_failure(self, mock_get_model, whisper_service, mock_audio_file, audio_config):
+    @patch("morag.services.whisper_service.WhisperService._get_model")
+    async def test_transcribe_audio_failure(
+        self, mock_get_model, whisper_service, mock_audio_file, audio_config
+    ):
         """Test audio transcription failure."""
         mock_get_model.side_effect = Exception("Transcription failed")
 
@@ -106,8 +117,10 @@ class TestAudioService:
             await whisper_service.transcribe_audio(mock_audio_file, audio_config)
 
     @pytest.mark.asyncio
-    @patch('morag.services.whisper_service.WhisperService.transcribe_audio')
-    async def test_transcribe_with_chunking(self, mock_transcribe_audio, whisper_service, mock_audio_file, audio_config):
+    @patch("morag.services.whisper_service.WhisperService.transcribe_audio")
+    async def test_transcribe_with_chunking(
+        self, mock_transcribe_audio, whisper_service, mock_audio_file, audio_config
+    ):
         """Test chunked transcription (currently delegates to regular transcription)."""
         mock_result = AudioProcessingResult(
             text="Hello world",
@@ -117,18 +130,22 @@ class TestAudioService:
             segments=[],
             metadata={},
             processing_time=1.0,
-            model_used="tiny"
+            model_used="tiny",
         )
         mock_transcribe_audio.return_value = mock_result
 
-        result = await whisper_service.transcribe_with_chunking(mock_audio_file, audio_config)
+        result = await whisper_service.transcribe_with_chunking(
+            mock_audio_file, audio_config
+        )
 
         assert result == mock_result
         mock_transcribe_audio.assert_called_once_with(mock_audio_file, audio_config)
 
     @pytest.mark.asyncio
-    @patch('morag.services.whisper_service.WhisperService._get_model')
-    async def test_detect_language_success(self, mock_get_model, whisper_service, mock_audio_file):
+    @patch("morag.services.whisper_service.WhisperService._get_model")
+    async def test_detect_language_success(
+        self, mock_get_model, whisper_service, mock_audio_file
+    ):
         """Test successful language detection."""
         # Mock model and transcription results
         mock_model = Mock()
@@ -153,12 +170,14 @@ class TestAudioService:
             language=None,  # Auto-detect
             beam_size=1,
             best_of=1,
-            temperature=0.0
+            temperature=0.0,
         )
 
     @pytest.mark.asyncio
-    @patch('morag.services.whisper_service.WhisperService._get_model')
-    async def test_detect_language_failure(self, mock_get_model, whisper_service, mock_audio_file):
+    @patch("morag.services.whisper_service.WhisperService._get_model")
+    async def test_detect_language_failure(
+        self, mock_get_model, whisper_service, mock_audio_file
+    ):
         """Test language detection failure."""
         mock_get_model.side_effect = Exception("Language detection failed")
 
@@ -181,7 +200,7 @@ class TestAudioService:
             compression_ratio_threshold=2.4,
             log_prob_threshold=-1.0,
             no_speech_threshold=0.6,
-            initial_prompt=None
+            initial_prompt=None,
         )
 
     def test_get_available_models(self, whisper_service):
@@ -222,8 +241,10 @@ class TestAudioService:
         assert len(whisper_service._models) == 0
 
     @pytest.mark.asyncio
-    @patch('morag.services.whisper_service.WhisperService._get_model')
-    async def test_transcribe_audio_empty_segments(self, mock_get_model, whisper_service, mock_audio_file, audio_config):
+    @patch("morag.services.whisper_service.WhisperService._get_model")
+    async def test_transcribe_audio_empty_segments(
+        self, mock_get_model, whisper_service, mock_audio_file, audio_config
+    ):
         """Test transcription with empty segments."""
         # Mock model with no segments
         mock_model = Mock()
@@ -237,16 +258,22 @@ class TestAudioService:
         mock_info.all_language_probs = {"en": 0.95}
 
         # Mock the _transcribe_sync method with empty segments
-        with patch.object(whisper_service, '_transcribe_sync', return_value=([], mock_info)):
-            result = await whisper_service.transcribe_audio(mock_audio_file, audio_config)
+        with patch.object(
+            whisper_service, "_transcribe_sync", return_value=([], mock_info)
+        ):
+            result = await whisper_service.transcribe_audio(
+                mock_audio_file, audio_config
+            )
 
         assert result.text == ""
         assert result.confidence == 0.0  # No segments means 0 confidence
         assert len(result.segments) == 0
 
     @pytest.mark.asyncio
-    @patch('morag.services.whisper_service.WhisperService._get_model')
-    async def test_transcribe_audio_multiple_segments(self, mock_get_model, whisper_service, mock_audio_file, audio_config):
+    @patch("morag.services.whisper_service.WhisperService._get_model")
+    async def test_transcribe_audio_multiple_segments(
+        self, mock_get_model, whisper_service, mock_audio_file, audio_config
+    ):
         """Test transcription with multiple segments."""
         # Mock model with multiple segments
         mock_model = Mock()
@@ -272,8 +299,14 @@ class TestAudioService:
         mock_info.all_language_probs = {"en": 0.95}
 
         # Mock the _transcribe_sync method
-        with patch.object(whisper_service, '_transcribe_sync', return_value=([mock_segment1, mock_segment2], mock_info)):
-            result = await whisper_service.transcribe_audio(mock_audio_file, audio_config)
+        with patch.object(
+            whisper_service,
+            "_transcribe_sync",
+            return_value=([mock_segment1, mock_segment2], mock_info),
+        ):
+            result = await whisper_service.transcribe_audio(
+                mock_audio_file, audio_config
+            )
 
         assert result.text == "Hello world"
         assert len(result.segments) == 2

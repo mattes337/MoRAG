@@ -1,7 +1,7 @@
 """Query and search operations for Neo4j storage."""
 
 import logging
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
 
 from ...models import Entity
 from ...models.types import EntityId
@@ -17,7 +17,7 @@ class QueryOperations(BaseOperations):
         self,
         entity_id: EntityId,
         relation_type: Optional[str] = None,
-        max_depth: int = 1
+        max_depth: int = 1,
     ) -> List[Entity]:
         """Get neighboring entities.
 
@@ -56,7 +56,7 @@ class QueryOperations(BaseOperations):
             try:
                 neighbor_data = dict(record["neighbor"])
                 # Only process if it has the required fields for an Entity
-                if 'name' in neighbor_data and neighbor_data['name']:
+                if "name" in neighbor_data and neighbor_data["name"]:
                     neighbors.append(Entity.from_neo4j_node(neighbor_data))
                 else:
                     logger.debug(f"Skipping non-entity node: {neighbor_data}")
@@ -66,10 +66,7 @@ class QueryOperations(BaseOperations):
         return neighbors
 
     async def find_path(
-        self,
-        source_entity_id: EntityId,
-        target_entity_id: EntityId,
-        max_depth: int = 3
+        self, source_entity_id: EntityId, target_entity_id: EntityId, max_depth: int = 3
     ) -> List[List[EntityId]]:
         """Find paths between two entities.
 
@@ -88,18 +85,14 @@ class QueryOperations(BaseOperations):
         LIMIT 10
         """
 
-        result = await self._execute_query(query, {
-            "source_id": source_entity_id,
-            "target_id": target_entity_id
-        })
+        result = await self._execute_query(
+            query, {"source_id": source_entity_id, "target_id": target_entity_id}
+        )
 
         return [record["path_ids"] for record in result]
 
     async def search_entities_by_content(
-        self,
-        search_term: str,
-        entity_type: Optional[str] = None,
-        limit: int = 10
+        self, search_term: str, entity_type: Optional[str] = None, limit: int = 10
     ) -> List[Entity]:
         """Search entities by content using full-text search.
 
@@ -150,7 +143,7 @@ class QueryOperations(BaseOperations):
         entity_id: EntityId,
         relation_types: Optional[List[str]] = None,
         max_depth: int = 2,
-        limit: int = 20
+        limit: int = 20,
     ) -> List[Dict[str, Any]]:
         """Find entities related to a given entity with relationship context.
 
@@ -164,7 +157,9 @@ class QueryOperations(BaseOperations):
             List of related entities with relationship metadata
         """
         if relation_types:
-            relation_filter = f"WHERE ALL(r in relationships(path) WHERE r.type IN {relation_types})"
+            relation_filter = (
+                f"WHERE ALL(r in relationships(path) WHERE r.type IN {relation_types})"
+            )
         else:
             relation_filter = ""
 
@@ -180,29 +175,28 @@ class QueryOperations(BaseOperations):
                [r in relationships(path) | {{type: r.type, confidence: r.confidence}}] as relationship_path
         """
 
-        result = await self._execute_query(query, {
-            "entity_id": entity_id,
-            "limit": limit
-        })
+        result = await self._execute_query(
+            query, {"entity_id": entity_id, "limit": limit}
+        )
 
         related_entities = []
         for record in result:
             try:
                 entity = Entity.from_neo4j_node(record["related"])
-                related_entities.append({
-                    "entity": entity,
-                    "distance": record["distance"],
-                    "relationship_path": record["relationship_path"]
-                })
+                related_entities.append(
+                    {
+                        "entity": entity,
+                        "distance": record["distance"],
+                        "relationship_path": record["relationship_path"],
+                    }
+                )
             except Exception as e:
                 logger.warning(f"Failed to parse related entity: {e}")
 
         return related_entities
 
     async def get_entity_clusters(
-        self,
-        min_cluster_size: int = 3,
-        max_clusters: int = 10
+        self, min_cluster_size: int = 3, max_clusters: int = 10
     ) -> List[Dict[str, Any]]:
         """Find clusters of highly connected entities.
 
@@ -223,10 +217,9 @@ class QueryOperations(BaseOperations):
         RETURN e as central_entity, connection_count, connections
         """
 
-        result = await self._execute_query(query, {
-            "min_cluster_size": min_cluster_size,
-            "max_clusters": max_clusters
-        })
+        result = await self._execute_query(
+            query, {"min_cluster_size": min_cluster_size, "max_clusters": max_clusters}
+        )
 
         clusters = []
         for record in result:
@@ -239,21 +232,20 @@ class QueryOperations(BaseOperations):
                     except Exception as e:
                         logger.warning(f"Failed to parse connected entity: {e}")
 
-                clusters.append({
-                    "central_entity": central_entity,
-                    "connection_count": record["connection_count"],
-                    "connected_entities": connected_entities
-                })
+                clusters.append(
+                    {
+                        "central_entity": central_entity,
+                        "connection_count": record["connection_count"],
+                        "connected_entities": connected_entities,
+                    }
+                )
             except Exception as e:
                 logger.warning(f"Failed to parse cluster: {e}")
 
         return clusters
 
     async def find_shortest_paths(
-        self,
-        source_entity_id: EntityId,
-        target_entity_id: EntityId,
-        max_depth: int = 5
+        self, source_entity_id: EntityId, target_entity_id: EntityId, max_depth: int = 5
     ) -> List[Dict[str, Any]]:
         """Find shortest paths between two entities with relationship details.
 
@@ -276,17 +268,18 @@ class QueryOperations(BaseOperations):
         LIMIT 5
         """
 
-        result = await self._execute_query(query, {
-            "source_id": source_entity_id,
-            "target_id": target_entity_id
-        })
+        result = await self._execute_query(
+            query, {"source_id": source_entity_id, "target_id": target_entity_id}
+        )
 
         paths = []
         for record in result:
-            paths.append({
-                "path_length": record["path_length"],
-                "entities": record["entities"],
-                "relationships": record["relationships"]
-            })
+            paths.append(
+                {
+                    "path_length": record["path_length"],
+                    "entities": record["entities"],
+                    "relationships": record["relationships"],
+                }
+            )
 
         return paths

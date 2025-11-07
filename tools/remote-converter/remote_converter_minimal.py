@@ -5,16 +5,17 @@ Minimal MoRAG Remote Converter Tool for testing fixes
 
 import asyncio
 import os
-import sys
-import time
-import signal
-import tempfile
 import shutil
-from pathlib import Path
-from typing import Optional, Dict, Any, List
+import signal
+import sys
+import tempfile
+import time
 from dataclasses import dataclass
-import structlog
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
 import requests
+import structlog
 from dotenv import load_dotenv
 
 # Add MoRAG packages to path
@@ -28,6 +29,7 @@ logger = structlog.get_logger(__name__)
 @dataclass
 class ProcessingResult:
     """Unified processing result for remote converter."""
+
     success: bool
     text_content: str
     metadata: Dict[str, Any]
@@ -38,23 +40,23 @@ class ProcessingResult:
 def test_audio_processor():
     """Test audio processor import and method availability."""
     try:
-        from morag_audio.processor import AudioProcessor, AudioProcessingResult
+        from morag_audio.processor import AudioProcessingResult, AudioProcessor
 
         # Create processor instance
         processor = AudioProcessor()
         print(f"✅ AudioProcessor created: {type(processor)}")
 
         # Check available methods
-        methods = [method for method in dir(processor) if not method.startswith('_')]
+        methods = [method for method in dir(processor) if not method.startswith("_")]
         print(f"Available methods: {methods}")
 
         # Check if process method exists
-        if hasattr(processor, 'process'):
+        if hasattr(processor, "process"):
             print("✅ AudioProcessor has 'process' method")
         else:
             print("❌ AudioProcessor missing 'process' method")
 
-        if hasattr(processor, 'process_audio'):
+        if hasattr(processor, "process_audio"):
             print("✅ AudioProcessor has 'process_audio' method")
         else:
             print("❌ AudioProcessor missing 'process_audio' method")
@@ -65,7 +67,7 @@ def test_audio_processor():
             segments=[],
             metadata={},
             file_path="test.mp3",
-            processing_time=1.0
+            processing_time=1.0,
         )
         print(f"✅ AudioProcessingResult created: success={result.success}")
 
@@ -74,6 +76,7 @@ def test_audio_processor():
     except Exception as e:
         print(f"❌ Audio processor test failed: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
@@ -91,7 +94,7 @@ def test_result_conversion():
             file_path="test.mp3",
             processing_time=2.0,
             success=True,
-            error_message=None
+            error_message=None,
         )
 
         # Convert to unified result
@@ -100,7 +103,7 @@ def test_result_conversion():
             text_content=audio_result.transcript,
             metadata=audio_result.metadata,
             processing_time=audio_result.processing_time,
-            error_message=audio_result.error_message
+            error_message=audio_result.error_message,
         )
 
         print(f"✅ Result conversion successful:")
@@ -114,6 +117,7 @@ def test_result_conversion():
     except Exception as e:
         print(f"❌ Result conversion test failed: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
@@ -130,11 +134,12 @@ async def test_audio_processing():
 
         # Check method signature without actually calling it
         import inspect
-        if hasattr(processor, 'process'):
+
+        if hasattr(processor, "process"):
             sig = inspect.signature(processor.process)
             print(f"✅ process() method signature: {sig}")
 
-        if hasattr(processor, 'process_audio'):
+        if hasattr(processor, "process_audio"):
             sig = inspect.signature(processor.process_audio)
             print(f"✅ process_audio() method signature: {sig}")
 
@@ -143,6 +148,7 @@ async def test_audio_processing():
     except Exception as e:
         print(f"❌ Audio processing test failed: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 

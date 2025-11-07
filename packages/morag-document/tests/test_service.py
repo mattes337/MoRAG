@@ -1,16 +1,19 @@
 """Tests for document service."""
 
 import os
-import pytest
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from morag_core.interfaces.service import ServiceConfig, ServiceStatus
+import pytest
+from morag_core.exceptions import ProcessingError, ValidationError
 from morag_core.interfaces.converter import ChunkingStrategy
+from morag_core.interfaces.service import ServiceConfig, ServiceStatus
 from morag_core.models.document import Document
-from morag_core.models.embedding import EmbeddingResult, BatchEmbeddingResult, SummaryResult
-from morag_core.exceptions import ValidationError, ProcessingError
-
+from morag_core.models.embedding import (
+    BatchEmbeddingResult,
+    EmbeddingResult,
+    SummaryResult,
+)
 from morag_document.service import DocumentService
 
 
@@ -43,7 +46,7 @@ def sample_document():
             "title": "Test Document",
             "file_type": "text",
             "word_count": 5,
-        }
+        },
     )
     doc.add_chunk(content="Sample document text for testing.")
     return doc
@@ -138,8 +141,7 @@ async def test_process_document(service, tmp_path):
     # Mock processor
     service.processor.process_file = AsyncMock()
     service.processor.process_file.return_value = MagicMock(
-        document=MagicMock(),
-        metadata={"quality_score": 0.9}
+        document=MagicMock(), metadata={"quality_score": 0.9}
     )
 
     # Process document
@@ -149,13 +151,14 @@ async def test_process_document(service, tmp_path):
 
     # Check processor was called with correct arguments
     service.processor.process_file.assert_called_once_with(
-        test_file,
-        generate_embeddings=False
+        test_file, generate_embeddings=False
     )
 
 
 @pytest.mark.asyncio
-async def test_process_document_with_embeddings(service_with_embedding, sample_document, tmp_path):
+async def test_process_document_with_embeddings(
+    service_with_embedding, sample_document, tmp_path
+):
     """Test document processing with embeddings."""
     # Initialize service
     await service_with_embedding.initialize()
@@ -167,8 +170,7 @@ async def test_process_document_with_embeddings(service_with_embedding, sample_d
     # Mock processor
     service_with_embedding.processor.process_file = AsyncMock()
     service_with_embedding.processor.process_file.return_value = MagicMock(
-        document=sample_document,
-        metadata={"quality_score": 0.9}
+        document=sample_document, metadata={"quality_score": 0.9}
     )
 
     # Mock embedding service
@@ -176,18 +178,14 @@ async def test_process_document_with_embeddings(service_with_embedding, sample_d
         id="test",
         text="Sample document text for testing.",
         embedding=[0.1, 0.2, 0.3],
-        model="test-model"
+        model="test-model",
     )
-    batch_result = BatchEmbeddingResult(
-        results=[embedding_result],
-        model="test-model"
-    )
+    batch_result = BatchEmbeddingResult(results=[embedding_result], model="test-model")
     service_with_embedding.embedding_service.embed_batch.return_value = batch_result
 
     # Process document with embeddings
     result = await service_with_embedding.process_document(
-        test_file,
-        generate_embeddings=True
+        test_file, generate_embeddings=True
     )
 
     # Check result
@@ -230,18 +228,14 @@ async def test_process_text_with_embeddings(service_with_embedding):
         id="test",
         text="Sample text for processing.",
         embedding=[0.1, 0.2, 0.3],
-        model="test-model"
+        model="test-model",
     )
-    batch_result = BatchEmbeddingResult(
-        results=[embedding_result],
-        model="test-model"
-    )
+    batch_result = BatchEmbeddingResult(results=[embedding_result], model="test-model")
     service_with_embedding.embedding_service.embed_batch.return_value = batch_result
 
     # Process text with embeddings
     result = await service_with_embedding.process_text(
-        "Sample text for processing.",
-        generate_embeddings=True
+        "Sample text for processing.", generate_embeddings=True
     )
 
     # Check embedding service was called
@@ -259,7 +253,7 @@ async def test_summarize_document(service_with_embedding, sample_document):
         id="test",
         text="Sample document text for testing.",
         summary="This is a test document.",
-        model="test-model"
+        model="test-model",
     )
     service_with_embedding.embedding_service.summarize.return_value = summary_result
 
@@ -271,8 +265,7 @@ async def test_summarize_document(service_with_embedding, sample_document):
 
     # Check embedding service was called
     service_with_embedding.embedding_service.summarize.assert_called_once_with(
-        "Sample document text for testing.",
-        max_length=1000
+        "Sample document text for testing.", max_length=1000
     )
 
 

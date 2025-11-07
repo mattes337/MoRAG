@@ -1,10 +1,11 @@
 """Entity types configuration manager for MoRAG agents."""
 
 import os
-import yaml
-from typing import List, Dict, Set, Optional, Any
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Set
+
 import structlog
+import yaml
 
 logger = structlog.get_logger(__name__)
 
@@ -28,11 +29,13 @@ class EntityTypesManager:
     def _load_config(self) -> None:
         """Load entity types configuration from YAML file."""
         try:
-            with open(self.config_path, 'r', encoding='utf-8') as f:
+            with open(self.config_path, "r", encoding="utf-8") as f:
                 self._config = yaml.safe_load(f)
             logger.info("Entity types configuration loaded", path=str(self.config_path))
         except FileNotFoundError:
-            logger.error("Entity types configuration file not found", path=str(self.config_path))
+            logger.error(
+                "Entity types configuration file not found", path=str(self.config_path)
+            )
             self._config = self._get_fallback_config()
         except yaml.YAMLError as e:
             logger.error("Failed to parse entity types configuration", error=str(e))
@@ -42,20 +45,36 @@ class EntityTypesManager:
         """Get fallback configuration if file loading fails."""
         return {
             "standard_entity_types": [
-                "PERSON", "ORGANIZATION", "LOCATION", "CONCEPT",
-                "PRODUCT", "EVENT", "DATE", "QUANTITY", "TECHNOLOGY", "PROCESS"
+                "PERSON",
+                "ORGANIZATION",
+                "LOCATION",
+                "CONCEPT",
+                "PRODUCT",
+                "EVENT",
+                "DATE",
+                "QUANTITY",
+                "TECHNOLOGY",
+                "PROCESS",
             ],
             "agent_defaults": {
                 "entity_extraction": [
-                    "PERSON", "ORGANIZATION", "LOCATION", "CONCEPT",
-                    "PRODUCT", "EVENT", "DATE", "QUANTITY", "TECHNOLOGY", "PROCESS"
+                    "PERSON",
+                    "ORGANIZATION",
+                    "LOCATION",
+                    "CONCEPT",
+                    "PRODUCT",
+                    "EVENT",
+                    "DATE",
+                    "QUANTITY",
+                    "TECHNOLOGY",
+                    "PROCESS",
                 ]
             },
             "dynamic_entity_types": {
                 "enabled": True,
                 "max_custom_types": 20,
-                "confidence_threshold": 0.8
-            }
+                "confidence_threshold": 0.8,
+            },
         }
 
     def get_standard_entity_types(self) -> List[str]:
@@ -221,10 +240,13 @@ class EntityTypesManager:
             return False
 
         # Check characters (simplified validation)
-        allowed = rules.get("allowed_characters", "alphanumeric_spaces_hyphens_underscores")
+        allowed = rules.get(
+            "allowed_characters", "alphanumeric_spaces_hyphens_underscores"
+        )
         if allowed == "alphanumeric_spaces_hyphens_underscores":
             import re
-            if not re.match(r'^[A-Za-z0-9\s\-_]+$', entity_type):
+
+            if not re.match(r"^[A-Za-z0-9\s\-_]+$", entity_type):
                 return False
 
         return True

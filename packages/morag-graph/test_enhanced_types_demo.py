@@ -8,7 +8,9 @@ generic ones.
 """
 
 import asyncio
+
 from morag_graph.models import Entity, Relation
+
 
 def demo_entity_labels():
     """Demonstrate enhanced entity label generation."""
@@ -28,18 +30,14 @@ def demo_entity_labels():
     ]
 
     for name, entity_type in test_entities:
-        entity = Entity(
-            name=name,
-            type=entity_type,
-            confidence=0.9,
-            attributes={}
-        )
+        entity = Entity(name=name, type=entity_type, confidence=0.9, attributes={})
 
         neo4j_label = entity.get_neo4j_label()
         print(f"  Entity: {name}")
         print(f"    Type: {entity_type}")
         print(f"    Neo4j Label: :{neo4j_label}")
         print()
+
 
 def demo_relationship_types():
     """Demonstrate enhanced relationship type generation."""
@@ -64,7 +62,7 @@ def demo_relationship_types():
             target_entity_id="entity_2",
             type=rel_type,
             confidence=0.9,
-            attributes={"description": description}
+            attributes={"description": description},
         )
 
         neo4j_type = relation.get_neo4j_type()
@@ -72,6 +70,7 @@ def demo_relationship_types():
         print(f"    Description: {description}")
         print(f"    Neo4j Type: -{neo4j_type}->")
         print()
+
 
 def demo_prompt_improvements():
     """Demonstrate the improved LLM prompts."""
@@ -87,6 +86,7 @@ def demo_prompt_improvements():
             from morag_reasoning.llm import LLMConfig
         except ImportError:
             from pydantic import BaseModel
+
             class LLMConfig(BaseModel):
                 provider: str = "gemini"
                 model: str = "gemini-1.5-flash"
@@ -122,6 +122,7 @@ def demo_prompt_improvements():
     except Exception as e:
         print(f"Error demonstrating prompts: {e}")
 
+
 def demo_neo4j_storage_changes():
     """Demonstrate how Neo4j storage now uses dynamic labels."""
     print("🗄️  Neo4j Storage Improvements")
@@ -146,6 +147,7 @@ def demo_neo4j_storage_changes():
     print("  ✓ Domain-specific graph schemas")
     print()
 
+
 def main():
     """Run the demo."""
     print("🚀 Enhanced Graph Entity and Relationship Type Generation Demo")
@@ -167,6 +169,7 @@ def main():
     print("✅ Demo completed! The graph extraction now generates diverse,")
     print("   specialized entity labels and relationship types instead of")
     print("   generic ones, leading to much richer knowledge graphs.")
+
 
 if __name__ == "__main__":
     main()

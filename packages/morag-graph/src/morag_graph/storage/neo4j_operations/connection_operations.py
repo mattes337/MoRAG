@@ -2,7 +2,8 @@
 
 import logging
 from typing import Optional
-from neo4j import AsyncGraphDatabase, AsyncDriver
+
+from neo4j import AsyncDriver, AsyncGraphDatabase
 
 from .base_operations import BaseOperations
 
@@ -73,14 +74,16 @@ class ConnectionOperations(BaseOperations):
                 # Check if database exists
                 result = await session.run(
                     "SHOW DATABASES YIELD name WHERE name = $db_name",
-                    {"db_name": self.config.database}
+                    {"db_name": self.config.database},
                 )
 
                 databases = [record async for record in result]
 
                 if not databases:
                     # Database doesn't exist, try to create it
-                    logger.info(f"Database '{self.config.database}' not found, attempting to create it")
+                    logger.info(
+                        f"Database '{self.config.database}' not found, attempting to create it"
+                    )
                     await session.run(f"CREATE DATABASE `{self.config.database}`")
                     logger.info(f"Created database '{self.config.database}'")
                 else:
@@ -90,15 +93,21 @@ class ConnectionOperations(BaseOperations):
             # If we can't access system database or create databases,
             # try to connect directly to the target database
             try:
-                async with self.driver.session(database=self.config.database) as session:
+                async with self.driver.session(
+                    database=self.config.database
+                ) as session:
                     # Simple query to test database access
                     await session.run("RETURN 1")
-                    logger.info(f"Successfully connected to database '{self.config.database}'")
+                    logger.info(
+                        f"Successfully connected to database '{self.config.database}'"
+                    )
             except Exception as direct_error:
                 if "database does not exist" in str(direct_error).lower():
-                    logger.error(f"Database '{self.config.database}' does not exist and cannot be created automatically. "
-                               f"Please either: 1) Create the database manually, 2) Use the default 'neo4j' database, "
-                               f"or 3) Use Neo4j Enterprise Edition for automatic database creation.")
+                    logger.error(
+                        f"Database '{self.config.database}' does not exist and cannot be created automatically. "
+                        f"Please either: 1) Create the database manually, 2) Use the default 'neo4j' database, "
+                        f"or 3) Use Neo4j Enterprise Edition for automatic database creation."
+                    )
                 raise direct_error
 
     async def create_database_if_not_exists(self, database_name: str) -> bool:
@@ -116,7 +125,7 @@ class ConnectionOperations(BaseOperations):
                 # Check if database exists
                 result = await session.run(
                     "SHOW DATABASES YIELD name WHERE name = $db_name",
-                    {"db_name": database_name}
+                    {"db_name": database_name},
                 )
 
                 databases = [record async for record in result]

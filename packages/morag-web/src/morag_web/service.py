@@ -1,10 +1,10 @@
 """Web service for high-level operations."""
 
-from typing import Dict, List, Optional, Any, Union
-from pathlib import Path
 import asyncio
-import structlog
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Union
 
+import structlog
 from morag_core.exceptions import ProcessingError
 from morag_core.interfaces.service import BaseService
 from morag_core.models.document import DocumentChunk
@@ -41,7 +41,9 @@ class WebService(BaseService):
         """
         return {"status": "healthy", "processor": "ready"}
 
-    async def process_url(self, url: str, config_options: Optional[Dict[str, Any]] = None) -> WebScrapingResult:
+    async def process_url(
+        self, url: str, config_options: Optional[Dict[str, Any]] = None
+    ) -> WebScrapingResult:
         """Process a single URL with the given configuration options.
 
         Args:
@@ -72,7 +74,7 @@ class WebService(BaseService):
         self,
         urls: List[str],
         config_options: Optional[Dict[str, Any]] = None,
-        concurrency_limit: int = 5
+        concurrency_limit: int = 5,
     ) -> Dict[str, WebScrapingResult]:
         """Process multiple URLs with concurrency limit.
 
@@ -115,7 +117,7 @@ class WebService(BaseService):
                     chunks=[],
                     processing_time=0.0,
                     success=False,
-                    error_message=f"Error: {str(result)}"
+                    error_message=f"Error: {str(result)}",
                 )
             else:
                 output[url] = result
@@ -153,10 +155,7 @@ class WebService(BaseService):
         Raises:
             ProcessingError: If processing fails
         """
-        result = await self.process_url(
-            url,
-            {"convert_to_markdown": True}
-        )
+        result = await self.process_url(url, {"convert_to_markdown": True})
 
         if not result.success or not result.content:
             raise ProcessingError(f"Failed to extract markdown: {result.error_message}")
@@ -194,10 +193,7 @@ class WebService(BaseService):
         Raises:
             ProcessingError: If processing fails
         """
-        result = await self.process_url(
-            url,
-            {"extract_links": True}
-        )
+        result = await self.process_url(url, {"extract_links": True})
 
         if not result.success or not result.content:
             raise ProcessingError(f"Failed to extract links: {result.error_message}")
@@ -223,17 +219,19 @@ class WebService(BaseService):
 
         return result.content.images
 
-    def _create_comprehensive_metadata(self, url: str, result: WebScrapingResult) -> Dict[str, Any]:
+    def _create_comprehensive_metadata(
+        self, url: str, result: WebScrapingResult
+    ) -> Dict[str, Any]:
         """Create comprehensive metadata including all required document fields."""
-        from urllib.parse import urlparse
         import hashlib
+        from urllib.parse import urlparse
 
         # Parse URL for metadata
         parsed_url = urlparse(url)
         domain = parsed_url.netloc
 
         # Create a pseudo-filename from URL
-        path_parts = parsed_url.path.strip('/').split('/')
+        path_parts = parsed_url.path.strip("/").split("/")
         if path_parts and path_parts[-1]:
             filename = f"{path_parts[-1]}.html"
         else:
@@ -241,7 +239,7 @@ class WebService(BaseService):
 
         # Calculate content checksum for document identification
         content_text = result.content.content if result.content else ""
-        checksum = hashlib.sha256(content_text.encode('utf-8')).hexdigest()
+        checksum = hashlib.sha256(content_text.encode("utf-8")).hexdigest()
 
         # Build comprehensive metadata with all required fields for document creation
         metadata = {
@@ -250,18 +248,21 @@ class WebService(BaseService):
             "source_name": filename,
             "file_name": filename,
             "mime_type": "text/html",
-            "file_size": len(content_text.encode('utf-8')) if content_text else 0,
+            "file_size": len(content_text.encode("utf-8")) if content_text else 0,
             "checksum": checksum,
-
             # Web-specific metadata
             "url": url,
             "domain": domain,
             "title": result.content.title if result.content else "",
-            "content_type": result.content.content_type if result.content else "text/html",
+            "content_type": result.content.content_type
+            if result.content
+            else "text/html",
             "content_length": result.content.content_length if result.content else 0,
             "links_count": len(result.content.links) if result.content else 0,
             "images_count": len(result.content.images) if result.content else 0,
-            "extraction_time": result.content.extraction_time if result.content else 0.0,
+            "extraction_time": result.content.extraction_time
+            if result.content
+            else 0.0,
             "chunks_count": len(result.chunks) if result.chunks else 0,
         }
 

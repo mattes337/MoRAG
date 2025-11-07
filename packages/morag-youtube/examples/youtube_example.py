@@ -1,13 +1,14 @@
 """Example usage of morag-youtube package for YouTube video processing."""
 
 import asyncio
+import json
 import os
 from pathlib import Path
-import json
 
-from morag_youtube.processor import YouTubeProcessor, YouTubeConfig
+from morag_youtube.processor import YouTubeConfig, YouTubeProcessor
 from morag_youtube.service import YouTubeService
 from morag_youtube.transcript import YouTubeTranscriptService
+
 
 async def basic_example():
     """Basic example of using YouTubeProcessor directly."""
@@ -22,7 +23,7 @@ async def basic_example():
         extract_audio=True,
         download_subtitles=True,
         subtitle_languages=["en"],
-        download_thumbnails=True
+        download_thumbnails=True,
     )
 
     # Process a YouTube video
@@ -40,7 +41,9 @@ async def basic_example():
         if result.subtitle_paths:
             print(f"Subtitle files: {', '.join(str(p) for p in result.subtitle_paths)}")
         if result.thumbnail_paths:
-            print(f"Thumbnail files: {', '.join(str(p) for p in result.thumbnail_paths)}")
+            print(
+                f"Thumbnail files: {', '.join(str(p) for p in result.thumbnail_paths)}"
+            )
         print(f"Total size: {result.file_size / (1024*1024):.2f} MB")
         print(f"Processing time: {result.processing_time:.2f} seconds")
 
@@ -56,6 +59,7 @@ async def basic_example():
         processor.cleanup(result)
     else:
         print(f"Processing failed: {result.error_message}")
+
 
 async def service_example():
     """Example of using YouTubeService for higher-level operations."""
@@ -78,7 +82,7 @@ async def service_example():
             output_dir=output_dir,
             quality="best",
             extract_audio=True,
-            download_subtitles=True
+            download_subtitles=True,
         )
 
         print(f"Video downloaded: {result.video_path}")
@@ -107,7 +111,9 @@ async def service_example():
     # Example 4: Download only thumbnail
     print("\n4. Downloading thumbnail")
     try:
-        thumbnail_path = await service.download_thumbnail(video_url, output_dir=output_dir)
+        thumbnail_path = await service.download_thumbnail(
+            video_url, output_dir=output_dir
+        )
         print(f"Thumbnail downloaded: {thumbnail_path}")
     except Exception as e:
         print(f"Error downloading thumbnail: {str(e)}")
@@ -121,9 +127,7 @@ async def service_example():
 
         # Extract transcript in original language (no language specified)
         transcript_result = await service.extract_transcript(
-            video_url,
-            output_dir=output_dir,
-            format_type="text"
+            video_url, output_dir=output_dir, format_type="text"
         )
 
         print(f"Transcript extracted:")
@@ -134,8 +138,8 @@ async def service_example():
         print(f"  File: {transcript_result['transcript_path']}")
 
         # Show preview of transcript
-        preview = transcript_result['transcript_text'][:200]
-        if len(transcript_result['transcript_text']) > 200:
+        preview = transcript_result["transcript_text"][:200]
+        if len(transcript_result["transcript_text"]) > 200:
             preview += "..."
         print(f"  Preview: {preview}")
 
@@ -159,11 +163,14 @@ async def service_example():
             if isinstance(result, Exception):
                 print(f"  Video {i+1}: Error - {str(result)}")
             elif result.success:
-                print(f"  Video {i+1}: {result.metadata.title} ({result.metadata.duration:.2f} seconds)")
+                print(
+                    f"  Video {i+1}: {result.metadata.title} ({result.metadata.duration:.2f} seconds)"
+                )
             else:
                 print(f"  Video {i+1}: Failed - {result.error_message}")
     except Exception as e:
         print(f"Error processing videos: {str(e)}")
+
 
 async def playlist_example():
     """Example of processing a YouTube playlist."""
@@ -187,11 +194,14 @@ async def playlist_example():
         print(f"\nProcessed {len(results)} videos in playlist:")
         for i, result in enumerate(results):
             if result.success:
-                print(f"  {i+1}. {result.metadata.title} ({result.metadata.duration:.2f} seconds)")
+                print(
+                    f"  {i+1}. {result.metadata.title} ({result.metadata.duration:.2f} seconds)"
+                )
             else:
                 print(f"  {i+1}. Failed: {result.error_message}")
     except Exception as e:
         print(f"Error processing playlist: {str(e)}")
+
 
 async def transcript_example():
     """Example of using YouTube transcript functionality."""
@@ -212,7 +222,9 @@ async def transcript_example():
         if languages:
             print("Available languages:")
             for lang_code, info in languages.items():
-                status = "Auto-generated" if info.get('is_generated', False) else "Manual"
+                status = (
+                    "Auto-generated" if info.get("is_generated", False) else "Manual"
+                )
                 print(f"  - {lang_code}: {info.get('language', 'Unknown')} ({status})")
         else:
             print("No transcripts available for this video")
@@ -221,8 +233,7 @@ async def transcript_example():
         # Example 2: Extract transcript in original language
         print("\n2. Extracting transcript in original language")
         transcript_result = await service.extract_transcript(
-            video_url,
-            format_type="text"
+            video_url, format_type="text"
         )
 
         print(f"Original language transcript:")
@@ -232,18 +243,16 @@ async def transcript_example():
         print(f"  Auto-generated: {transcript_result['is_auto_generated']}")
 
         # Show preview
-        preview = transcript_result['transcript_text'][:300]
-        if len(transcript_result['transcript_text']) > 300:
+        preview = transcript_result["transcript_text"][:300]
+        if len(transcript_result["transcript_text"]) > 300:
             preview += "..."
         print(f"  Preview: {preview}")
 
         # Example 3: Extract transcript in specific language (if available)
-        if 'en' in languages and transcript_result['language'] != 'en':
+        if "en" in languages and transcript_result["language"] != "en":
             print("\n3. Extracting English transcript")
             en_transcript = await service.extract_transcript(
-                video_url,
-                language='en',
-                format_type="srt"
+                video_url, language="en", format_type="srt"
             )
             print(f"English transcript extracted: {en_transcript['transcript_path']}")
 
@@ -254,10 +263,15 @@ async def transcript_example():
         print(f"  Video ID: {transcript.video_id}")
         print(f"  Language: {transcript.language}")
         print(f"  Segments: {len(transcript.segments)}")
-        print(f"  First segment: {transcript.segments[0].text[:100]}..." if transcript.segments else "No segments")
+        print(
+            f"  First segment: {transcript.segments[0].text[:100]}..."
+            if transcript.segments
+            else "No segments"
+        )
 
     except Exception as e:
         print(f"Error in transcript example: {str(e)}")
+
 
 async def main():
     """Run all examples."""
@@ -278,6 +292,7 @@ async def main():
     # await playlist_example()
 
     print("\nAll examples completed!")
+
 
 if __name__ == "__main__":
     asyncio.run(main())

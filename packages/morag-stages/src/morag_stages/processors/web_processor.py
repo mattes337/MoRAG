@@ -2,10 +2,11 @@
 
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any, Dict
+
 import structlog
 
-from .interface import StageProcessor, ProcessorResult
+from .interface import ProcessorResult, StageProcessor
 
 logger = structlog.get_logger(__name__)
 
@@ -13,6 +14,7 @@ logger = structlog.get_logger(__name__)
 try:
     from morag_core.exceptions import ProcessingError
 except ImportError:
+
     class ProcessingError(Exception):  # type: ignore
         pass
 
@@ -30,6 +32,7 @@ class WebStageProcessor(StageProcessor):
         if self._web_processor is None:
             try:
                 from morag_web import WebProcessor
+
                 self._web_processor = WebProcessor()
             except ImportError as e:
                 raise ProcessingError(f"Web processor not available: {e}")
@@ -40,6 +43,7 @@ class WebStageProcessor(StageProcessor):
         if self._services is None:
             try:
                 from morag_services import MoRAGServices
+
                 self._services = MoRAGServices()
             except ImportError as e:
                 raise ProcessingError(f"MoRAG services not available: {e}")
@@ -50,42 +54,41 @@ class WebStageProcessor(StageProcessor):
         return content_type.upper() == "WEB"
 
     async def process(
-        self,
-        input_file: Path,
-        output_file: Path,
-        config: Dict[str, Any]
+        self, input_file: Path, output_file: Path, config: Dict[str, Any]
     ) -> ProcessorResult:
         """Process web URL to markdown."""
         # Convert Path back to URL string and fix Windows path conversion issues
         url = str(input_file)
 
         # Handle Windows path conversion issue - Path() mangles URLs
-        if not url.startswith(('http://', 'https://')):
+        if not url.startswith(("http://", "https://")):
             # Convert backslashes to forward slashes
-            url = url.replace('\\', '/')
+            url = url.replace("\\", "/")
 
             # Fix common URL mangling patterns
-            if url.startswith('https:') and not url.startswith('https://'):
+            if url.startswith("https:") and not url.startswith("https://"):
                 # Pattern: https:/www.example.com -> https://www.example.com
-                if url.startswith('https://'):
+                if url.startswith("https://"):
                     pass  # Already correct
-                elif url.startswith('https:/'):
-                    url = url.replace('https:/', 'https://', 1)
+                elif url.startswith("https:/"):
+                    url = url.replace("https:/", "https://", 1)
                 else:
-                    url = url.replace('https:', 'https://', 1)
-            elif url.startswith('http:') and not url.startswith('http://'):
+                    url = url.replace("https:", "https://", 1)
+            elif url.startswith("http:") and not url.startswith("http://"):
                 # Pattern: http:/www.example.com -> http://www.example.com
-                if url.startswith('http://'):
+                if url.startswith("http://"):
                     pass  # Already correct
-                elif url.startswith('http:/'):
-                    url = url.replace('http:/', 'http://', 1)
+                elif url.startswith("http:/"):
+                    url = url.replace("http:/", "http://", 1)
                 else:
-                    url = url.replace('http:', 'http://', 1)
+                    url = url.replace("http:", "http://", 1)
 
             # Additional fix for URLs that lost protocol entirely
-            if ('www.' in url or '.com' in url or '.org' in url or '.net' in url) and not url.startswith(('http://', 'https://')):
+            if (
+                "www." in url or ".com" in url or ".org" in url or ".net" in url
+            ) and not url.startswith(("http://", "https://")):
                 # Default to https for security
-                url = 'https://' + url
+                url = "https://" + url
 
         logger.info("Processing web URL", url=url)
 
@@ -96,13 +99,14 @@ class WebStageProcessor(StageProcessor):
 
                 # Convert config to WebConfig
                 from morag_web import WebConfig
+
                 web_config = WebConfig(
-                    extract_links=config.get('extract_links', False),
-                    follow_links=config.get('follow_links', False),
-                    max_depth=config.get('max_depth', 1),
-                    clean_content=config.get('clean_content', True),
-                    convert_to_markdown=config.get('convert_to_markdown', True),
-                    timeout=config.get('timeout', 30)
+                    extract_links=config.get("extract_links", False),
+                    follow_links=config.get("follow_links", False),
+                    max_depth=config.get("max_depth", 1),
+                    clean_content=config.get("clean_content", True),
+                    convert_to_markdown=config.get("convert_to_markdown", True),
+                    timeout=config.get("timeout", 30),
                 )
 
                 result = await processor.process_url(url, web_config)
@@ -116,14 +120,14 @@ class WebStageProcessor(StageProcessor):
                     "content_length": result.content.content_length,
                     "extraction_time": result.content.extraction_time,
                     "created_at": datetime.now().isoformat(),
-                    **result.content.metadata
+                    **result.content.metadata,
                 }
 
                 # Use markdown content if available, otherwise plain content
                 content = result.content.markdown_content or result.content.content
 
                 markdown_content = self.create_markdown_with_metadata(content, metadata)
-                output_file.write_text(markdown_content, encoding='utf-8')
+                output_file.write_text(markdown_content, encoding="utf-8")
 
                 return ProcessorResult(
                     content=content,
@@ -131,40 +135,43 @@ class WebStageProcessor(StageProcessor):
                     metrics={
                         "url": url,
                         "content_length": len(content),
-                        "links_followed": config.get('follow_links', False)
+                        "links_followed": config.get("follow_links", False),
                     },
-                    final_output_file=output_file
+                    final_output_file=output_file,
                 )
 
             except Exception as web_error:
-                logger.warning("morag_web processor failed, trying MoRAG services", error=str(web_error))
+                logger.warning(
+                    "morag_web processor failed, trying MoRAG services",
+                    error=str(web_error),
+                )
 
                 # Fallback to MoRAG services
                 services = self._get_services()
 
                 # Prepare options for web service
                 options = {
-                    'extract_links': config.get('extract_links', False),
-                    'follow_links': config.get('follow_links', False),
-                    'max_depth': config.get('max_depth', 1),
-                    'timeout': config.get('timeout', 30)
+                    "extract_links": config.get("extract_links", False),
+                    "follow_links": config.get("follow_links", False),
+                    "max_depth": config.get("max_depth", 1),
+                    "timeout": config.get("timeout", 30),
                 }
 
                 # Use web service
                 result = await services.process_web(url, options)
 
                 metadata = {
-                    "title": result.metadata.get('title', "Web Content"),
+                    "title": result.metadata.get("title", "Web Content"),
                     "source": url,
                     "type": "web",
                     "url": url,
                     "created_at": datetime.now().isoformat(),
-                    **result.metadata
+                    **result.metadata,
                 }
 
                 content = result.text_content or ""
                 markdown_content = self.create_markdown_with_metadata(content, metadata)
-                output_file.write_text(markdown_content, encoding='utf-8')
+                output_file.write_text(markdown_content, encoding="utf-8")
 
                 return ProcessorResult(
                     content=content,
@@ -172,9 +179,9 @@ class WebStageProcessor(StageProcessor):
                     metrics={
                         "url": url,
                         "content_length": len(content),
-                        "links_followed": config.get('follow_links', False)
+                        "links_followed": config.get("follow_links", False),
                     },
-                    final_output_file=output_file
+                    final_output_file=output_file,
                 )
 
         except Exception as e:

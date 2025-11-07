@@ -4,30 +4,56 @@ import asyncio
 import json
 import os
 import shutil
-import uuid
-from datetime import datetime
-from pathlib import Path
-from typing import List, Optional, Dict, Any, Union
-
-import structlog
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form, BackgroundTasks, Depends, Query, Request, Body
-from fastapi.responses import FileResponse
 
 # Add path for stage imports
 import sys
-sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent / "morag-stages" / "src"))
+import uuid
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Union
 
-from morag_stages import StageManager, StageType, StageStatus
-from morag_stages.models import StageContext
+import structlog
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Body,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+)
+from fastapi.responses import FileResponse
+
+sys.path.insert(
+    0, str(Path(__file__).parent.parent.parent.parent.parent / "morag-stages" / "src")
+)
+
 from morag.api_models.stage_models import (
-    StageTypeEnum, StageStatusEnum, StageExecutionRequest, StageExecutionResponse,
-    StageChainRequest, StageChainResponse, StageStatusResponse, StageFileMetadata,
-    FileDownloadResponse, FileListResponse, StageInfoResponse, StageListResponse,
-    ErrorResponse, HealthCheckResponse, StageExecutionMetadata, JobCleanupResponse,
-    WebhookConfig
+    ErrorResponse,
+    FileDownloadResponse,
+    FileListResponse,
+    HealthCheckResponse,
+    JobCleanupResponse,
+    StageChainRequest,
+    StageChainResponse,
+    StageExecutionMetadata,
+    StageExecutionRequest,
+    StageExecutionResponse,
+    StageFileMetadata,
+    StageInfoResponse,
+    StageListResponse,
+    StageStatusEnum,
+    StageStatusResponse,
+    StageTypeEnum,
+    WebhookConfig,
 )
 from morag.utils.file_upload import get_upload_handler
 from morag.utils.url_path import create_path_from_string
+from morag_stages import StageManager, StageStatus, StageType
+from morag_stages.models import StageContext
 
 logger = structlog.get_logger(__name__)
 
@@ -65,7 +91,9 @@ def convert_stage_status(status: StageStatus) -> StageStatusEnum:
     return mapping[status]
 
 
-def create_file_metadata(file_path: Path, stage_type: StageTypeEnum, include_content: bool = False) -> StageFileMetadata:
+def create_file_metadata(
+    file_path: Path, stage_type: StageTypeEnum, include_content: bool = False
+) -> StageFileMetadata:
     """Create file metadata from a file path."""
     stat = file_path.stat()
 
@@ -74,11 +102,12 @@ def create_file_metadata(file_path: Path, stage_type: StageTypeEnum, include_con
     if include_content:
         try:
             # Try to read as text first
-            content = file_path.read_text(encoding='utf-8')
+            content = file_path.read_text(encoding="utf-8")
         except UnicodeDecodeError:
             # If it's not text, read as binary and encode as base64
             import base64
-            content = base64.b64encode(file_path.read_bytes()).decode('ascii')
+
+            content = base64.b64encode(file_path.read_bytes()).decode("ascii")
 
     return StageFileMetadata(
         filename=file_path.name,
@@ -88,18 +117,21 @@ def create_file_metadata(file_path: Path, stage_type: StageTypeEnum, include_con
         stage_type=stage_type,
         content_type=get_content_type(file_path),
         checksum=None,  # TODO: Calculate checksum if needed
-        content=content
+        content=content,
     )
 
 
 def get_content_type(file_path: Path) -> str:
     """Get MIME type for a file."""
     import mimetypes
+
     content_type, _ = mimetypes.guess_type(str(file_path))
     return content_type or "application/octet-stream"
 
 
-async def send_webhook_notification(webhook_config, stage_result, job_id: Optional[str] = None):
+async def send_webhook_notification(
+    webhook_config, stage_result, job_id: Optional[str] = None
+):
     """Send webhook notification for stage completion."""
     if not webhook_config:
         return False
@@ -111,10 +143,11 @@ async def send_webhook_notification(webhook_config, stage_result, job_id: Option
             "job_id": job_id,
             "stage_type": stage_result.stage_type.value,
             "status": stage_result.status.value,
-            "success": stage_result.status in [StageStatus.COMPLETED, StageStatus.SKIPPED],
+            "success": stage_result.status
+            in [StageStatus.COMPLETED, StageStatus.SKIPPED],
             "output_files": [str(f) for f in stage_result.output_files],
             "execution_time": stage_result.metadata.execution_time,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
         }
 
         headers = {"Content-Type": "application/json"}
@@ -125,15 +158,17 @@ async def send_webhook_notification(webhook_config, stage_result, job_id: Option
 
         async with httpx.AsyncClient(timeout=webhook_config.timeout) as client:
             response = await client.post(
-                webhook_config.url,
-                json=payload,
-                headers=headers
+                webhook_config.url, json=payload, headers=headers
             )
             response.raise_for_status()
             return True
 
     except Exception as e:
-        logger.error("Failed to send webhook notification", error=str(e), webhook_url=webhook_config.url)
+        logger.error(
+            "Failed to send webhook notification",
+            error=str(e),
+            webhook_url=webhook_config.url,
+        )
         return False
 
 
@@ -144,19 +179,39 @@ async def _list_stages_impl():
     stage_descriptions = {
         StageTypeEnum.MARKDOWN_CONVERSION: {
             "description": "Convert input files to unified markdown format",
-            "input_formats": ["pdf", "docx", "txt", "mp3", "mp4", "wav", "m4a", "flac", "avi", "mov", "mkv"],
+            "input_formats": [
+                "pdf",
+                "docx",
+                "txt",
+                "mp3",
+                "mp4",
+                "wav",
+                "m4a",
+                "flac",
+                "avi",
+                "mov",
+                "mkv",
+            ],
             "output_formats": ["md"],
             "required_config": [],
-            "optional_config": ["include_timestamps", "speaker_diarization", "topic_segmentation"],
-            "dependencies": []
+            "optional_config": [
+                "include_timestamps",
+                "speaker_diarization",
+                "topic_segmentation",
+            ],
+            "dependencies": [],
         },
         StageTypeEnum.MARKDOWN_OPTIMIZER: {
             "description": "LLM-based text improvement and transcription error correction",
             "input_formats": ["md"],
             "output_formats": ["md"],
             "required_config": [],
-            "optional_config": ["fix_transcription_errors", "improve_readability", "preserve_timestamps"],
-            "dependencies": [StageTypeEnum.MARKDOWN_CONVERSION]
+            "optional_config": [
+                "fix_transcription_errors",
+                "improve_readability",
+                "preserve_timestamps",
+            ],
+            "dependencies": [StageTypeEnum.MARKDOWN_CONVERSION],
         },
         StageTypeEnum.CHUNKER: {
             "description": "Create summary, chunks, and contextual embeddings",
@@ -164,7 +219,7 @@ async def _list_stages_impl():
             "output_formats": ["json"],
             "required_config": [],
             "optional_config": ["chunk_strategy", "chunk_size", "generate_summary"],
-            "dependencies": [StageTypeEnum.MARKDOWN_CONVERSION]
+            "dependencies": [StageTypeEnum.MARKDOWN_CONVERSION],
         },
         StageTypeEnum.FACT_GENERATOR: {
             "description": "Extract facts, entities, relations, and keywords",
@@ -172,7 +227,7 @@ async def _list_stages_impl():
             "output_formats": ["json"],
             "required_config": [],
             "optional_config": ["extract_entities", "extract_relations", "domain"],
-            "dependencies": [StageTypeEnum.CHUNKER]
+            "dependencies": [StageTypeEnum.CHUNKER],
         },
         StageTypeEnum.INGESTOR: {
             "description": "Database ingestion and storage",
@@ -180,26 +235,25 @@ async def _list_stages_impl():
             "output_formats": ["json"],
             "required_config": [],
             "optional_config": ["databases", "collection_name"],
-            "dependencies": [StageTypeEnum.CHUNKER, StageTypeEnum.FACT_GENERATOR]
-        }
+            "dependencies": [StageTypeEnum.CHUNKER, StageTypeEnum.FACT_GENERATOR],
+        },
     }
 
     for stage_type in StageTypeEnum:
         info = stage_descriptions[stage_type]
-        stages_info.append(StageInfoResponse(
-            stage_type=stage_type,
-            description=info["description"],
-            input_formats=info["input_formats"],
-            output_formats=info["output_formats"],
-            required_config=info["required_config"],
-            optional_config=info["optional_config"],
-            dependencies=info["dependencies"]
-        ))
+        stages_info.append(
+            StageInfoResponse(
+                stage_type=stage_type,
+                description=info["description"],
+                input_formats=info["input_formats"],
+                output_formats=info["output_formats"],
+                required_config=info["required_config"],
+                optional_config=info["optional_config"],
+                dependencies=info["dependencies"],
+            )
+        )
 
-    return StageListResponse(
-        stages=stages_info,
-        total_count=len(stages_info)
-    )
+    return StageListResponse(stages=stages_info, total_count=len(stages_info))
 
 
 @router.get("/", response_model=StageListResponse)
@@ -243,7 +297,7 @@ async def execute_stage(
     content_analysis_agent_model: Optional[str] = Form(None),
     markdown_optimizer_agent_model: Optional[str] = Form(None),
     chunking_agent_model: Optional[str] = Form(None),
-    background_tasks: BackgroundTasks = BackgroundTasks()
+    background_tasks: BackgroundTasks = BackgroundTasks(),
 ):
     """Execute a single stage using canonical stage names."""
     try:
@@ -254,7 +308,7 @@ async def execute_stage(
         except ValueError:
             raise HTTPException(
                 status_code=400,
-                detail=f"Invalid stage name: {stage_name}. Valid stages: {[s.value for s in StageTypeEnum]}"
+                detail=f"Invalid stage name: {stage_name}. Valid stages: {[s.value for s in StageTypeEnum]}",
             )
 
         # Handle request data - either from JSON body or form data
@@ -266,7 +320,9 @@ async def execute_stage(
                     request_dict = json.loads(request)
                     parsed_request = StageExecutionRequest(**request_dict)
                 except (json.JSONDecodeError, ValueError) as e:
-                    raise HTTPException(status_code=400, detail=f"Invalid JSON request: {str(e)}")
+                    raise HTTPException(
+                        status_code=400, detail=f"Invalid JSON request: {str(e)}"
+                    )
             else:
                 parsed_request = request
 
@@ -274,7 +330,11 @@ async def execute_stage(
             request_output_dir = parsed_request.output_dir
             request_config = parsed_request.config or {}
             request_input_files = parsed_request.input_files or []
-            request_webhook_url = parsed_request.webhook_config.url if parsed_request.webhook_config else None
+            request_webhook_url = (
+                parsed_request.webhook_config.url
+                if parsed_request.webhook_config
+                else None
+            )
             request_model_config = parsed_request.llm_model_config
         else:
             # Form data request
@@ -285,20 +345,34 @@ async def execute_stage(
 
             # Build model configuration from form parameters
             from ..stage_models import ModelConfig
-            request_model_config = ModelConfig(
-                default_model=default_model,
-                fact_extraction_agent_model=fact_extraction_agent_model,
-                entity_extraction_agent_model=entity_extraction_agent_model,
-                relation_extraction_agent_model=relation_extraction_agent_model,
-                keyword_extraction_agent_model=keyword_extraction_agent_model,
-                summarization_agent_model=summarization_agent_model,
-                content_analysis_agent_model=content_analysis_agent_model,
-                markdown_optimizer_agent_model=markdown_optimizer_agent_model,
-                chunking_agent_model=chunking_agent_model
-            ) if any([default_model, fact_extraction_agent_model, entity_extraction_agent_model,
-                     relation_extraction_agent_model, keyword_extraction_agent_model,
-                     summarization_agent_model, content_analysis_agent_model,
-                     markdown_optimizer_agent_model, chunking_agent_model]) else None
+
+            request_model_config = (
+                ModelConfig(
+                    default_model=default_model,
+                    fact_extraction_agent_model=fact_extraction_agent_model,
+                    entity_extraction_agent_model=entity_extraction_agent_model,
+                    relation_extraction_agent_model=relation_extraction_agent_model,
+                    keyword_extraction_agent_model=keyword_extraction_agent_model,
+                    summarization_agent_model=summarization_agent_model,
+                    content_analysis_agent_model=content_analysis_agent_model,
+                    markdown_optimizer_agent_model=markdown_optimizer_agent_model,
+                    chunking_agent_model=chunking_agent_model,
+                )
+                if any(
+                    [
+                        default_model,
+                        fact_extraction_agent_model,
+                        entity_extraction_agent_model,
+                        relation_extraction_agent_model,
+                        keyword_extraction_agent_model,
+                        summarization_agent_model,
+                        content_analysis_agent_model,
+                        markdown_optimizer_agent_model,
+                        chunking_agent_model,
+                    ]
+                )
+                else None
+            )
 
         # Handle file upload if provided
         input_file_paths = []
@@ -306,12 +380,14 @@ async def execute_stage(
         if file:
             upload_handler = get_upload_handler()
             # Allow intermediate files (JSON) for stage-to-stage communication
-            allow_intermediate = file.filename and file.filename.endswith('.json')
-            temp_path = await upload_handler.save_upload(file, allow_intermediate=allow_intermediate)
+            allow_intermediate = file.filename and file.filename.endswith(".json")
+            temp_path = await upload_handler.save_upload(
+                file, allow_intermediate=allow_intermediate
+            )
             input_file_paths = [temp_path]
 
             # Extract job_id from the uploaded file path (first 8 chars of UUID)
-            job_id = temp_path.name.split('_')[0]
+            job_id = temp_path.name.split("_")[0]
 
             # Set output directory relative to the temp directory
             temp_dir = temp_path.parent
@@ -321,7 +397,10 @@ async def execute_stage(
             input_file_paths = [create_path_from_string(f) for f in request_input_files]
             output_path = Path(request_output_dir)
         else:
-            raise HTTPException(status_code=400, detail="Either file upload or input_files must be provided")
+            raise HTTPException(
+                status_code=400,
+                detail="Either file upload or input_files must be provided",
+            )
 
         # Create output directory
         output_path.mkdir(parents=True, exist_ok=True)
@@ -332,7 +411,7 @@ async def execute_stage(
                 "status": "in_progress",
                 "current_stage": stage_enum.value,
                 "output_dir": str(output_path),
-                "start_time": datetime.now().isoformat()
+                "start_time": datetime.now().isoformat(),
             }
 
         # Merge model configuration into the config
@@ -340,30 +419,36 @@ async def execute_stage(
         if request_model_config:
             # Convert ModelConfig to dict format expected by stages
             model_config_dict = {
-                'default_model': request_model_config.default_model,
-                'agent_models': {
-                    'fact_extraction': request_model_config.fact_extraction_agent_model,
-                    'entity_extraction': request_model_config.entity_extraction_agent_model,
-                    'relation_extraction': request_model_config.relation_extraction_agent_model,
-                    'keyword_extraction': request_model_config.keyword_extraction_agent_model,
-                    'summarization': request_model_config.summarization_agent_model,
-                    'content_analysis': request_model_config.content_analysis_agent_model,
-                    'markdown_optimizer': request_model_config.markdown_optimizer_agent_model,
-                    'chunking': request_model_config.chunking_agent_model,
-                }
+                "default_model": request_model_config.default_model,
+                "agent_models": {
+                    "fact_extraction": request_model_config.fact_extraction_agent_model,
+                    "entity_extraction": request_model_config.entity_extraction_agent_model,
+                    "relation_extraction": request_model_config.relation_extraction_agent_model,
+                    "keyword_extraction": request_model_config.keyword_extraction_agent_model,
+                    "summarization": request_model_config.summarization_agent_model,
+                    "content_analysis": request_model_config.content_analysis_agent_model,
+                    "markdown_optimizer": request_model_config.markdown_optimizer_agent_model,
+                    "chunking": request_model_config.chunking_agent_model,
+                },
             }
             # Remove None values
-            model_config_dict['agent_models'] = {k: v for k, v in model_config_dict['agent_models'].items() if v is not None}
-            merged_config['model_config'] = model_config_dict
+            model_config_dict["agent_models"] = {
+                k: v
+                for k, v in model_config_dict["agent_models"].items()
+                if v is not None
+            }
+            merged_config["model_config"] = model_config_dict
 
         # Validate all required variables are defined before creating context
-        if 'input_file_paths' not in locals():
+        if "input_file_paths" not in locals():
             raise HTTPException(status_code=500, detail="input_file_paths not defined")
-        if 'output_path' not in locals():
+        if "output_path" not in locals():
             raise HTTPException(status_code=500, detail="output_path not defined")
-        if 'request_webhook_url' not in locals():
-            raise HTTPException(status_code=500, detail="request_webhook_url not defined")
-        if 'merged_config' not in locals():
+        if "request_webhook_url" not in locals():
+            raise HTTPException(
+                status_code=500, detail="request_webhook_url not defined"
+            )
+        if "merged_config" not in locals():
             raise HTTPException(status_code=500, detail="merged_config not defined")
 
         # Create stage context - ensure this is always executed
@@ -372,20 +457,26 @@ async def execute_stage(
                 source_path=input_file_paths[0] if input_file_paths else None,
                 output_dir=output_path,
                 webhook_url=request_webhook_url,
-                config=merged_config
+                config=merged_config,
             )
         except Exception as e:
-            logger.error("Failed to create StageContext",
-                        input_file_paths=input_file_paths,
-                        output_path=str(output_path),
-                        request_webhook_url=request_webhook_url,
-                        merged_config=merged_config,
-                        error=str(e))
-            raise HTTPException(status_code=500, detail=f"Failed to create stage context: {str(e)}")
+            logger.error(
+                "Failed to create StageContext",
+                input_file_paths=input_file_paths,
+                output_path=str(output_path),
+                request_webhook_url=request_webhook_url,
+                merged_config=merged_config,
+                error=str(e),
+            )
+            raise HTTPException(
+                status_code=500, detail=f"Failed to create stage context: {str(e)}"
+            )
 
         # Execute stage
         start_time = datetime.now()
-        result = await stage_manager.execute_stage(stage_type, input_file_paths, context)
+        result = await stage_manager.execute_stage(
+            stage_type, input_file_paths, context
+        )
         end_time = datetime.now()
 
         # Update job tracking after execution
@@ -400,7 +491,8 @@ async def execute_stage(
 
         # Create response
         output_file_metadata = [
-            create_file_metadata(f, stage_enum, include_content=return_content) for f in result.output_files
+            create_file_metadata(f, stage_enum, include_content=return_content)
+            for f in result.output_files
         ]
 
         execution_metadata = StageExecutionMetadata(
@@ -409,13 +501,15 @@ async def execute_stage(
             end_time=end_time,
             input_files=[str(f) for f in input_file_paths],
             config_used=request_config,
-            warnings=[]
+            warnings=[],
         )
 
         # Send webhook notification if configured
         webhook_sent = False
         if parsed_request is not None and parsed_request.webhook_config:
-            webhook_sent = await send_webhook_notification(parsed_request.webhook_config, result)
+            webhook_sent = await send_webhook_notification(
+                parsed_request.webhook_config, result
+            )
 
         return StageExecutionResponse(
             success=result.status in [StageStatus.COMPLETED, StageStatus.SKIPPED],
@@ -424,24 +518,26 @@ async def execute_stage(
             output_files=output_file_metadata,
             metadata=execution_metadata,
             error_message=result.error_message,
-            webhook_sent=webhook_sent
+            webhook_sent=webhook_sent,
         )
 
     except HTTPException:
         raise
     except Exception as e:
         # Log detailed error information
-        logger.error("Stage execution failed",
-                    stage=stage_name,
-                    error=str(e),
-                    error_type=e.__class__.__name__,
-                    exc_info=True)
+        logger.error(
+            "Stage execution failed",
+            stage=stage_name,
+            error=str(e),
+            error_type=e.__class__.__name__,
+            exc_info=True,
+        )
 
         # Provide more detailed error message
         error_detail = f"Stage '{stage_name}' execution failed: {str(e)}"
-        if hasattr(e, 'stage_type'):
+        if hasattr(e, "stage_type"):
             error_detail = f"Stage '{e.stage_type}' failed: {str(e)}"
-        if hasattr(e, 'invalid_files'):
+        if hasattr(e, "invalid_files"):
             error_detail += f" (Invalid files: {e.invalid_files})"
 
         raise HTTPException(status_code=500, detail=error_detail)
@@ -451,7 +547,7 @@ async def execute_stage(
 async def execute_stage_chain(
     request: Union[StageChainRequest, str] = Body(...),
     file: Optional[UploadFile] = File(None),
-    background_tasks: BackgroundTasks = BackgroundTasks()
+    background_tasks: BackgroundTasks = BackgroundTasks(),
 ):
     """Execute a chain of stages using canonical stage names."""
     try:
@@ -461,12 +557,16 @@ async def execute_stage_chain(
                 request_dict = json.loads(request)
                 parsed_request = StageChainRequest(**request_dict)
             except (json.JSONDecodeError, ValueError) as e:
-                raise HTTPException(status_code=400, detail=f"Invalid JSON request: {str(e)}")
+                raise HTTPException(
+                    status_code=400, detail=f"Invalid JSON request: {str(e)}"
+                )
         else:
             parsed_request = request
 
         # Convert stage enums to internal types
-        stage_types = [convert_stage_type(stage_enum) for stage_enum in parsed_request.stages]
+        stage_types = [
+            convert_stage_type(stage_enum) for stage_enum in parsed_request.stages
+        ]
 
         # Handle file upload if provided
         input_files = []
@@ -474,22 +574,29 @@ async def execute_stage_chain(
         if file:
             upload_handler = get_upload_handler()
             # Allow intermediate files (JSON) for stage-to-stage communication
-            allow_intermediate = file.filename and file.filename.endswith('.json')
-            temp_path = await upload_handler.save_upload(file, allow_intermediate=allow_intermediate)
+            allow_intermediate = file.filename and file.filename.endswith(".json")
+            temp_path = await upload_handler.save_upload(
+                file, allow_intermediate=allow_intermediate
+            )
             input_files = [temp_path]
 
             # Extract job_id from the uploaded file path (first 8 chars of UUID)
-            job_id = temp_path.name.split('_')[0]
+            job_id = temp_path.name.split("_")[0]
 
             # Set output directory relative to the temp directory
             temp_dir = temp_path.parent
             output_dir = temp_dir / "output"
         elif parsed_request.input_files:
             # Handle URLs properly - don't convert URLs to Path objects as it corrupts them
-            input_files = [create_path_from_string(f) for f in parsed_request.input_files]
+            input_files = [
+                create_path_from_string(f) for f in parsed_request.input_files
+            ]
             output_dir = Path(parsed_request.output_dir)
         else:
-            raise HTTPException(status_code=400, detail="Either file upload or input_files must be provided")
+            raise HTTPException(
+                status_code=400,
+                detail="Either file upload or input_files must be provided",
+            )
 
         # Create output directory
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -498,10 +605,12 @@ async def execute_stage_chain(
         if job_id:
             background_jobs[job_id] = {
                 "status": "in_progress",
-                "current_stage": parsed_request.stages[0].value if parsed_request.stages else None,
+                "current_stage": parsed_request.stages[0].value
+                if parsed_request.stages
+                else None,
                 "output_dir": str(output_dir),
                 "start_time": datetime.now().isoformat(),
-                "total_stages": len(parsed_request.stages)
+                "total_stages": len(parsed_request.stages),
             }
 
         # Merge global and stage-specific configs
@@ -509,34 +618,41 @@ async def execute_stage_chain(
         if parsed_request.stage_configs:
             for stage_enum, stage_config in parsed_request.stage_configs.items():
                 stage_key = stage_enum.value
-                merged_config[stage_key] = {**(merged_config.get(stage_key, {})), **stage_config}
+                merged_config[stage_key] = {
+                    **(merged_config.get(stage_key, {})),
+                    **stage_config,
+                }
 
         # Add model configuration if provided
         if parsed_request.llm_model_config:
             # Convert ModelConfig to dict format expected by stages
             model_config_dict = {
-                'default_model': parsed_request.llm_model_config.default_model,
-                'agent_models': {
-                    'fact_extraction': parsed_request.llm_model_config.fact_extraction_agent_model,
-                    'entity_extraction': parsed_request.llm_model_config.entity_extraction_agent_model,
-                    'relation_extraction': parsed_request.llm_model_config.relation_extraction_agent_model,
-                    'keyword_extraction': parsed_request.llm_model_config.keyword_extraction_agent_model,
-                    'summarization': parsed_request.llm_model_config.summarization_agent_model,
-                    'content_analysis': parsed_request.llm_model_config.content_analysis_agent_model,
-                    'markdown_optimizer': parsed_request.llm_model_config.markdown_optimizer_agent_model,
-                    'chunking': parsed_request.llm_model_config.chunking_agent_model,
-                }
+                "default_model": parsed_request.llm_model_config.default_model,
+                "agent_models": {
+                    "fact_extraction": parsed_request.llm_model_config.fact_extraction_agent_model,
+                    "entity_extraction": parsed_request.llm_model_config.entity_extraction_agent_model,
+                    "relation_extraction": parsed_request.llm_model_config.relation_extraction_agent_model,
+                    "keyword_extraction": parsed_request.llm_model_config.keyword_extraction_agent_model,
+                    "summarization": parsed_request.llm_model_config.summarization_agent_model,
+                    "content_analysis": parsed_request.llm_model_config.content_analysis_agent_model,
+                    "markdown_optimizer": parsed_request.llm_model_config.markdown_optimizer_agent_model,
+                    "chunking": parsed_request.llm_model_config.chunking_agent_model,
+                },
             }
             # Remove None values
-            model_config_dict['agent_models'] = {k: v for k, v in model_config_dict['agent_models'].items() if v is not None}
-            merged_config['model_config'] = model_config_dict
+            model_config_dict["agent_models"] = {
+                k: v
+                for k, v in model_config_dict["agent_models"].items()
+                if v is not None
+            }
+            merged_config["model_config"] = model_config_dict
 
         # Validate all required variables are defined before creating context
-        if 'input_files' not in locals():
+        if "input_files" not in locals():
             raise HTTPException(status_code=500, detail="input_files not defined")
-        if 'output_dir' not in locals():
+        if "output_dir" not in locals():
             raise HTTPException(status_code=500, detail="output_dir not defined")
-        if 'merged_config' not in locals():
+        if "merged_config" not in locals():
             raise HTTPException(status_code=500, detail="merged_config not defined")
 
         # Create stage context with error handling
@@ -544,20 +660,28 @@ async def execute_stage_chain(
             context = StageContext(
                 source_path=input_files[0] if input_files else None,
                 output_dir=output_dir,
-                webhook_url=parsed_request.webhook_config.url if parsed_request and parsed_request.webhook_config else None,
-                config=merged_config
+                webhook_url=parsed_request.webhook_config.url
+                if parsed_request and parsed_request.webhook_config
+                else None,
+                config=merged_config,
             )
         except Exception as e:
-            logger.error("Failed to create StageContext in stage chain",
-                        input_files=input_files,
-                        output_dir=str(output_dir),
-                        merged_config=merged_config,
-                        error=str(e))
-            raise HTTPException(status_code=500, detail=f"Failed to create stage context: {str(e)}")
+            logger.error(
+                "Failed to create StageContext in stage chain",
+                input_files=input_files,
+                output_dir=str(output_dir),
+                merged_config=merged_config,
+                error=str(e),
+            )
+            raise HTTPException(
+                status_code=500, detail=f"Failed to create stage context: {str(e)}"
+            )
 
         # Execute stage chain
         start_time = datetime.now()
-        results = await stage_manager.execute_stage_chain(stage_types, input_files, context)
+        results = await stage_manager.execute_stage_chain(
+            stage_types, input_files, context
+        )
         end_time = datetime.now()
 
         # Process results
@@ -572,21 +696,26 @@ async def execute_stage_chain(
             if job_id and job_id in background_jobs:
                 next_stage_index = i + 1
                 if next_stage_index < len(parsed_request.stages):
-                    background_jobs[job_id]["current_stage"] = parsed_request.stages[next_stage_index].value
+                    background_jobs[job_id]["current_stage"] = parsed_request.stages[
+                        next_stage_index
+                    ].value
                 else:
                     background_jobs[job_id]["current_stage"] = None
 
             output_file_metadata = [
-                create_file_metadata(f, stage_enum, include_content=parsed_request.return_content) for f in result.output_files
+                create_file_metadata(
+                    f, stage_enum, include_content=parsed_request.return_content
+                )
+                for f in result.output_files
             ]
 
             execution_metadata = StageExecutionMetadata(
                 execution_time=result.metadata.execution_time,
                 start_time=start_time,  # TODO: Get actual stage start time
-                end_time=end_time,      # TODO: Get actual stage end time
+                end_time=end_time,  # TODO: Get actual stage end time
                 input_files=[str(f) for f in input_files],
                 config_used=merged_config.get(stage_enum.value, {}),
-                warnings=[]
+                warnings=[],
             )
 
             stage_response = StageExecutionResponse(
@@ -596,7 +725,7 @@ async def execute_stage_chain(
                 output_files=output_file_metadata,
                 metadata=execution_metadata,
                 error_message=result.error_message,
-                webhook_sent=False  # Individual webhooks not sent in chain mode
+                webhook_sent=False,  # Individual webhooks not sent in chain mode
             )
 
             stage_responses.append(stage_response)
@@ -628,7 +757,10 @@ async def execute_stage_chain(
         if parsed_request and parsed_request.webhook_config:
             chain_success = failed_stage is None
             await send_webhook_notification_for_chain(
-                parsed_request.webhook_config, stage_responses, chain_success, total_execution_time
+                parsed_request.webhook_config,
+                stage_responses,
+                chain_success,
+                total_execution_time,
             )
 
         return StageChainResponse(
@@ -636,22 +768,24 @@ async def execute_stage_chain(
             stages_executed=stage_responses,
             total_execution_time=total_execution_time,
             failed_stage=failed_stage,
-            final_output_files=final_output_files
+            final_output_files=final_output_files,
         )
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("Stage chain execution failed",
-                    error=str(e),
-                    error_type=e.__class__.__name__,
-                    exc_info=True)
+        logger.error(
+            "Stage chain execution failed",
+            error=str(e),
+            error_type=e.__class__.__name__,
+            exc_info=True,
+        )
 
         # Provide more detailed error message
         error_detail = f"Stage chain execution failed: {str(e)}"
-        if hasattr(e, 'stage_type'):
+        if hasattr(e, "stage_type"):
             error_detail = f"Stage '{e.stage_type}' in chain failed: {str(e)}"
-        if hasattr(e, 'invalid_files'):
+        if hasattr(e, "invalid_files"):
             error_detail += f" (Invalid files: {e.invalid_files})"
 
         raise HTTPException(status_code=500, detail=error_detail)
@@ -679,12 +813,13 @@ async def execute_all_stages(
     content_analysis_agent_model: Optional[str] = Form(None),
     markdown_optimizer_agent_model: Optional[str] = Form(None),
     chunking_agent_model: Optional[str] = Form(None),
-    background_tasks: BackgroundTasks = BackgroundTasks()
+    background_tasks: BackgroundTasks = BackgroundTasks(),
 ):
     """Execute all stages using form data (for easier API consumption)."""
     try:
         # Parse stages from JSON string
         import json
+
         stage_names = json.loads(stages)
         stage_enums = [StageTypeEnum(name) for name in stage_names]
 
@@ -705,20 +840,34 @@ async def execute_all_stages(
 
         # Build model configuration from form parameters
         from ..stage_models import ModelConfig
-        model_config = ModelConfig(
-            default_model=default_model,
-            fact_extraction_agent_model=fact_extraction_agent_model,
-            entity_extraction_agent_model=entity_extraction_agent_model,
-            relation_extraction_agent_model=relation_extraction_agent_model,
-            keyword_extraction_agent_model=keyword_extraction_agent_model,
-            summarization_agent_model=summarization_agent_model,
-            content_analysis_agent_model=content_analysis_agent_model,
-            markdown_optimizer_agent_model=markdown_optimizer_agent_model,
-            chunking_agent_model=chunking_agent_model
-        ) if any([default_model, fact_extraction_agent_model, entity_extraction_agent_model,
-                 relation_extraction_agent_model, keyword_extraction_agent_model,
-                 summarization_agent_model, content_analysis_agent_model,
-                 markdown_optimizer_agent_model, chunking_agent_model]) else None
+
+        model_config = (
+            ModelConfig(
+                default_model=default_model,
+                fact_extraction_agent_model=fact_extraction_agent_model,
+                entity_extraction_agent_model=entity_extraction_agent_model,
+                relation_extraction_agent_model=relation_extraction_agent_model,
+                keyword_extraction_agent_model=keyword_extraction_agent_model,
+                summarization_agent_model=summarization_agent_model,
+                content_analysis_agent_model=content_analysis_agent_model,
+                markdown_optimizer_agent_model=markdown_optimizer_agent_model,
+                chunking_agent_model=chunking_agent_model,
+            )
+            if any(
+                [
+                    default_model,
+                    fact_extraction_agent_model,
+                    entity_extraction_agent_model,
+                    relation_extraction_agent_model,
+                    keyword_extraction_agent_model,
+                    summarization_agent_model,
+                    content_analysis_agent_model,
+                    markdown_optimizer_agent_model,
+                    chunking_agent_model,
+                ]
+            )
+            else None
+        )
 
         # Create request object
         request = StageChainRequest(
@@ -730,33 +879,39 @@ async def execute_all_stages(
             webhook_config=webhook_config,
             stop_on_failure=stop_on_failure,
             skip_existing=skip_existing,
-            return_content=return_content
+            return_content=return_content,
         )
 
         # Call the main chain execution function
         return await execute_stage_chain(request, file, background_tasks)
 
     except json.JSONDecodeError as e:
-        raise HTTPException(status_code=400, detail=f"Invalid JSON in form data: {str(e)}")
+        raise HTTPException(
+            status_code=400, detail=f"Invalid JSON in form data: {str(e)}"
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=f"Invalid stage name: {str(e)}")
     except Exception as e:
-        logger.error("Execute all stages failed",
-                    error=str(e),
-                    error_type=e.__class__.__name__,
-                    exc_info=True)
+        logger.error(
+            "Execute all stages failed",
+            error=str(e),
+            error_type=e.__class__.__name__,
+            exc_info=True,
+        )
 
         # Provide more detailed error message
         error_detail = f"Execute all stages failed: {str(e)}"
-        if hasattr(e, 'stage_type'):
+        if hasattr(e, "stage_type"):
             error_detail = f"Stage '{e.stage_type}' failed during execution: {str(e)}"
-        if hasattr(e, 'invalid_files'):
+        if hasattr(e, "invalid_files"):
             error_detail += f" (Invalid files: {e.invalid_files})"
 
         raise HTTPException(status_code=500, detail=error_detail)
 
 
-async def send_webhook_notification_for_chain(webhook_config, stage_responses, success, total_time):
+async def send_webhook_notification_for_chain(
+    webhook_config, stage_responses, success, total_time
+):
     """Send webhook notification for stage chain completion."""
     try:
         import httpx
@@ -768,7 +923,7 @@ async def send_webhook_notification_for_chain(webhook_config, stage_responses, s
             "stages_executed": len(stage_responses),
             "stages_successful": sum(1 for r in stage_responses if r.success),
             "stages_failed": sum(1 for r in stage_responses if not r.success),
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
         }
 
         headers = {"Content-Type": "application/json"}
@@ -779,9 +934,7 @@ async def send_webhook_notification_for_chain(webhook_config, stage_responses, s
 
         async with httpx.AsyncClient(timeout=webhook_config.timeout) as client:
             response = await client.post(
-                webhook_config.url,
-                json=payload,
-                headers=headers
+                webhook_config.url, json=payload, headers=headers
             )
             response.raise_for_status()
 
@@ -792,14 +945,16 @@ async def send_webhook_notification_for_chain(webhook_config, stage_responses, s
 @router.get("/status", response_model=StageStatusResponse)
 async def get_stage_status(
     output_dir: str = Query("./output", description="Output directory to check"),
-    job_id: Optional[str] = Query(None, description="Job ID for background execution")
+    job_id: Optional[str] = Query(None, description="Job ID for background execution"),
 ):
     """Get status of stage execution and available files."""
     try:
         # Check if mock mode is enabled
-        mock_mode = os.getenv('MORAG_MOCK_MODE', 'false').lower() == 'true'
+        mock_mode = os.getenv("MORAG_MOCK_MODE", "false").lower() == "true"
         if mock_mode:
-            logger.info("Status check in mock mode", output_dir=output_dir, job_id=job_id)
+            logger.info(
+                "Status check in mock mode", output_dir=output_dir, job_id=job_id
+            )
         # If job_id is provided, try to find the job-specific output directory
         if job_id:
             # Look for job-specific temp directories
@@ -814,8 +969,11 @@ async def get_stage_status(
                             potential_output = temp_dir / "output"
                             if potential_output.exists():
                                 job_output_path = potential_output
-                                logger.info("Found job-specific output directory",
-                                           job_id=job_id, output_path=str(job_output_path))
+                                logger.info(
+                                    "Found job-specific output directory",
+                                    job_id=job_id,
+                                    output_path=str(job_output_path),
+                                )
                                 break
                     if job_output_path:
                         break
@@ -833,14 +991,21 @@ async def get_stage_status(
             # Check for stage output files
             md_files = list(output_path.glob("*.md"))
             # Handle both .opt.md and .optimized.md patterns for optimizer output
-            opt_files = list(output_path.glob("*.opt.md")) + list(output_path.glob("*.optimized.md"))
+            opt_files = list(output_path.glob("*.opt.md")) + list(
+                output_path.glob("*.optimized.md")
+            )
             chunk_files = list(output_path.glob("*.chunks.json"))
             fact_files = list(output_path.glob("*.facts.json"))
             ingestion_files = list(output_path.glob("*.ingestion.json"))
 
             # Determine completed stages
             # For markdown conversion, exclude optimized files to avoid double counting
-            conversion_files = [f for f in md_files if not f.name.endswith('.optimized.md') and not f.name.endswith('.opt.md')]
+            conversion_files = [
+                f
+                for f in md_files
+                if not f.name.endswith(".optimized.md")
+                and not f.name.endswith(".opt.md")
+            ]
             if conversion_files:
                 stages_completed.append(StageTypeEnum.MARKDOWN_CONVERSION)
             if opt_files:
@@ -853,13 +1018,19 @@ async def get_stage_status(
                 stages_completed.append(StageTypeEnum.INGESTOR)
 
             # Create metadata for all files
-            all_files = md_files + opt_files + chunk_files + fact_files + ingestion_files
+            all_files = (
+                md_files + opt_files + chunk_files + fact_files + ingestion_files
+            )
             for file_path in all_files:
                 try:
                     metadata = create_file_metadata(file_path, None)
                     available_files.append(metadata)
                 except Exception as e:
-                    logger.warning("Failed to create metadata for file", file=str(file_path), error=str(e))
+                    logger.warning(
+                        "Failed to create metadata for file",
+                        file=str(file_path),
+                        error=str(e),
+                    )
 
         # Check background job status if job_id provided
         current_stage = None
@@ -882,13 +1053,15 @@ async def get_stage_status(
         total_stages = 5  # Total number of stages
         progress_percentage = (len(stages_completed) / total_stages) * 100
 
-        logger.info("Stage status check completed",
-                   job_id=job_id,
-                   output_path=str(output_path),
-                   stages_completed=len(stages_completed),
-                   available_files=len(available_files),
-                   overall_status=overall_status.value,
-                   progress_percentage=progress_percentage)
+        logger.info(
+            "Stage status check completed",
+            job_id=job_id,
+            output_path=str(output_path),
+            stages_completed=len(stages_completed),
+            available_files=len(available_files),
+            overall_status=overall_status.value,
+            progress_percentage=progress_percentage,
+        )
 
         return StageStatusResponse(
             job_id=job_id,
@@ -896,7 +1069,7 @@ async def get_stage_status(
             current_stage=current_stage,
             available_files=available_files,
             overall_status=overall_status,
-            progress_percentage=progress_percentage
+            progress_percentage=progress_percentage,
         )
 
     except Exception as e:
@@ -907,7 +1080,9 @@ async def get_stage_status(
 @router.delete("/cleanup/{job_id}", response_model=JobCleanupResponse)
 async def cleanup_job_files(
     job_id: str,
-    force: bool = Query(False, description="Force cleanup even if job is still running")
+    force: bool = Query(
+        False, description="Force cleanup even if job is still running"
+    ),
 ):
     """Clean up all files associated with a specific job ID."""
     try:
@@ -919,7 +1094,7 @@ async def cleanup_job_files(
             if job_info.get("status") == "in_progress":
                 raise HTTPException(
                     status_code=409,
-                    detail=f"Job {job_id} is still running. Use force=true to cleanup anyway."
+                    detail=f"Job {job_id} is still running. Use force=true to cleanup anyway.",
                 )
 
         # Find job-specific directories
@@ -932,8 +1107,11 @@ async def cleanup_job_files(
                 for temp_dir in temp_base.iterdir():
                     if temp_dir.is_dir() and job_id in temp_dir.name:
                         job_directories.append(temp_dir)
-                        logger.info("Found job directory for cleanup",
-                                   job_id=job_id, directory=str(temp_dir))
+                        logger.info(
+                            "Found job directory for cleanup",
+                            job_id=job_id,
+                            directory=str(temp_dir),
+                        )
 
         if not job_directories:
             logger.warning("No directories found for job", job_id=job_id)
@@ -944,7 +1122,7 @@ async def cleanup_job_files(
                 directories_removed=0,
                 total_size_freed=0,
                 deleted_files=[],
-                message=f"No files found for job {job_id}"
+                message=f"No files found for job {job_id}",
             )
 
         # Calculate total size and collect file paths before deletion
@@ -962,8 +1140,11 @@ async def cleanup_job_files(
                         deleted_files.append(str(file_path))
                         files_deleted += 1
                     except Exception as e:
-                        logger.warning("Failed to get file stats",
-                                     file=str(file_path), error=str(e))
+                        logger.warning(
+                            "Failed to get file stats",
+                            file=str(file_path),
+                            error=str(e),
+                        )
 
         # Delete the directories and all contents
         directories_removed = 0
@@ -971,14 +1152,19 @@ async def cleanup_job_files(
             try:
                 shutil.rmtree(job_dir)
                 directories_removed += 1
-                logger.info("Deleted job directory",
-                           job_id=job_id, directory=str(job_dir))
+                logger.info(
+                    "Deleted job directory", job_id=job_id, directory=str(job_dir)
+                )
             except Exception as e:
-                logger.error("Failed to delete job directory",
-                           job_id=job_id, directory=str(job_dir), error=str(e))
+                logger.error(
+                    "Failed to delete job directory",
+                    job_id=job_id,
+                    directory=str(job_dir),
+                    error=str(e),
+                )
                 raise HTTPException(
                     status_code=500,
-                    detail=f"Failed to delete directory {job_dir}: {str(e)}"
+                    detail=f"Failed to delete directory {job_dir}: {str(e)}",
                 )
 
         # Remove job from background tracking
@@ -990,11 +1176,13 @@ async def cleanup_job_files(
         size_mb = total_size_freed / (1024 * 1024)
         message = f"Successfully cleaned up job {job_id}: {files_deleted} files, {directories_removed} directories, {size_mb:.2f} MB freed"
 
-        logger.info("Job cleanup completed",
-                   job_id=job_id,
-                   files_deleted=files_deleted,
-                   directories_removed=directories_removed,
-                   total_size_freed=total_size_freed)
+        logger.info(
+            "Job cleanup completed",
+            job_id=job_id,
+            files_deleted=files_deleted,
+            directories_removed=directories_removed,
+            total_size_freed=total_size_freed,
+        )
 
         return JobCleanupResponse(
             success=True,
@@ -1003,7 +1191,7 @@ async def cleanup_job_files(
             directories_removed=directories_removed,
             total_size_freed=total_size_freed,
             deleted_files=deleted_files,
-            message=message
+            message=message,
         )
 
     except HTTPException:
@@ -1025,7 +1213,7 @@ async def health_check():
         services_status = {
             "stage_manager": "healthy",
             "file_system": "healthy",
-            "background_jobs": "healthy"
+            "background_jobs": "healthy",
         }
 
         # TODO: Add actual health checks for:
@@ -1039,7 +1227,7 @@ async def health_check():
             timestamp=datetime.now(),
             version="1.0.0",  # TODO: Get actual version
             stages_available=stages_available,
-            services_status=services_status
+            services_status=services_status,
         )
 
     except Exception as e:

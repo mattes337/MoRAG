@@ -5,9 +5,9 @@ neighborhood exploration, and multi-hop queries.
 """
 
 import logging
-from typing import List, Optional, Dict, Any, Set, Union
+from collections import defaultdict, deque
+from typing import Any, Dict, List, Optional, Set, Union
 from uuid import UUID
-from collections import deque, defaultdict
 
 from ..models import Entity, Relation
 from ..storage.base import BaseStorage
@@ -45,18 +45,19 @@ class GraphPath:
     def to_dict(self) -> Dict[str, Any]:
         """Convert path to dictionary representation."""
         return {
-            "entities": [{
-                "id": str(e.id),
-                "name": e.name,
-                "type": e.type
-            } for e in self.entities],
-            "relations": [{
-                "id": str(r.id),
-                "type": r.type,
-                "source_id": str(r.source_id),
-                "target_id": str(r.target_id)
-            } for r in self.relations],
-            "length": self.length
+            "entities": [
+                {"id": str(e.id), "name": e.name, "type": e.type} for e in self.entities
+            ],
+            "relations": [
+                {
+                    "id": str(r.id),
+                    "type": r.type,
+                    "source_id": str(r.source_id),
+                    "target_id": str(r.target_id),
+                }
+                for r in self.relations
+            ],
+            "length": self.length,
         }
 
 
@@ -76,9 +77,12 @@ class GraphTraversal:
         self.storage = storage
         self.logger = logger.getChild(self.__class__.__name__)
 
-    async def find_neighbors(self, entity_id: Union[str, UUID],
-                           max_distance: int = 1,
-                           relation_types: Optional[List[str]] = None) -> List[Entity]:
+    async def find_neighbors(
+        self,
+        entity_id: Union[str, UUID],
+        max_distance: int = 1,
+        relation_types: Optional[List[str]] = None,
+    ) -> List[Entity]:
         """Find neighboring entities within a given distance.
 
         Args:
@@ -89,16 +93,25 @@ class GraphTraversal:
         Returns:
             List of neighboring entities
         """
-        self.logger.info(f"Finding neighbors for entity {entity_id} within distance {max_distance}")
+        self.logger.info(
+            f"Finding neighbors for entity {entity_id} within distance {max_distance}"
+        )
 
         if isinstance(self.storage, Neo4jStorage):
-            return await self._find_neighbors_neo4j(entity_id, max_distance, relation_types)
+            return await self._find_neighbors_neo4j(
+                entity_id, max_distance, relation_types
+            )
         else:
-            return await self._find_neighbors_generic(entity_id, max_distance, relation_types)
+            return await self._find_neighbors_generic(
+                entity_id, max_distance, relation_types
+            )
 
-    async def _find_neighbors_neo4j(self, entity_id: Union[str, UUID],
-                                  max_distance: int,
-                                  relation_types: Optional[List[str]]) -> List[Entity]:
+    async def _find_neighbors_neo4j(
+        self,
+        entity_id: Union[str, UUID],
+        max_distance: int,
+        relation_types: Optional[List[str]],
+    ) -> List[Entity]:
         """Find neighbors using Neo4j-specific queries."""
         entity_id_str = str(entity_id)
 
@@ -123,7 +136,7 @@ class GraphTraversal:
             try:
                 neighbor_data = dict(record["neighbor"])
                 # Only process if it has the required fields for an Entity
-                if 'name' in neighbor_data and neighbor_data['name']:
+                if "name" in neighbor_data and neighbor_data["name"]:
                     entity = Entity.from_neo4j_node(neighbor_data)
                     neighbors.append(entity)
                 else:
@@ -133,9 +146,12 @@ class GraphTraversal:
 
         return neighbors
 
-    async def _find_neighbors_generic(self, entity_id: Union[str, UUID],
-                                    max_distance: int,
-                                    relation_types: Optional[List[str]]) -> List[Entity]:
+    async def _find_neighbors_generic(
+        self,
+        entity_id: Union[str, UUID],
+        max_distance: int,
+        relation_types: Optional[List[str]],
+    ) -> List[Entity]:
         """Find neighbors using generic graph traversal."""
         entity_id_str = str(entity_id)
 
@@ -183,9 +199,12 @@ class GraphTraversal:
 
         return neighbors
 
-    async def find_shortest_path(self, source_id: Union[str, UUID],
-                               target_id: Union[str, UUID],
-                               relation_types: Optional[List[str]] = None) -> Optional[GraphPath]:
+    async def find_shortest_path(
+        self,
+        source_id: Union[str, UUID],
+        target_id: Union[str, UUID],
+        relation_types: Optional[List[str]] = None,
+    ) -> Optional[GraphPath]:
         """Find the shortest path between two entities.
 
         Args:
@@ -199,13 +218,20 @@ class GraphTraversal:
         self.logger.info(f"Finding shortest path from {source_id} to {target_id}")
 
         if isinstance(self.storage, Neo4jStorage):
-            return await self._find_shortest_path_neo4j(source_id, target_id, relation_types)
+            return await self._find_shortest_path_neo4j(
+                source_id, target_id, relation_types
+            )
         else:
-            return await self._find_shortest_path_generic(source_id, target_id, relation_types)
+            return await self._find_shortest_path_generic(
+                source_id, target_id, relation_types
+            )
 
-    async def _find_shortest_path_neo4j(self, source_id: Union[str, UUID],
-                                       target_id: Union[str, UUID],
-                                       relation_types: Optional[List[str]]) -> Optional[GraphPath]:
+    async def _find_shortest_path_neo4j(
+        self,
+        source_id: Union[str, UUID],
+        target_id: Union[str, UUID],
+        relation_types: Optional[List[str]],
+    ) -> Optional[GraphPath]:
         """Find shortest path using Neo4j-specific queries."""
         source_id_str = str(source_id)
         target_id_str = str(target_id)
@@ -222,10 +248,9 @@ class GraphTraversal:
         RETURN path, nodes(path) as entities, relationships(path) as relations
         """
 
-        result = await self.storage._execute_query(query, {
-            "source_id": source_id_str,
-            "target_id": target_id_str
-        })
+        result = await self.storage._execute_query(
+            query, {"source_id": source_id_str, "target_id": target_id_str}
+        )
 
         if not result:
             return None
@@ -251,9 +276,12 @@ class GraphTraversal:
 
         return GraphPath(entities, relations)
 
-    async def _find_shortest_path_generic(self, source_id: Union[str, UUID],
-                                        target_id: Union[str, UUID],
-                                        relation_types: Optional[List[str]]) -> Optional[GraphPath]:
+    async def _find_shortest_path_generic(
+        self,
+        source_id: Union[str, UUID],
+        target_id: Union[str, UUID],
+        relation_types: Optional[List[str]],
+    ) -> Optional[GraphPath]:
         """Find shortest path using generic BFS."""
         source_id_str = str(source_id)
         target_id_str = str(target_id)
@@ -279,7 +307,9 @@ class GraphTraversal:
             adjacency[target].append((source, str(relation.id)))  # Undirected
 
         # BFS to find shortest path
-        queue = deque([(source_id_str, [source_id_str], [])])  # (current, path_entities, path_relations)
+        queue = deque(
+            [(source_id_str, [source_id_str], [])]
+        )  # (current, path_entities, path_relations)
         visited = set()
 
         while queue:
@@ -293,8 +323,12 @@ class GraphTraversal:
             # Check if we reached the target
             if current_id == target_id_str:
                 # Build GraphPath
-                path_entity_objects = [entity_map[eid] for eid in path_entities if eid in entity_map]
-                path_relation_objects = [relation_map[rid] for rid in path_relations if rid in relation_map]
+                path_entity_objects = [
+                    entity_map[eid] for eid in path_entities if eid in entity_map
+                ]
+                path_relation_objects = [
+                    relation_map[rid] for rid in path_relations if rid in relation_map
+                ]
                 return GraphPath(path_entity_objects, path_relation_objects)
 
             # Explore neighbors
@@ -306,10 +340,13 @@ class GraphTraversal:
 
         return None  # No path found
 
-    async def find_all_paths(self, source_id: Union[str, UUID],
-                           target_id: Union[str, UUID],
-                           max_length: int = 5,
-                           relation_types: Optional[List[str]] = None) -> List[GraphPath]:
+    async def find_all_paths(
+        self,
+        source_id: Union[str, UUID],
+        target_id: Union[str, UUID],
+        max_length: int = 5,
+        relation_types: Optional[List[str]] = None,
+    ) -> List[GraphPath]:
         """Find all paths between two entities up to a maximum length.
 
         Args:
@@ -321,7 +358,9 @@ class GraphTraversal:
         Returns:
             List of all paths found
         """
-        self.logger.info(f"Finding all paths from {source_id} to {target_id} (max length: {max_length})")
+        self.logger.info(
+            f"Finding all paths from {source_id} to {target_id} (max length: {max_length})"
+        )
 
         source_id_str = str(source_id)
         target_id_str = str(target_id)
@@ -349,14 +388,23 @@ class GraphTraversal:
         # DFS to find all paths
         all_paths = []
 
-        def dfs(current_id: str, path_entities: List[str], path_relations: List[str], visited: Set[str]):
+        def dfs(
+            current_id: str,
+            path_entities: List[str],
+            path_relations: List[str],
+            visited: Set[str],
+        ):
             if len(path_relations) >= max_length:
                 return
 
             if current_id == target_id_str and len(path_entities) > 1:
                 # Found a path
-                path_entity_objects = [entity_map[eid] for eid in path_entities if eid in entity_map]
-                path_relation_objects = [relation_map[rid] for rid in path_relations if rid in relation_map]
+                path_entity_objects = [
+                    entity_map[eid] for eid in path_entities if eid in entity_map
+                ]
+                path_relation_objects = [
+                    relation_map[rid] for rid in path_relations if rid in relation_map
+                ]
                 all_paths.append(GraphPath(path_entity_objects, path_relation_objects))
                 return
 
@@ -364,10 +412,12 @@ class GraphTraversal:
                 if neighbor_id not in visited:
                     new_visited = visited.copy()
                     new_visited.add(current_id)
-                    dfs(neighbor_id,
+                    dfs(
+                        neighbor_id,
                         path_entities + [neighbor_id],
                         path_relations + [relation_id],
-                        new_visited)
+                        new_visited,
+                    )
 
         dfs(source_id_str, [source_id_str], [], set())
 
@@ -377,7 +427,9 @@ class GraphTraversal:
         self.logger.info(f"Found {len(all_paths)} paths")
         return all_paths
 
-    async def find_connected_components(self, relation_types: Optional[List[str]] = None) -> List[List[Entity]]:
+    async def find_connected_components(
+        self, relation_types: Optional[List[str]] = None
+    ) -> List[List[Entity]]:
         """Find connected components in the graph.
 
         Args:
@@ -427,7 +479,9 @@ class GraphTraversal:
                 component = []
                 dfs(entity_id, component)
                 if component:
-                    component_entities = [entity_map[eid] for eid in component if eid in entity_map]
+                    component_entities = [
+                        entity_map[eid] for eid in component if eid in entity_map
+                    ]
                     components.append(component_entities)
 
         # Sort components by size (largest first)
@@ -436,8 +490,9 @@ class GraphTraversal:
         self.logger.info(f"Found {len(components)} connected components")
         return components
 
-    async def get_entity_degree(self, entity_id: Union[str, UUID],
-                              relation_types: Optional[List[str]] = None) -> Dict[str, int]:
+    async def get_entity_degree(
+        self, entity_id: Union[str, UUID], relation_types: Optional[List[str]] = None
+    ) -> Dict[str, int]:
         """Get the degree (number of connections) of an entity.
 
         Args:
@@ -464,5 +519,5 @@ class GraphTraversal:
         return {
             "in_degree": in_degree,
             "out_degree": out_degree,
-            "total_degree": total_degree
+            "total_degree": total_degree,
         }

@@ -5,7 +5,7 @@ operations for graph entities and relations.
 """
 
 import logging
-from typing import List, Optional, Dict, Any, Union
+from typing import Any, Dict, List, Optional, Union
 from uuid import UUID
 
 from ..models import Entity, Relation
@@ -63,7 +63,9 @@ class GraphCRUD:
         Raises:
             ValueError: If source or target entities don't exist
         """
-        self.logger.info(f"Creating relation: {relation.source_id} -> {relation.target_id} ({relation.type})")
+        self.logger.info(
+            f"Creating relation: {relation.source_id} -> {relation.target_id} ({relation.type})"
+        )
 
         # Verify source and target entities exist
         source_entity = await self.get_entity(relation.source_id)
@@ -111,7 +113,9 @@ class GraphCRUD:
                 return entity
         return None
 
-    async def get_entities_by_type(self, entity_type: str, limit: Optional[int] = None) -> List[Entity]:
+    async def get_entities_by_type(
+        self, entity_type: str, limit: Optional[int] = None
+    ) -> List[Entity]:
         """Get entities by type.
 
         Args:
@@ -146,8 +150,9 @@ class GraphCRUD:
                 return relation
         return None
 
-    async def get_entity_relations(self, entity_id: Union[str, UUID],
-                                 direction: str = "both") -> List[Relation]:
+    async def get_entity_relations(
+        self, entity_id: Union[str, UUID], direction: str = "both"
+    ) -> List[Relation]:
         """Get all relations for an entity.
 
         Args:
@@ -165,11 +170,16 @@ class GraphCRUD:
         elif direction == "outgoing":
             return [r for r in relations if str(r.source_id) == entity_id_str]
         else:  # both
-            return [r for r in relations if
-                   str(r.source_id) == entity_id_str or str(r.target_id) == entity_id_str]
+            return [
+                r
+                for r in relations
+                if str(r.source_id) == entity_id_str
+                or str(r.target_id) == entity_id_str
+            ]
 
-    async def update_entity(self, entity_id: Union[str, UUID],
-                          updates: Dict[str, Any]) -> Optional[Entity]:
+    async def update_entity(
+        self, entity_id: Union[str, UUID], updates: Dict[str, Any]
+    ) -> Optional[Entity]:
         """Update an entity.
 
         Args:
@@ -193,8 +203,9 @@ class GraphCRUD:
         self.logger.info(f"Entity updated: {entity.id}")
         return entity
 
-    async def update_relation(self, relation_id: Union[str, UUID],
-                            updates: Dict[str, Any]) -> Optional[Relation]:
+    async def update_relation(
+        self, relation_id: Union[str, UUID], updates: Dict[str, Any]
+    ) -> Optional[Relation]:
         """Update a relation.
 
         Args:
@@ -218,8 +229,9 @@ class GraphCRUD:
         self.logger.info(f"Relation updated: {relation.id}")
         return relation
 
-    async def delete_entity(self, entity_id: Union[str, UUID],
-                          cascade: bool = True) -> bool:
+    async def delete_entity(
+        self, entity_id: Union[str, UUID], cascade: bool = True
+    ) -> bool:
         """Delete an entity.
 
         Args:
@@ -337,5 +349,5 @@ class GraphCRUD:
             "total_entities": len(entities),
             "total_relations": len(relations),
             "entity_types": entity_types,
-            "relation_types": relation_types
+            "relation_types": relation_types,
         }

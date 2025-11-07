@@ -14,15 +14,17 @@ import asyncio
 import json
 import os
 import sys
-from typing import Dict, Any, List
+from typing import Any, Dict, List
 
 import structlog
 
 # Add the packages to the path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'packages', 'morag-graph', 'src'))
+sys.path.insert(
+    0, os.path.join(os.path.dirname(__file__), "..", "packages", "morag-graph", "src")
+)
 
-from morag_graph.storage import Neo4jStorage, Neo4jConfig
 from morag_graph.maintenance.query_optimizer import QueryOptimizer
+from morag_graph.storage import Neo4jConfig, Neo4jStorage
 
 logger = structlog.get_logger(__name__)
 
@@ -34,7 +36,7 @@ async def analyze_relationships() -> Dict[str, Any]:
         uri=os.getenv("NEO4J_URI", "bolt://localhost:7687"),
         username=os.getenv("NEO4J_USERNAME", "neo4j"),
         password=os.getenv("NEO4J_PASSWORD", "password"),
-        database=os.getenv("NEO4J_DATABASE", "neo4j")
+        database=os.getenv("NEO4J_DATABASE", "neo4j"),
     )
 
     storage = Neo4jStorage(neo4j_config)
@@ -69,7 +71,7 @@ async def analyze_relationships() -> Dict[str, Any]:
             "graph_statistics": stats[0] if stats else {},
             "all_relationship_types": all_rels,
             "fact_to_entity_relationships": fact_rels,
-            "analysis": {}
+            "analysis": {},
         }
 
         # Categorize relationship types
@@ -85,66 +87,86 @@ async def analyze_relationships() -> Dict[str, Any]:
             "most_common_all_relationships": all_rels[:10],
             "relationship_type_categories": {
                 "fact_to_entity": sorted(list(fact_rel_types)),
-                "entity_to_entity": sorted(list(entity_rel_types))
-            }
+                "entity_to_entity": sorted(list(entity_rel_types)),
+            },
         }
 
         # Print summary
         print(f"📊 Graph Statistics:")
         print(f"   Entities: {analysis['graph_statistics'].get('entity_count', 0):,}")
         print(f"   Facts: {analysis['graph_statistics'].get('fact_count', 0):,}")
-        print(f"   Total Relationships: {analysis['graph_statistics'].get('total_relationships', 0):,}")
+        print(
+            f"   Total Relationships: {analysis['graph_statistics'].get('total_relationships', 0):,}"
+        )
         print()
 
         print(f"🔗 Relationship Type Analysis:")
-        print(f"   Total Relationship Types: {analysis['analysis']['total_relationship_types']}")
+        print(
+            f"   Total Relationship Types: {analysis['analysis']['total_relationship_types']}"
+        )
         print(f"   Fact→Entity Types: {analysis['analysis']['fact_to_entity_types']}")
-        print(f"   Entity→Entity Types: {analysis['analysis']['entity_to_entity_types']}")
+        print(
+            f"   Entity→Entity Types: {analysis['analysis']['entity_to_entity_types']}"
+        )
         print()
 
         print(f"📈 Top 10 Fact→Entity Relationship Types:")
-        for i, rel in enumerate(analysis['analysis']['most_common_fact_relationships'], 1):
+        for i, rel in enumerate(
+            analysis["analysis"]["most_common_fact_relationships"], 1
+        ):
             print(f"   {i:2d}. {rel['rel_type']:20s} ({rel['count']:,} relationships)")
         print()
 
         if entity_rel_types:
             print(f"🔄 Entity→Entity Relationship Types:")
-            entity_rels = [rel for rel in all_rels if rel['rel_type'] in entity_rel_types][:10]
+            entity_rels = [
+                rel for rel in all_rels if rel["rel_type"] in entity_rel_types
+            ][:10]
             for i, rel in enumerate(entity_rels, 1):
-                print(f"   {i:2d}. {rel['rel_type']:20s} ({rel['count']:,} relationships)")
+                print(
+                    f"   {i:2d}. {rel['rel_type']:20s} ({rel['count']:,} relationships)"
+                )
             print()
 
         print(f"💡 Key Insights:")
 
         # Check for common patterns
-        common_fact_types = [rel['rel_type'] for rel in fact_rels[:5]]
+        common_fact_types = [rel["rel_type"] for rel in fact_rels[:5]]
 
-        if any('ABOUT' in t or 'RELATES_TO' in t for t in common_fact_types):
+        if any("ABOUT" in t or "RELATES_TO" in t for t in common_fact_types):
             print(f"   ✓ Found standard relationship types (ABOUT, RELATES_TO)")
         else:
-            print(f"   ⚠️  No standard relationship types found - using domain-specific types")
+            print(
+                f"   ⚠️  No standard relationship types found - using domain-specific types"
+            )
 
         # Check for domain-specific patterns
         domain_indicators = {
-            'medical': ['TREATS', 'CAUSES', 'SYMPTOM', 'DIAGNOSIS', 'MEDICATION'],
-            'technical': ['IMPLEMENTS', 'USES', 'REQUIRES', 'CONFIGURES'],
-            'business': ['MANAGES', 'REPORTS_TO', 'OWNS', 'RESPONSIBLE_FOR'],
-            'academic': ['STUDIES', 'RESEARCHES', 'PUBLISHES', 'CITES']
+            "medical": ["TREATS", "CAUSES", "SYMPTOM", "DIAGNOSIS", "MEDICATION"],
+            "technical": ["IMPLEMENTS", "USES", "REQUIRES", "CONFIGURES"],
+            "business": ["MANAGES", "REPORTS_TO", "OWNS", "RESPONSIBLE_FOR"],
+            "academic": ["STUDIES", "RESEARCHES", "PUBLISHES", "CITES"],
         }
 
         detected_domains = []
         for domain, indicators in domain_indicators.items():
-            if any(any(indicator in rel_type for indicator in indicators)
-                   for rel_type in fact_rel_types):
+            if any(
+                any(indicator in rel_type for indicator in indicators)
+                for rel_type in fact_rel_types
+            ):
                 detected_domains.append(domain)
 
         if detected_domains:
             print(f"   🎯 Detected domain(s): {', '.join(detected_domains)}")
         else:
-            print(f"   🔍 Custom domain detected - relationship types are domain-specific")
+            print(
+                f"   🔍 Custom domain detected - relationship types are domain-specific"
+            )
 
         print(f"   ✅ All maintenance queries use relationship-agnostic patterns")
-        print(f"   📝 This ensures all {analysis['analysis']['total_relationship_types']} relationship types are captured")
+        print(
+            f"   📝 This ensures all {analysis['analysis']['total_relationship_types']} relationship types are captured"
+        )
 
         return analysis
 
@@ -163,7 +185,7 @@ async def main():
         # Optionally save detailed analysis to file
         if "--save" in sys.argv:
             output_file = "graph_relationship_analysis.json"
-            with open(output_file, 'w') as f:
+            with open(output_file, "w") as f:
                 json.dump(analysis, f, indent=2)
             print(f"\n💾 Detailed analysis saved to {output_file}")
 

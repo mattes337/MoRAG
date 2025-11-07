@@ -3,13 +3,14 @@
 Automated test for RAG quality validation.
 Based on test_fact_quality.py
 """
-import pytest
 import json
+import os
 import re
 import tempfile
-import os
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import Any, Dict, List
+
+import pytest
 
 
 class TestRAGQualityValidation:
@@ -42,27 +43,35 @@ The continued advancement of AI technologies promises significant impacts across
                 {
                     "fact_text": "Artificial intelligence represents a transformative field in computer science that focuses on creating intelligent systems.",
                     "confidence": 0.92,
-                    "keywords": ["artificial intelligence", "computer science", "intelligent systems"],
-                    "domain": "technology"
+                    "keywords": [
+                        "artificial intelligence",
+                        "computer science",
+                        "intelligent systems",
+                    ],
+                    "domain": "technology",
                 },
                 {
                     "fact_text": "Machine learning constitutes a crucial subset of artificial intelligence.",
                     "confidence": 0.88,
-                    "keywords": ["machine learning", "artificial intelligence", "subset"],
-                    "domain": "technology"
+                    "keywords": [
+                        "machine learning",
+                        "artificial intelligence",
+                        "subset",
+                    ],
+                    "domain": "technology",
                 },
                 {
                     "fact_text": "Neural networks serve as the foundational architecture for many modern AI systems.",
                     "confidence": 0.85,
                     "keywords": ["neural networks", "architecture", "AI systems"],
-                    "domain": "technology"
+                    "domain": "technology",
                 },
                 {
                     "fact_text": "It works well.",
                     "confidence": 0.25,
                     "keywords": ["works"],
-                    "domain": "general"
-                }
+                    "domain": "general",
+                },
             ]
         }
 
@@ -71,7 +80,7 @@ The continued advancement of AI technologies promises significant impacts across
         content = sample_document_content
 
         # Simulate paragraph-based chunking
-        paragraphs = [p.strip() for p in content.split('\n\n') if p.strip()]
+        paragraphs = [p.strip() for p in content.split("\n\n") if p.strip()]
 
         # Combine paragraphs to create reasonable chunks (~2000 chars)
         chunks = []
@@ -89,7 +98,9 @@ The continued advancement of AI technologies promises significant impacts across
 
         # Validate chunk quality
         assert len(chunks) > 0, "Should create at least one chunk"
-        assert len(chunks) <= 20, f"Too many chunks ({len(chunks)}), indicates fragmentation"
+        assert (
+            len(chunks) <= 20
+        ), f"Too many chunks ({len(chunks)}), indicates fragmentation"
 
         # Check chunk sizes
         sizes = [len(chunk) for chunk in chunks]
@@ -102,8 +113,10 @@ The continued advancement of AI technologies promises significant impacts across
         # Validate chunk content coherence
         for i, chunk in enumerate(chunks):
             # Each chunk should contain complete sentences
-            sentences = chunk.split('.')
-            complete_sentences = [s.strip() for s in sentences if s.strip() and len(s.strip()) > 10]
+            sentences = chunk.split(".")
+            complete_sentences = [
+                s.strip() for s in sentences if s.strip() and len(s.strip()) > 10
+            ]
             assert len(complete_sentences) >= 1, f"Chunk {i} lacks complete sentences"
 
     def test_keyword_extraction_quality(self):
@@ -116,21 +129,48 @@ The continued advancement of AI technologies promises significant impacts across
         """
 
         # Extract words longer than 3 characters
-        words = re.findall(r'\b[a-zA-Z]{4,}\b', test_text.lower())
+        words = re.findall(r"\b[a-zA-Z]{4,}\b", test_text.lower())
 
         # Basic filtering: remove very common words
         basic_stop_words = {
-            'that', 'this', 'with', 'from', 'they', 'have', 'been', 'were', 'said',
-            'each', 'which', 'their', 'time', 'will', 'about', 'would', 'there',
-            'could', 'other', 'more', 'very', 'what', 'know', 'just', 'first',
-            'also', 'after', 'back', 'well', 'work', 'life', 'only', 'then'
+            "that",
+            "this",
+            "with",
+            "from",
+            "they",
+            "have",
+            "been",
+            "were",
+            "said",
+            "each",
+            "which",
+            "their",
+            "time",
+            "will",
+            "about",
+            "would",
+            "there",
+            "could",
+            "other",
+            "more",
+            "very",
+            "what",
+            "know",
+            "just",
+            "first",
+            "also",
+            "after",
+            "back",
+            "well",
+            "work",
+            "life",
+            "only",
+            "then",
         }
 
         keywords = []
         for word in words:
-            if (word not in basic_stop_words and
-                not word.isdigit() and
-                len(word) >= 4):
+            if word not in basic_stop_words and not word.isdigit() and len(word) >= 4:
                 keywords.append(word)
 
         # Remove duplicates
@@ -138,19 +178,32 @@ The continued advancement of AI technologies promises significant impacts across
 
         # Validate keyword quality
         expected_domain_terms = [
-            'artificial', 'intelligence', 'machine', 'learning', 'neural',
-            'networks', 'deep', 'algorithms', 'natural', 'language', 'processing'
+            "artificial",
+            "intelligence",
+            "machine",
+            "learning",
+            "neural",
+            "networks",
+            "deep",
+            "algorithms",
+            "natural",
+            "language",
+            "processing",
         ]
 
         found_relevant = sum(1 for term in expected_domain_terms if term in keywords)
 
         assert len(keywords) > 0, "Should extract some keywords"
-        assert found_relevant >= 5, f"Should find domain-specific terms, found {found_relevant}"
+        assert (
+            found_relevant >= 5
+        ), f"Should find domain-specific terms, found {found_relevant}"
 
         # Check that we don't have too many stop words
-        common_words = ['that', 'this', 'with', 'from', 'they', 'have', 'been']
+        common_words = ["that", "this", "with", "from", "they", "have", "been"]
         stop_word_count = sum(1 for word in common_words if word in keywords)
-        assert stop_word_count <= 2, f"Too many stop words in keywords ({stop_word_count})"
+        assert (
+            stop_word_count <= 2
+        ), f"Too many stop words in keywords ({stop_word_count})"
 
     def test_fact_rag_usefulness(self, sample_facts_data):
         """Test that extracted facts are useful for RAG applications."""
@@ -160,68 +213,87 @@ The continued advancement of AI technologies promises significant impacts across
 
         # Analyze fact quality for RAG
         rag_quality_metrics = {
-            'substantial_length': 0,
-            'reasonable_confidence': 0,
-            'domain_specific': 0,
-            'self_contained': 0
+            "substantial_length": 0,
+            "reasonable_confidence": 0,
+            "domain_specific": 0,
+            "self_contained": 0,
         }
 
         for fact in facts:
-            fact_text = fact.get('fact_text', '')
-            confidence = fact.get('confidence', 0)
+            fact_text = fact.get("fact_text", "")
+            confidence = fact.get("confidence", 0)
 
             # Check fact length (should be substantial for RAG)
             if len(fact_text) > 50:
-                rag_quality_metrics['substantial_length'] += 1
+                rag_quality_metrics["substantial_length"] += 1
 
             # Check confidence (should be reasonable)
             if confidence > 0.5:
-                rag_quality_metrics['reasonable_confidence'] += 1
+                rag_quality_metrics["reasonable_confidence"] += 1
 
             # Check for domain-specific content
-            domain_terms = ['artificial intelligence', 'machine learning', 'neural networks', 'computer science']
+            domain_terms = [
+                "artificial intelligence",
+                "machine learning",
+                "neural networks",
+                "computer science",
+            ]
             if any(term in fact_text.lower() for term in domain_terms):
-                rag_quality_metrics['domain_specific'] += 1
+                rag_quality_metrics["domain_specific"] += 1
 
             # Check self-containment (avoid pronouns that make facts unclear)
-            problematic_pronouns = ['it ', 'they ', 'this ', 'these ', 'that ']
-            if not any(pronoun in fact_text.lower() for pronoun in problematic_pronouns):
-                rag_quality_metrics['self_contained'] += 1
+            problematic_pronouns = ["it ", "they ", "this ", "these ", "that "]
+            if not any(
+                pronoun in fact_text.lower() for pronoun in problematic_pronouns
+            ):
+                rag_quality_metrics["self_contained"] += 1
 
         total_facts = len(facts)
 
         # Calculate quality percentages
-        substantial_pct = (rag_quality_metrics['substantial_length'] / total_facts) * 100
-        confidence_pct = (rag_quality_metrics['reasonable_confidence'] / total_facts) * 100
-        domain_pct = (rag_quality_metrics['domain_specific'] / total_facts) * 100
-        self_contained_pct = (rag_quality_metrics['self_contained'] / total_facts) * 100
+        substantial_pct = (
+            rag_quality_metrics["substantial_length"] / total_facts
+        ) * 100
+        confidence_pct = (
+            rag_quality_metrics["reasonable_confidence"] / total_facts
+        ) * 100
+        domain_pct = (rag_quality_metrics["domain_specific"] / total_facts) * 100
+        self_contained_pct = (rag_quality_metrics["self_contained"] / total_facts) * 100
 
         # Quality thresholds for RAG usefulness
-        assert substantial_pct >= 50, f"Too few substantial facts ({substantial_pct:.1f}%)"
+        assert (
+            substantial_pct >= 50
+        ), f"Too few substantial facts ({substantial_pct:.1f}%)"
         assert confidence_pct >= 50, f"Too few confident facts ({confidence_pct:.1f}%)"
         assert domain_pct >= 50, f"Too few domain-specific facts ({domain_pct:.1f}%)"
-        assert self_contained_pct >= 75, f"Too few self-contained facts ({self_contained_pct:.1f}%)"
+        assert (
+            self_contained_pct >= 75
+        ), f"Too few self-contained facts ({self_contained_pct:.1f}%)"
 
     def test_fact_diversity_for_rag(self, sample_facts_data):
         """Test that facts provide diverse information for RAG."""
         facts = sample_facts_data["facts"]
 
         # Check fact text diversity
-        fact_texts = [fact.get('fact_text', '') for fact in facts]
+        fact_texts = [fact.get("fact_text", "") for fact in facts]
         unique_words = set()
 
         for text in fact_texts:
-            words = re.findall(r'\b[a-zA-Z]{4,}\b', text.lower())
+            words = re.findall(r"\b[a-zA-Z]{4,}\b", text.lower())
             unique_words.update(words)
 
         # Should have good vocabulary diversity
-        total_words = sum(len(re.findall(r'\b[a-zA-Z]+\b', text.lower())) for text in fact_texts)
+        total_words = sum(
+            len(re.findall(r"\b[a-zA-Z]+\b", text.lower())) for text in fact_texts
+        )
         diversity_ratio = len(unique_words) / total_words if total_words > 0 else 0
 
-        assert diversity_ratio > 0.3, f"Low vocabulary diversity ({diversity_ratio:.2f})"
+        assert (
+            diversity_ratio > 0.3
+        ), f"Low vocabulary diversity ({diversity_ratio:.2f})"
 
         # Check confidence diversity
-        confidences = [fact.get('confidence', 0) for fact in facts]
+        confidences = [fact.get("confidence", 0) for fact in facts]
         confidence_range = max(confidences) - min(confidences) if confidences else 0
 
         assert confidence_range > 0.1, "Facts should have varied confidence levels"
@@ -230,7 +302,7 @@ The continued advancement of AI technologies promises significant impacts across
         """Test that facts have appropriate length distribution for RAG."""
         facts = sample_facts_data["facts"]
 
-        lengths = [len(fact.get('fact_text', '')) for fact in facts]
+        lengths = [len(fact.get("fact_text", "")) for fact in facts]
 
         # Check length statistics
         avg_length = sum(lengths) / len(lengths) if lengths else 0
@@ -253,7 +325,7 @@ The continued advancement of AI technologies promises significant impacts across
 
         all_keywords = []
         for fact in facts:
-            keywords = fact.get('keywords', [])
+            keywords = fact.get("keywords", [])
             all_keywords.extend(keywords)
 
         # Remove duplicates
@@ -264,21 +336,29 @@ The continued advancement of AI technologies promises significant impacts across
         # Check keyword quality
         # Keywords should be meaningful (not too short)
         meaningful_keywords = [kw for kw in unique_keywords if len(kw) >= 3]
-        meaningful_ratio = len(meaningful_keywords) / len(unique_keywords) if unique_keywords else 0
+        meaningful_ratio = (
+            len(meaningful_keywords) / len(unique_keywords) if unique_keywords else 0
+        )
 
-        assert meaningful_ratio >= 0.8, f"Too few meaningful keywords ({meaningful_ratio:.1f})"
+        assert (
+            meaningful_ratio >= 0.8
+        ), f"Too few meaningful keywords ({meaningful_ratio:.1f})"
 
         # Keywords should relate to fact content
         for fact in facts:
-            fact_text = fact.get('fact_text', '').lower()
-            fact_keywords = fact.get('keywords', [])
+            fact_text = fact.get("fact_text", "").lower()
+            fact_keywords = fact.get("keywords", [])
 
             if fact_keywords:
                 # At least some keywords should appear in the fact text
-                matching_keywords = [kw for kw in fact_keywords if kw.lower() in fact_text]
+                matching_keywords = [
+                    kw for kw in fact_keywords if kw.lower() in fact_text
+                ]
                 match_ratio = len(matching_keywords) / len(fact_keywords)
 
-                assert match_ratio >= 0.5, f"Keywords don't match fact content well ({match_ratio:.1f})"
+                assert (
+                    match_ratio >= 0.5
+                ), f"Keywords don't match fact content well ({match_ratio:.1f})"
 
 
 @pytest.mark.integration
@@ -291,7 +371,7 @@ class TestRAGQualityIntegration:
         results_paths = [
             Path("temp/Broers.json"),
             Path("temp/test_results.json"),
-            Path("output/facts.json")
+            Path("output/facts.json"),
         ]
 
         results_file = None
@@ -304,22 +384,28 @@ class TestRAGQualityIntegration:
             pytest.skip("No real extraction results available for integration testing")
 
         try:
-            with open(results_file, 'r', encoding='utf-8') as f:
+            with open(results_file, "r", encoding="utf-8") as f:
                 results = json.load(f)
         except Exception as e:
             pytest.fail(f"Failed to load results from {results_file}: {e}")
 
-        facts = results.get('facts', [])
+        facts = results.get("facts", [])
 
         if len(facts) == 0:
-            pytest.fail("No facts found in extraction results - indicates extraction issues")
+            pytest.fail(
+                "No facts found in extraction results - indicates extraction issues"
+            )
 
         # Test basic RAG quality metrics
-        substantial_facts = [f for f in facts if len(f.get('fact_text', '')) > 30]
-        confident_facts = [f for f in facts if f.get('confidence', 0) > 0.5]
+        substantial_facts = [f for f in facts if len(f.get("fact_text", "")) > 30]
+        confident_facts = [f for f in facts if f.get("confidence", 0) > 0.5]
 
         substantial_ratio = len(substantial_facts) / len(facts)
         confident_ratio = len(confident_facts) / len(facts)
 
-        assert substantial_ratio >= 0.5, f"Too few substantial facts for RAG ({substantial_ratio:.1f})"
-        assert confident_ratio >= 0.3, f"Too few confident facts for RAG ({confident_ratio:.1f})"
+        assert (
+            substantial_ratio >= 0.5
+        ), f"Too few substantial facts for RAG ({substantial_ratio:.1f})"
+        assert (
+            confident_ratio >= 0.3
+        ), f"Too few confident facts for RAG ({confident_ratio:.1f})"

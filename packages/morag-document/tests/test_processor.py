@@ -1,17 +1,16 @@
 """Tests for document processor."""
 
 import os
-import pytest
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+from morag_core.exceptions import ProcessingError, ValidationError
 from morag_core.interfaces.converter import ChunkingStrategy, ConversionOptions
 from morag_core.interfaces.processor import ProcessingConfig
 from morag_core.models.document import Document
-from morag_core.exceptions import ValidationError, ProcessingError
-
-from morag_document.processor import DocumentProcessor
 from morag_document.converters.base import DocumentConverter
+from morag_document.processor import DocumentProcessor
 
 
 @pytest.fixture
@@ -38,7 +37,7 @@ def sample_document():
             "title": "Test Document",
             "file_type": "test",
             "word_count": 3,
-        }
+        },
     )
 
 
@@ -97,7 +96,9 @@ async def test_validate_input(processor, tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_process_with_custom_converter(processor, mock_converter, sample_document, tmp_path):
+async def test_process_with_custom_converter(
+    processor, mock_converter, sample_document, tmp_path
+):
     """Test processing with custom converter."""
     # Create test file
     test_file = tmp_path / "test.test"
@@ -146,7 +147,9 @@ async def test_process_with_unsupported_format(processor, tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_process_with_custom_options(processor, mock_converter, sample_document, tmp_path):
+async def test_process_with_custom_options(
+    processor, mock_converter, sample_document, tmp_path
+):
     """Test processing with custom options."""
     # Create test file
     test_file = tmp_path / "test.test"

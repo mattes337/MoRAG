@@ -4,28 +4,29 @@ This module tests that each MoRAG package can be imported and used
 independently without requiring other packages.
 """
 
-import pytest
-import sys
-import subprocess
 import importlib
-from pathlib import Path
-from typing import List, Dict, Any
-import tempfile
 import os
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+from typing import Any, Dict, List
+
+import pytest
 
 
 class TestPackageIndependence:
     """Test that packages can work independently."""
 
     PACKAGES = [
-        'morag_core',
-        'morag_services',
-        'morag_web',
-        'morag_youtube',
-        'morag_audio',
-        'morag_video',
-        'morag_document',
-        'morag_image'
+        "morag_core",
+        "morag_services",
+        "morag_web",
+        "morag_youtube",
+        "morag_audio",
+        "morag_video",
+        "morag_document",
+        "morag_image",
     ]
 
     def test_package_imports_independently(self):
@@ -33,9 +34,13 @@ class TestPackageIndependence:
         for package_name in self.PACKAGES:
             # Test import in isolated subprocess
             result = self._test_import_in_subprocess(package_name)
-            assert result.returncode == 0, f"Failed to import {package_name}: {result.stderr}"
+            assert (
+                result.returncode == 0
+            ), f"Failed to import {package_name}: {result.stderr}"
 
-    def _test_import_in_subprocess(self, package_name: str) -> subprocess.CompletedProcess:
+    def _test_import_in_subprocess(
+        self, package_name: str
+    ) -> subprocess.CompletedProcess:
         """Test package import in isolated subprocess."""
         test_script = f"""
 import sys
@@ -52,24 +57,21 @@ except Exception as e:
 """
 
         return subprocess.run(
-            [sys.executable, '-c', test_script],
+            [sys.executable, "-c", test_script],
             capture_output=True,
             text=True,
-            timeout=30
+            timeout=30,
         )
 
     def test_core_package_functionality(self):
         """Test core package basic functionality."""
         try:
-            from morag_core.models import Document
-            from morag_core.interfaces.processor import BaseProcessor
             from morag_core.interfaces.converter import BaseConverter
+            from morag_core.interfaces.processor import BaseProcessor
+            from morag_core.models import Document
 
             # Test basic model creation
-            doc = Document(
-                content="Test content",
-                metadata={"test": True}
-            )
+            doc = Document(content="Test content", metadata={"test": True})
             assert doc.content == "Test content"
             assert doc.metadata["test"] is True
 
@@ -104,7 +106,7 @@ except Exception as e:
     def test_audio_package_functionality(self):
         """Test audio package basic functionality."""
         try:
-            from morag_audio import AudioProcessor, AudioConfig
+            from morag_audio import AudioConfig, AudioProcessor
 
             # Test basic processor creation
             config = AudioConfig()
@@ -117,7 +119,7 @@ except Exception as e:
     def test_video_package_functionality(self):
         """Test video package basic functionality."""
         try:
-            from morag_video import VideoProcessor, VideoConfig
+            from morag_video import VideoConfig, VideoProcessor
 
             # Test basic processor creation
             config = VideoConfig()
@@ -142,7 +144,7 @@ except Exception as e:
     def test_image_package_functionality(self):
         """Test image package basic functionality."""
         try:
-            from morag_image import ImageProcessor, ImageConfig
+            from morag_image import ImageConfig, ImageProcessor
 
             # Test basic processor creation
             config = ImageConfig()
@@ -168,18 +170,22 @@ except Exception as e:
         """Test that packages don't interfere with each other."""
         # Import packages in different orders to test isolation
         import_orders = [
-            ['morag_core', 'morag_services', 'morag_web'],
-            ['morag_web', 'morag_core', 'morag_services'],
-            ['morag_services', 'morag_web', 'morag_core']
+            ["morag_core", "morag_services", "morag_web"],
+            ["morag_web", "morag_core", "morag_services"],
+            ["morag_services", "morag_web", "morag_core"],
         ]
 
         for order in import_orders:
             result = self._test_import_order_in_subprocess(order)
-            assert result.returncode == 0, f"Failed import order {order}: {result.stderr}"
+            assert (
+                result.returncode == 0
+            ), f"Failed import order {order}: {result.stderr}"
 
-    def _test_import_order_in_subprocess(self, packages: List[str]) -> subprocess.CompletedProcess:
+    def _test_import_order_in_subprocess(
+        self, packages: List[str]
+    ) -> subprocess.CompletedProcess:
         """Test importing packages in specific order."""
-        import_statements = '\n'.join([f"import {pkg}" for pkg in packages])
+        import_statements = "\n".join([f"import {pkg}" for pkg in packages])
         test_script = f"""
 import sys
 try:
@@ -192,10 +198,10 @@ except Exception as e:
 """
 
         return subprocess.run(
-            [sys.executable, '-c', test_script],
+            [sys.executable, "-c", test_script],
             capture_output=True,
             text=True,
-            timeout=30
+            timeout=30,
         )
 
     def test_no_circular_dependencies(self):
@@ -207,9 +213,13 @@ except Exception as e:
             try:
                 # Import package and check if it can be imported cleanly
                 result = self._test_import_in_subprocess(package_name)
-                assert result.returncode == 0, f"Circular dependency detected in {package_name}"
+                assert (
+                    result.returncode == 0
+                ), f"Circular dependency detected in {package_name}"
             except Exception as e:
-                pytest.fail(f"Error testing {package_name} for circular dependencies: {e}")
+                pytest.fail(
+                    f"Error testing {package_name} for circular dependencies: {e}"
+                )
 
     def test_package_versions_compatible(self):
         """Test that package versions are compatible."""
@@ -226,8 +236,9 @@ except Exception as e:
     @pytest.mark.slow
     def test_package_memory_isolation(self):
         """Test that packages don't leak memory between imports."""
-        import psutil
         import gc
+
+        import psutil
 
         process = psutil.Process()
         initial_memory = process.memory_info().rss
@@ -246,7 +257,9 @@ except Exception as e:
                 memory_growth = current_memory - initial_memory
 
                 # Allow for some memory growth but not excessive
-                assert memory_growth < 100 * 1024 * 1024, f"Excessive memory growth after importing {package_name}"
+                assert (
+                    memory_growth < 100 * 1024 * 1024
+                ), f"Excessive memory growth after importing {package_name}"
 
             except ImportError:
                 # Skip if package not available
@@ -264,8 +277,13 @@ class TestPackageStructure:
             pytest.skip("Packages directory not found")
 
         for package_dir in packages_dir.iterdir():
-            if package_dir.is_dir() and package_dir.name.startswith('morag'):
-                init_file = package_dir / "src" / package_dir.name.replace('-', '_') / "__init__.py"
+            if package_dir.is_dir() and package_dir.name.startswith("morag"):
+                init_file = (
+                    package_dir
+                    / "src"
+                    / package_dir.name.replace("-", "_")
+                    / "__init__.py"
+                )
                 assert init_file.exists(), f"Missing __init__.py in {package_dir.name}"
 
     def test_package_has_setup_file(self):
@@ -276,12 +294,14 @@ class TestPackageStructure:
             pytest.skip("Packages directory not found")
 
         for package_dir in packages_dir.iterdir():
-            if package_dir.is_dir() and package_dir.name.startswith('morag'):
+            if package_dir.is_dir() and package_dir.name.startswith("morag"):
                 # Check for pyproject.toml or setup.py
                 has_pyproject = (package_dir / "pyproject.toml").exists()
                 has_setup = (package_dir / "setup.py").exists()
 
-                assert has_pyproject or has_setup, f"Missing setup configuration in {package_dir.name}"
+                assert (
+                    has_pyproject or has_setup
+                ), f"Missing setup configuration in {package_dir.name}"
 
 
 if __name__ == "__main__":

@@ -1,10 +1,10 @@
 """Unit tests for AudioProcessor class."""
 
-import pytest
 import asyncio
 from pathlib import Path
-from typing import Dict, List, Any
+from typing import Any, Dict, List
 
+import pytest
 
 
 class MockAudioSegment:
@@ -38,7 +38,7 @@ class MockAudioProcessingResult:
         file_path: str,
         processing_time: float = 1.0,
         success: bool = True,
-        error_message: str = None
+        error_message: str = None,
     ):
         self.transcript = transcript
         self.segments = segments
@@ -87,7 +87,7 @@ class MockAudioProcessor:
                 segments=[],
                 file_path=str(file_path),
                 success=False,
-                error_message="File not found"
+                error_message="File not found",
             )
 
         if not self.is_supported_format(file_path):
@@ -96,7 +96,7 @@ class MockAudioProcessor:
                 segments=[],
                 file_path=str(file_path),
                 success=False,
-                error_message=f"Unsupported format: {file_path.suffix}"
+                error_message=f"Unsupported format: {file_path.suffix}",
             )
 
         # Simulate processing based on filename
@@ -106,7 +106,7 @@ class MockAudioProcessor:
                 segments=[],
                 file_path=str(file_path),
                 success=False,
-                error_message="Processing failed"
+                error_message="Processing failed",
             )
 
         # Simulate successful processing
@@ -124,7 +124,7 @@ class MockAudioProcessor:
             transcript=transcript,
             segments=segments,
             file_path=str(file_path),
-            processing_time=processing_time
+            processing_time=processing_time,
         )
 
     def _create_mock_segments(self, file_path: Path) -> List[MockAudioSegment]:
@@ -133,18 +133,18 @@ class MockAudioProcessor:
             return []
 
         if "short" in file_path.name.lower():
-            return [
-                MockAudioSegment(0.0, 5.0, "This is a short audio clip.")
-            ]
+            return [MockAudioSegment(0.0, 5.0, "This is a short audio clip.")]
 
         # Default segments
         return [
             MockAudioSegment(0.0, 3.0, "Hello, this is the beginning of the audio."),
             MockAudioSegment(3.0, 7.0, "This is the middle part of the transcript."),
-            MockAudioSegment(7.0, 10.0, "And this is the end of the audio file.")
+            MockAudioSegment(7.0, 10.0, "And this is the end of the audio file."),
         ]
 
-    async def process_batch(self, file_paths: List[Path], **kwargs) -> List[MockAudioProcessingResult]:
+    async def process_batch(
+        self, file_paths: List[Path], **kwargs
+    ) -> List[MockAudioProcessingResult]:
         """Process multiple audio files."""
         results = []
         for file_path in file_paths:
@@ -196,20 +196,20 @@ class TestAudioProcessor:
         files = {}
 
         # Create various test audio files (empty files for testing)
-        files['regular.mp3'] = tmp_path / "regular.mp3"
-        files['regular.mp3'].write_bytes(b"fake audio data")
+        files["regular.mp3"] = tmp_path / "regular.mp3"
+        files["regular.mp3"].write_bytes(b"fake audio data")
 
-        files['short.wav'] = tmp_path / "short.wav"
-        files['short.wav'].write_bytes(b"short audio")
+        files["short.wav"] = tmp_path / "short.wav"
+        files["short.wav"].write_bytes(b"short audio")
 
-        files['empty.m4a'] = tmp_path / "empty.m4a"
-        files['empty.m4a'].write_bytes(b"")  # Empty file
+        files["empty.m4a"] = tmp_path / "empty.m4a"
+        files["empty.m4a"].write_bytes(b"")  # Empty file
 
-        files['error.flac'] = tmp_path / "error.flac"
-        files['error.flac'].write_bytes(b"will cause error")
+        files["error.flac"] = tmp_path / "error.flac"
+        files["error.flac"].write_bytes(b"will cause error")
 
-        files['unsupported.txt'] = tmp_path / "unsupported.txt"
-        files['unsupported.txt'].write_text("not an audio file")
+        files["unsupported.txt"] = tmp_path / "unsupported.txt"
+        files["unsupported.txt"].write_text("not an audio file")
 
         return files
 
@@ -222,10 +222,7 @@ class TestAudioProcessor:
     def test_processor_creation_with_custom_config(self):
         """Test creating processor with custom config."""
         config = MockAudioConfig(
-            whisper_model="large",
-            device="cuda",
-            language="fr",
-            enable_diarization=True
+            whisper_model="large", device="cuda", language="fr", enable_diarization=True
         )
         processor = MockAudioProcessor(config)
 
@@ -250,7 +247,9 @@ class TestAudioProcessor:
         # Supported formats
         assert audio_processor.is_supported_format(Path("test.mp3")) is True
         assert audio_processor.is_supported_format(Path("test.wav")) is True
-        assert audio_processor.is_supported_format(Path("test.M4A")) is True  # Case insensitive
+        assert (
+            audio_processor.is_supported_format(Path("test.M4A")) is True
+        )  # Case insensitive
 
         # Unsupported formats
         assert audio_processor.is_supported_format(Path("test.txt")) is False
@@ -259,7 +258,7 @@ class TestAudioProcessor:
 
     async def test_process_success(self, audio_processor, sample_audio_files):
         """Test successful audio processing."""
-        audio_file = sample_audio_files['regular.mp3']
+        audio_file = sample_audio_files["regular.mp3"]
 
         result = await audio_processor.process(audio_file)
 
@@ -282,9 +281,11 @@ class TestAudioProcessor:
         assert result.transcript == ""
         assert len(result.segments) == 0
 
-    async def test_process_unsupported_format(self, audio_processor, sample_audio_files):
+    async def test_process_unsupported_format(
+        self, audio_processor, sample_audio_files
+    ):
         """Test processing unsupported format."""
-        unsupported_file = sample_audio_files['unsupported.txt']
+        unsupported_file = sample_audio_files["unsupported.txt"]
 
         result = await audio_processor.process(unsupported_file)
 
@@ -294,7 +295,7 @@ class TestAudioProcessor:
 
     async def test_process_error_simulation(self, audio_processor, sample_audio_files):
         """Test processing error simulation."""
-        error_file = sample_audio_files['error.flac']
+        error_file = sample_audio_files["error.flac"]
 
         result = await audio_processor.process(error_file)
 
@@ -303,7 +304,7 @@ class TestAudioProcessor:
 
     async def test_process_short_audio(self, audio_processor, sample_audio_files):
         """Test processing short audio file."""
-        short_file = sample_audio_files['short.wav']
+        short_file = sample_audio_files["short.wav"]
 
         result = await audio_processor.process(short_file)
 
@@ -313,7 +314,7 @@ class TestAudioProcessor:
 
     async def test_process_empty_audio(self, audio_processor, sample_audio_files):
         """Test processing empty audio file."""
-        empty_file = sample_audio_files['empty.m4a']
+        empty_file = sample_audio_files["empty.m4a"]
 
         # Empty file should fail validation
         is_valid = await audio_processor.validate_audio_file(empty_file)
@@ -322,8 +323,8 @@ class TestAudioProcessor:
     async def test_process_batch(self, audio_processor, sample_audio_files):
         """Test batch processing of audio files."""
         files_to_process = [
-            sample_audio_files['regular.mp3'],
-            sample_audio_files['short.wav']
+            sample_audio_files["regular.mp3"],
+            sample_audio_files["short.wav"],
         ]
 
         results = await audio_processor.process_batch(files_to_process)
@@ -336,9 +337,9 @@ class TestAudioProcessor:
     async def test_process_batch_with_errors(self, audio_processor, sample_audio_files):
         """Test batch processing with some failures."""
         files_to_process = [
-            sample_audio_files['regular.mp3'],
-            sample_audio_files['error.flac'],
-            sample_audio_files['unsupported.txt']
+            sample_audio_files["regular.mp3"],
+            sample_audio_files["error.flac"],
+            sample_audio_files["unsupported.txt"],
         ]
 
         results = await audio_processor.process_batch(files_to_process)
@@ -348,10 +349,12 @@ class TestAudioProcessor:
         assert results[1].success is False
         assert results[2].success is False
 
-    async def test_validate_audio_file(self, audio_processor, sample_audio_files, tmp_path):
+    async def test_validate_audio_file(
+        self, audio_processor, sample_audio_files, tmp_path
+    ):
         """Test audio file validation."""
         # Valid file
-        valid_file = sample_audio_files['regular.mp3']
+        valid_file = sample_audio_files["regular.mp3"]
         assert await audio_processor.validate_audio_file(valid_file) is True
 
         # Missing file
@@ -359,16 +362,16 @@ class TestAudioProcessor:
         assert await audio_processor.validate_audio_file(missing_file) is False
 
         # Unsupported format
-        unsupported_file = sample_audio_files['unsupported.txt']
+        unsupported_file = sample_audio_files["unsupported.txt"]
         assert await audio_processor.validate_audio_file(unsupported_file) is False
 
         # Empty file
-        empty_file = sample_audio_files['empty.m4a']
+        empty_file = sample_audio_files["empty.m4a"]
         assert await audio_processor.validate_audio_file(empty_file) is False
 
     async def test_estimate_processing_time(self, audio_processor, sample_audio_files):
         """Test processing time estimation."""
-        audio_file = sample_audio_files['regular.mp3']
+        audio_file = sample_audio_files["regular.mp3"]
 
         estimated_time = await audio_processor.estimate_processing_time(audio_file)
 
@@ -376,7 +379,9 @@ class TestAudioProcessor:
         assert isinstance(estimated_time, (int, float))
 
         # Invalid file should return 0
-        invalid_time = await audio_processor.estimate_processing_time(Path("nonexistent.mp3"))
+        invalid_time = await audio_processor.estimate_processing_time(
+            Path("nonexistent.mp3")
+        )
         assert invalid_time == 0
 
     def test_processing_stats(self, audio_processor):
@@ -387,7 +392,7 @@ class TestAudioProcessor:
 
     async def test_processing_stats_update(self, audio_processor, sample_audio_files):
         """Test that processing stats are updated."""
-        audio_file = sample_audio_files['regular.mp3']
+        audio_file = sample_audio_files["regular.mp3"]
 
         initial_stats = audio_processor.get_processing_stats()
         initial_count = initial_stats["files_processed"]
@@ -401,10 +406,7 @@ class TestAudioProcessor:
 
     async def test_concurrent_processing(self, audio_processor, sample_audio_files):
         """Test concurrent processing of multiple files."""
-        files = [
-            sample_audio_files['regular.mp3'],
-            sample_audio_files['short.wav']
-        ]
+        files = [sample_audio_files["regular.mp3"], sample_audio_files["short.wav"]]
 
         # Process concurrently
         tasks = [audio_processor.process(file) for file in files]
@@ -421,7 +423,7 @@ class TestAudioProcessor:
 
     async def test_segment_properties(self, audio_processor, sample_audio_files):
         """Test properties of generated segments."""
-        audio_file = sample_audio_files['regular.mp3']
+        audio_file = sample_audio_files["regular.mp3"]
 
         result = await audio_processor.process(audio_file)
 
@@ -429,10 +431,10 @@ class TestAudioProcessor:
 
         for segment in result.segments:
             # Check segment has required properties
-            assert hasattr(segment, 'start')
-            assert hasattr(segment, 'end')
-            assert hasattr(segment, 'text')
-            assert hasattr(segment, 'speaker')
+            assert hasattr(segment, "start")
+            assert hasattr(segment, "end")
+            assert hasattr(segment, "text")
+            assert hasattr(segment, "speaker")
 
             # Check segment timing makes sense
             assert segment.start >= 0
@@ -442,14 +444,14 @@ class TestAudioProcessor:
 
     async def test_markdown_generation(self, audio_processor, sample_audio_files):
         """Test markdown transcript generation."""
-        audio_file = sample_audio_files['regular.mp3']
+        audio_file = sample_audio_files["regular.mp3"]
 
         result = await audio_processor.process(audio_file)
 
         assert result.success is True
         assert result.markdown_transcript is not None
 
-        markdown_lines = result.markdown_transcript.split('\n')
+        markdown_lines = result.markdown_transcript.split("\n")
         assert "# Audio Transcript" in markdown_lines[0]
 
         # Check that segments are included
@@ -458,7 +460,7 @@ class TestAudioProcessor:
 
     async def test_metadata_inclusion(self, audio_processor, sample_audio_files):
         """Test that processing result includes metadata."""
-        audio_file = sample_audio_files['regular.mp3']
+        audio_file = sample_audio_files["regular.mp3"]
 
         result = await audio_processor.process(audio_file)
 

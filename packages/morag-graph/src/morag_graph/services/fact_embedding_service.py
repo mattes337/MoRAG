@@ -2,11 +2,12 @@
 
 import asyncio
 import logging
-from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple
+
+from morag_services.embedding import GeminiEmbeddingService
 
 from ..storage.neo4j_storage import Neo4jStorage
-from morag_services.embedding import GeminiEmbeddingService
 
 logger = logging.getLogger(__name__)
 
@@ -15,9 +16,7 @@ class FactEmbeddingService:
     """Service for generating and managing fact embeddings."""
 
     def __init__(
-        self,
-        neo4j_storage: Neo4jStorage,
-        embedding_service: GeminiEmbeddingService
+        self, neo4j_storage: Neo4jStorage, embedding_service: GeminiEmbeddingService
     ):
         """Initialize fact embedding service.
 
@@ -39,12 +38,12 @@ class FactEmbeddingService:
             Text representation for embedding
         """
         # Get core fact components
-        subject = fact.get('subject', '')
-        approach = fact.get('approach', '')
-        object_text = fact.get('object', '')
-        solution = fact.get('solution', '')
-        condition = fact.get('condition', '')
-        remarks = fact.get('remarks', '')
+        subject = fact.get("subject", "")
+        approach = fact.get("approach", "")
+        object_text = fact.get("object", "")
+        solution = fact.get("solution", "")
+        condition = fact.get("condition", "")
+        remarks = fact.get("remarks", "")
 
         # Create structured fact text
         text_parts = []
@@ -68,17 +67,17 @@ class FactEmbeddingService:
             text_parts.append(f"Remarks: {remarks}")
 
         # Add keywords if available
-        keywords = fact.get('keywords', '')
+        keywords = fact.get("keywords", "")
         if keywords:
             text_parts.append(f"Keywords: {keywords}")
 
         # Add domain context
-        domain = fact.get('domain', '')
-        if domain and domain != 'general':
+        domain = fact.get("domain", "")
+        if domain and domain != "general":
             text_parts.append(f"Domain: {domain}")
 
         # Add fact type for context
-        fact_type = fact.get('fact_type', '')
+        fact_type = fact.get("fact_type", "")
         if fact_type:
             text_parts.append(f"Type: {fact_type}")
 
@@ -141,18 +140,16 @@ class FactEmbeddingService:
                 fact_text, task_type="retrieval_document"
             )
 
-            self.logger.debug(f"Generated embedding for fact {fact_id}: {fact_text[:100]}...")
+            self.logger.debug(
+                f"Generated embedding for fact {fact_id}: {fact_text[:100]}..."
+            )
             return embedding
 
         except Exception as e:
             self.logger.error(f"Failed to generate embedding for fact {fact_id}: {e}")
             return None
 
-    async def store_fact_embedding(
-        self,
-        fact_id: str,
-        embedding: List[float]
-    ) -> bool:
+    async def store_fact_embedding(self, fact_id: str, embedding: List[float]) -> bool:
         """Store embedding for a fact in Neo4j.
 
         Args:
@@ -173,7 +170,7 @@ class FactEmbeddingService:
             """
 
             # Handle different embedding result types
-            if hasattr(embedding, 'embedding'):
+            if hasattr(embedding, "embedding"):
                 # EmbeddingResult object
                 embedding_vector = embedding.embedding
             elif isinstance(embedding, list):
@@ -183,13 +180,16 @@ class FactEmbeddingService:
                 self.logger.error(f"Unexpected embedding type: {type(embedding)}")
                 return False
 
-            results = await self.neo4j_storage._connection_ops._execute_query(query, {
-                "fact_id": fact_id,
-                "embedding": embedding_vector,
-                "model": "text-embedding-004",
-                "dimensions": len(embedding_vector),
-                "created_at": datetime.utcnow().isoformat()
-            })
+            results = await self.neo4j_storage._connection_ops._execute_query(
+                query,
+                {
+                    "fact_id": fact_id,
+                    "embedding": embedding_vector,
+                    "model": "text-embedding-004",
+                    "dimensions": len(embedding_vector),
+                    "created_at": datetime.utcnow().isoformat(),
+                },
+            )
 
             if results:
                 self.logger.debug(f"Stored embedding for fact {fact_id}")
@@ -217,9 +217,7 @@ class FactEmbeddingService:
         return False
 
     async def process_facts_batch(
-        self,
-        fact_ids: List[str],
-        batch_size: int = 10
+        self, fact_ids: List[str], batch_size: int = 10
     ) -> Dict[str, bool]:
         """Process multiple facts in batches.
 
@@ -233,14 +231,15 @@ class FactEmbeddingService:
         results = {}
 
         for i in range(0, len(fact_ids), batch_size):
-            batch = fact_ids[i:i + batch_size]
+            batch = fact_ids[i : i + batch_size]
 
-            self.logger.info(f"Processing fact batch {i//batch_size + 1}: {len(batch)} facts")
+            self.logger.info(
+                f"Processing fact batch {i//batch_size + 1}: {len(batch)} facts"
+            )
 
             # Process batch
             batch_tasks = [
-                self.generate_and_store_fact_embedding(fact_id)
-                for fact_id in batch
+                self.generate_and_store_fact_embedding(fact_id) for fact_id in batch
             ]
 
             batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
@@ -272,13 +271,13 @@ class FactEmbeddingService:
         """
 
         results = await self.neo4j_storage._connection_ops._execute_query(query)
-        return [result['id'] for result in results]
+        return [result["id"] for result in results]
 
     async def search_similar_facts(
         self,
         query_embedding: List[float],
         limit: int = 10,
-        similarity_threshold: float = 0.3
+        similarity_threshold: float = 0.3,
     ) -> List[Dict[str, Any]]:
         """Search for facts similar to query embedding.
 
@@ -302,10 +301,7 @@ class FactEmbeddingService:
             return []
 
     async def _manual_similarity_search(
-        self,
-        query_embedding: List[float],
-        limit: int,
-        similarity_threshold: float
+        self, query_embedding: List[float], limit: int, similarity_threshold: float
     ) -> List[Dict[str, Any]]:
         """Manual similarity search using Python calculations.
 
@@ -330,19 +326,21 @@ class FactEmbeddingService:
         # Calculate similarities
         similarities = []
         for fact in results:
-            similarity = self._cosine_similarity(query_embedding, fact['embedding'])
+            similarity = self._cosine_similarity(query_embedding, fact["embedding"])
             if similarity >= similarity_threshold:
-                similarities.append({
-                    'id': fact['id'],
-                    'subject': fact['subject'],
-                    'approach': fact['approach'],
-                    'object': fact['object'],
-                    'solution': fact['solution'],
-                    'similarity': similarity
-                })
+                similarities.append(
+                    {
+                        "id": fact["id"],
+                        "subject": fact["subject"],
+                        "approach": fact["approach"],
+                        "object": fact["object"],
+                        "solution": fact["solution"],
+                        "similarity": similarity,
+                    }
+                )
 
         # Sort by similarity and limit
-        similarities.sort(key=lambda x: x['similarity'], reverse=True)
+        similarities.sort(key=lambda x: x["similarity"], reverse=True)
         return similarities[:limit]
 
     def _cosine_similarity(self, vec1: List[float], vec2: List[float]) -> float:
@@ -387,19 +385,19 @@ class FactEmbeddingService:
 
         if results:
             result = results[0]
-            total = result['total_facts']
-            with_embeddings = result['facts_with_embeddings'] or 0
+            total = result["total_facts"]
+            with_embeddings = result["facts_with_embeddings"] or 0
 
             return {
-                'total_facts': total,
-                'facts_with_embeddings': with_embeddings,
-                'facts_without_embeddings': total - with_embeddings,
-                'avg_dimensions': result['avg_dimensions']
+                "total_facts": total,
+                "facts_with_embeddings": with_embeddings,
+                "facts_without_embeddings": total - with_embeddings,
+                "avg_dimensions": result["avg_dimensions"],
             }
 
         return {
-            'total_facts': 0,
-            'facts_with_embeddings': 0,
-            'facts_without_embeddings': 0,
-            'avg_dimensions': None
+            "total_facts": 0,
+            "facts_with_embeddings": 0,
+            "facts_without_embeddings": 0,
+            "avg_dimensions": None,
         }

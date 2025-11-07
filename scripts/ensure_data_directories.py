@@ -7,9 +7,10 @@ including remote jobs directories, with proper permissions.
 """
 
 import os
-import sys
 import stat
+import sys
 from pathlib import Path
+
 import structlog
 
 # Set up basic logging
@@ -17,7 +18,7 @@ structlog.configure(
     processors=[
         structlog.stdlib.add_log_level,
         structlog.processors.TimeStamper(fmt="ISO"),
-        structlog.processors.JSONRenderer()
+        structlog.processors.JSONRenderer(),
     ],
     logger_factory=structlog.stdlib.LoggerFactory(),
     wrapper_class=structlog.stdlib.BoundLogger,
@@ -39,7 +40,9 @@ def ensure_directory(path: Path, mode: int = 0o755) -> bool:
         return True
 
     except PermissionError as e:
-        logger.error("Permission denied creating directory", path=str(path), error=str(e))
+        logger.error(
+            "Permission denied creating directory", path=str(path), error=str(e)
+        )
         return False
     except Exception as e:
         logger.error("Failed to create directory", path=str(path), error=str(e))
@@ -67,26 +70,26 @@ def main():
     logger.info("Starting data directory initialization")
 
     # Get base data directory from environment or use default
-    base_data_dir = Path(os.getenv('MORAG_DATA_DIR', '/app/data'))
+    base_data_dir = Path(os.getenv("MORAG_DATA_DIR", "/app/data"))
 
     # Define all required directories
     directories = [
         base_data_dir,
-        base_data_dir / 'remote_jobs',
-        base_data_dir / 'remote_jobs' / 'pending',
-        base_data_dir / 'remote_jobs' / 'processing',
-        base_data_dir / 'remote_jobs' / 'completed',
-        base_data_dir / 'remote_jobs' / 'failed',
-        base_data_dir / 'remote_jobs' / 'timeout',
-        base_data_dir / 'remote_jobs' / 'cancelled',
-        base_data_dir / 'uploads',
-        base_data_dir / 'temp',
-        base_data_dir / 'cache',
+        base_data_dir / "remote_jobs",
+        base_data_dir / "remote_jobs" / "pending",
+        base_data_dir / "remote_jobs" / "processing",
+        base_data_dir / "remote_jobs" / "completed",
+        base_data_dir / "remote_jobs" / "failed",
+        base_data_dir / "remote_jobs" / "timeout",
+        base_data_dir / "remote_jobs" / "cancelled",
+        base_data_dir / "uploads",
+        base_data_dir / "temp",
+        base_data_dir / "cache",
     ]
 
     # Additional directories for logs and temp
-    log_dir = Path(os.getenv('MORAG_LOG_DIR', '/app/logs'))
-    temp_dir = Path(os.getenv('MORAG_TEMP_DIR', '/app/temp'))
+    log_dir = Path(os.getenv("MORAG_LOG_DIR", "/app/logs"))
+    temp_dir = Path(os.getenv("MORAG_TEMP_DIR", "/app/temp"))
 
     directories.extend([log_dir, temp_dir])
 
@@ -98,12 +101,7 @@ def main():
             success = False
 
     # Check if directories are writable
-    critical_dirs = [
-        base_data_dir,
-        base_data_dir / 'remote_jobs',
-        log_dir,
-        temp_dir
-    ]
+    critical_dirs = [base_data_dir, base_data_dir / "remote_jobs", log_dir, temp_dir]
 
     for directory in critical_dirs:
         if directory.exists() and not check_directory_writable(directory):
@@ -135,5 +133,5 @@ def main():
         return 1
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

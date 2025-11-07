@@ -1,14 +1,16 @@
 """Unit tests for audio tasks."""
 
-import pytest
 import tempfile
 from pathlib import Path
-from unittest.mock import Mock, patch, AsyncMock
+from unittest.mock import AsyncMock, Mock, patch
+
+import pytest
 
 # Import the actual task functions, not the Celery tasks
 from morag.tasks import audio_tasks
 from morag_audio import AudioProcessingResult, AudioTranscriptSegment
 from morag_services.processing import ChunkInfo
+
 
 class TestAudioTasks:
     """Test cases for audio processing tasks."""
@@ -31,11 +33,13 @@ class TestAudioTasks:
             segments=[
                 AudioTranscriptSegment("Hello world,", 0.0, 2.0, 0.95, language="en"),
                 AudioTranscriptSegment("this is a test", 2.0, 4.0, 0.88, language="en"),
-                AudioTranscriptSegment("audio transcription.", 4.0, 5.0, 0.87, language="en")
+                AudioTranscriptSegment(
+                    "audio transcription.", 4.0, 5.0, 0.87, language="en"
+                ),
             ],
             metadata={"file_name": "test.wav", "sample_rate": 44100},
             processing_time=2.5,
-            model_used="base"
+            model_used="base",
         )
 
     @pytest.fixture
@@ -50,7 +54,7 @@ class TestAudioTasks:
                 word_count=6,
                 entities=[],
                 topics=[],
-                chunk_type="semantic"
+                chunk_type="semantic",
             ),
             ChunkInfo(
                 text="audio transcription.",
@@ -60,16 +64,16 @@ class TestAudioTasks:
                 word_count=2,
                 entities=[],
                 topics=[],
-                chunk_type="semantic"
-            )
+                chunk_type="semantic",
+            ),
         ]
 
     @pytest.mark.asyncio
-    @patch('morag.tasks.audio_tasks.audio_processor')
-    @patch('morag.tasks.audio_tasks.chunking_service')
-    @patch('morag.tasks.audio_tasks.enhanced_summarization_service')
-    @patch('morag.tasks.audio_tasks.gemini_service')
-    @patch('morag.tasks.audio_tasks.qdrant_service')
+    @patch("morag.tasks.audio_tasks.audio_processor")
+    @patch("morag.tasks.audio_tasks.chunking_service")
+    @patch("morag.tasks.audio_tasks.enhanced_summarization_service")
+    @patch("morag.tasks.audio_tasks.gemini_service")
+    @patch("morag.tasks.audio_tasks.qdrant_service")
     async def test_process_audio_file_success(
         self,
         mock_qdrant,
@@ -79,7 +83,7 @@ class TestAudioTasks:
         mock_audio_processor,
         mock_audio_file,
         mock_audio_result,
-        mock_text_chunks
+        mock_text_chunks,
     ):
         """Test successful audio file processing."""
         # Mock task instance
@@ -113,11 +117,7 @@ class TestAudioTasks:
 
         # Execute task
         result = await audio_tasks.process_audio_file(
-            mock_task,
-            mock_audio_file,
-            "test_task_123",
-            {"model_size": "base"},
-            True
+            mock_task, mock_audio_file, "test_task_123", {"model_size": "base"}, True
         )
 
         # Verify result
@@ -137,14 +137,14 @@ class TestAudioTasks:
         assert mock_qdrant.store_chunk.call_count == 2  # One per chunk
 
         # Verify status updates
-        assert mock_task.update_status.call_count >= 3  # At least processing stages + success
+        assert (
+            mock_task.update_status.call_count >= 3
+        )  # At least processing stages + success
 
     @pytest.mark.asyncio
-    @patch('morag.tasks.audio_tasks.audio_processor')
+    @patch("morag.tasks.audio_tasks.audio_processor")
     async def test_process_audio_file_audio_processing_failure(
-        self,
-        mock_audio_processor,
-        mock_audio_file
+        self, mock_audio_processor, mock_audio_file
     ):
         """Test audio file processing with audio processing failure."""
         # Mock task instance
@@ -152,24 +152,26 @@ class TestAudioTasks:
         mock_task.update_status = AsyncMock()
 
         # Mock audio processor to raise exception
-        mock_audio_processor.process_audio_file.side_effect = Exception("Audio processing failed")
+        mock_audio_processor.process_audio_file.side_effect = Exception(
+            "Audio processing failed"
+        )
 
         # Execute task and expect exception
         with pytest.raises(Exception, match="Audio processing failed"):
             await audio_tasks.process_audio_file(
-                mock_task,
-                mock_audio_file,
-                "test_task_123"
+                mock_task, mock_audio_file, "test_task_123"
             )
 
         # Verify failure status was set
-        mock_task.update_status.assert_called_with("FAILURE", {"error": "Audio processing failed: Audio processing failed"})
+        mock_task.update_status.assert_called_with(
+            "FAILURE", {"error": "Audio processing failed: Audio processing failed"}
+        )
 
     @pytest.mark.asyncio
-    @patch('morag.tasks.audio_tasks.audio_processor')
-    @patch('morag.tasks.audio_tasks.chunking_service')
-    @patch('morag.tasks.audio_tasks.gemini_service')
-    @patch('morag.tasks.audio_tasks.qdrant_service')
+    @patch("morag.tasks.audio_tasks.audio_processor")
+    @patch("morag.tasks.audio_tasks.chunking_service")
+    @patch("morag.tasks.audio_tasks.gemini_service")
+    @patch("morag.tasks.audio_tasks.qdrant_service")
     async def test_process_audio_file_basic_summary(
         self,
         mock_qdrant,
@@ -178,7 +180,7 @@ class TestAudioTasks:
         mock_audio_processor,
         mock_audio_file,
         mock_audio_result,
-        mock_text_chunks
+        mock_text_chunks,
     ):
         """Test audio file processing with basic summarization."""
         # Mock task instance
@@ -208,11 +210,7 @@ class TestAudioTasks:
 
         # Execute task with basic summary
         result = await audio_tasks.process_audio_file(
-            mock_task,
-            mock_audio_file,
-            "test_task_123",
-            None,
-            False
+            mock_task, mock_audio_file, "test_task_123", None, False
         )
 
         # Verify result
@@ -223,11 +221,9 @@ class TestAudioTasks:
         assert mock_gemini.generate_summary.call_count == 2  # One per chunk
 
     @pytest.mark.asyncio
-    @patch('morag.tasks.audio_tasks.whisper_service')
+    @patch("morag.tasks.audio_tasks.whisper_service")
     async def test_detect_audio_language_success(
-        self,
-        mock_whisper_service,
-        mock_audio_file
+        self, mock_whisper_service, mock_audio_file
     ):
         """Test successful audio language detection."""
         # Mock task instance
@@ -238,16 +234,13 @@ class TestAudioTasks:
         mock_language_result = {
             "language": "en",
             "language_probability": 0.95,
-            "all_language_probs": {"en": 0.95, "es": 0.05}
+            "all_language_probs": {"en": 0.95, "es": 0.05},
         }
         mock_whisper_service.detect_language.return_value = mock_language_result
 
         # Execute task
         result = await audio_tasks.detect_audio_language(
-            mock_task,
-            mock_audio_file,
-            "test_task_123",
-            "base"
+            mock_task, mock_audio_file, "test_task_123", "base"
         )
 
         # Verify result
@@ -259,19 +252,16 @@ class TestAudioTasks:
 
         # Verify method calls
         mock_whisper_service.detect_language.assert_called_once_with(
-            audio_path=mock_audio_file,
-            model_size="base"
+            audio_path=mock_audio_file, model_size="base"
         )
 
         # Verify status updates
         mock_task.update_status.assert_called_with("SUCCESS", result)
 
     @pytest.mark.asyncio
-    @patch('morag.tasks.audio_tasks.whisper_service')
+    @patch("morag.tasks.audio_tasks.whisper_service")
     async def test_detect_audio_language_failure(
-        self,
-        mock_whisper_service,
-        mock_audio_file
+        self, mock_whisper_service, mock_audio_file
     ):
         """Test audio language detection failure."""
         # Mock task instance
@@ -279,26 +269,26 @@ class TestAudioTasks:
         mock_task.update_status = AsyncMock()
 
         # Mock whisper service to raise exception
-        mock_whisper_service.detect_language.side_effect = Exception("Language detection failed")
+        mock_whisper_service.detect_language.side_effect = Exception(
+            "Language detection failed"
+        )
 
         # Execute task and expect exception
         with pytest.raises(Exception, match="Language detection failed"):
             await audio_tasks.detect_audio_language(
-                mock_task,
-                mock_audio_file,
-                "test_task_123"
+                mock_task, mock_audio_file, "test_task_123"
             )
 
         # Verify failure status was set
-        mock_task.update_status.assert_called_with("FAILURE", {"error": "Audio language detection failed: Language detection failed"})
+        mock_task.update_status.assert_called_with(
+            "FAILURE",
+            {"error": "Audio language detection failed: Language detection failed"},
+        )
 
     @pytest.mark.asyncio
-    @patch('morag.tasks.audio_tasks.audio_processor')
+    @patch("morag.tasks.audio_tasks.audio_processor")
     async def test_transcribe_audio_segments_success(
-        self,
-        mock_audio_processor,
-        mock_audio_file,
-        mock_audio_result
+        self, mock_audio_processor, mock_audio_file, mock_audio_result
     ):
         """Test successful audio segment transcription."""
         # Mock task instance
@@ -309,17 +299,11 @@ class TestAudioTasks:
         mock_audio_processor.process_audio_file.return_value = mock_audio_result
 
         # Define segments to transcribe
-        segments = [
-            {"start": 0.0, "end": 2.0},
-            {"start": 2.0, "end": 4.0}
-        ]
+        segments = [{"start": 0.0, "end": 2.0}, {"start": 2.0, "end": 4.0}]
 
         # Execute task
         result = await audio_tasks.transcribe_audio_segments(
-            mock_task,
-            mock_audio_file,
-            "test_task_123",
-            segments
+            mock_task, mock_audio_file, "test_task_123", segments
         )
 
         # Verify result
@@ -337,18 +321,17 @@ class TestAudioTasks:
         assert segment_result_1["language"] == "en"
 
         # Verify method calls
-        assert mock_audio_processor.process_audio_file.call_count == 2  # One per segment
+        assert (
+            mock_audio_processor.process_audio_file.call_count == 2
+        )  # One per segment
 
         # Verify status updates
         mock_task.update_status.assert_called_with("SUCCESS", result)
 
     @pytest.mark.asyncio
-    @patch('morag.tasks.audio_tasks.audio_processor')
+    @patch("morag.tasks.audio_tasks.audio_processor")
     async def test_transcribe_audio_segments_partial_failure(
-        self,
-        mock_audio_processor,
-        mock_audio_file,
-        mock_audio_result
+        self, mock_audio_processor, mock_audio_file, mock_audio_result
     ):
         """Test audio segment transcription with partial failure."""
         # Mock task instance
@@ -358,21 +341,15 @@ class TestAudioTasks:
         # Mock audio processor - first call succeeds, second fails
         mock_audio_processor.process_audio_file.side_effect = [
             mock_audio_result,
-            Exception("Segment processing failed")
+            Exception("Segment processing failed"),
         ]
 
         # Define segments to transcribe
-        segments = [
-            {"start": 0.0, "end": 2.0},
-            {"start": 2.0, "end": 4.0}
-        ]
+        segments = [{"start": 0.0, "end": 2.0}, {"start": 2.0, "end": 4.0}]
 
         # Execute task
         result = await audio_tasks.transcribe_audio_segments(
-            mock_task,
-            mock_audio_file,
-            "test_task_123",
-            segments
+            mock_task, mock_audio_file, "test_task_123", segments
         )
 
         # Verify result
@@ -397,10 +374,7 @@ class TestAudioTasks:
 
         # Execute task with empty segments
         result = await audio_tasks.transcribe_audio_segments(
-            mock_task,
-            mock_audio_file,
-            "test_task_123",
-            []
+            mock_task, mock_audio_file, "test_task_123", []
         )
 
         # Verify result

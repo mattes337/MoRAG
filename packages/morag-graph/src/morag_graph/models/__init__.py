@@ -1,11 +1,11 @@
 """Models for graph-augmented RAG."""
 
-from .entity import Entity
-from .relation import Relation
-from .graph import Graph
 from .document import Document
 from .document_chunk import DocumentChunk
-from .fact import Fact, FactRelation, FactType, FactRelationType
+from .entity import Entity
+from .fact import Fact, FactRelation, FactRelationType, FactType
+from .graph import Graph
+from .relation import Relation
 
 __all__ = [
     "Entity",

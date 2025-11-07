@@ -1,12 +1,17 @@
 """Tests for stage models."""
 
-import pytest
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
+import pytest
 from morag_stages.models import (
-    StageType, StageStatus, StageResult, StageContext,
-    StageMetadata, StageConfig, PipelineConfig
+    PipelineConfig,
+    StageConfig,
+    StageContext,
+    StageMetadata,
+    StageResult,
+    StageStatus,
+    StageType,
 )
 
 
@@ -43,7 +48,7 @@ class TestStageMetadata:
             execution_time=1.5,
             start_time=datetime.now(),
             input_files=["input.txt"],
-            output_files=["output.md"]
+            output_files=["output.md"],
         )
 
         assert metadata.execution_time == 1.5
@@ -64,14 +69,14 @@ class TestStageResult:
             execution_time=1.0,
             start_time=datetime.now(),
             input_files=["input.txt"],
-            output_files=["output.md"]
+            output_files=["output.md"],
         )
 
         result = StageResult(
             stage_type=StageType.MARKDOWN_CONVERSION,
             status=StageStatus.COMPLETED,
             output_files=[Path("output.md")],
-            metadata=metadata
+            metadata=metadata,
         )
 
         assert result.stage_type == StageType.MARKDOWN_CONVERSION
@@ -87,7 +92,7 @@ class TestStageResult:
             execution_time=1.0,
             start_time=datetime.now(),
             input_files=["input.txt"],
-            output_files=["output.md"]
+            output_files=["output.md"],
         )
 
         # Test successful result
@@ -95,7 +100,7 @@ class TestStageResult:
             stage_type=StageType.MARKDOWN_CONVERSION,
             status=StageStatus.COMPLETED,
             output_files=[Path("output.md")],
-            metadata=metadata
+            metadata=metadata,
         )
 
         assert success_result.success is True
@@ -108,7 +113,7 @@ class TestStageResult:
             status=StageStatus.FAILED,
             output_files=[],
             metadata=metadata,
-            error_message="Test error"
+            error_message="Test error",
         )
 
         assert failed_result.success is False
@@ -120,7 +125,7 @@ class TestStageResult:
             stage_type=StageType.MARKDOWN_CONVERSION,
             status=StageStatus.SKIPPED,
             output_files=[Path("output.md")],
-            metadata=metadata
+            metadata=metadata,
         )
 
         assert skipped_result.success is False
@@ -133,29 +138,29 @@ class TestStageResult:
             execution_time=1.0,
             start_time=datetime.now(),
             input_files=["input.txt"],
-            output_files=["output.md", "output.json"]
+            output_files=["output.md", "output.json"],
         )
 
         result = StageResult(
             stage_type=StageType.MARKDOWN_CONVERSION,
             status=StageStatus.COMPLETED,
             output_files=[Path("output.md"), Path("output.json"), Path("data.txt")],
-            metadata=metadata
+            metadata=metadata,
         )
 
         # Test finding existing extensions
-        md_file = result.get_output_by_extension('.md')
+        md_file = result.get_output_by_extension(".md")
         assert md_file == Path("output.md")
 
-        json_file = result.get_output_by_extension('.json')
+        json_file = result.get_output_by_extension(".json")
         assert json_file == Path("output.json")
 
         # Test case insensitive
-        md_file_upper = result.get_output_by_extension('.MD')
+        md_file_upper = result.get_output_by_extension(".MD")
         assert md_file_upper == Path("output.md")
 
         # Test non-existing extension
-        xml_file = result.get_output_by_extension('.xml')
+        xml_file = result.get_output_by_extension(".xml")
         assert xml_file is None
 
     def test_get_outputs_by_extension(self):
@@ -164,29 +169,29 @@ class TestStageResult:
             execution_time=1.0,
             start_time=datetime.now(),
             input_files=["input.txt"],
-            output_files=["file1.md", "file2.md", "output.json"]
+            output_files=["file1.md", "file2.md", "output.json"],
         )
 
         result = StageResult(
             stage_type=StageType.MARKDOWN_CONVERSION,
             status=StageStatus.COMPLETED,
             output_files=[Path("file1.md"), Path("file2.md"), Path("output.json")],
-            metadata=metadata
+            metadata=metadata,
         )
 
         # Test finding multiple files
-        md_files = result.get_outputs_by_extension('.md')
+        md_files = result.get_outputs_by_extension(".md")
         assert len(md_files) == 2
         assert Path("file1.md") in md_files
         assert Path("file2.md") in md_files
 
         # Test finding single file
-        json_files = result.get_outputs_by_extension('.json')
+        json_files = result.get_outputs_by_extension(".json")
         assert len(json_files) == 1
         assert json_files[0] == Path("output.json")
 
         # Test non-existing extension
-        xml_files = result.get_outputs_by_extension('.xml')
+        xml_files = result.get_outputs_by_extension(".xml")
         assert len(xml_files) == 0
 
 
@@ -195,10 +200,7 @@ class TestStageContext:
 
     def test_create_context(self):
         """Test creating stage context."""
-        context = StageContext(
-            source_path=Path("input.txt"),
-            output_dir=Path("output")
-        )
+        context = StageContext(source_path=Path("input.txt"), output_dir=Path("output"))
 
         assert context.source_path == Path("input.txt")
         assert context.output_dir == Path("output")
@@ -212,10 +214,7 @@ class TestStageContext:
 
     def test_stage_config_methods(self):
         """Test stage configuration methods."""
-        context = StageContext(
-            source_path=Path("input.txt"),
-            output_dir=Path("output")
-        )
+        context = StageContext(source_path=Path("input.txt"), output_dir=Path("output"))
 
         # Test getting empty config
         config = context.get_stage_config(StageType.MARKDOWN_CONVERSION)
@@ -234,23 +233,20 @@ class TestStageContext:
 
     def test_stage_result_methods(self):
         """Test stage result management methods."""
-        context = StageContext(
-            source_path=Path("input.txt"),
-            output_dir=Path("output")
-        )
+        context = StageContext(source_path=Path("input.txt"), output_dir=Path("output"))
 
         metadata = StageMetadata(
             execution_time=1.0,
             start_time=datetime.now(),
             input_files=["input.txt"],
-            output_files=["output.md"]
+            output_files=["output.md"],
         )
 
         result = StageResult(
             stage_type=StageType.MARKDOWN_CONVERSION,
             status=StageStatus.COMPLETED,
             output_files=[Path("output.md")],
-            metadata=metadata
+            metadata=metadata,
         )
 
         # Test adding result

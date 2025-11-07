@@ -1,6 +1,6 @@
 """Type definitions for graph models."""
 
-from typing import Dict, Any
+from typing import Any, Dict
 
 # Type aliases for improved readability
 EntityId = str

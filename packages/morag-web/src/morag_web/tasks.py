@@ -3,10 +3,9 @@
 import asyncio
 import threading
 from typing import Any, Dict, List, Optional
+
 import nest_asyncio
-
 import structlog
-
 from morag_core.interfaces.task import BaseTask
 from morag_core.models.document import DocumentChunk
 
@@ -21,6 +20,7 @@ nest_asyncio.apply()
 _event_loop = None
 _loop_thread = None
 _loop_lock = threading.Lock()
+
 
 def get_shared_event_loop():
     """Get or create a shared event loop for async operations."""
@@ -40,10 +40,12 @@ def get_shared_event_loop():
 
             # Wait for loop to be ready
             import time
+
             while _event_loop is None:
                 time.sleep(0.01)
 
     return _event_loop
+
 
 def run_async(coroutine):
     """Run coroutine using the shared event loop."""
@@ -67,13 +69,11 @@ class ProcessWebUrlTask(WebProcessingTask):
         self,
         url: str,
         config: Optional[Dict[str, Any]] = None,
-        task_id: Optional[str] = None
+        task_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Process a single web URL and extract content."""
 
-        logger.info("Starting web URL processing task",
-                   task_id=task_id,
-                   url=url)
+        logger.info("Starting web URL processing task", task_id=task_id, url=url)
 
         try:
             await self.update_status("PROCESSING", {"stage": "url_validation"})
@@ -92,11 +92,7 @@ class ProcessWebUrlTask(WebProcessingTask):
 
             if not result.success:
                 await self.update_status("FAILED", {"error": result.error_message})
-                return {
-                    "success": False,
-                    "error": result.error_message,
-                    "url": url
-                }
+                return {"success": False, "error": result.error_message, "url": url}
 
             await self.update_status("PROCESSING", {"stage": "content_chunking"})
 
@@ -111,7 +107,7 @@ class ProcessWebUrlTask(WebProcessingTask):
                 "images_found": len(result.content.images),
                 "processing_time": result.processing_time,
                 "metadata": result.content.metadata,
-                "success": True
+                "success": True,
             }
 
             await self.update_status("COMPLETED", response_data)
@@ -121,7 +117,7 @@ class ProcessWebUrlTask(WebProcessingTask):
                 task_id=task_id,
                 url=url,
                 chunks_created=len(result.chunks),
-                processing_time=result.processing_time
+                processing_time=result.processing_time,
             )
 
             return response_data
@@ -131,17 +127,10 @@ class ProcessWebUrlTask(WebProcessingTask):
             await self.update_status("FAILED", {"error": error_msg})
 
             logger.error(
-                "Web URL processing failed",
-                task_id=task_id,
-                url=url,
-                error=str(e)
+                "Web URL processing failed", task_id=task_id, url=url, error=str(e)
             )
 
-            return {
-                "success": False,
-                "error": error_msg,
-                "url": url
-            }
+            return {"success": False, "error": error_msg, "url": url}
 
 
 class ProcessWebUrlsBatchTask(WebProcessingTask):
@@ -151,13 +140,15 @@ class ProcessWebUrlsBatchTask(WebProcessingTask):
         self,
         urls: List[str],
         config: Optional[Dict[str, Any]] = None,
-        task_id: Optional[str] = None
+        task_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Process multiple web URLs in batch."""
 
-        logger.info("Starting batch web URL processing task",
-                   task_id=task_id,
-                   url_count=len(urls))
+        logger.info(
+            "Starting batch web URL processing task",
+            task_id=task_id,
+            url_count=len(urls),
+        )
 
         try:
             await self.update_status("PROCESSING", {"stage": "batch_initialization"})
@@ -188,8 +179,10 @@ class ProcessWebUrlsBatchTask(WebProcessingTask):
                 "total_chunks": total_chunks,
                 "total_processing_time": total_processing_time,
                 "successful_urls": [r.url for r in successful_results],
-                "failed_urls": [{"url": r.url, "error": r.error_message} for r in failed_results],
-                "success": True
+                "failed_urls": [
+                    {"url": r.url, "error": r.error_message} for r in failed_results
+                ],
+                "success": True,
             }
 
             await self.update_status("COMPLETED", response_data)
@@ -200,7 +193,7 @@ class ProcessWebUrlsBatchTask(WebProcessingTask):
                 total_urls=len(urls),
                 successful=len(successful_results),
                 failed=len(failed_results),
-                total_chunks=total_chunks
+                total_chunks=total_chunks,
             )
 
             return response_data
@@ -213,21 +206,15 @@ class ProcessWebUrlsBatchTask(WebProcessingTask):
                 "Batch web URL processing failed",
                 task_id=task_id,
                 urls=urls,
-                error=str(e)
+                error=str(e),
             )
 
-            return {
-                "success": False,
-                "error": error_msg,
-                "total_urls": len(urls)
-            }
+            return {"success": False, "error": error_msg, "total_urls": len(urls)}
 
 
 # Convenience functions for external use
 async def process_web_url(
-    url: str,
-    config: Optional[Dict[str, Any]] = None,
-    task_id: Optional[str] = None
+    url: str, config: Optional[Dict[str, Any]] = None, task_id: Optional[str] = None
 ) -> Dict[str, Any]:
     """Process a single web URL."""
     task = ProcessWebUrlTask()
@@ -237,7 +224,7 @@ async def process_web_url(
 async def process_web_urls_batch(
     urls: List[str],
     config: Optional[Dict[str, Any]] = None,
-    task_id: Optional[str] = None
+    task_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Process multiple web URLs in batch."""
     task = ProcessWebUrlsBatchTask()
@@ -254,11 +241,13 @@ def create_celery_tasks(celery_app):
         return run_async(process_web_url(url, config, self.request.id))
 
     @celery_app.task(bind=True)
-    def process_web_urls_batch_celery(self, urls: List[str], config: Optional[Dict[str, Any]] = None):
+    def process_web_urls_batch_celery(
+        self, urls: List[str], config: Optional[Dict[str, Any]] = None
+    ):
         """Celery wrapper for batch web URL processing."""
         return run_async(process_web_urls_batch(urls, config, self.request.id))
 
     return {
-        'process_web_url': process_web_url_celery,
-        'process_web_urls_batch': process_web_urls_batch_celery
+        "process_web_url": process_web_url_celery,
+        "process_web_urls_batch": process_web_urls_batch_celery,
     }

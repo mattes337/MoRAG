@@ -4,23 +4,26 @@ Test script to validate Docling functionality in Docker environment.
 This script tests both CPU-only and regular Docling configurations.
 """
 
+import logging
 import os
 import sys
 import tempfile
-import logging
 from pathlib import Path
 
 # Add the packages to the Python path
-sys.path.insert(0, '/app/packages/morag-document/src')
-sys.path.insert(0, '/app/packages/morag-core/src')
+sys.path.insert(0, "/app/packages/morag-document/src")
+sys.path.insert(0, "/app/packages/morag-core/src")
 
-from morag_document.converters.pdf import PDFConverter
-from morag_core.models.document import Document, DocumentMetadata
 from morag_core.interfaces.processor import ConversionOptions
+from morag_core.models.document import Document, DocumentMetadata
+from morag_document.converters.pdf import PDFConverter
 
 # Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
+
 
 def test_docling_availability():
     """Test if Docling is available and working."""
@@ -34,12 +37,13 @@ def test_docling_availability():
     logger.info(f"Docling available: {docling_available}")
 
     # Print environment variables
-    force_cpu = os.environ.get('MORAG_FORCE_CPU', 'false')
-    disable_docling = os.environ.get('MORAG_DISABLE_DOCLING', 'false')
+    force_cpu = os.environ.get("MORAG_FORCE_CPU", "false")
+    disable_docling = os.environ.get("MORAG_DISABLE_DOCLING", "false")
     logger.info(f"MORAG_FORCE_CPU: {force_cpu}")
     logger.info(f"MORAG_DISABLE_DOCLING: {disable_docling}")
 
     return docling_available
+
 
 def test_docling_import():
     """Test direct Docling import and basic functionality."""
@@ -47,10 +51,13 @@ def test_docling_import():
 
     try:
         import docling
-        logger.info(f"Docling version: {docling.__version__ if hasattr(docling, '__version__') else 'unknown'}")
 
-        from docling.document_converter import DocumentConverter
+        logger.info(
+            f"Docling version: {docling.__version__ if hasattr(docling, '__version__') else 'unknown'}"
+        )
+
         from docling.datamodel.pipeline_options import PdfPipelineOptions
+        from docling.document_converter import DocumentConverter
 
         # Test basic initialization
         pipeline_options = PdfPipelineOptions()
@@ -69,15 +76,19 @@ def test_docling_import():
         logger.error(f"Failed to initialize Docling: {e}")
         return False
 
+
 def test_pytorch_compatibility():
     """Test PyTorch compatibility in CPU mode."""
     logger.info("Testing PyTorch compatibility...")
 
     try:
         import torch
+
         logger.info(f"PyTorch version: {torch.__version__}")
         logger.info(f"CUDA available: {torch.cuda.is_available()}")
-        logger.info(f"MPS available: {torch.backends.mps.is_available() if hasattr(torch.backends, 'mps') else False}")
+        logger.info(
+            f"MPS available: {torch.backends.mps.is_available() if hasattr(torch.backends, 'mps') else False}"
+        )
 
         # Test basic tensor operations
         x = torch.tensor([1.0, 2.0, 3.0])
@@ -90,14 +101,15 @@ def test_pytorch_compatibility():
         logger.error(f"PyTorch compatibility test failed: {e}")
         return False
 
+
 def create_test_pdf():
     """Create a simple test PDF for testing."""
     try:
-        from reportlab.pdfgen import canvas
         from reportlab.lib.pagesizes import letter
+        from reportlab.pdfgen import canvas
 
         # Create a temporary PDF file
-        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
         temp_path = temp_file.name
         temp_file.close()
 
@@ -119,6 +131,7 @@ def create_test_pdf():
         logger.error(f"Failed to create test PDF: {e}")
         return None
 
+
 def test_pdf_processing(pdf_path):
     """Test PDF processing with the converter."""
     if not pdf_path or not os.path.exists(pdf_path):
@@ -135,15 +148,13 @@ def test_pdf_processing(pdf_path):
             metadata=DocumentMetadata(
                 source_type="document",
                 file_path=pdf_path,
-                file_name=os.path.basename(pdf_path)
-            )
+                file_name=os.path.basename(pdf_path),
+            ),
         )
 
         # Create conversion options
         options = ConversionOptions(
-            chunking_strategy="page",
-            chunk_size=1000,
-            chunk_overlap=100
+            chunking_strategy="page", chunk_size=1000, chunk_overlap=100
         )
 
         # Test conversion (async function, so we need to handle it properly)
@@ -156,7 +167,9 @@ def test_pdf_processing(pdf_path):
         result = asyncio.run(run_conversion())
 
         logger.info(f"PDF processing successful")
-        logger.info(f"Extracted text length: {len(result.raw_text) if result.raw_text else 0}")
+        logger.info(
+            f"Extracted text length: {len(result.raw_text) if result.raw_text else 0}"
+        )
         logger.info(f"Page count: {result.metadata.page_count}")
         logger.info(f"Word count: {result.metadata.word_count}")
 
@@ -174,6 +187,7 @@ def test_pdf_processing(pdf_path):
             except Exception as e:
                 logger.warning(f"Failed to clean up test PDF: {e}")
 
+
 def main():
     """Main test function."""
     logger.info("Starting Docling Docker validation tests...")
@@ -182,22 +196,22 @@ def main():
     results = {}
 
     # Test 1: PyTorch compatibility
-    results['pytorch'] = test_pytorch_compatibility()
+    results["pytorch"] = test_pytorch_compatibility()
 
     # Test 2: Docling import
-    results['docling_import'] = test_docling_import()
+    results["docling_import"] = test_docling_import()
 
     # Test 3: Docling availability through converter
-    results['docling_availability'] = test_docling_availability()
+    results["docling_availability"] = test_docling_availability()
 
     # Test 4: PDF processing (if possible)
     test_pdf = create_test_pdf()
-    results['pdf_processing'] = test_pdf_processing(test_pdf)
+    results["pdf_processing"] = test_pdf_processing(test_pdf)
 
     # Print summary
-    logger.info("\n" + "="*50)
+    logger.info("\n" + "=" * 50)
     logger.info("DOCLING DOCKER VALIDATION SUMMARY")
-    logger.info("="*50)
+    logger.info("=" * 50)
 
     for test_name, result in results.items():
         status = "✅ PASS" if result else "❌ FAIL"
@@ -210,6 +224,7 @@ def main():
 
     # Exit with appropriate code
     sys.exit(0 if all_passed else 1)
+
 
 if __name__ == "__main__":
     main()

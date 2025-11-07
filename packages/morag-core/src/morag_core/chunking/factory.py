@@ -1,6 +1,7 @@
 """Factory for creating chunkers with different configurations."""
 
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
+
 import structlog
 
 from .config import ChunkingConfig, ChunkingStrategy
@@ -45,7 +46,7 @@ class ChunkerFactory:
             "Creating chunker",
             strategy=config.strategy,
             max_chunk_size=config.max_chunk_size,
-            content_type=config.content_type
+            content_type=config.content_type,
         )
 
         return SemanticChunker(config)
@@ -58,9 +59,7 @@ class ChunkerFactory:
     ) -> SemanticChunker:
         """Create a chunker optimized for document processing."""
         config = ChunkingConfig.for_documents(
-            max_chunk_size=max_chunk_size,
-            strategy=strategy,
-            **kwargs
+            max_chunk_size=max_chunk_size, strategy=strategy, **kwargs
         )
         return SemanticChunker(config)
 
@@ -72,9 +71,7 @@ class ChunkerFactory:
     ) -> SemanticChunker:
         """Create a chunker optimized for audio transcript processing."""
         config = ChunkingConfig.for_audio_transcripts(
-            max_chunk_size=max_chunk_size,
-            strategy=strategy,
-            **kwargs
+            max_chunk_size=max_chunk_size, strategy=strategy, **kwargs
         )
         return SemanticChunker(config)
 
@@ -86,9 +83,7 @@ class ChunkerFactory:
     ) -> SemanticChunker:
         """Create a chunker optimized for video transcript processing."""
         config = ChunkingConfig.for_video_transcripts(
-            max_chunk_size=max_chunk_size,
-            strategy=strategy,
-            **kwargs
+            max_chunk_size=max_chunk_size, strategy=strategy, **kwargs
         )
         return SemanticChunker(config)
 
@@ -100,9 +95,7 @@ class ChunkerFactory:
     ) -> SemanticChunker:
         """Create a chunker optimized for web content processing."""
         config = ChunkingConfig.for_web_content(
-            max_chunk_size=max_chunk_size,
-            strategy=strategy,
-            **kwargs
+            max_chunk_size=max_chunk_size, strategy=strategy, **kwargs
         )
         return SemanticChunker(config)
 
@@ -132,7 +125,4 @@ def create_chunker(
         config_kwargs["max_chunk_size"] = max_chunk_size
     config_kwargs.update(kwargs)
 
-    return ChunkerFactory.create_chunker(
-        content_type=content_type,
-        **config_kwargs
-    )
+    return ChunkerFactory.create_chunker(content_type=content_type, **config_kwargs)

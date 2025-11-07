@@ -1,7 +1,8 @@
 """Test GPU error simulation and fallback mechanisms."""
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 from morag_core.config import detect_device, get_safe_device
 from src.morag.core.ai_error_handlers import WhisperErrorHandler
 from src.morag.core.resilience import ErrorType
@@ -42,9 +43,10 @@ class TestGPUErrorSimulation:
 
     def test_device_detection_with_cuda_error(self):
         """Test device detection when CUDA throws an error."""
-        with patch.dict('sys.modules', {'torch': MagicMock()}):
+        with patch.dict("sys.modules", {"torch": MagicMock()}):
             import sys
-            mock_torch = sys.modules['torch']
+
+            mock_torch = sys.modules["torch"]
             mock_torch.cuda.is_available.side_effect = RuntimeError("CUDA driver error")
 
             device = detect_device()
@@ -52,10 +54,13 @@ class TestGPUErrorSimulation:
 
     def test_safe_device_with_memory_error(self):
         """Test safe device function with memory error."""
-        with patch.dict('sys.modules', {'torch': MagicMock()}):
+        with patch.dict("sys.modules", {"torch": MagicMock()}):
             import sys
-            mock_torch = sys.modules['torch']
-            mock_torch.cuda.is_available.side_effect = RuntimeError("CUDA out of memory")
+
+            mock_torch = sys.modules["torch"]
+            mock_torch.cuda.is_available.side_effect = RuntimeError(
+                "CUDA out of memory"
+            )
 
             device = get_safe_device("cuda")
             assert device == "cpu"
@@ -70,8 +75,13 @@ class TestGPUErrorSimulation:
                 raise RuntimeError("CUDA out of memory. Tried to allocate 4.00 GiB")
             return MagicMock()
 
-        with patch('morag.services.whisper_service.WhisperModel', side_effect=mock_whisper_model):
-            with patch('morag.services.whisper_service.get_safe_device', return_value="cuda"):
+        with patch(
+            "morag.services.whisper_service.WhisperModel",
+            side_effect=mock_whisper_model,
+        ):
+            with patch(
+                "morag.services.whisper_service.get_safe_device", return_value="cuda"
+            ):
                 service = WhisperService()
                 # This should not raise an exception and should fall back to CPU
                 model = service._get_model("base", "cuda", "int8")
@@ -89,7 +99,7 @@ class TestGPUErrorSimulation:
         )
         mock_easyocr.Reader = mock_reader_class
 
-        with patch.dict('sys.modules', {'easyocr': mock_easyocr}):
+        with patch.dict("sys.modules", {"easyocr": mock_easyocr}):
             processor = ImageProcessor()
             # This should initialize without errors
             assert processor is not None
@@ -106,9 +116,14 @@ class TestGPUErrorSimulation:
         )
         mock_st.SentenceTransformer = mock_st_class
 
-        with patch.dict('sys.modules', {'sentence_transformers': mock_st}):
-            with patch('morag.services.topic_segmentation.TOPIC_SEGMENTATION_AVAILABLE', True):
-                with patch('morag.services.topic_segmentation.get_safe_device', return_value="cuda"):
+        with patch.dict("sys.modules", {"sentence_transformers": mock_st}):
+            with patch(
+                "morag.services.topic_segmentation.TOPIC_SEGMENTATION_AVAILABLE", True
+            ):
+                with patch(
+                    "morag.services.topic_segmentation.get_safe_device",
+                    return_value="cuda",
+                ):
                     service = EnhancedTopicSegmentation()
                     # Should initialize successfully with CPU fallback
                     assert service is not None
@@ -126,13 +141,15 @@ class TestGPUErrorSimulation:
             "torch.cuda.OutOfMemoryError",
             "device-side assert triggered",
             "CUDA kernel launch failed",
-            "GPU memory allocation failed"
+            "GPU memory allocation failed",
         ]
 
         for error_msg in gpu_errors:
             error = RuntimeError(error_msg)
             error_type = handler._classify_error(error)
-            assert error_type == ErrorType.SERVICE_UNAVAILABLE, f"Failed to detect GPU error: {error_msg}"
+            assert (
+                error_type == ErrorType.SERVICE_UNAVAILABLE
+            ), f"Failed to detect GPU error: {error_msg}"
 
     def test_non_gpu_errors_not_classified_as_gpu(self):
         """Test that non-GPU errors are not classified as GPU errors."""
@@ -143,7 +160,7 @@ class TestGPUErrorSimulation:
             "Network connection failed",
             "Invalid API key",
             "Rate limit exceeded",
-            "Service temporarily unavailable"
+            "Service temporarily unavailable",
         ]
 
         for error_msg in non_gpu_errors:
@@ -163,7 +180,7 @@ class TestGPUFallbackIntegration:
         from morag_audio import AudioConfig
 
         # Mock get_safe_device to simulate GPU unavailable
-        with patch('morag.processors.audio.get_safe_device', return_value="cpu"):
+        with patch("morag.processors.audio.get_safe_device", return_value="cpu"):
             config = AudioConfig(device="cuda")
             assert config.device == "cpu"
 
@@ -176,7 +193,7 @@ class TestGPUFallbackIntegration:
         assert settings.get_device() == "cpu"
 
         # Test auto detection
-        with patch('morag.core.config.detect_device', return_value="cpu"):
+        with patch("morag.core.config.detect_device", return_value="cpu"):
             settings = Settings(preferred_device="auto")
             assert settings.get_device() == "cpu"
 

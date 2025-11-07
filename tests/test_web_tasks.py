@@ -1,11 +1,11 @@
 """Tests for web tasks."""
 
-import pytest
 from unittest.mock import AsyncMock, Mock, patch
 
-from src.morag.tasks.web_tasks import process_web_url, process_web_urls_batch
-from src.morag.processors.web import WebContent, WebScrapingResult
+import pytest
 from src.morag.processors.document import DocumentChunk
+from src.morag.processors.web import WebContent, WebScrapingResult
+from src.morag.tasks.web_tasks import process_web_url, process_web_urls_batch
 
 
 class TestWebTasks:
@@ -22,13 +22,13 @@ class TestWebTasks:
             metadata={
                 "title": "Test Page",
                 "description": "A test page",
-                "domain": "example.com"
+                "domain": "example.com",
             },
             links=["https://example.com/link1", "https://example.com/link2"],
             images=["https://example.com/image1.jpg"],
             extraction_time=1.5,
             content_length=100,
-            content_type="text/html"
+            content_type="text/html",
         )
 
     @pytest.fixture
@@ -40,15 +40,15 @@ class TestWebTasks:
                 chunk_type="text",
                 page_number=1,
                 element_id="chunk_1",
-                metadata={"source": "web"}
+                metadata={"source": "web"},
             ),
             DocumentChunk(
                 text="for web scraping.",
                 chunk_type="text",
                 page_number=1,
                 element_id="chunk_2",
-                metadata={"source": "web"}
-            )
+                metadata={"source": "web"},
+            ),
         ]
 
     @pytest.fixture
@@ -59,7 +59,7 @@ class TestWebTasks:
             content=mock_web_content,
             chunks=mock_chunks,
             processing_time=2.0,
-            success=True
+            success=True,
         )
 
     @pytest.fixture
@@ -71,23 +71,26 @@ class TestWebTasks:
             chunks=[],
             processing_time=1.0,
             success=False,
-            error_message="Network error occurred"
+            error_message="Network error occurred",
         )
 
     @pytest.mark.asyncio
     async def test_process_web_url_success(self, mock_successful_result):
         """Test successful web URL processing."""
         # Mock the web processor
-        with patch('src.morag.tasks.web_tasks.web_processor') as mock_processor:
+        with patch("src.morag.tasks.web_tasks.web_processor") as mock_processor:
             mock_processor.process_url = AsyncMock(return_value=mock_successful_result)
 
             # Mock the embedding and storage services
-            with patch('src.morag.tasks.web_tasks.embedding_service') as mock_embedding:
-                with patch('src.morag.tasks.web_tasks.storage_service') as mock_storage:
+            with patch("src.morag.tasks.web_tasks.embedding_service") as mock_embedding:
+                with patch("src.morag.tasks.web_tasks.storage_service") as mock_storage:
                     from src.morag.services.embedding import EmbeddingResult
-                    mock_embedding.generate_embedding = AsyncMock(return_value=EmbeddingResult(
-                        embedding=[0.1, 0.2, 0.3], token_count=10, model="test"
-                    ))
+
+                    mock_embedding.generate_embedding = AsyncMock(
+                        return_value=EmbeddingResult(
+                            embedding=[0.1, 0.2, 0.3], token_count=10, model="test"
+                        )
+                    )
                     mock_storage.store_chunk_with_embedding = AsyncMock()
 
                     # Create a mock task instance
@@ -99,7 +102,7 @@ class TestWebTasks:
                         mock_task,
                         "https://example.com",
                         {"timeout": 30},
-                        "test_task_id"
+                        "test_task_id",
                     )
 
                     # Verify the result
@@ -114,17 +117,25 @@ class TestWebTasks:
                     assert "processing_time" in result
 
                     # Verify status updates were called
-                    mock_task.update_status.assert_any_call("PROCESSING", {"stage": "url_validation"})
-                    mock_task.update_status.assert_any_call("PROCESSING", {"stage": "content_extraction"})
-                    mock_task.update_status.assert_any_call("PROCESSING", {"stage": "content_chunking"})
-                    mock_task.update_status.assert_any_call("PROCESSING", {"stage": "embedding_generation"})
+                    mock_task.update_status.assert_any_call(
+                        "PROCESSING", {"stage": "url_validation"}
+                    )
+                    mock_task.update_status.assert_any_call(
+                        "PROCESSING", {"stage": "content_extraction"}
+                    )
+                    mock_task.update_status.assert_any_call(
+                        "PROCESSING", {"stage": "content_chunking"}
+                    )
+                    mock_task.update_status.assert_any_call(
+                        "PROCESSING", {"stage": "embedding_generation"}
+                    )
                     mock_task.update_status.assert_any_call("COMPLETED", result)
 
     @pytest.mark.asyncio
     async def test_process_web_url_failure(self, mock_failed_result):
         """Test failed web URL processing."""
         # Mock the web processor to return failure
-        with patch('src.morag.tasks.web_tasks.web_processor') as mock_processor:
+        with patch("src.morag.tasks.web_tasks.web_processor") as mock_processor:
             mock_processor.process_url = AsyncMock(return_value=mock_failed_result)
 
             # Create a mock task instance
@@ -133,10 +144,7 @@ class TestWebTasks:
 
             # Call the task function
             result = await process_web_url(
-                mock_task,
-                "https://example.com",
-                None,
-                "test_task_id"
+                mock_task, "https://example.com", None, "test_task_id"
             )
 
             # Verify the result
@@ -145,15 +153,21 @@ class TestWebTasks:
             assert result["url"] == "https://example.com"
 
             # Verify status updates
-            mock_task.update_status.assert_any_call("PROCESSING", {"stage": "url_validation"})
-            mock_task.update_status.assert_any_call("FAILED", {"error": "Network error occurred"})
+            mock_task.update_status.assert_any_call(
+                "PROCESSING", {"stage": "url_validation"}
+            )
+            mock_task.update_status.assert_any_call(
+                "FAILED", {"error": "Network error occurred"}
+            )
 
     @pytest.mark.asyncio
     async def test_process_web_url_exception(self):
         """Test web URL processing with exception."""
         # Mock the web processor to raise an exception
-        with patch('src.morag.tasks.web_tasks.web_processor') as mock_processor:
-            mock_processor.process_url = AsyncMock(side_effect=Exception("Unexpected error"))
+        with patch("src.morag.tasks.web_tasks.web_processor") as mock_processor:
+            mock_processor.process_url = AsyncMock(
+                side_effect=Exception("Unexpected error")
+            )
 
             # Create a mock task instance
             mock_task = Mock()
@@ -161,10 +175,7 @@ class TestWebTasks:
 
             # Call the task function
             result = await process_web_url(
-                mock_task,
-                "https://example.com",
-                None,
-                "test_task_id"
+                mock_task, "https://example.com", None, "test_task_id"
             )
 
             # Verify the result
@@ -173,18 +184,22 @@ class TestWebTasks:
             assert result["url"] == "https://example.com"
 
             # Verify status updates
-            mock_task.update_status.assert_any_call("FAILED", {"error": result["error"]})
+            mock_task.update_status.assert_any_call(
+                "FAILED", {"error": result["error"]}
+            )
 
     @pytest.mark.asyncio
     async def test_process_web_url_embedding_failure(self, mock_successful_result):
         """Test web URL processing with embedding failure."""
         # Mock the web processor
-        with patch('src.morag.tasks.web_tasks.web_processor') as mock_processor:
+        with patch("src.morag.tasks.web_tasks.web_processor") as mock_processor:
             mock_processor.process_url = AsyncMock(return_value=mock_successful_result)
 
             # Mock embedding service to fail
-            with patch('src.morag.tasks.web_tasks.embedding_service') as mock_embedding:
-                mock_embedding.generate_embedding = AsyncMock(side_effect=Exception("Embedding error"))
+            with patch("src.morag.tasks.web_tasks.embedding_service") as mock_embedding:
+                mock_embedding.generate_embedding = AsyncMock(
+                    side_effect=Exception("Embedding error")
+                )
 
                 # Create a mock task instance
                 mock_task = Mock()
@@ -192,10 +207,7 @@ class TestWebTasks:
 
                 # Call the task function
                 result = await process_web_url(
-                    mock_task,
-                    "https://example.com",
-                    None,
-                    "test_task_id"
+                    mock_task, "https://example.com", None, "test_task_id"
                 )
 
                 # Verify the result - should still succeed but with embedding error
@@ -209,19 +221,21 @@ class TestWebTasks:
         urls = ["https://example1.com", "https://example2.com"]
 
         # Mock the web processor
-        with patch('src.morag.tasks.web_tasks.web_processor') as mock_processor:
-            mock_processor.process_urls = AsyncMock(return_value=[
-                mock_successful_result,
-                mock_successful_result
-            ])
+        with patch("src.morag.tasks.web_tasks.web_processor") as mock_processor:
+            mock_processor.process_urls = AsyncMock(
+                return_value=[mock_successful_result, mock_successful_result]
+            )
 
             # Mock the embedding and storage services
-            with patch('src.morag.tasks.web_tasks.embedding_service') as mock_embedding:
-                with patch('src.morag.tasks.web_tasks.storage_service') as mock_storage:
+            with patch("src.morag.tasks.web_tasks.embedding_service") as mock_embedding:
+                with patch("src.morag.tasks.web_tasks.storage_service") as mock_storage:
                     from src.morag.services.embedding import EmbeddingResult
-                    mock_embedding.generate_embedding = AsyncMock(return_value=EmbeddingResult(
-                        embedding=[0.1, 0.2, 0.3], token_count=10, model="test"
-                    ))
+
+                    mock_embedding.generate_embedding = AsyncMock(
+                        return_value=EmbeddingResult(
+                            embedding=[0.1, 0.2, 0.3], token_count=10, model="test"
+                        )
+                    )
                     mock_storage.store_chunk_with_embedding = AsyncMock()
 
                     # Create a mock task instance
@@ -230,10 +244,7 @@ class TestWebTasks:
 
                     # Call the task function
                     result = await process_web_urls_batch(
-                        mock_task,
-                        urls,
-                        {"timeout": 30},
-                        "test_task_id"
+                        mock_task, urls, {"timeout": 30}, "test_task_id"
                     )
 
                     # Verify the result
@@ -247,30 +258,40 @@ class TestWebTasks:
                     assert len(result["failed_urls"]) == 0
 
                     # Verify status updates
-                    mock_task.update_status.assert_any_call("PROCESSING", {"stage": "batch_initialization"})
-                    mock_task.update_status.assert_any_call("PROCESSING", {"stage": "batch_processing"})
-                    mock_task.update_status.assert_any_call("PROCESSING", {"stage": "embedding_generation"})
+                    mock_task.update_status.assert_any_call(
+                        "PROCESSING", {"stage": "batch_initialization"}
+                    )
+                    mock_task.update_status.assert_any_call(
+                        "PROCESSING", {"stage": "batch_processing"}
+                    )
+                    mock_task.update_status.assert_any_call(
+                        "PROCESSING", {"stage": "embedding_generation"}
+                    )
                     mock_task.update_status.assert_any_call("COMPLETED", result)
 
     @pytest.mark.asyncio
-    async def test_process_web_urls_batch_mixed_results(self, mock_successful_result, mock_failed_result):
+    async def test_process_web_urls_batch_mixed_results(
+        self, mock_successful_result, mock_failed_result
+    ):
         """Test batch web URL processing with mixed results."""
         urls = ["https://example1.com", "https://example2.com"]
 
         # Mock the web processor with mixed results
-        with patch('src.morag.tasks.web_tasks.web_processor') as mock_processor:
-            mock_processor.process_urls = AsyncMock(return_value=[
-                mock_successful_result,
-                mock_failed_result
-            ])
+        with patch("src.morag.tasks.web_tasks.web_processor") as mock_processor:
+            mock_processor.process_urls = AsyncMock(
+                return_value=[mock_successful_result, mock_failed_result]
+            )
 
             # Mock the embedding and storage services
-            with patch('src.morag.tasks.web_tasks.embedding_service') as mock_embedding:
-                with patch('src.morag.tasks.web_tasks.storage_service') as mock_storage:
+            with patch("src.morag.tasks.web_tasks.embedding_service") as mock_embedding:
+                with patch("src.morag.tasks.web_tasks.storage_service") as mock_storage:
                     from src.morag.services.embedding import EmbeddingResult
-                    mock_embedding.generate_embedding = AsyncMock(return_value=EmbeddingResult(
-                        embedding=[0.1, 0.2, 0.3], token_count=10, model="test"
-                    ))
+
+                    mock_embedding.generate_embedding = AsyncMock(
+                        return_value=EmbeddingResult(
+                            embedding=[0.1, 0.2, 0.3], token_count=10, model="test"
+                        )
+                    )
                     mock_storage.store_chunk_with_embedding = AsyncMock()
 
                     # Create a mock task instance
@@ -279,10 +300,7 @@ class TestWebTasks:
 
                     # Call the task function
                     result = await process_web_urls_batch(
-                        mock_task,
-                        urls,
-                        None,
-                        "test_task_id"
+                        mock_task, urls, None, "test_task_id"
                     )
 
                     # Verify the result
@@ -302,20 +320,17 @@ class TestWebTasks:
         urls = ["https://example1.com", "https://example2.com"]
 
         # Mock the web processor to raise an exception
-        with patch('src.morag.tasks.web_tasks.web_processor') as mock_processor:
-            mock_processor.process_urls = AsyncMock(side_effect=Exception("Batch processing error"))
+        with patch("src.morag.tasks.web_tasks.web_processor") as mock_processor:
+            mock_processor.process_urls = AsyncMock(
+                side_effect=Exception("Batch processing error")
+            )
 
             # Create a mock task instance
             mock_task = Mock()
             mock_task.update_status = AsyncMock()
 
             # Call the task function
-            result = await process_web_urls_batch(
-                mock_task,
-                urls,
-                None,
-                "test_task_id"
-            )
+            result = await process_web_urls_batch(mock_task, urls, None, "test_task_id")
 
             # Verify the result
             assert result["success"] is False
@@ -323,4 +338,6 @@ class TestWebTasks:
             assert result["total_urls"] == 2
 
             # Verify status updates
-            mock_task.update_status.assert_any_call("FAILED", {"error": result["error"]})
+            mock_task.update_status.assert_any_call(
+                "FAILED", {"error": result["error"]}
+            )

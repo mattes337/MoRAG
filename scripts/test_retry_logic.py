@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """Test script to demonstrate the new indefinite retry logic for rate limits."""
 
-import sys
 import os
+import sys
 import time
 from pathlib import Path
 
 # Add the project root to the Python path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
+
 
 def test_retry_configuration():
     """Test that retry configuration is properly loaded."""
@@ -44,7 +45,9 @@ def simulate_exponential_backoff():
         exponential_base = settings.retry_exponential_base
         use_jitter = settings.retry_jitter
 
-        print(f"Configuration: base={base_delay}s, max={max_delay}s, multiplier={exponential_base}")
+        print(
+            f"Configuration: base={base_delay}s, max={max_delay}s, multiplier={exponential_base}"
+        )
         print("\nRetry attempt delays:")
 
         total_time = 0
@@ -61,14 +64,18 @@ def simulate_exponential_backoff():
 
             total_time += delay_with_jitter
 
-            print(f"  Attempt {attempt:2d}: {delay:.2f}s (with jitter: {delay_with_jitter:.2f}s) - Total: {total_time:.1f}s")
+            print(
+                f"  Attempt {attempt:2d}: {delay:.2f}s (with jitter: {delay_with_jitter:.2f}s) - Total: {total_time:.1f}s"
+            )
 
             # Show when we hit max delay
             if delay >= max_delay:
                 print(f"  → Max delay reached at attempt {attempt}")
                 break
 
-        print(f"\n✅ After 10 attempts, total wait time would be: {total_time:.1f}s ({total_time/60:.1f} minutes)")
+        print(
+            f"\n✅ After 10 attempts, total wait time would be: {total_time:.1f}s ({total_time/60:.1f} minutes)"
+        )
         return True
 
     except Exception as e:
@@ -100,7 +107,7 @@ def demonstrate_rate_limit_vs_other_errors():
             "429",
             "RESOURCE_EXHAUSTED",
             "quota exceeded",
-            "rate limit"
+            "rate limit",
         ]
 
         for pattern in rate_limit_patterns:
@@ -176,8 +183,12 @@ def main():
 
     if passed == total:
         print("🎉 All retry logic tests passed!")
-        print("\n💡 The system is now configured to retry rate limit errors indefinitely")
-        print("   with intelligent exponential backoff, preventing task failures due to")
+        print(
+            "\n💡 The system is now configured to retry rate limit errors indefinitely"
+        )
+        print(
+            "   with intelligent exponential backoff, preventing task failures due to"
+        )
         print("   temporary API quota limits.")
         return True
     else:

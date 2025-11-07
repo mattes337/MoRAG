@@ -1,24 +1,28 @@
 """Tests for GraphBuilder."""
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
-from typing import List, Dict, Any
 import asyncio
+from typing import Any, Dict, List
+from unittest.mock import AsyncMock, MagicMock, patch
 
-from morag_graph.builders import GraphBuilder, GraphBuildResult, GraphBuildError
+import pytest
+from morag_graph.builders import GraphBuilder, GraphBuildError, GraphBuildResult
+
 # Import LLMConfig from morag-reasoning package
 try:
     from morag_reasoning.llm import LLMConfig
 except ImportError:
     # Fallback LLMConfig for compatibility
     from pydantic import BaseModel
+
     class LLMConfig(BaseModel):
         provider: str = "gemini"
         model: str = "gemini-1.5-flash"
         api_key: str = None
         temperature: float = 0.1
         max_tokens: int = 2000
-from morag_graph.models import Entity, Relation, DocumentChunk
+
+
+from morag_graph.models import DocumentChunk, Entity, Relation
 from morag_graph.storage.base import BaseStorage
 
 
@@ -77,8 +81,12 @@ class MockStorage(BaseStorage):
             if entity.id == entity_id:
                 del self.entities[i]
                 # Remove related relations
-                self.relations = [r for r in self.relations
-                                if r.source_entity_id != entity_id and r.target_entity_id != entity_id]
+                self.relations = [
+                    r
+                    for r in self.relations
+                    if r.source_entity_id != entity_id
+                    and r.target_entity_id != entity_id
+                ]
                 return True
         return False
 
@@ -99,7 +107,9 @@ class MockStorage(BaseStorage):
     async def get_relations(self, relation_ids):
         return [relation for relation in self.relations if relation.id in relation_ids]
 
-    async def get_entity_relations(self, entity_id, relation_type=None, direction="both"):
+    async def get_entity_relations(
+        self, entity_id, relation_type=None, direction="both"
+    ):
         results = []
         for relation in self.relations:
             if direction in ["out", "both"] and relation.source_entity_id == entity_id:
@@ -150,7 +160,10 @@ class MockStorage(BaseStorage):
 
     async def get_graph(self, entity_ids=None):
         from morag_graph.models import Graph
-        entities = self.entities if entity_ids is None else await self.get_entities(entity_ids)
+
+        entities = (
+            self.entities if entity_ids is None else await self.get_entities(entity_ids)
+        )
         return Graph(entities=entities, relations=self.relations)
 
     async def clear(self):
@@ -160,7 +173,7 @@ class MockStorage(BaseStorage):
     async def get_statistics(self):
         return {
             "entity_count": len(self.entities),
-            "relation_count": len(self.relations)
+            "relation_count": len(self.relations),
         }
 
     async def __aenter__(self):
@@ -182,19 +195,12 @@ def mock_storage():
 
 @pytest.fixture
 def llm_config():
-    return LLMConfig(
-        provider="gemini",
-        api_key="test-key",
-        model="gemini-pro"
-    )
+    return LLMConfig(provider="gemini", api_key="test-key", model="gemini-pro")
 
 
 @pytest.fixture
 def graph_builder(mock_storage, llm_config):
-    return GraphBuilder(
-        storage=mock_storage,
-        llm_config=llm_config
-    )
+    return GraphBuilder(storage=mock_storage, llm_config=llm_config)
 
 
 @pytest.fixture
@@ -205,14 +211,14 @@ def sample_entities():
             id="ent_entity1",
             name="Test Entity 1",
             type="Person",
-            attributes={"age": 30}
+            attributes={"age": 30},
         ),
         Entity(
             id="ent_entity2",
             name="Test Entity 2",
             type="Organization",
-            attributes={"founded": 2020}
-        )
+            attributes={"founded": 2020},
+        ),
     ]
 
 
@@ -225,7 +231,7 @@ def sample_relations(sample_entities):
             target_entity_id=sample_entities[1].id,
             type="WORKS_FOR",
             description="Person works for organization",
-            metadata={"source": "test"}
+            metadata={"source": "test"},
         )
     ]
 
@@ -236,26 +242,27 @@ class TestGraphBuilder:
     @pytest.mark.asyncio
     async def test_initialization(self, mock_storage, llm_config):
         """Test GraphBuilder initialization."""
-        builder = GraphBuilder(
-            storage=mock_storage,
-            llm_config=llm_config
-        )
+        builder = GraphBuilder(storage=mock_storage, llm_config=llm_config)
 
         assert builder.storage == mock_storage
         assert builder.entity_extractor is not None
         assert builder.relation_extractor is not None
 
     @pytest.mark.asyncio
-    async def test_process_document_success(self, mock_storage, llm_config, sample_entities, sample_relations):
+    async def test_process_document_success(
+        self, mock_storage, llm_config, sample_entities, sample_relations
+    ):
         """Test successful document processing."""
         print("=== TEST STARTED ===")
         print(f"Sample entities length: {len(sample_entities)}")
         print(f"Sample relations length: {len(sample_relations)}")
 
         # Mock the extractors at class level before instantiation
-        with patch('morag_graph.builders.graph_builder.EntityExtractor') as mock_entity_extractor_class, \
-             patch('morag_graph.builders.graph_builder.RelationExtractor') as mock_relation_extractor_class:
-
+        with patch(
+            "morag_graph.builders.graph_builder.EntityExtractor"
+        ) as mock_entity_extractor_class, patch(
+            "morag_graph.builders.graph_builder.RelationExtractor"
+        ) as mock_relation_extractor_class:
             # Create mock instances
             mock_entity_extractor = AsyncMock()
             mock_relation_extractor = AsyncMock()
@@ -269,13 +276,12 @@ class TestGraphBuilder:
             mock_relation_extractor.extract = AsyncMock(return_value=sample_relations)
 
             print(f"Mock entity extractor configured: {mock_entity_extractor.extract}")
-            print(f"Mock relation extractor configured: {mock_relation_extractor.extract}")
+            print(
+                f"Mock relation extractor configured: {mock_relation_extractor.extract}"
+            )
 
             # Now create the GraphBuilder
-            graph_builder = GraphBuilder(
-                storage=mock_storage,
-                llm_config=llm_config
-            )
+            graph_builder = GraphBuilder(storage=mock_storage, llm_config=llm_config)
 
             print(f"Sample entities: {len(sample_entities)}")
             print(f"Sample relations: {len(sample_relations)}")
@@ -283,7 +289,7 @@ class TestGraphBuilder:
             result = await graph_builder.process_document(
                 content="Test content",
                 document_id="test_doc_1",
-                metadata={"test": "metadata"}
+                metadata={"test": "metadata"},
             )
 
             print(f"Result entities_created: {result.entities_created}")
@@ -291,7 +297,9 @@ class TestGraphBuilder:
             print(f"Storage entities: {len(mock_storage.entities)}")
             print(f"Storage relations: {len(mock_storage.relations)}")
 
-            print(f"Result: entities_created={result.entities_created}, relations_created={result.relations_created}")
+            print(
+                f"Result: entities_created={result.entities_created}, relations_created={result.relations_created}"
+            )
 
             # Verify result
             assert isinstance(result, GraphBuildResult)
@@ -305,12 +313,10 @@ class TestGraphBuilder:
 
             # Verify extractors were called
             mock_entity_extractor.extract.assert_called_once_with(
-                "Test content",
-                source_doc_id="test_doc_1"
+                "Test content", source_doc_id="test_doc_1"
             )
             mock_relation_extractor.extract.assert_called_once_with(
-                "Test content",
-                entities=sample_entities
+                "Test content", entities=sample_entities
             )
 
             # Verify entities and relations were stored
@@ -321,12 +327,13 @@ class TestGraphBuilder:
     async def test_process_document_with_extraction_error(self, graph_builder):
         """Test document processing with extraction error."""
         # Mock the extractors to raise an exception
-        with patch.object(graph_builder.entity_extractor, 'extract', new_callable=AsyncMock) as mock_entity_extract:
+        with patch.object(
+            graph_builder.entity_extractor, "extract", new_callable=AsyncMock
+        ) as mock_entity_extract:
             mock_entity_extract.side_effect = Exception("Extraction failed")
 
             result = await graph_builder.process_document(
-                content="Test document content",
-                document_id="test_doc_1"
+                content="Test document content", document_id="test_doc_1"
             )
 
             # Verify error handling
@@ -338,7 +345,9 @@ class TestGraphBuilder:
             assert "Extraction failed" in result.errors[0]
 
     @pytest.mark.asyncio
-    async def test_process_document_chunks(self, graph_builder, sample_entities, sample_relations):
+    async def test_process_document_chunks(
+        self, graph_builder, sample_entities, sample_relations
+    ):
         """Test processing document chunks."""
         chunks = [
             DocumentChunk(
@@ -346,15 +355,15 @@ class TestGraphBuilder:
                 document_id="doc_test1",
                 chunk_index=0,
                 text="Test content 1",
-                metadata={"page": 1}
+                metadata={"page": 1},
             ),
             DocumentChunk(
                 id="doc_test1:chunk:1",
                 document_id="doc_test1",
                 chunk_index=1,
                 text="Test content 2",
-                metadata={"page": 2}
-            )
+                metadata={"page": 2},
+            ),
         ]
 
         # Mock the extractors with proper method signatures
@@ -364,13 +373,15 @@ class TestGraphBuilder:
         async def mock_relation_extract(content, entities=None, **kwargs):
             return sample_relations[:1]  # One relation per chunk
 
-        graph_builder.entity_extractor.extract = AsyncMock(side_effect=mock_entity_extract)
-        graph_builder.relation_extractor.extract = AsyncMock(side_effect=mock_relation_extract)
+        graph_builder.entity_extractor.extract = AsyncMock(
+            side_effect=mock_entity_extract
+        )
+        graph_builder.relation_extractor.extract = AsyncMock(
+            side_effect=mock_relation_extract
+        )
 
         result = await graph_builder.process_document_chunks(
-            chunks=chunks,
-            document_id="test_doc_1",
-            metadata={"test": "metadata"}
+            chunks=chunks, document_id="test_doc_1", metadata={"test": "metadata"}
         )
 
         # Verify result
@@ -386,12 +397,14 @@ class TestGraphBuilder:
         assert graph_builder.relation_extractor.extract.call_count == 2
 
     @pytest.mark.asyncio
-    async def test_process_documents_batch(self, graph_builder, sample_entities, sample_relations):
+    async def test_process_documents_batch(
+        self, graph_builder, sample_entities, sample_relations
+    ):
         """Test batch processing of documents."""
         documents = [
             ("Content 1", "doc1", {"meta": "1"}),
             ("Content 2", "doc2", {"meta": "2"}),
-            ("Content 3", "doc3", {"meta": "3"})
+            ("Content 3", "doc3", {"meta": "3"}),
         ]
 
         # Mock the extractors with proper method signatures
@@ -401,8 +414,12 @@ class TestGraphBuilder:
         async def mock_relation_extract(content, entities=None, **kwargs):
             return sample_relations[:1]
 
-        graph_builder.entity_extractor.extract = AsyncMock(side_effect=mock_entity_extract)
-        graph_builder.relation_extractor.extract = AsyncMock(side_effect=mock_relation_extract)
+        graph_builder.entity_extractor.extract = AsyncMock(
+            side_effect=mock_entity_extract
+        )
+        graph_builder.relation_extractor.extract = AsyncMock(
+            side_effect=mock_relation_extract
+        )
 
         results = await graph_builder.process_documents_batch(documents)
 
@@ -421,13 +438,19 @@ class TestGraphBuilder:
         assert graph_builder.storage.closed
 
     @pytest.mark.asyncio
-    async def test_store_entities_and_relations_error(self, graph_builder, sample_entities, sample_relations):
+    async def test_store_entities_and_relations_error(
+        self, graph_builder, sample_entities, sample_relations
+    ):
         """Test error handling in storage operations."""
         # Mock storage to raise an exception
-        with patch.object(graph_builder.storage, 'store_entities', new_callable=AsyncMock) as mock_store:
+        with patch.object(
+            graph_builder.storage, "store_entities", new_callable=AsyncMock
+        ) as mock_store:
             mock_store.side_effect = Exception("Storage failed")
 
-            with pytest.raises(GraphBuildError, match="Failed to store entities and relations"):
+            with pytest.raises(
+                GraphBuildError, match="Failed to store entities and relations"
+            ):
                 await graph_builder._store_entities_and_relations(
                     sample_entities, sample_relations, "test_doc"
                 )
@@ -439,7 +462,7 @@ class TestGraphBuilder:
             entities_created=5,
             relations_created=3,
             entity_ids=["e1", "e2", "e3", "e4", "e5"],
-            relation_ids=["r1", "r2", "r3"]
+            relation_ids=["r1", "r2", "r3"],
         )
 
         assert result.document_id == "test_doc"

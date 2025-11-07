@@ -5,8 +5,8 @@ clustering analysis, and graph metrics.
 """
 
 import logging
-from typing import List, Dict, Any, Optional
-from collections import defaultdict, Counter
+from collections import Counter, defaultdict
+from typing import Any, Dict, List, Optional
 
 from ..models import Entity
 from ..storage.base import BaseStorage
@@ -31,9 +31,9 @@ class GraphAnalytics:
         self.storage = storage
         self.logger = logger.getChild(self.__class__.__name__)
 
-    async def calculate_degree_centrality(self,
-                                        relation_types: Optional[List[str]] = None,
-                                        top_k: Optional[int] = None) -> List[Dict[str, Any]]:
+    async def calculate_degree_centrality(
+        self, relation_types: Optional[List[str]] = None, top_k: Optional[int] = None
+    ) -> List[Dict[str, Any]]:
         """Calculate degree centrality for all entities.
 
         Args:
@@ -48,11 +48,13 @@ class GraphAnalytics:
         if isinstance(self.storage, Neo4jStorage):
             return await self._calculate_degree_centrality_neo4j(relation_types, top_k)
         else:
-            return await self._calculate_degree_centrality_generic(relation_types, top_k)
+            return await self._calculate_degree_centrality_generic(
+                relation_types, top_k
+            )
 
-    async def _calculate_degree_centrality_neo4j(self,
-                                                relation_types: Optional[List[str]],
-                                                top_k: Optional[int]) -> List[Dict[str, Any]]:
+    async def _calculate_degree_centrality_neo4j(
+        self, relation_types: Optional[List[str]], top_k: Optional[int]
+    ) -> List[Dict[str, Any]]:
         """Calculate degree centrality using Neo4j queries."""
         # Build relation type filter
         rel_filter = ""
@@ -76,19 +78,21 @@ class GraphAnalytics:
             try:
                 entity = Entity.from_neo4j_node(record["e"])
                 degree = record["degree"]
-                centrality_scores.append({
-                    "entity": entity,
-                    "degree": degree,
-                    "centrality": degree  # For degree centrality, score equals degree
-                })
+                centrality_scores.append(
+                    {
+                        "entity": entity,
+                        "degree": degree,
+                        "centrality": degree,  # For degree centrality, score equals degree
+                    }
+                )
             except Exception as e:
                 self.logger.warning(f"Failed to parse entity for centrality: {e}")
 
         return centrality_scores
 
-    async def _calculate_degree_centrality_generic(self,
-                                                 relation_types: Optional[List[str]],
-                                                 top_k: Optional[int]) -> List[Dict[str, Any]]:
+    async def _calculate_degree_centrality_generic(
+        self, relation_types: Optional[List[str]], top_k: Optional[int]
+    ) -> List[Dict[str, Any]]:
         """Calculate degree centrality using generic graph analysis."""
         # Get all entities and relations
         entities = await self.storage.get_all_entities()
@@ -111,11 +115,9 @@ class GraphAnalytics:
         for entity in entities:
             entity_id = str(entity.id)
             degree = degree_counts.get(entity_id, 0)
-            centrality_scores.append({
-                "entity": entity,
-                "degree": degree,
-                "centrality": degree
-            })
+            centrality_scores.append(
+                {"entity": entity, "degree": degree, "centrality": degree}
+            )
 
         # Sort by centrality (descending)
         centrality_scores.sort(key=lambda x: x["centrality"], reverse=True)
@@ -126,9 +128,9 @@ class GraphAnalytics:
 
         return centrality_scores
 
-    async def calculate_betweenness_centrality(self,
-                                             relation_types: Optional[List[str]] = None,
-                                             top_k: Optional[int] = None) -> List[Dict[str, Any]]:
+    async def calculate_betweenness_centrality(
+        self, relation_types: Optional[List[str]] = None, top_k: Optional[int] = None
+    ) -> List[Dict[str, Any]]:
         """Calculate betweenness centrality for all entities.
 
         Betweenness centrality measures how often an entity lies on the
@@ -188,13 +190,17 @@ class GraphAnalytics:
         for entity in entities:
             entity_id = str(entity.id)
             raw_score = betweenness_scores.get(entity_id, 0)
-            normalized_score = raw_score / normalization_factor if normalization_factor > 0 else 0
+            normalized_score = (
+                raw_score / normalization_factor if normalization_factor > 0 else 0
+            )
 
-            centrality_scores.append({
-                "entity": entity,
-                "betweenness": normalized_score,
-                "centrality": normalized_score
-            })
+            centrality_scores.append(
+                {
+                    "entity": entity,
+                    "betweenness": normalized_score,
+                    "centrality": normalized_score,
+                }
+            )
 
         # Sort by centrality (descending)
         centrality_scores.sort(key=lambda x: x["centrality"], reverse=True)
@@ -205,8 +211,9 @@ class GraphAnalytics:
 
         return centrality_scores
 
-    def _find_all_shortest_paths(self, source_id: str, target_id: str,
-                                adjacency: Dict[str, List[str]]) -> List[List[str]]:
+    def _find_all_shortest_paths(
+        self, source_id: str, target_id: str, adjacency: Dict[str, List[str]]
+    ) -> List[List[str]]:
         """Find all shortest paths between two entities using BFS."""
         from collections import deque
 
@@ -239,15 +246,18 @@ class GraphAnalytics:
                 new_path = path + [neighbor_id]
 
                 # Only continue if this is a shortest path
-                if neighbor_id not in visited or visited[neighbor_id] == len(new_path) - 1:
+                if (
+                    neighbor_id not in visited
+                    or visited[neighbor_id] == len(new_path) - 1
+                ):
                     visited[neighbor_id] = len(new_path) - 1
                     queue.append((neighbor_id, new_path))
 
         return all_paths
 
-    async def calculate_closeness_centrality(self,
-                                           relation_types: Optional[List[str]] = None,
-                                           top_k: Optional[int] = None) -> List[Dict[str, Any]]:
+    async def calculate_closeness_centrality(
+        self, relation_types: Optional[List[str]] = None, top_k: Optional[int] = None
+    ) -> List[Dict[str, Any]]:
         """Calculate closeness centrality for all entities.
 
         Closeness centrality measures how close an entity is to all other entities.
@@ -287,7 +297,9 @@ class GraphAnalytics:
             distances = self._calculate_shortest_distances(entity_id, adjacency)
 
             # Calculate closeness centrality
-            reachable_distances = [d for d in distances.values() if d > 0 and d != float('inf')]
+            reachable_distances = [
+                d for d in distances.values() if d > 0 and d != float("inf")
+            ]
 
             if reachable_distances:
                 avg_distance = sum(reachable_distances) / len(reachable_distances)
@@ -295,12 +307,14 @@ class GraphAnalytics:
             else:
                 closeness = 0
 
-            centrality_scores.append({
-                "entity": entity,
-                "closeness": closeness,
-                "centrality": closeness,
-                "reachable_entities": len(reachable_distances)
-            })
+            centrality_scores.append(
+                {
+                    "entity": entity,
+                    "closeness": closeness,
+                    "centrality": closeness,
+                    "reachable_entities": len(reachable_distances),
+                }
+            )
 
         # Sort by centrality (descending)
         centrality_scores.sort(key=lambda x: x["centrality"], reverse=True)
@@ -311,8 +325,9 @@ class GraphAnalytics:
 
         return centrality_scores
 
-    def _calculate_shortest_distances(self, source_id: str,
-                                    adjacency: Dict[str, List[str]]) -> Dict[str, int]:
+    def _calculate_shortest_distances(
+        self, source_id: str, adjacency: Dict[str, List[str]]
+    ) -> Dict[str, int]:
         """Calculate shortest distances from source to all other entities using BFS."""
         from collections import deque
 
@@ -351,21 +366,24 @@ class GraphAnalytics:
         type_distribution = {
             entity_type: {
                 "count": count,
-                "percentage": (count / total_entities * 100) if total_entities > 0 else 0
+                "percentage": (count / total_entities * 100)
+                if total_entities > 0
+                else 0,
             }
             for entity_type, count in type_counts.items()
         }
 
         # Sort by count (descending)
-        sorted_types = sorted(type_distribution.items(),
-                            key=lambda x: x[1]["count"], reverse=True)
+        sorted_types = sorted(
+            type_distribution.items(), key=lambda x: x[1]["count"], reverse=True
+        )
 
         return {
             "total_entities": total_entities,
             "unique_types": unique_types,
             "type_distribution": dict(sorted_types),
             "most_common_type": sorted_types[0][0] if sorted_types else None,
-            "least_common_type": sorted_types[-1][0] if sorted_types else None
+            "least_common_type": sorted_types[-1][0] if sorted_types else None,
         }
 
     async def analyze_relation_types(self) -> Dict[str, Any]:
@@ -389,24 +407,29 @@ class GraphAnalytics:
         type_distribution = {
             relation_type: {
                 "count": count,
-                "percentage": (count / total_relations * 100) if total_relations > 0 else 0
+                "percentage": (count / total_relations * 100)
+                if total_relations > 0
+                else 0,
             }
             for relation_type, count in type_counts.items()
         }
 
         # Sort by count (descending)
-        sorted_types = sorted(type_distribution.items(),
-                            key=lambda x: x[1]["count"], reverse=True)
+        sorted_types = sorted(
+            type_distribution.items(), key=lambda x: x[1]["count"], reverse=True
+        )
 
         return {
             "total_relations": total_relations,
             "unique_types": unique_types,
             "type_distribution": dict(sorted_types),
             "most_common_type": sorted_types[0][0] if sorted_types else None,
-            "least_common_type": sorted_types[-1][0] if sorted_types else None
+            "least_common_type": sorted_types[-1][0] if sorted_types else None,
         }
 
-    async def calculate_graph_density(self, relation_types: Optional[List[str]] = None) -> float:
+    async def calculate_graph_density(
+        self, relation_types: Optional[List[str]] = None
+    ) -> float:
         """Calculate the density of the graph.
 
         Graph density is the ratio of existing edges to possible edges.
@@ -440,7 +463,9 @@ class GraphAnalytics:
 
         return min(density, 1.0)  # Cap at 1.0 in case of directed graph
 
-    async def find_entity_clusters(self, min_cluster_size: int = 3) -> List[Dict[str, Any]]:
+    async def find_entity_clusters(
+        self, min_cluster_size: int = 3
+    ) -> List[Dict[str, Any]]:
         """Find clusters of highly connected entities.
 
         Args:
@@ -486,7 +511,9 @@ class GraphAnalytics:
 
                 if len(cluster) >= min_cluster_size:
                     # Calculate cluster properties
-                    cluster_entities = [entity_map[eid] for eid in cluster if eid in entity_map]
+                    cluster_entities = [
+                        entity_map[eid] for eid in cluster if eid in entity_map
+                    ]
 
                     # Count internal edges
                     internal_edges = 0
@@ -498,19 +525,27 @@ class GraphAnalytics:
 
                     # Calculate cluster density
                     max_internal_edges = len(cluster) * (len(cluster) - 1) / 2
-                    cluster_density = internal_edges / max_internal_edges if max_internal_edges > 0 else 0
+                    cluster_density = (
+                        internal_edges / max_internal_edges
+                        if max_internal_edges > 0
+                        else 0
+                    )
 
                     # Analyze entity types in cluster
                     type_counts = Counter(entity.type for entity in cluster_entities)
 
-                    clusters.append({
-                        "entities": cluster_entities,
-                        "size": len(cluster),
-                        "internal_edges": internal_edges,
-                        "density": cluster_density,
-                        "entity_types": dict(type_counts),
-                        "dominant_type": type_counts.most_common(1)[0][0] if type_counts else None
-                    })
+                    clusters.append(
+                        {
+                            "entities": cluster_entities,
+                            "size": len(cluster),
+                            "internal_edges": internal_edges,
+                            "density": cluster_density,
+                            "entity_types": dict(type_counts),
+                            "dominant_type": type_counts.most_common(1)[0][0]
+                            if type_counts
+                            else None,
+                        }
+                    )
 
         # Sort clusters by size (descending)
         clusters.sort(key=lambda c: c["size"], reverse=True)
@@ -556,6 +591,7 @@ class GraphAnalytics:
 
         # Find connected components
         from .traversal import GraphTraversal
+
         traversal = GraphTraversal(self.storage)
         components = await traversal.find_connected_components()
 
@@ -563,19 +599,19 @@ class GraphAnalytics:
             "basic_metrics": {
                 "num_entities": num_entities,
                 "num_relations": num_relations,
-                "density": density
+                "density": density,
             },
             "degree_statistics": {
                 "average_degree": avg_degree,
                 "max_degree": max_degree,
                 "min_degree": min_degree,
-                "degree_distribution": dict(Counter(degrees))
+                "degree_distribution": dict(Counter(degrees)),
             },
             "connectivity": {
                 "num_components": len(components),
                 "largest_component_size": len(components[0]) if components else 0,
-                "is_connected": len(components) <= 1
+                "is_connected": len(components) <= 1,
             },
             "entity_analysis": entity_type_analysis,
-            "relation_analysis": relation_type_analysis
+            "relation_analysis": relation_type_analysis,
         }

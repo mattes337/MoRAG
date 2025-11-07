@@ -1,21 +1,23 @@
 """File upload handling utilities for MoRAG system."""
 
+import asyncio
+import mimetypes
 import tempfile
 import time
 import uuid
-import asyncio
-import aiofiles
-import mimetypes
 from pathlib import Path
-from typing import Optional, List, Dict, Any, Set
+from typing import Any, Dict, List, Optional, Set
+
+import aiofiles
 import structlog
-from fastapi import UploadFile, HTTPException
+from fastapi import HTTPException, UploadFile
 
 logger = structlog.get_logger(__name__)
 
 
 class FileUploadError(Exception):
     """Exception raised for file upload errors."""
+
     pass
 
 
@@ -28,42 +30,81 @@ class FileUploadConfig:
         allowed_extensions: Optional[Set[str]] = None,
         temp_dir_prefix: str = "morag_uploads_",
         cleanup_timeout: int = 3600,  # 1 hour
-        allowed_mime_types: Optional[Set[str]] = None
+        allowed_mime_types: Optional[Set[str]] = None,
     ):
         self.max_file_size = max_file_size
         self.allowed_extensions = allowed_extensions or {
-            '.pdf', '.txt', '.docx', '.doc', '.pptx', '.ppt', '.xlsx', '.xls',
-            '.mp3', '.wav', '.m4a', '.flac', '.ogg',
-            '.mp4', '.avi', '.mov', '.mkv', '.webm',
-            '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp',
-            '.html', '.htm', '.md', '.rtf'
+            ".pdf",
+            ".txt",
+            ".docx",
+            ".doc",
+            ".pptx",
+            ".ppt",
+            ".xlsx",
+            ".xls",
+            ".mp3",
+            ".wav",
+            ".m4a",
+            ".flac",
+            ".ogg",
+            ".mp4",
+            ".avi",
+            ".mov",
+            ".mkv",
+            ".webm",
+            ".jpg",
+            ".jpeg",
+            ".png",
+            ".gif",
+            ".bmp",
+            ".tiff",
+            ".webp",
+            ".html",
+            ".htm",
+            ".md",
+            ".rtf",
         }
         # Extensions allowed for inter-stage communication (intermediate files)
-        self.intermediate_extensions = {'.json'}
+        self.intermediate_extensions = {".json"}
         self.temp_dir_prefix = temp_dir_prefix
         self.cleanup_timeout = cleanup_timeout
         self.allowed_mime_types = allowed_mime_types or {
             # Documents
-            'application/pdf', 'text/plain', 'text/markdown',
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            'application/msword',
-            'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-            'application/vnd.ms-powerpoint',
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'application/vnd.ms-excel',
+            "application/pdf",
+            "text/plain",
+            "text/markdown",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            "application/vnd.ms-powerpoint",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "application/vnd.ms-excel",
             # Audio
-            'audio/mpeg', 'audio/wav', 'audio/mp4', 'audio/flac', 'audio/ogg',
+            "audio/mpeg",
+            "audio/wav",
+            "audio/mp4",
+            "audio/flac",
+            "audio/ogg",
             # Video
-            'video/mp4', 'video/avi', 'video/quicktime', 'video/x-msvideo',
-            'video/x-matroska', 'video/webm',
+            "video/mp4",
+            "video/avi",
+            "video/quicktime",
+            "video/x-msvideo",
+            "video/x-matroska",
+            "video/webm",
             # Images
-            'image/jpeg', 'image/png', 'image/gif', 'image/bmp',
-            'image/tiff', 'image/webp',
+            "image/jpeg",
+            "image/png",
+            "image/gif",
+            "image/bmp",
+            "image/tiff",
+            "image/webp",
             # Web
-            'text/html', 'application/rtf'
+            "text/html",
+            "application/rtf",
         }
         # MIME types allowed for inter-stage communication
-        self.intermediate_mime_types = {'application/json'}
+        self.intermediate_mime_types = {"application/json"}
 
 
 class FileUploadHandler:
@@ -80,31 +121,46 @@ class FileUploadHandler:
             # First try /app/temp (Docker shared volume) - REQUIRED for container deployments
             app_temp_dir = Path("/app/temp")
             if app_temp_dir.exists() or self._try_create_dir(app_temp_dir):
-                self.temp_dir = app_temp_dir / f"{self.config.temp_dir_prefix}{uuid.uuid4().hex[:8]}"
+                self.temp_dir = (
+                    app_temp_dir
+                    / f"{self.config.temp_dir_prefix}{uuid.uuid4().hex[:8]}"
+                )
                 self.temp_dir.mkdir(parents=True, exist_ok=True)
-                logger.info("Using shared Docker temp directory", temp_dir=str(self.temp_dir))
+                logger.info(
+                    "Using shared Docker temp directory", temp_dir=str(self.temp_dir)
+                )
                 temp_dir_created = True
             else:
                 # Try ./temp directory (local development)
                 local_temp_dir = Path("./temp")
                 if local_temp_dir.exists() or self._try_create_dir(local_temp_dir):
-                    self.temp_dir = local_temp_dir / f"{self.config.temp_dir_prefix}{uuid.uuid4().hex[:8]}"
+                    self.temp_dir = (
+                        local_temp_dir
+                        / f"{self.config.temp_dir_prefix}{uuid.uuid4().hex[:8]}"
+                    )
                     self.temp_dir.mkdir(parents=True, exist_ok=True)
-                    logger.info("Using local temp directory", temp_dir=str(self.temp_dir))
+                    logger.info(
+                        "Using local temp directory", temp_dir=str(self.temp_dir)
+                    )
                     temp_dir_created = True
                 else:
                     # CRITICAL: System temp directory will NOT work in container environments
                     # because workers won't have access to the same files
-                    self.temp_dir = Path(tempfile.mkdtemp(prefix=self.config.temp_dir_prefix))
-                    logger.error("CRITICAL: Using system temp directory - files will NOT be shared between containers!",
-                               temp_dir=str(self.temp_dir),
-                               warning="This will cause file access errors in worker processes")
+                    self.temp_dir = Path(
+                        tempfile.mkdtemp(prefix=self.config.temp_dir_prefix)
+                    )
+                    logger.error(
+                        "CRITICAL: Using system temp directory - files will NOT be shared between containers!",
+                        temp_dir=str(self.temp_dir),
+                        warning="This will cause file access errors in worker processes",
+                    )
                     temp_dir_created = True
 
         except Exception as e:
-            logger.error("CRITICAL: Failed to create any temp directory",
-                        error=str(e))
-            raise RuntimeError(f"Cannot create temporary directory for file uploads: {str(e)}")
+            logger.error("CRITICAL: Failed to create any temp directory", error=str(e))
+            raise RuntimeError(
+                f"Cannot create temporary directory for file uploads: {str(e)}"
+            )
 
         if not temp_dir_created:
             raise RuntimeError("Failed to create any usable temporary directory")
@@ -115,9 +171,11 @@ class FileUploadHandler:
         marker_file = self.temp_dir / ".morag_upload_handler_active"
         marker_file.write_text(f"Created at {time.time()}")
 
-        logger.info("FileUploadHandler initialized",
-                   temp_dir=str(self.temp_dir),
-                   max_file_size=self.config.max_file_size)
+        logger.info(
+            "FileUploadHandler initialized",
+            temp_dir=str(self.temp_dir),
+            max_file_size=self.config.max_file_size,
+        )
 
     def _try_create_dir(self, dir_path: Path) -> bool:
         """Try to create a directory and return True if successful.
@@ -136,11 +194,16 @@ class FileUploadHandler:
             test_file.unlink()
             return dir_path.exists() and dir_path.is_dir()
         except Exception as e:
-            logger.debug("Failed to create directory or test write permissions",
-                        dir_path=str(dir_path), error=str(e))
+            logger.debug(
+                "Failed to create directory or test write permissions",
+                dir_path=str(dir_path),
+                error=str(e),
+            )
             return False
 
-    async def save_upload(self, file: UploadFile, allow_intermediate: bool = False) -> Path:
+    async def save_upload(
+        self, file: UploadFile, allow_intermediate: bool = False
+    ) -> Path:
         """Save uploaded file to temporary location with validation.
 
         Args:
@@ -165,12 +228,14 @@ class FileUploadHandler:
             self.temp_dir.mkdir(parents=True, exist_ok=True)
 
             # Save file asynchronously
-            logger.info("Saving uploaded file",
-                       filename=file.filename,
-                       temp_path=str(temp_path),
-                       content_type=file.content_type)
+            logger.info(
+                "Saving uploaded file",
+                filename=file.filename,
+                temp_path=str(temp_path),
+                content_type=file.content_type,
+            )
 
-            async with aiofiles.open(temp_path, 'wb') as f:
+            async with aiofiles.open(temp_path, "wb") as f:
                 # Read file in chunks to handle large files efficiently
                 chunk_size = 8192  # 8KB chunks
                 total_size = 0
@@ -195,22 +260,28 @@ class FileUploadHandler:
             # NOTE: No longer scheduling individual file cleanup to prevent race conditions
             # Files will be cleaned up by periodic cleanup process based on age and disk space
 
-            logger.info("File uploaded successfully",
-                       filename=file.filename,
-                       temp_path=str(temp_path),
-                       file_size=total_size)
+            logger.info(
+                "File uploaded successfully",
+                filename=file.filename,
+                temp_path=str(temp_path),
+                file_size=total_size,
+            )
 
             return temp_path
 
         except Exception as e:
-            logger.error("File upload failed",
-                        filename=getattr(file, 'filename', 'unknown'),
-                        error=str(e))
+            logger.error(
+                "File upload failed",
+                filename=getattr(file, "filename", "unknown"),
+                error=str(e),
+            )
             if isinstance(e, FileUploadError):
                 raise
             raise FileUploadError(f"File upload failed: {str(e)}") from e
 
-    async def _validate_file(self, file: UploadFile, allow_intermediate: bool = False) -> None:
+    async def _validate_file(
+        self, file: UploadFile, allow_intermediate: bool = False
+    ) -> None:
         """Validate uploaded file.
 
         Args:
@@ -233,7 +304,9 @@ class FileUploadHandler:
         file_ext = Path(sanitized_filename).suffix.lower()
         allowed_extensions = self.config.allowed_extensions
         if allow_intermediate:
-            allowed_extensions = allowed_extensions | self.config.intermediate_extensions
+            allowed_extensions = (
+                allowed_extensions | self.config.intermediate_extensions
+            )
 
         if file_ext not in allowed_extensions:
             raise FileUploadError(
@@ -245,7 +318,9 @@ class FileUploadHandler:
         if file.content_type:
             allowed_mime_types = self.config.allowed_mime_types
             if allow_intermediate:
-                allowed_mime_types = allowed_mime_types | self.config.intermediate_mime_types
+                allowed_mime_types = (
+                    allowed_mime_types | self.config.intermediate_mime_types
+                )
 
             if file.content_type not in allowed_mime_types:
                 # Try to guess MIME type from filename
@@ -256,7 +331,7 @@ class FileUploadHandler:
                     )
 
         # Check file size (initial check)
-        if hasattr(file, 'size') and file.size:
+        if hasattr(file, "size") and file.size:
             if file.size > self.config.max_file_size:
                 raise FileUploadError(
                     f"File size {file.size} exceeds maximum allowed size of "
@@ -281,10 +356,10 @@ class FileUploadHandler:
         # Remove or replace dangerous characters
         dangerous_chars = '<>:"/\\|?*'
         for char in dangerous_chars:
-            filename = filename.replace(char, '_')
+            filename = filename.replace(char, "_")
 
         # Remove leading/trailing dots and spaces
-        filename = filename.strip('. ')
+        filename = filename.strip(". ")
 
         # Ensure filename is not empty and not too long
         if not filename:
@@ -314,7 +389,9 @@ class FileUploadHandler:
         unique_id = str(uuid.uuid4())[:8]
         return f"{unique_id}_{sanitized}"
 
-    def cleanup_old_files(self, max_age_hours: int = 24, max_disk_usage_mb: int = 10000) -> int:
+    def cleanup_old_files(
+        self, max_age_hours: int = 24, max_disk_usage_mb: int = 10000
+    ) -> int:
         """Clean up old temporary files based on age and disk usage.
 
         Args:
@@ -339,24 +416,30 @@ class FileUploadHandler:
             total_size_mb = 0
 
             for file_path in self.temp_dir.glob("*"):
-                if file_path.is_file() and not file_path.name.startswith('.'):
+                if file_path.is_file() and not file_path.name.startswith("."):
                     try:
                         file_age = current_time - file_path.stat().st_mtime
                         file_size = file_path.stat().st_size
                         files_with_ages.append((file_path, file_age, file_size))
                         total_size_mb += file_size / (1024 * 1024)
                     except Exception as e:
-                        logger.warning("Failed to get file stats", file_path=str(file_path), error=str(e))
+                        logger.warning(
+                            "Failed to get file stats",
+                            file_path=str(file_path),
+                            error=str(e),
+                        )
 
             # Sort by age (oldest first)
             files_with_ages.sort(key=lambda x: x[1], reverse=True)
 
-            logger.debug("Cleanup scan results",
-                        temp_dir=str(self.temp_dir),
-                        total_files=len(files_with_ages),
-                        total_size_mb=round(total_size_mb, 2),
-                        max_age_hours=max_age_hours,
-                        max_disk_usage_mb=max_disk_usage_mb)
+            logger.debug(
+                "Cleanup scan results",
+                temp_dir=str(self.temp_dir),
+                total_files=len(files_with_ages),
+                total_size_mb=round(total_size_mb, 2),
+                max_age_hours=max_age_hours,
+                max_disk_usage_mb=max_disk_usage_mb,
+            )
 
             # Clean up files based on age and disk usage
             for file_path, file_age, file_size in files_with_ages:
@@ -378,25 +461,33 @@ class FileUploadHandler:
                     try:
                         file_path.unlink()
                         deleted_count += 1
-                        logger.debug("Cleaned up temporary file",
-                                   file_path=str(file_path),
-                                   reason=reason,
-                                   age_hours=round(file_age/3600, 1))
+                        logger.debug(
+                            "Cleaned up temporary file",
+                            file_path=str(file_path),
+                            reason=reason,
+                            age_hours=round(file_age / 3600, 1),
+                        )
                     except Exception as e:
-                        logger.warning("Failed to delete temporary file",
-                                     file_path=str(file_path),
-                                     error=str(e))
+                        logger.warning(
+                            "Failed to delete temporary file",
+                            file_path=str(file_path),
+                            error=str(e),
+                        )
 
             if deleted_count > 0:
-                logger.info("Temporary file cleanup completed",
-                           temp_dir=str(self.temp_dir),
-                           files_deleted=deleted_count,
-                           remaining_files=len(files_with_ages) - deleted_count)
+                logger.info(
+                    "Temporary file cleanup completed",
+                    temp_dir=str(self.temp_dir),
+                    files_deleted=deleted_count,
+                    remaining_files=len(files_with_ages) - deleted_count,
+                )
 
         except Exception as e:
-            logger.error("Error during temporary file cleanup",
-                        temp_dir=str(self.temp_dir),
-                        error=str(e))
+            logger.error(
+                "Error during temporary file cleanup",
+                temp_dir=str(self.temp_dir),
+                error=str(e),
+            )
 
         return deleted_count
 
@@ -405,11 +496,17 @@ class FileUploadHandler:
         try:
             if self.temp_dir.exists():
                 import shutil
+
                 shutil.rmtree(self.temp_dir, ignore_errors=True)
-                logger.info("Cleaned up temporary directory", temp_dir=str(self.temp_dir))
+                logger.info(
+                    "Cleaned up temporary directory", temp_dir=str(self.temp_dir)
+                )
         except Exception as e:
-            logger.warning("Failed to clean up temporary directory",
-                         temp_dir=str(self.temp_dir), error=str(e))
+            logger.warning(
+                "Failed to clean up temporary directory",
+                temp_dir=str(self.temp_dir),
+                error=str(e),
+            )
 
     def __del__(self):
         """Cleanup on object destruction."""
@@ -419,9 +516,13 @@ class FileUploadHandler:
 
         # Log when handler is being garbage collected for debugging
         try:
-            logger.warning("FileUploadHandler being garbage collected",
-                         temp_dir=str(self.temp_dir) if hasattr(self, 'temp_dir') else 'unknown',
-                         temp_dir_exists=self.temp_dir.exists() if hasattr(self, 'temp_dir') else False)
+            logger.warning(
+                "FileUploadHandler being garbage collected",
+                temp_dir=str(self.temp_dir) if hasattr(self, "temp_dir") else "unknown",
+                temp_dir_exists=self.temp_dir.exists()
+                if hasattr(self, "temp_dir")
+                else False,
+            )
         except Exception:
             # Ignore any errors during destruction
             pass
@@ -440,36 +541,45 @@ def get_upload_handler() -> FileUploadHandler:
         # Get configuration from MoRAG settings
         try:
             from morag_core.config import get_settings
+
             settings = get_settings()
             max_upload_size = settings.get_max_upload_size_bytes()
 
             config = FileUploadConfig(max_file_size=max_upload_size)
             _upload_handler = FileUploadHandler(config)
 
-            logger.info("FileUploadHandler configured from settings",
-                       max_upload_size_mb=max_upload_size / (1024 * 1024),
-                       max_upload_size_bytes=max_upload_size)
+            logger.info(
+                "FileUploadHandler configured from settings",
+                max_upload_size_mb=max_upload_size / (1024 * 1024),
+                max_upload_size_bytes=max_upload_size,
+            )
         except Exception as e:
-            logger.warning("Failed to load MoRAG settings, using default config",
-                         error=str(e))
+            logger.warning(
+                "Failed to load MoRAG settings, using default config", error=str(e)
+            )
             _upload_handler = FileUploadHandler()
     else:
         # Check if the handler's temp directory still exists
         if not _upload_handler.temp_dir.exists():
-            logger.warning("Global FileUploadHandler temp directory missing, creating new handler",
-                         old_temp_dir=str(_upload_handler.temp_dir))
+            logger.warning(
+                "Global FileUploadHandler temp directory missing, creating new handler",
+                old_temp_dir=str(_upload_handler.temp_dir),
+            )
 
             # Recreate with same configuration approach
             try:
                 from morag_core.config import get_settings
+
                 settings = get_settings()
                 max_upload_size = settings.get_max_upload_size_bytes()
 
                 config = FileUploadConfig(max_file_size=max_upload_size)
                 _upload_handler = FileUploadHandler(config)
             except Exception as e:
-                logger.warning("Failed to load MoRAG settings for new handler, using default config",
-                             error=str(e))
+                logger.warning(
+                    "Failed to load MoRAG settings for new handler, using default config",
+                    error=str(e),
+                )
                 _upload_handler = FileUploadHandler()
     return _upload_handler
 
@@ -482,9 +592,11 @@ def configure_upload_handler(config: FileUploadConfig) -> None:
     if _upload_handler is not None:
         old_temp_dir = str(_upload_handler.temp_dir)
 
-    logger.info("Configuring new FileUploadHandler",
-               old_temp_dir=old_temp_dir,
-               new_config=config.__dict__)
+    logger.info(
+        "Configuring new FileUploadHandler",
+        old_temp_dir=old_temp_dir,
+        new_config=config.__dict__,
+    )
 
     # NOTE: Don't cleanup existing temp directory to avoid race conditions
     # with background tasks that might still be processing files
@@ -521,13 +633,17 @@ def validate_temp_directory_access() -> bool:
             raise RuntimeError(f"Temp directory is not writable: {temp_dir} - {str(e)}")
 
         # Check if we're using system temp (which is problematic in containers)
-        if str(temp_dir).startswith('/tmp/'):
-            logger.warning("STARTUP WARNING: Using system temp directory - this may cause issues in container environments",
-                          temp_dir=str(temp_dir))
+        if str(temp_dir).startswith("/tmp/"):
+            logger.warning(
+                "STARTUP WARNING: Using system temp directory - this may cause issues in container environments",
+                temp_dir=str(temp_dir),
+            )
 
-        logger.info("Temp directory validation successful",
-                   temp_dir=str(temp_dir),
-                   is_shared_volume=str(temp_dir).startswith('/app/temp'))
+        logger.info(
+            "Temp directory validation successful",
+            temp_dir=str(temp_dir),
+            is_shared_volume=str(temp_dir).startswith("/app/temp"),
+        )
         return True
 
     except Exception as e:

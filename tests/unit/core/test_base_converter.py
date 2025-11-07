@@ -1,12 +1,12 @@
 """Unit tests for BaseConverter class."""
 
-import pytest
 from pathlib import Path
 
+import pytest
 from morag_core.converters.base import (
     BaseConverter,
+    ConversionQualityValidator,
     ConversionResult,
-    ConversionQualityValidator
 )
 from morag_core.exceptions import ProcessingError
 
@@ -15,10 +15,7 @@ class MockConverter(BaseConverter):
     """Mock converter for testing."""
 
     def get_supported_formats(self):
-        return {
-            "input": ["txt", "md"],
-            "output": ["html", "pdf"]
-        }
+        return {"input": ["txt", "md"], "output": ["html", "pdf"]}
 
     def convert(self, source_path, target_path, **kwargs):
         # Simple mock conversion
@@ -30,7 +27,7 @@ class MockConverter(BaseConverter):
                 success=False,
                 source_path=str(source_path),
                 error_message="Source file not found",
-                error_type="FileNotFoundError"
+                error_type="FileNotFoundError",
             )
 
         # Create target file
@@ -40,12 +37,12 @@ class MockConverter(BaseConverter):
             success=True,
             source_path=str(source_path),
             target_path=str(target_path),
-            source_format=source_path.suffix.lower().lstrip('.'),
-            target_format=target_path.suffix.lower().lstrip('.'),
+            source_format=source_path.suffix.lower().lstrip("."),
+            target_format=target_path.suffix.lower().lstrip("."),
             conversion_time=0.1,
             file_size_before=source_path.stat().st_size,
             file_size_after=target_path.stat().st_size,
-            quality_score=0.9
+            quality_score=0.9,
         )
 
 
@@ -70,7 +67,7 @@ class TestConversionResult:
             success=True,
             source_path="test.txt",
             target_path="test.html",
-            conversion_time=1.5
+            conversion_time=1.5,
         )
 
         result_dict = result.to_dict()
@@ -88,7 +85,7 @@ class TestConversionResult:
             success=False,
             source_path="test.txt",
             error_message="Conversion failed",
-            error_type="ProcessingError"
+            error_type="ProcessingError",
         )
 
         assert result.success is False
@@ -113,9 +110,7 @@ class TestConversionQualityValidator:
         """Test quality validation with good quality."""
         validator = ConversionQualityValidator(min_quality_score=0.8)
         result = ConversionResult(
-            success=True,
-            source_path="test.txt",
-            quality_score=0.9
+            success=True, source_path="test.txt", quality_score=0.9
         )
 
         assert validator.validate_quality(result) is True
@@ -132,12 +127,12 @@ class TestConversionQualityValidator:
         """Test quality validation with low quality score."""
         validator = ConversionQualityValidator(min_quality_score=0.8)
         result = ConversionResult(
-            success=True,
-            source_path="test.txt",
-            quality_score=0.5
+            success=True, source_path="test.txt", quality_score=0.5
         )
 
-        with pytest.raises(ProcessingError, match="Quality score 0.5 below threshold 0.8"):
+        with pytest.raises(
+            ProcessingError, match="Quality score 0.5 below threshold 0.8"
+        ):
             validator.validate_quality(result)
 
     def test_validate_quality_no_score(self):
@@ -301,12 +296,15 @@ class TestBaseConverter:
         assert result.error_type == "FileNotFoundError"
 
 
-@pytest.mark.parametrize("source_format,target_format,should_succeed", [
-    ("txt", "html", True),
-    ("md", "pdf", True),
-    ("docx", "html", False),  # Unsupported input
-    ("txt", "xml", False),    # Unsupported output
-])
+@pytest.mark.parametrize(
+    "source_format,target_format,should_succeed",
+    [
+        ("txt", "html", True),
+        ("md", "pdf", True),
+        ("docx", "html", False),  # Unsupported input
+        ("txt", "xml", False),  # Unsupported output
+    ],
+)
 def test_format_validation_parametrized(source_format, target_format, should_succeed):
     """Parametrized test for format validation."""
     converter = MockConverter()
@@ -322,6 +320,7 @@ def test_format_validation_parametrized(source_format, target_format, should_suc
 # STAGE PROCESSING EDGE CASES - Added for missing coverage
 # =============================================================================
 
+
 class MockFailingStage:
     """Mock stage that fails after processing N items."""
 
@@ -334,7 +333,7 @@ class MockFailingStage:
     def process_items(self, input_files):
         """Process items with controlled failure."""
         results = []
-        for i, file in enumerate(input_files[:self.total_items]):
+        for i, file in enumerate(input_files[: self.total_items]):
             if i >= self.fail_after_items:
                 raise ProcessingError(f"Simulated failure at item {i}")
             self.processed_files.append(file)
@@ -357,7 +356,9 @@ class MockMemoryLimitedStage:
         """Process large file with memory limit check."""
         required_mb = file_size_gb * 1024
         if required_mb > self.limit_mb:
-            raise MemoryError(f"Memory limit exceeded: {required_mb}MB > {self.limit_mb}MB")
+            raise MemoryError(
+                f"Memory limit exceeded: {required_mb}MB > {self.limit_mb}MB"
+            )
         return "processed"
 
     def cleanup(self):
@@ -382,7 +383,7 @@ class TestStageProcessingEdgeCases:
     def large_test_file(self, tmp_path):
         """Create a simulated large file (metadata only)."""
         large_file = tmp_path / "large_file.bin"
-        large_file.write_bytes(b'x' * 1024)  # Create 1KB file as placeholder
+        large_file.write_bytes(b"x" * 1024)  # Create 1KB file as placeholder
         # Store size metadata
         large_file.size_gb = 2.0  # Simulate 2GB size
         return large_file
@@ -397,7 +398,9 @@ class TestStageProcessingEdgeCases:
             failing_stage.process_items(input_files)
 
         # Verify partial results are preserved
-        assert len(failing_stage.processed_files) == 2, "Should process 2 files before failing"
+        assert (
+            len(failing_stage.processed_files) == 2
+        ), "Should process 2 files before failing"
         assert "Simulated failure at item 2" in str(exc_info.value)
 
         # Verify cleanup can be called
@@ -410,11 +413,15 @@ class TestStageProcessingEdgeCases:
         with pytest.raises(MemoryError) as exc_info:
             memory_limited_stage.process_large_file(large_test_file.size_gb)
 
-        assert "Memory limit exceeded" in str(exc_info.value), "Should indicate memory limit exceeded"
+        assert "Memory limit exceeded" in str(
+            exc_info.value
+        ), "Should indicate memory limit exceeded"
 
         # Verify cleanup is called even after memory error
         memory_limited_stage.cleanup()
-        assert memory_limited_stage.cleanup_called, "Resources should be cleaned up after memory error"
+        assert (
+            memory_limited_stage.cleanup_called
+        ), "Resources should be cleaned up after memory error"
 
     def test_stage_resource_cleanup_on_failure(self, failing_stage, tmp_path):
         """Test resource cleanup when stage fails."""
@@ -430,7 +437,9 @@ class TestStageProcessingEdgeCases:
 
         # Ensure cleanup is properly called
         failing_stage.cleanup()
-        assert failing_stage.cleanup_called, "Cleanup should be called after stage failure"
+        assert (
+            failing_stage.cleanup_called
+        ), "Cleanup should be called after stage failure"
 
     def test_partial_results_preservation(self, failing_stage):
         """Test that partial results are preserved during failure."""
@@ -448,6 +457,7 @@ class TestStageProcessingEdgeCases:
 
     def test_stage_retry_mechanism(self):
         """Test retry mechanisms for failed stages."""
+
         class RetryableStage:
             def __init__(self):
                 self.attempt_count = 0
@@ -492,7 +502,9 @@ class TestStageProcessingEdgeCases:
                 elapsed = time.time() - start_time
 
                 if elapsed > timeout:
-                    raise TimeoutError(f"Stage timed out after {elapsed:.3f}s > {timeout}s")
+                    raise TimeoutError(
+                        f"Stage timed out after {elapsed:.3f}s > {timeout}s"
+                    )
                 return "completed"
 
         slow_stage = SlowStage(processing_time=0.1)
@@ -519,7 +531,9 @@ class TestStageProcessingEdgeCases:
 
                 # Check for race condition
                 if self.counter != old_counter + 1:
-                    error = ProcessingError(f"Race condition detected: {self.counter} != {old_counter + 1}")
+                    error = ProcessingError(
+                        f"Race condition detected: {self.counter} != {old_counter + 1}"
+                    )
                     self.errors.append(error)
                     raise error
                 return self.counter
@@ -551,6 +565,7 @@ class TestStageProcessingEdgeCases:
 
     def test_stage_file_system_error_handling(self, tmp_path):
         """Test handling of file system errors during stage execution."""
+
         class FileSystemStage:
             def __init__(self, output_dir: Path):
                 self.output_dir = output_dir
@@ -582,6 +597,7 @@ class TestStageProcessingEdgeCases:
 
     def test_stage_intermediate_state_corruption(self, tmp_path):
         """Test handling of intermediate state corruption."""
+
         class StatefulStage:
             def __init__(self, state_file: Path):
                 self.state_file = state_file
@@ -590,14 +606,16 @@ class TestStageProcessingEdgeCases:
             def save_state(self):
                 """Save current state to file."""
                 import json
-                with open(self.state_file, 'w') as f:
+
+                with open(self.state_file, "w") as f:
                     json.dump(self.state, f)
 
             def load_state(self):
                 """Load state from file."""
                 import json
+
                 if self.state_file.exists():
-                    with open(self.state_file, 'r') as f:
+                    with open(self.state_file, "r") as f:
                         self.state = json.load(f)
 
             def execute_step(self, step_data: str, corrupt_state: bool = False):
@@ -632,6 +650,7 @@ class TestStageProcessingEdgeCases:
 
     def test_stage_dependency_chain_failure(self):
         """Test failure propagation in stage dependency chains."""
+
         class DependentStage:
             def __init__(self, name: str, dependencies: list = None):
                 self.name = name
@@ -683,6 +702,7 @@ class TestStageProcessingEdgeCases:
 
     def test_stage_resource_exhaustion_recovery(self, tmp_path):
         """Test recovery from resource exhaustion scenarios."""
+
         class ResourceExhaustionStage:
             def __init__(self, max_memory_mb: int = 100):
                 self.max_memory_mb = max_memory_mb
@@ -692,7 +712,9 @@ class TestStageProcessingEdgeCases:
             def allocate_resource(self, size_mb: int):
                 """Allocate a resource of given size."""
                 if self.allocated_memory + size_mb > self.max_memory_mb:
-                    raise MemoryError(f"Cannot allocate {size_mb}MB, limit is {self.max_memory_mb}MB")
+                    raise MemoryError(
+                        f"Cannot allocate {size_mb}MB, limit is {self.max_memory_mb}MB"
+                    )
 
                 self.allocated_memory += size_mb
                 resource_id = len(self.resources)

@@ -1,13 +1,14 @@
 """Base interfaces for tasks."""
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union
-from dataclasses import dataclass
 
 
 class TaskStatus(str, Enum):
     """Task status enum."""
+
     PENDING = "pending"
     STARTED = "started"
     PROCESSING = "processing"
@@ -19,6 +20,7 @@ class TaskStatus(str, Enum):
 @dataclass
 class TaskProgress:
     """Task progress information."""
+
     status: TaskStatus
     progress: float  # 0.0 to 1.0
     message: Optional[str] = None
@@ -29,6 +31,7 @@ class TaskProgress:
 @dataclass
 class TaskResult:
     """Task result information."""
+
     task_id: str
     status: TaskStatus
     result: Optional[Dict[str, Any]] = None
@@ -67,7 +70,9 @@ class BaseTask(ABC):
         pass
 
     @abstractmethod
-    async def update_progress(self, progress: float, message: Optional[str] = None) -> None:
+    async def update_progress(
+        self, progress: float, message: Optional[str] = None
+    ) -> None:
         """Update task progress.
 
         Args:
@@ -81,7 +86,9 @@ class TaskManager(ABC):
     """Interface for task management."""
 
     @abstractmethod
-    async def register_task(self, task_id: str, task_type: str, metadata: Optional[Dict[str, Any]] = None) -> None:
+    async def register_task(
+        self, task_id: str, task_type: str, metadata: Optional[Dict[str, Any]] = None
+    ) -> None:
         """Register a new task.
 
         Args:
@@ -92,7 +99,9 @@ class TaskManager(ABC):
         pass
 
     @abstractmethod
-    async def update_task_status(self, task_id: str, status: TaskStatus, message: Optional[str] = None) -> None:
+    async def update_task_status(
+        self, task_id: str, status: TaskStatus, message: Optional[str] = None
+    ) -> None:
         """Update task status.
 
         Args:
@@ -103,7 +112,9 @@ class TaskManager(ABC):
         pass
 
     @abstractmethod
-    async def update_task_progress(self, task_id: str, progress: float, message: Optional[str] = None) -> None:
+    async def update_task_progress(
+        self, task_id: str, progress: float, message: Optional[str] = None
+    ) -> None:
         """Update task progress.
 
         Args:
@@ -126,7 +137,9 @@ class TaskManager(ABC):
         pass
 
     @abstractmethod
-    async def complete_task(self, task_id: str, result: Optional[Dict[str, Any]] = None) -> None:
+    async def complete_task(
+        self, task_id: str, result: Optional[Dict[str, Any]] = None
+    ) -> None:
         """Mark task as completed.
 
         Args:

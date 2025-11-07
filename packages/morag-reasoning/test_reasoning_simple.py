@@ -16,7 +16,7 @@ import asyncio
 import os
 import sys
 from pathlib import Path
-from typing import Dict, List, Any
+from typing import Any, Dict, List
 
 from dotenv import load_dotenv
 
@@ -27,11 +27,16 @@ load_dotenv()
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 try:
-    from morag_reasoning import (
-        LLMClient, LLMConfig, PathSelectionAgent, ReasoningPathFinder,
-        IterativeRetriever, RetrievalContext, PathRelevanceScore
-    )
     from morag_graph.operations import GraphPath
+    from morag_reasoning import (
+        IterativeRetriever,
+        LLMClient,
+        LLMConfig,
+        PathRelevanceScore,
+        PathSelectionAgent,
+        ReasoningPathFinder,
+        RetrievalContext,
+    )
 except ImportError as e:
     print(f"❌ Import error: {e}")
     print("💡 Make sure you're running from the morag-reasoning package directory")
@@ -54,32 +59,46 @@ def create_sample_paths() -> List[GraphPath]:
     innovation = Entity(name="innovation", type="CONCEPT")
 
     # Create sample relations using string types
-    founded_rel = Relation(source_entity_id=steve.id, target_entity_id=apple.id, type="FOUNDED")
-    created_rel = Relation(source_entity_id=steve.id, target_entity_id=iphone.id, type="CREATED_BY")
-    conducts_rel = Relation(source_entity_id=apple.id, target_entity_id=ai_research.id, type="USES")
-    partners_rel = Relation(source_entity_id=apple.id, target_entity_id=stanford.id, type="WORKS_WITH")
-    led_rel = Relation(source_entity_id=steve.id, target_entity_id=product_dev.id, type="LEADS")
-    resulted_rel = Relation(source_entity_id=product_dev.id, target_entity_id=iphone.id, type="CREATED_BY")
-    influences_rel = Relation(source_entity_id=ai_research.id, target_entity_id=product_dev.id, type="AFFECTS")
-    drives_rel = Relation(source_entity_id=product_dev.id, target_entity_id=innovation.id, type="ENABLES")
+    founded_rel = Relation(
+        source_entity_id=steve.id, target_entity_id=apple.id, type="FOUNDED"
+    )
+    created_rel = Relation(
+        source_entity_id=steve.id, target_entity_id=iphone.id, type="CREATED_BY"
+    )
+    conducts_rel = Relation(
+        source_entity_id=apple.id, target_entity_id=ai_research.id, type="USES"
+    )
+    partners_rel = Relation(
+        source_entity_id=apple.id, target_entity_id=stanford.id, type="WORKS_WITH"
+    )
+    led_rel = Relation(
+        source_entity_id=steve.id, target_entity_id=product_dev.id, type="LEADS"
+    )
+    resulted_rel = Relation(
+        source_entity_id=product_dev.id, target_entity_id=iphone.id, type="CREATED_BY"
+    )
+    influences_rel = Relation(
+        source_entity_id=ai_research.id, target_entity_id=product_dev.id, type="AFFECTS"
+    )
+    drives_rel = Relation(
+        source_entity_id=product_dev.id, target_entity_id=innovation.id, type="ENABLES"
+    )
 
     return [
         GraphPath(
-            entities=[apple, steve, iphone],
-            relations=[founded_rel, created_rel]
+            entities=[apple, steve, iphone], relations=[founded_rel, created_rel]
         ),
         GraphPath(
             entities=[apple, ai_research, stanford],
-            relations=[conducts_rel, partners_rel]
+            relations=[conducts_rel, partners_rel],
         ),
         GraphPath(
-            entities=[steve, product_dev, iphone],
-            relations=[led_rel, resulted_rel]
+            entities=[steve, product_dev, iphone], relations=[led_rel, resulted_rel]
         ),
         GraphPath(
             entities=[ai_research, product_dev, innovation],
-            relations=[influences_rel, drives_rel]
-        )
+            relations=[influences_rel, drives_rel],
+        ),
     ]
 
 
@@ -91,10 +110,11 @@ async def test_path_selection(verbose: bool = False) -> bool:
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
         print("⚠️  No GEMINI_API_KEY found. Using mock LLM responses.")
+
         # Create a mock LLM client
         class MockLLMClient:
             async def generate(self, prompt: str, **kwargs):
-                return '''
+                return """
                 {
                   "selected_paths": [
                     {
@@ -111,7 +131,8 @@ async def test_path_selection(verbose: bool = False) -> bool:
                     }
                   ]
                 }
-                '''
+                """
+
         llm_client = MockLLMClient()
     else:
         # Create real LLM client
@@ -120,7 +141,7 @@ async def test_path_selection(verbose: bool = False) -> bool:
             api_key=api_key,
             model="gemini-1.5-flash",
             temperature=0.1,
-            max_tokens=1000
+            max_tokens=1000,
         )
         llm_client = LLMClient(llm_config)
 
@@ -138,12 +159,16 @@ async def test_path_selection(verbose: bool = False) -> bool:
 
         # Test path selection
         query = "How are Apple's founding and product development connected through key people?"
-        selected_paths = await agent.select_paths(query, sample_paths, strategy="forward_chaining")
+        selected_paths = await agent.select_paths(
+            query, sample_paths, strategy="forward_chaining"
+        )
 
         if verbose:
             print(f"   ✅ Selected {len(selected_paths)} paths:")
             for i, path_score in enumerate(selected_paths):
-                print(f"      {i+1}. Score: {path_score.relevance_score:.2f}, Confidence: {path_score.confidence:.2f}")
+                print(
+                    f"      {i+1}. Score: {path_score.relevance_score:.2f}, Confidence: {path_score.confidence:.2f}"
+                )
                 print(f"         Reasoning: {path_score.reasoning}")
                 print(f"         Path: {' -> '.join(path_score.path.entities)}")
         else:
@@ -151,8 +176,12 @@ async def test_path_selection(verbose: bool = False) -> bool:
 
         # Verify results
         assert len(selected_paths) > 0, "No paths were selected"
-        assert all(isinstance(ps, PathRelevanceScore) for ps in selected_paths), "Invalid path score objects"
-        assert all(ps.relevance_score >= 0 for ps in selected_paths), "Invalid relevance scores"
+        assert all(
+            isinstance(ps, PathRelevanceScore) for ps in selected_paths
+        ), "Invalid path score objects"
+        assert all(
+            ps.relevance_score >= 0 for ps in selected_paths
+        ), "Invalid relevance scores"
 
         print("   ✅ Path selection test passed!")
         return True
@@ -170,10 +199,11 @@ async def test_iterative_retrieval(verbose: bool = False) -> bool:
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
         print("⚠️  No GEMINI_API_KEY found. Using mock LLM responses.")
+
         # Create a mock LLM client
         class MockLLMClient:
             async def generate(self, prompt: str, **kwargs):
-                return '''
+                return """
                 {
                   "is_sufficient": true,
                   "confidence": 8.5,
@@ -181,7 +211,8 @@ async def test_iterative_retrieval(verbose: bool = False) -> bool:
                   "gaps": [],
                   "suggested_queries": []
                 }
-                '''
+                """
+
         llm_client = MockLLMClient()
     else:
         # Create real LLM client
@@ -190,7 +221,7 @@ async def test_iterative_retrieval(verbose: bool = False) -> bool:
             api_key=api_key,
             model="gemini-1.5-flash",
             temperature=0.1,
-            max_tokens=800
+            max_tokens=800,
         )
         llm_client = LLMClient(llm_config)
 
@@ -200,7 +231,9 @@ async def test_iterative_retrieval(verbose: bool = False) -> bool:
             return {"type": "ORG", "description": f"Details about {entity_name}"}
 
         async def get_relations_by_type(self, relation_type: str):
-            return [{"subject": "Apple", "predicate": relation_type, "object": "iPhone"}]
+            return [
+                {"subject": "Apple", "predicate": relation_type, "object": "iPhone"}
+            ]
 
     class MockVectorRetriever:
         async def search(self, query: str, limit: int = 10):
@@ -213,37 +246,52 @@ async def test_iterative_retrieval(verbose: bool = False) -> bool:
             graph_engine=MockGraphEngine(),
             vector_retriever=MockVectorRetriever(),
             max_iterations=3,
-            sufficiency_threshold=0.8
+            sufficiency_threshold=0.8,
         )
 
         # Create initial context
         initial_context = RetrievalContext(
             entities={"Apple Inc.": {"type": "ORG"}, "iPhone": {"type": "PRODUCT"}},
-            documents=[{"id": "doc1", "content": "Apple Inc. is a technology company that develops the iPhone."}]
+            documents=[
+                {
+                    "id": "doc1",
+                    "content": "Apple Inc. is a technology company that develops the iPhone.",
+                }
+            ],
         )
 
         if verbose:
-            print(f"   📊 Initial context: {len(initial_context.entities)} entities, {len(initial_context.documents)} documents")
+            print(
+                f"   📊 Initial context: {len(initial_context.entities)} entities, {len(initial_context.documents)} documents"
+            )
 
         # Test context refinement
         query = "What products does Apple develop?"
         refined_context = await retriever.refine_context(query, initial_context)
 
         if verbose:
-            print(f"   ✅ Refined context: {len(refined_context.entities)} entities, {len(refined_context.documents)} documents")
-            print(f"      Iterations used: {refined_context.metadata.get('iterations_used', 0)}")
+            print(
+                f"   ✅ Refined context: {len(refined_context.entities)} entities, {len(refined_context.documents)} documents"
+            )
+            print(
+                f"      Iterations used: {refined_context.metadata.get('iterations_used', 0)}"
+            )
 
-            final_analysis = refined_context.metadata.get('final_analysis')
+            final_analysis = refined_context.metadata.get("final_analysis")
             if final_analysis:
                 print(f"      Final confidence: {final_analysis.confidence:.2f}")
                 print(f"      Context sufficient: {final_analysis.is_sufficient}")
         else:
-            print(f"   ✅ Context refined in {refined_context.metadata.get('iterations_used', 0)} iterations")
+            print(
+                f"   ✅ Context refined in {refined_context.metadata.get('iterations_used', 0)} iterations"
+            )
 
         # Verify results
-        assert len(refined_context.entities) >= len(initial_context.entities), "Context should not lose entities"
-        assert 'final_analysis' in refined_context.metadata, "Missing final analysis"
-        assert 'iterations_used' in refined_context.metadata, "Missing iteration count"
+        assert len(refined_context.entities) >= len(
+            initial_context.entities
+        ), "Context should not lose entities"
+        assert "final_analysis" in refined_context.metadata, "Missing final analysis"
+        assert "iterations_used" in refined_context.metadata, "Missing iteration count"
 
         print("   ✅ Iterative retrieval test passed!")
         return True
@@ -270,7 +318,7 @@ async def test_integration(verbose: bool = False) -> bool:
             api_key=api_key,
             model="gemini-1.5-flash",
             temperature=0.1,
-            max_tokens=1000
+            max_tokens=1000,
         )
         llm_client = LLMClient(llm_config)
 
@@ -282,7 +330,9 @@ async def test_integration(verbose: bool = False) -> bool:
         # Create mock vector retriever
         class MockVectorRetriever:
             async def search(self, query: str, limit: int = 10):
-                return [{"id": "doc1", "content": f"Document about {query}", "score": 0.9}]
+                return [
+                    {"id": "doc1", "content": f"Document about {query}", "score": 0.9}
+                ]
 
         # Initialize all components
         path_selector = PathSelectionAgent(llm_client, max_paths=5)
@@ -309,15 +359,23 @@ async def test_integration(verbose: bool = False) -> bool:
 
         # Step 2: Create initial context and refine
         initial_context = RetrievalContext(
-            entities={entity: {"type": "UNKNOWN"} for path in reasoning_paths[:2] for entity in path.path.entities},
-            paths=[path_score.path for path_score in reasoning_paths[:3]]
+            entities={
+                entity: {"type": "UNKNOWN"}
+                for path in reasoning_paths[:2]
+                for entity in path.path.entities
+            },
+            paths=[path_score.path for path_score in reasoning_paths[:3]],
         )
 
-        refined_context = await iterative_retriever.refine_context(query, initial_context)
+        refined_context = await iterative_retriever.refine_context(
+            query, initial_context
+        )
 
         if verbose:
             print(f"   🔄 Context refined: {len(refined_context.entities)} entities")
-            print(f"      Iterations: {refined_context.metadata.get('iterations_used', 0)}")
+            print(
+                f"      Iterations: {refined_context.metadata.get('iterations_used', 0)}"
+            )
 
         # Verify integration
         assert len(reasoning_paths) > 0, "No reasoning paths found"
@@ -341,20 +399,18 @@ async def main():
   python test_reasoning_simple.py --verbose                 # Run with detailed output
   python test_reasoning_simple.py --component path_selection # Test only path selection
   python test_reasoning_simple.py --component iterative_retrieval # Test only iterative retrieval
-"""
+""",
     )
 
     parser.add_argument(
         "--component",
         type=str,
         choices=["path_selection", "iterative_retrieval", "integration"],
-        help="Test specific component only"
+        help="Test specific component only",
     )
 
     parser.add_argument(
-        "--verbose",
-        action="store_true",
-        help="Show detailed test output"
+        "--verbose", action="store_true", help="Show detailed test output"
     )
 
     args = parser.parse_args()

@@ -1,50 +1,73 @@
 """Qdrant storage backend for graph data."""
 
 import logging
-from typing import Dict, List, Optional, Any, Set, TYPE_CHECKING
 import uuid
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
 
 if TYPE_CHECKING:
     from qdrant_client import AsyncQdrantClient
     from qdrant_client.models import (
-        Distance, VectorParams, CreateCollection, PointStruct,
-        Filter, FieldCondition, MatchValue, SearchRequest
+        CreateCollection,
+        Distance,
+        FieldCondition,
+        Filter,
+        MatchValue,
+        PointStruct,
+        SearchRequest,
+        VectorParams,
     )
 
 try:
     from qdrant_client import AsyncQdrantClient
     from qdrant_client.models import (
-        Distance, VectorParams, CreateCollection, PointStruct,
-        Filter, FieldCondition, MatchValue, SearchRequest
+        CreateCollection,
+        Distance,
+        FieldCondition,
+        Filter,
+        MatchValue,
+        PointStruct,
+        SearchRequest,
+        VectorParams,
     )
+
     QDRANT_AVAILABLE = True
 except ImportError:
     QDRANT_AVAILABLE = False
+
     # Create placeholder classes for runtime
     class AsyncQdrantClient:  # type: ignore
         pass
+
     class Distance:  # type: ignore
         pass
+
     class VectorParams:  # type: ignore
         pass
+
     class CreateCollection:  # type: ignore
         pass
+
     class PointStruct:  # type: ignore
         pass
+
     class Filter:  # type: ignore
         pass
+
     class FieldCondition:  # type: ignore
         pass
+
     class MatchValue:  # type: ignore
         pass
+
     class SearchRequest:  # type: ignore
         pass
 
+
 from pydantic import BaseModel
 
-from ..models import Entity, Relation, Graph
+from ..models import Entity, Graph, Relation
 from ..models.types import EntityId, RelationId
-from ..utils.id_generation import UnifiedIDGenerator, IDValidator
+from ..utils.id_generation import IDValidator, UnifiedIDGenerator
 from .base import BaseStorage
 
 logger = logging.getLogger(__name__)
@@ -63,14 +86,19 @@ class QdrantConfig(BaseModel):
     timeout: Optional[float] = None
     collection_name: str = "morag_entities"
     vector_size: int = 384  # Default embedding size
-    verify_ssl: Optional[bool] = None  # Whether to verify SSL certificates (None = use environment)
+    verify_ssl: Optional[
+        bool
+    ] = None  # Whether to verify SSL certificates (None = use environment)
 
     def __init__(self, **data):
         """Initialize with environment variable defaults."""
         import os
+
         # Set verify_ssl from environment if not explicitly provided
-        if 'verify_ssl' not in data or data['verify_ssl'] is None:
-            data['verify_ssl'] = os.getenv('QDRANT_VERIFY_SSL', 'true').lower() == 'true'
+        if "verify_ssl" not in data or data["verify_ssl"] is None:
+            data["verify_ssl"] = (
+                os.getenv("QDRANT_VERIFY_SSL", "true").lower() == "true"
+            )
         super().__init__(**data)
 
 
@@ -97,16 +125,21 @@ class QdrantStorage(BaseStorage):
         """Connect to Qdrant database."""
         try:
             # Check if host is a URL (starts with http:// or https://)
-            if self.config.host.startswith(('http://', 'https://')):
+            if self.config.host.startswith(("http://", "https://")):
                 from urllib.parse import urlparse
+
                 parsed = urlparse(self.config.host)
                 hostname = parsed.hostname
-                port = parsed.port or (443 if parsed.scheme == 'https' else self.config.port)
-                use_https = parsed.scheme == 'https'
+                port = parsed.port or (
+                    443 if parsed.scheme == "https" else self.config.port
+                )
+                use_https = parsed.scheme == "https"
 
-                logger.info(f"Connecting to Qdrant via URL: {self.config.host} "
-                           f"(hostname={hostname}, port={port}, https={use_https}, "
-                           f"verify_ssl={self.config.verify_ssl})")
+                logger.info(
+                    f"Connecting to Qdrant via URL: {self.config.host} "
+                    f"(hostname={hostname}, port={port}, https={use_https}, "
+                    f"verify_ssl={self.config.verify_ssl})"
+                )
 
                 self.client = AsyncQdrantClient(
                     host=hostname,
@@ -123,8 +156,10 @@ class QdrantStorage(BaseStorage):
                 # Auto-detect HTTPS if port is 443
                 use_https = self.config.https or (self.config.port == 443)
 
-                logger.info(f"Connecting to Qdrant via host/port: {self.config.host}:{self.config.port} "
-                           f"(https={use_https}, verify_ssl={self.config.verify_ssl})")
+                logger.info(
+                    f"Connecting to Qdrant via host/port: {self.config.host}:{self.config.port} "
+                    f"(https={use_https}, verify_ssl={self.config.verify_ssl})"
+                )
 
                 self.client = AsyncQdrantClient(
                     host=self.config.host,
@@ -146,9 +181,8 @@ class QdrantStorage(BaseStorage):
                 await self.client.create_collection(
                     collection_name=self.config.collection_name,
                     vectors_config=VectorParams(
-                        size=self.config.vector_size,
-                        distance=Distance.COSINE
-                    )
+                        size=self.config.vector_size, distance=Distance.COSINE
+                    ),
                 )
                 logger.info(f"Created Qdrant collection: {self.config.collection_name}")
 
@@ -191,15 +225,18 @@ class QdrantStorage(BaseStorage):
                 "attributes": entity.attributes,
                 "source_doc_id": entity.source_doc_id,
                 "confidence": entity.confidence,
-                "created_at": entity.created_at.isoformat() if entity.created_at else None,
-                "updated_at": entity.updated_at.isoformat() if entity.updated_at else None,
-            }
+                "created_at": entity.created_at.isoformat()
+                if entity.created_at
+                else None,
+                "updated_at": entity.updated_at.isoformat()
+                if entity.updated_at
+                else None,
+            },
         )
 
         # Upsert the point
         await self.client.upsert(
-            collection_name=self.config.collection_name,
-            points=[point]
+            collection_name=self.config.collection_name, points=[point]
         )
 
         logger.debug(f"Stored entity {entity_id} in Qdrant")
@@ -237,25 +274,27 @@ class QdrantStorage(BaseStorage):
                     "attributes": entity.attributes,
                     "source_doc_id": entity.source_doc_id,
                     "confidence": entity.confidence,
-                    "created_at": entity.created_at.isoformat() if entity.created_at else None,
-                    "updated_at": entity.updated_at.isoformat() if entity.updated_at else None,
-                }
+                    "created_at": entity.created_at.isoformat()
+                    if entity.created_at
+                    else None,
+                    "updated_at": entity.updated_at.isoformat()
+                    if entity.updated_at
+                    else None,
+                },
             )
             points.append(point)
 
         # Batch upsert
         await self.client.upsert(
-            collection_name=self.config.collection_name,
-            points=points
+            collection_name=self.config.collection_name, points=points
         )
 
         logger.debug(f"Stored {len(entities)} entities in Qdrant")
         return entity_ids
 
-    async def store_chunk_vector_with_unified_id(self,
-                                                chunk_id: str,
-                                                vector: List[float],
-                                                metadata: Dict[str, Any]) -> str:
+    async def store_chunk_vector_with_unified_id(
+        self, chunk_id: str, vector: List[float], metadata: Dict[str, Any]
+    ) -> str:
         """Store chunk vector with unified ID format.
 
         Args:
@@ -279,31 +318,32 @@ class QdrantStorage(BaseStorage):
 
         # Prepare enhanced metadata
         enhanced_metadata = {
-            'document_id': document_id,
-            'chunk_id': chunk_id,
-            'chunk_index': chunk_index,
-            'neo4j_chunk_id': chunk_id,  # Cross-reference
-            'unified_id_format': True,
-            **metadata
+            "document_id": document_id,
+            "chunk_id": chunk_id,
+            "chunk_index": chunk_index,
+            "neo4j_chunk_id": chunk_id,  # Cross-reference
+            "unified_id_format": True,
+            **metadata,
         }
 
         # Create point for insertion
         point = PointStruct(
             id=chunk_id,  # Use chunk_id as point ID
             vector=vector,
-            payload=enhanced_metadata
+            payload=enhanced_metadata,
         )
 
         # Upsert the point
         await self.client.upsert(
-            collection_name=self.config.collection_name,
-            points=[point]
+            collection_name=self.config.collection_name, points=[point]
         )
 
         logger.debug(f"Stored chunk vector {chunk_id} in Qdrant")
         return chunk_id
 
-    async def get_chunk_vectors_by_document_id(self, document_id: str) -> List[Dict[str, Any]]:
+    async def get_chunk_vectors_by_document_id(
+        self, document_id: str
+    ) -> List[Dict[str, Any]]:
         """Get all chunk vectors for a document.
 
         Args:
@@ -321,26 +361,31 @@ class QdrantStorage(BaseStorage):
             scroll_filter=Filter(
                 must=[
                     FieldCondition(
-                        key="document_id",
-                        match=MatchValue(value=document_id)
+                        key="document_id", match=MatchValue(value=document_id)
                     )
                 ]
             ),
-            limit=1000  # Adjust as needed
+            limit=1000,  # Adjust as needed
         )
 
         chunks = []
         for point in search_result[0]:  # search_result is (points, next_page_offset)
-            chunks.append({
-                'chunk_id': point.id,
-                'vector': point.vector,
-                'metadata': point.payload
-            })
+            chunks.append(
+                {
+                    "chunk_id": point.id,
+                    "vector": point.vector,
+                    "metadata": point.payload,
+                }
+            )
 
-        logger.debug(f"Retrieved {len(chunks)} chunk vectors for document {document_id}")
+        logger.debug(
+            f"Retrieved {len(chunks)} chunk vectors for document {document_id}"
+        )
         return chunks
 
-    async def update_chunk_vector_metadata(self, chunk_id: str, metadata: Dict[str, Any]) -> bool:
+    async def update_chunk_vector_metadata(
+        self, chunk_id: str, metadata: Dict[str, Any]
+    ) -> bool:
         """Update metadata for a chunk vector.
 
         Args:
@@ -358,7 +403,7 @@ class QdrantStorage(BaseStorage):
             existing_points = await self.client.retrieve(
                 collection_name=self.config.collection_name,
                 ids=[chunk_id],
-                with_payload=True
+                with_payload=True,
             )
 
             if not existing_points:
@@ -374,7 +419,7 @@ class QdrantStorage(BaseStorage):
             await self.client.set_payload(
                 collection_name=self.config.collection_name,
                 payload=updated_payload,
-                points=[chunk_id]
+                points=[chunk_id],
             )
 
             logger.debug(f"Updated metadata for chunk {chunk_id}")
@@ -384,11 +429,13 @@ class QdrantStorage(BaseStorage):
             logger.error(f"Failed to update metadata for chunk {chunk_id}: {e}")
             return False
 
-    async def store_chunk_vector_with_entities(self,
-                                             chunk_id: str,
-                                             vector: List[float],
-                                             metadata: Dict[str, Any],
-                                             entity_ids: List[str]) -> str:
+    async def store_chunk_vector_with_entities(
+        self,
+        chunk_id: str,
+        vector: List[float],
+        metadata: Dict[str, Any],
+        entity_ids: List[str],
+    ) -> str:
         """Store chunk vector with entity references.
 
         Args:
@@ -413,30 +460,31 @@ class QdrantStorage(BaseStorage):
 
         # Prepare enhanced metadata with entity references
         enhanced_metadata = {
-            'document_id': document_id,
-            'chunk_id': chunk_id,
-            'chunk_index': chunk_index,
-            'neo4j_chunk_id': chunk_id,  # Cross-reference
-            'unified_id_format': True,
-            'entity_ids': entity_ids,  # Entity references
-            'entity_count': len(entity_ids),
-            **metadata
+            "document_id": document_id,
+            "chunk_id": chunk_id,
+            "chunk_index": chunk_index,
+            "neo4j_chunk_id": chunk_id,  # Cross-reference
+            "unified_id_format": True,
+            "entity_ids": entity_ids,  # Entity references
+            "entity_count": len(entity_ids),
+            **metadata,
         }
 
         # Create point for insertion
         point = PointStruct(
             id=chunk_id,  # Use chunk_id as point ID
             vector=vector,
-            payload=enhanced_metadata
+            payload=enhanced_metadata,
         )
 
         # Upsert the point
         await self.client.upsert(
-            collection_name=self.config.collection_name,
-            points=[point]
+            collection_name=self.config.collection_name, points=[point]
         )
 
-        logger.debug(f"Stored chunk vector {chunk_id} with {len(entity_ids)} entity references in Qdrant")
+        logger.debug(
+            f"Stored chunk vector {chunk_id} with {len(entity_ids)} entity references in Qdrant"
+        )
         return chunk_id
 
     async def get_chunks_by_entity_id(self, entity_id: str) -> List[Dict[str, Any]]:
@@ -456,22 +504,21 @@ class QdrantStorage(BaseStorage):
             collection_name=self.config.collection_name,
             scroll_filter=Filter(
                 must=[
-                    FieldCondition(
-                        key="entity_ids",
-                        match=MatchValue(value=entity_id)
-                    )
+                    FieldCondition(key="entity_ids", match=MatchValue(value=entity_id))
                 ]
             ),
-            limit=1000  # Adjust as needed
+            limit=1000,  # Adjust as needed
         )
 
         chunks = []
         for point in search_result[0]:  # search_result is (points, next_page_offset)
-            chunks.append({
-                'chunk_id': point.id,
-                'vector': point.vector,
-                'metadata': point.payload
-            })
+            chunks.append(
+                {
+                    "chunk_id": point.id,
+                    "vector": point.vector,
+                    "metadata": point.payload,
+                }
+            )
 
         logger.debug(f"Retrieved {len(chunks)} chunks referencing entity {entity_id}")
         return chunks
@@ -493,7 +540,7 @@ class QdrantStorage(BaseStorage):
                 collection_name=self.config.collection_name,
                 ids=[entity_id],
                 with_payload=True,
-                with_vectors=True
+                with_vectors=True,
             )
 
             if not points:
@@ -510,7 +557,7 @@ class QdrantStorage(BaseStorage):
                 attributes=payload.get("attributes", {}),
                 source_doc_id=payload.get("source_doc_id"),
                 confidence=payload.get("confidence", 1.0),
-                embedding=point.vector
+                embedding=point.vector,
             )
 
         except Exception as e:
@@ -537,7 +584,7 @@ class QdrantStorage(BaseStorage):
                 collection_name=self.config.collection_name,
                 ids=entity_ids,
                 with_payload=True,
-                with_vectors=True
+                with_vectors=True,
             )
 
             entities = []
@@ -551,7 +598,7 @@ class QdrantStorage(BaseStorage):
                     attributes=payload.get("attributes", {}),
                     source_doc_id=payload.get("source_doc_id"),
                     confidence=payload.get("confidence", 1.0),
-                    embedding=point.vector
+                    embedding=point.vector,
                 )
                 entities.append(entity)
 
@@ -562,10 +609,7 @@ class QdrantStorage(BaseStorage):
             return []
 
     async def search_entities(
-        self,
-        query: str,
-        entity_type: Optional[str] = None,
-        limit: int = 10
+        self, query: str, entity_type: Optional[str] = None, limit: int = 10
     ) -> List[Entity]:
         """Search for entities by name or attributes in Qdrant.
 
@@ -587,16 +631,15 @@ class QdrantStorage(BaseStorage):
 
             if entity_type:
                 filter_conditions.append(
-                    FieldCondition(
-                        key="type",
-                        match=MatchValue(value=entity_type)
-                    )
+                    FieldCondition(key="type", match=MatchValue(value=entity_type))
                 )
 
             # Simple text search in name and description
             # Note: This is a basic implementation. For better search,
             # you'd want to embed the query and use vector search
-            search_filter = Filter(must=filter_conditions) if filter_conditions else None
+            search_filter = (
+                Filter(must=filter_conditions) if filter_conditions else None
+            )
 
             # Use scroll to get all points and filter client-side
             # In production, you'd want to use proper vector search
@@ -605,7 +648,7 @@ class QdrantStorage(BaseStorage):
                 scroll_filter=search_filter,
                 limit=limit * 2,  # Get more to filter client-side
                 with_payload=True,
-                with_vectors=True
+                with_vectors=True,
             )
 
             # Filter by query text
@@ -626,7 +669,7 @@ class QdrantStorage(BaseStorage):
                         attributes=payload.get("attributes", {}),
                         source_doc_id=payload.get("source_doc_id"),
                         confidence=payload.get("confidence", 1.0),
-                        embedding=point.vector
+                        embedding=point.vector,
                     )
                     matching_entities.append(entity)
 
@@ -673,8 +716,7 @@ class QdrantStorage(BaseStorage):
 
         try:
             await self.client.delete(
-                collection_name=self.config.collection_name,
-                points_selector=[entity_id]
+                collection_name=self.config.collection_name, points_selector=[entity_id]
             )
             logger.debug(f"Deleted entity {entity_id} from Qdrant")
             return True
@@ -701,7 +743,7 @@ class QdrantStorage(BaseStorage):
             points = await self.client.retrieve(
                 collection_name=self.config.collection_name,
                 ids=[checksum_id],
-                with_payload=True
+                with_payload=True,
             )
 
             if points and len(points) > 0:
@@ -735,13 +777,12 @@ class QdrantStorage(BaseStorage):
                     "type": "document_checksum",
                     "document_id": document_id,
                     "checksum": checksum,
-                    "updated_at": datetime.utcnow().isoformat()
-                }
+                    "updated_at": datetime.utcnow().isoformat(),
+                },
             )
 
             await self.client.upsert(
-                collection_name=self.config.collection_name,
-                points=[point]
+                collection_name=self.config.collection_name, points=[point]
             )
 
             logger.debug(f"Stored checksum for document {document_id}")
@@ -763,7 +804,7 @@ class QdrantStorage(BaseStorage):
             checksum_id = f"checksum_{document_id}"
             await self.client.delete(
                 collection_name=self.config.collection_name,
-                points_selector=[checksum_id]
+                points_selector=[checksum_id],
             )
 
             logger.debug(f"Deleted checksum for document {document_id}")
@@ -785,25 +826,17 @@ class QdrantStorage(BaseStorage):
             raise RuntimeError("Not connected to Qdrant database")
 
         try:
-
             # Create filter to get entities by source_doc_id, excluding checksum entries
             must_conditions = [
-                FieldCondition(
-                    key="source_doc_id",
-                    match=MatchValue(value=document_id)
-                )
+                FieldCondition(key="source_doc_id", match=MatchValue(value=document_id))
             ]
 
             must_not_conditions = [
-                FieldCondition(
-                    key="type",
-                    match=MatchValue(value="document_checksum")
-                )
+                FieldCondition(key="type", match=MatchValue(value="document_checksum"))
             ]
 
             filter_condition = Filter(
-                must=must_conditions,
-                must_not=must_not_conditions
+                must=must_conditions, must_not=must_not_conditions
             )
 
             # Search for entities with matching source_doc_id
@@ -812,11 +845,13 @@ class QdrantStorage(BaseStorage):
                 scroll_filter=filter_condition,
                 limit=1000,  # Adjust as needed
                 with_payload=True,
-                with_vectors=True
+                with_vectors=True,
             )
 
             entities = []
-            for point in search_result[0]:  # search_result is (points, next_page_offset)
+            for point in search_result[
+                0
+            ]:  # search_result is (points, next_page_offset)
                 payload = point.payload
                 # Skip checksum entries
                 if payload.get("type") == "document_checksum":
@@ -830,11 +865,13 @@ class QdrantStorage(BaseStorage):
                     attributes=payload.get("attributes", {}),
                     source_doc_id=payload.get("source_doc_id"),
                     confidence=payload.get("confidence", 1.0),
-                    embedding=point.vector
+                    embedding=point.vector,
                 )
                 entities.append(entity)
 
-            logger.debug(f"Retrieved {len(entities)} entities for document {document_id}")
+            logger.debug(
+                f"Retrieved {len(entities)} entities for document {document_id}"
+            )
             return entities
 
         except Exception as e:
@@ -871,9 +908,7 @@ class QdrantStorage(BaseStorage):
         return []
 
     async def get_entity_relations(
-        self,
-        entity_id: EntityId,
-        relation_type: Optional[str] = None
+        self, entity_id: EntityId, relation_type: Optional[str] = None
     ) -> List[Relation]:
         """Get relations for an entity."""
         return []
@@ -891,7 +926,7 @@ class QdrantStorage(BaseStorage):
         self,
         entity_id: EntityId,
         relation_type: Optional[str] = None,
-        max_depth: int = 1
+        max_depth: int = 1,
     ) -> List[Entity]:
         """Get neighboring entities (simplified for Qdrant)."""
         # Qdrant doesn't have native graph traversal
@@ -900,14 +935,13 @@ class QdrantStorage(BaseStorage):
         return []
 
     async def find_path(
-        self,
-        source_entity_id: EntityId,
-        target_entity_id: EntityId,
-        max_depth: int = 3
+        self, source_entity_id: EntityId, target_entity_id: EntityId, max_depth: int = 3
     ) -> List[List[EntityId]]:
         """Find paths between two entities (simplified for Qdrant)."""
         # Qdrant doesn't have native graph pathfinding
-        logger.debug(f"Path finding in Qdrant is simplified: {source_entity_id} -> {target_entity_id}")
+        logger.debug(
+            f"Path finding in Qdrant is simplified: {source_entity_id} -> {target_entity_id}"
+        )
         return []
 
     async def store_graph(self, graph: Graph) -> None:
@@ -920,12 +954,11 @@ class QdrantStorage(BaseStorage):
         if graph.relations:
             await self.store_relations(list(graph.relations.values()))
 
-        logger.info(f"Stored graph with {len(graph.entities)} entities and {len(graph.relations)} relations")
+        logger.info(
+            f"Stored graph with {len(graph.entities)} entities and {len(graph.relations)} relations"
+        )
 
-    async def get_graph(
-        self,
-        entity_ids: Optional[List[EntityId]] = None
-    ) -> Graph:
+    async def get_graph(self, entity_ids: Optional[List[EntityId]] = None) -> Graph:
         """Get a graph or subgraph."""
         from ..models import Graph
 
@@ -939,7 +972,7 @@ class QdrantStorage(BaseStorage):
                     collection_name=self.config.collection_name,
                     limit=10000,  # Large limit to get all entities
                     with_payload=True,
-                    with_vectors=True
+                    with_vectors=True,
                 )
 
                 for point in search_result[0]:
@@ -956,7 +989,7 @@ class QdrantStorage(BaseStorage):
                         attributes=payload.get("attributes", {}),
                         source_doc_id=payload.get("source_doc_id"),
                         confidence=payload.get("confidence", 1.0),
-                        embedding=point.vector
+                        embedding=point.vector,
                     )
                     entities.append(entity)
             except Exception as e:
@@ -980,7 +1013,9 @@ class QdrantStorage(BaseStorage):
 
         try:
             # Get collection info
-            collection_info = await self.client.get_collection(self.config.collection_name)
+            collection_info = await self.client.get_collection(
+                self.config.collection_name
+            )
 
             # Count entities (excluding checksums)
             search_result = await self.client.scroll(
@@ -988,25 +1023,28 @@ class QdrantStorage(BaseStorage):
                 scroll_filter=Filter(
                     must_not=[
                         FieldCondition(
-                            key="type",
-                            match=MatchValue(value="document_checksum")
+                            key="type", match=MatchValue(value="document_checksum")
                         )
                     ]
                 ),
                 limit=1,  # We just want the count
                 with_payload=False,
-                with_vectors=False
+                with_vectors=False,
             )
 
             # Get total points count from collection info
-            total_points = collection_info.points_count if hasattr(collection_info, 'points_count') else 0
+            total_points = (
+                collection_info.points_count
+                if hasattr(collection_info, "points_count")
+                else 0
+            )
 
             return {
                 "total_points": total_points,
                 "collection_name": self.config.collection_name,
                 "vector_size": self.config.vector_size,
                 "host": self.config.host,
-                "port": self.config.port
+                "port": self.config.port,
             }
 
         except Exception as e:
@@ -1024,9 +1062,8 @@ class QdrantStorage(BaseStorage):
             await self.client.create_collection(
                 collection_name=self.config.collection_name,
                 vectors_config=VectorParams(
-                    size=self.config.vector_size,
-                    distance=Distance.COSINE
-                )
+                    size=self.config.vector_size, distance=Distance.COSINE
+                ),
             )
             logger.info(f"Cleared Qdrant collection: {self.config.collection_name}")
             return True

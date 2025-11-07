@@ -1,15 +1,15 @@
 """Storage backends for graph data."""
 
 try:
-    from .base import BaseStorage
-    from .neo4j_storage import Neo4jStorage, Neo4jConfig
-    from .json_storage import JsonStorage
-    from .qdrant_storage import QdrantStorage, QdrantConfig
-
     # Define GraphStorage classes directly here to avoid circular imports
     from abc import ABC, abstractmethod
-    from typing import List, Dict, Any, Optional
+    from typing import Any, Dict, List, Optional
+
     from ..models import Entity, Relation
+    from .base import BaseStorage
+    from .json_storage import JsonStorage
+    from .neo4j_storage import Neo4jConfig, Neo4jStorage
+    from .qdrant_storage import QdrantConfig, QdrantStorage
 
     class GraphStorage(ABC):
         """Abstract base class for graph storage."""
@@ -35,7 +35,9 @@ try:
             pass
 
         @abstractmethod
-        async def get_relations(self, source_id: str, target_id: str = None) -> List[Relation]:
+        async def get_relations(
+            self, source_id: str, target_id: str = None
+        ) -> List[Relation]:
             """Retrieve relations for an entity."""
             pass
 
@@ -67,21 +69,35 @@ try:
 
         async def get_entities_by_type(self, entity_type: str) -> List[Entity]:
             """Retrieve entities by type."""
-            return [entity for entity in self.entities.values() if entity.type == entity_type]
+            return [
+                entity
+                for entity in self.entities.values()
+                if entity.type == entity_type
+            ]
 
-        async def get_relations(self, source_id: str, target_id: str = None) -> List[Relation]:
+        async def get_relations(
+            self, source_id: str, target_id: str = None
+        ) -> List[Relation]:
             """Retrieve relations for an entity."""
             if target_id:
-                return [rel for rel in self.relations.values()
-                       if rel.source_id == source_id and rel.target_id == target_id]
+                return [
+                    rel
+                    for rel in self.relations.values()
+                    if rel.source_id == source_id and rel.target_id == target_id
+                ]
             else:
-                return [rel for rel in self.relations.values() if rel.source_id == source_id]
+                return [
+                    rel for rel in self.relations.values() if rel.source_id == source_id
+                ]
 
         async def search_entities(self, query: str) -> List[Entity]:
             """Search entities by name or properties."""
             query_lower = query.lower()
-            return [entity for entity in self.entities.values()
-                   if query_lower in entity.name.lower()]
+            return [
+                entity
+                for entity in self.entities.values()
+                if query_lower in entity.name.lower()
+            ]
 
     class DummyGraphStorage(GraphStorage):
         """Dummy graph storage that does nothing."""
@@ -98,7 +114,9 @@ try:
         async def get_entities_by_type(self, entity_type: str) -> List[Entity]:
             return []
 
-        async def get_relations(self, source_id: str, target_id: str = None) -> List[Relation]:
+        async def get_relations(
+            self, source_id: str, target_id: str = None
+        ) -> List[Relation]:
             return []
 
         async def search_entities(self, query: str) -> List[Entity]:
@@ -107,8 +125,12 @@ try:
     LEGACY_STORAGE_AVAILABLE = True
 
     __all__ = [
-        "BaseStorage", "Neo4jStorage", "Neo4jConfig", "JsonStorage",
-        "QdrantStorage", "QdrantConfig"
+        "BaseStorage",
+        "Neo4jStorage",
+        "Neo4jConfig",
+        "JsonStorage",
+        "QdrantStorage",
+        "QdrantConfig",
     ]
 
     if LEGACY_STORAGE_AVAILABLE:

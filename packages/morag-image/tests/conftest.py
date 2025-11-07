@@ -1,14 +1,17 @@
 """Pytest configuration for morag-image package tests."""
 
 import os
-import pytest
 from pathlib import Path
+
+import pytest
+
 
 # Define test resources directory
 @pytest.fixture
 def resources_dir():
     """Path to test resources directory."""
     return Path(__file__).parent / "resources"
+
 
 # Skip tests requiring API key if not available
 def pytest_configure(config):
@@ -24,6 +27,7 @@ def pytest_configure(config):
         "markers", "requires_easyocr: mark test as requiring EasyOCR"
     )
 
+
 # Skip tests requiring API key if not available
 def pytest_runtest_setup(item):
     """Set up tests."""
@@ -35,6 +39,7 @@ def pytest_runtest_setup(item):
     if "requires_tesseract" in item.keywords:
         try:
             import pytesseract
+
             pytesseract.get_tesseract_version()
         except (ImportError, Exception):
             pytest.skip("Test requires Tesseract OCR to be installed")

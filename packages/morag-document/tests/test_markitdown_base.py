@@ -1,13 +1,13 @@
 """Tests for markitdown base converter."""
 
-import pytest
 from pathlib import Path
-from unittest.mock import Mock, patch, AsyncMock
+from unittest.mock import AsyncMock, Mock, patch
 
-from morag_document.converters.markitdown_base import MarkitdownConverter
-from morag_core.interfaces.converter import ConversionOptions, ChunkingStrategy
+import pytest
 from morag_core.exceptions import ConversionError, UnsupportedFormatError
+from morag_core.interfaces.converter import ChunkingStrategy, ConversionOptions
 from morag_core.models.document import DocumentType
+from morag_document.converters.markitdown_base import MarkitdownConverter
 
 
 class TestMarkitdownConverter:
@@ -17,14 +17,16 @@ class TestMarkitdownConverter:
     def converter(self):
         """Create markitdown converter instance."""
         converter = MarkitdownConverter()
-        converter.supported_formats = {'pdf', 'docx', 'txt'}
+        converter.supported_formats = {"pdf", "docx", "txt"}
         return converter
 
     @pytest.fixture
     def mock_markitdown_service(self):
         """Mock markitdown service."""
         service = Mock()
-        service.convert_file = AsyncMock(return_value="# Test Document\n\nThis is test content.")
+        service.convert_file = AsyncMock(
+            return_value="# Test Document\n\nThis is test content."
+        )
         service.supports_format = AsyncMock(return_value=True)
         return service
 
@@ -49,12 +51,12 @@ class TestMarkitdownConverter:
         converter._markitdown_service = mock_markitdown_service
 
         # Test supported format
-        result = await converter.supports_format('pdf')
+        result = await converter.supports_format("pdf")
         assert result is True
 
         # Test unsupported format
-        converter.supported_formats = {'pdf'}
-        result = await converter.supports_format('docx')
+        converter.supported_formats = {"pdf"}
+        result = await converter.supports_format("docx")
         assert result is False
 
     @pytest.mark.asyncio
@@ -94,19 +96,19 @@ class TestMarkitdownConverter:
         test_file = tmp_path / "test.pdf"
         test_file.write_text("Test content")
 
-        with patch('morag_core.utils.file_handling.detect_format', return_value='pdf'):
+        with patch("morag_core.utils.file_handling.detect_format", return_value="pdf"):
             format_type = converter.detect_format(test_file)
-            assert format_type == 'pdf'
+            assert format_type == "pdf"
 
     def test_map_format_to_document_type(self, converter):
         """Test format to document type mapping."""
-        assert converter._map_format_to_document_type('pdf') == DocumentType.PDF
-        assert converter._map_format_to_document_type('docx') == DocumentType.WORD
-        assert converter._map_format_to_document_type('xlsx') == DocumentType.EXCEL
-        assert converter._map_format_to_document_type('pptx') == DocumentType.POWERPOINT
-        assert converter._map_format_to_document_type('txt') == DocumentType.TEXT
-        assert converter._map_format_to_document_type('jpg') == DocumentType.IMAGE
-        assert converter._map_format_to_document_type('unknown') == DocumentType.UNKNOWN
+        assert converter._map_format_to_document_type("pdf") == DocumentType.PDF
+        assert converter._map_format_to_document_type("docx") == DocumentType.WORD
+        assert converter._map_format_to_document_type("xlsx") == DocumentType.EXCEL
+        assert converter._map_format_to_document_type("pptx") == DocumentType.POWERPOINT
+        assert converter._map_format_to_document_type("txt") == DocumentType.TEXT
+        assert converter._map_format_to_document_type("jpg") == DocumentType.IMAGE
+        assert converter._map_format_to_document_type("unknown") == DocumentType.UNKNOWN
 
     @pytest.mark.asyncio
     async def test_convert_success(self, converter, tmp_path, mock_markitdown_service):
@@ -118,22 +120,29 @@ class TestMarkitdownConverter:
         # Mock dependencies
         converter._markitdown_service = mock_markitdown_service
 
-        with patch('morag_core.utils.file_handling.get_file_info') as mock_get_file_info:
+        with patch(
+            "morag_core.utils.file_handling.get_file_info"
+        ) as mock_get_file_info:
             mock_get_file_info.return_value = {
-                'file_name': 'test.txt',
-                'mime_type': 'text/plain',
-                'file_size': 12
+                "file_name": "test.txt",
+                "mime_type": "text/plain",
+                "file_size": 12,
             }
 
-            with patch('morag_core.utils.file_handling.detect_format', return_value='txt'):
+            with patch(
+                "morag_core.utils.file_handling.detect_format", return_value="txt"
+            ):
                 options = ConversionOptions(chunking_strategy=ChunkingStrategy.NONE)
                 result = await converter.convert(test_file, options)
 
                 assert result.success is True
                 assert result.content == "# Test Document\n\nThis is test content."
-                assert result.document.raw_text == "# Test Document\n\nThis is test content."
-                assert result.metadata['converter'] == 'markitdown'
-                assert result.metadata['format'] == 'txt'
+                assert (
+                    result.document.raw_text
+                    == "# Test Document\n\nThis is test content."
+                )
+                assert result.metadata["converter"] == "markitdown"
+                assert result.metadata["format"] == "txt"
 
     @pytest.mark.asyncio
     async def test_convert_markitdown_disabled(self, converter, tmp_path):
@@ -157,14 +166,18 @@ class TestMarkitdownConverter:
         test_file = tmp_path / "test.unknown"
         test_file.write_text("Test content")
 
-        converter.supported_formats = {'pdf'}
+        converter.supported_formats = {"pdf"}
 
-        with patch('morag_core.utils.file_handling.detect_format', return_value='unknown'):
+        with patch(
+            "morag_core.utils.file_handling.detect_format", return_value="unknown"
+        ):
             with pytest.raises(UnsupportedFormatError):
                 await converter.convert(test_file)
 
     @pytest.mark.asyncio
-    async def test_convert_with_chunking(self, converter, tmp_path, mock_markitdown_service):
+    async def test_convert_with_chunking(
+        self, converter, tmp_path, mock_markitdown_service
+    ):
         """Test conversion with chunking enabled."""
         # Create test file
         test_file = tmp_path / "test.txt"
@@ -173,18 +186,22 @@ class TestMarkitdownConverter:
         # Mock dependencies
         converter._markitdown_service = mock_markitdown_service
 
-        with patch('morag_core.utils.file_handling.get_file_info') as mock_get_file_info:
+        with patch(
+            "morag_core.utils.file_handling.get_file_info"
+        ) as mock_get_file_info:
             mock_get_file_info.return_value = {
-                'file_name': 'test.txt',
-                'mime_type': 'text/plain',
-                'file_size': 12
+                "file_name": "test.txt",
+                "mime_type": "text/plain",
+                "file_size": 12,
             }
 
-            with patch('morag_core.utils.file_handling.detect_format', return_value='txt'):
+            with patch(
+                "morag_core.utils.file_handling.detect_format", return_value="txt"
+            ):
                 options = ConversionOptions(
                     chunking_strategy=ChunkingStrategy.PARAGRAPH,
                     chunk_size=100,
-                    chunk_overlap=20
+                    chunk_overlap=20,
                 )
                 result = await converter.convert(test_file, options)
 
@@ -197,8 +214,7 @@ class TestMarkitdownConverter:
         from morag_core.models.document import Document, DocumentMetadata, DocumentType
 
         metadata = DocumentMetadata(
-            source_type=DocumentType.TEXT,
-            source_name="test.txt"
+            source_type=DocumentType.TEXT, source_name="test.txt"
         )
         document = Document(metadata=metadata)
 
@@ -212,8 +228,7 @@ class TestMarkitdownConverter:
         from morag_core.models.document import Document, DocumentMetadata, DocumentType
 
         metadata = DocumentMetadata(
-            source_type=DocumentType.TEXT,
-            source_name="test.txt"
+            source_type=DocumentType.TEXT, source_name="test.txt"
         )
         document = Document(metadata=metadata)
         document.raw_text = "Short"
@@ -236,7 +251,7 @@ class TestMarkitdownConverter:
         # Test finding boundary at space
         boundary = converter._find_word_boundary(text, 10, "backward")
         assert boundary <= 10
-        assert text[boundary-1:boundary+1] in [" i", "s ", "is"]
+        assert text[boundary - 1 : boundary + 1] in [" i", "s ", "is"]
 
     def test_find_word_boundary_forward(self, converter):
         """Test finding word boundary in forward direction."""

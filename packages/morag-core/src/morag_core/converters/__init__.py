@@ -1,10 +1,6 @@
 """Converters for MoRAG."""
 
-from .base import (
-    ConversionResult,
-    ConversionQualityValidator,
-    BaseConverter,
-)
+from .base import BaseConverter, ConversionQualityValidator, ConversionResult
 
 __all__ = [
     "ConversionResult",

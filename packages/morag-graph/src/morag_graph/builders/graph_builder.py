@@ -3,27 +3,29 @@
 import asyncio
 import logging
 from dataclasses import dataclass, field
-from typing import List, Dict, Any, Optional
 from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 from ..extraction import EntityExtractor, RelationExtractor
-from ..storage.base import BaseStorage
-from ..models.entity import Entity
-from ..models.relation import Relation
 from ..models.document import Document
 from ..models.document_chunk import DocumentChunk
+from ..models.entity import Entity
+from ..models.relation import Relation
+from ..storage.base import BaseStorage
 from ..updates.checksum_manager import DocumentChecksumManager
-from ..updates.cleanup_manager import DocumentCleanupManager, CleanupResult
+from ..updates.cleanup_manager import CleanupResult, DocumentCleanupManager
 
 
 class GraphBuildError(Exception):
     """Exception raised when graph building fails."""
+
     pass
 
 
 @dataclass
 class GraphBuildResult:
     """Result of graph building operation."""
+
     document_id: str
     entities_created: int
     relations_created: int
@@ -49,7 +51,7 @@ class GraphBuilder:
         storage: BaseStorage,
         domain: str = "general",
         entity_types: Optional[Dict[str, str]] = None,
-        relation_types: Optional[Dict[str, str]] = None
+        relation_types: Optional[Dict[str, str]] = None,
     ):
         """Initialize the graph builder.
 
@@ -65,13 +67,11 @@ class GraphBuilder:
 
         # Initialize LangExtract-based extractors
         self.entity_extractor = EntityExtractor(
-            domain=domain,
-            entity_types=entity_types
+            domain=domain, entity_types=entity_types
         )
 
         self.relation_extractor = RelationExtractor(
-            domain=domain,
-            relation_types=relation_types
+            domain=domain, relation_types=relation_types
         )
 
         # Initialize checksum and cleanup managers
@@ -79,10 +79,7 @@ class GraphBuilder:
         self.cleanup_manager = DocumentCleanupManager(storage)
 
     async def process_document(
-        self,
-        content: str,
-        document_id: str,
-        metadata: Optional[Dict[str, Any]] = None
+        self, content: str, document_id: str, metadata: Optional[Dict[str, Any]] = None
     ) -> GraphBuildResult:
         """Process a document and build graph entities and relations.
 
@@ -101,6 +98,7 @@ class GraphBuilder:
             GraphBuildError: If processing fails
         """
         import time
+
         start_time = time.time()
 
         try:
@@ -114,7 +112,9 @@ class GraphBuilder:
             if not needs_update:
                 # Document unchanged, skip processing
                 processing_time = time.time() - start_time
-                self.logger.info(f"Document {document_id} unchanged, skipped processing")
+                self.logger.info(
+                    f"Document {document_id} unchanged, skipped processing"
+                )
 
                 return GraphBuildResult(
                     document_id=document_id,
@@ -123,22 +123,22 @@ class GraphBuilder:
                     entity_ids=[],
                     relation_ids=[],
                     processing_time=processing_time,
-                    skipped=True
+                    skipped=True,
                 )
 
             # Document changed, cleanup existing data first
-            cleanup_result = await self.cleanup_manager.cleanup_document_data(document_id)
+            cleanup_result = await self.cleanup_manager.cleanup_document_data(
+                document_id
+            )
 
             # Extract entities from content
             entities = await self.entity_extractor.extract(
-                content,
-                source_doc_id=document_id
+                content, source_doc_id=document_id
             )
 
             # Extract relations from content and entities
             relations = await self.relation_extractor.extract(
-                content,
-                entities=entities
+                content, entities=entities
             )
 
             # Store entities and relations
@@ -147,8 +147,12 @@ class GraphBuilder:
             )
 
             # Store new checksum
-            new_checksum = self.checksum_manager.calculate_document_checksum(content, metadata)
-            await self.checksum_manager.store_document_checksum(document_id, new_checksum)
+            new_checksum = self.checksum_manager.calculate_document_checksum(
+                content, metadata
+            )
+            await self.checksum_manager.store_document_checksum(
+                document_id, new_checksum
+            )
 
             processing_time = time.time() - start_time
             result.processing_time = processing_time
@@ -175,14 +179,14 @@ class GraphBuilder:
                 entity_ids=[],
                 relation_ids=[],
                 processing_time=processing_time,
-                errors=[error_msg]
+                errors=[error_msg],
             )
 
     async def process_document_chunks(
         self,
         chunks: List[DocumentChunk],
         document_id: str,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> GraphBuildResult:
         """Process document chunks and build graph entities and relations.
 
@@ -195,6 +199,7 @@ class GraphBuilder:
             GraphBuildResult with processing results
         """
         import time
+
         start_time = time.time()
 
         try:
@@ -212,21 +217,19 @@ class GraphBuilder:
                 try:
                     # Extract entities from chunk
                     entities = await self.entity_extractor.extract(
-                        chunk.text,
-                        source_doc_id=document_id
+                        chunk.text, source_doc_id=document_id
                     )
 
                     # Extract relations from chunk
                     relations = await self.relation_extractor.extract(
-                        chunk.text,
-                        entities=entities
+                        chunk.text, entities=entities
                     )
 
                     # Add chunk metadata
                     chunk_metadata = {
-                        'chunk_id': chunk.id,
-                        'chunk_index': i,
-                        'chunk_type': chunk.chunk_type
+                        "chunk_id": chunk.id,
+                        "chunk_index": i,
+                        "chunk_type": chunk.chunk_type,
                     }
 
                     # Add chunk metadata if available
@@ -284,12 +287,11 @@ class GraphBuilder:
                 relation_ids=[],
                 processing_time=processing_time,
                 chunks_processed=len(chunks),
-                errors=[error_msg]
+                errors=[error_msg],
             )
 
     async def process_documents_batch(
-        self,
-        documents: List[tuple[str, str, Optional[Dict[str, Any]]]]
+        self, documents: List[tuple[str, str, Optional[Dict[str, Any]]]]
     ) -> List[GraphBuildResult]:
         """Process multiple documents in parallel.
 
@@ -315,14 +317,16 @@ class GraphBuilder:
                 doc_id = documents[i][1]
                 error_msg = f"Failed to process document {doc_id}: {str(result)}"
                 self.logger.error(error_msg)
-                processed_results.append(GraphBuildResult(
-                    document_id=doc_id,
-                    entities_created=0,
-                    relations_created=0,
-                    entity_ids=[],
-                    relation_ids=[],
-                    errors=[error_msg]
-                ))
+                processed_results.append(
+                    GraphBuildResult(
+                        document_id=doc_id,
+                        entities_created=0,
+                        relations_created=0,
+                        entity_ids=[],
+                        relation_ids=[],
+                        errors=[error_msg],
+                    )
+                )
             else:
                 processed_results.append(result)
 
@@ -330,10 +334,7 @@ class GraphBuilder:
         return processed_results
 
     async def _store_entities_and_relations(
-        self,
-        entities: List[Entity],
-        relations: List[Relation],
-        document_id: str
+        self, entities: List[Entity], relations: List[Relation], document_id: str
     ) -> GraphBuildResult:
         """Store extracted entities and relations in the graph database.
 
@@ -363,7 +364,7 @@ class GraphBuilder:
                 entities_created=len(entities),
                 relations_created=len(relations),
                 entity_ids=entity_ids,
-                relation_ids=relation_ids
+                relation_ids=relation_ids,
             )
 
         except Exception as e:

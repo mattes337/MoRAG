@@ -1,13 +1,14 @@
 """Test configuration and fixtures for MoRAG tests."""
 
-import pytest
 import asyncio
-import tempfile
 import shutil
 import sys
+import tempfile
 from pathlib import Path
-from typing import Generator, AsyncGenerator
-from unittest.mock import MagicMock, AsyncMock, patch
+from typing import AsyncGenerator, Generator
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 import redis
 from fastapi.testclient import TestClient
 
@@ -28,12 +29,14 @@ except ImportError:
 
     settings = MockSettings()
 
+
 # Define result classes for testing
 class EmbeddingResult:
     def __init__(self, embedding, token_count, model):
         self.embedding = embedding
         self.token_count = token_count
         self.model = model
+
 
 class SummaryResult:
     def __init__(self, summary, token_count, model):
@@ -44,6 +47,7 @@ class SummaryResult:
 
 class TestSettings:
     """Test-specific settings."""
+
     redis_url = "redis://localhost:6379/15"  # Use different DB for tests
     qdrant_collection_name = "test_morag_documents"
     upload_dir = "./test_uploads"
@@ -73,8 +77,9 @@ def sample_documents(temp_files):
     docs = {}
 
     # Sample text document
-    docs['sample.txt'] = temp_files / "sample.txt"
-    docs['sample.txt'].write_text("""
+    docs["sample.txt"] = temp_files / "sample.txt"
+    docs["sample.txt"].write_text(
+        """
 # Sample Document
 
 This is a sample document for testing the MoRAG pipeline.
@@ -91,11 +96,13 @@ The system should handle this text appropriately.
 ## Conclusion
 
 This concludes the sample document.
-    """)
+    """
+    )
 
     # Sample markdown
-    docs['sample.md'] = temp_files / "sample.md"
-    docs['sample.md'].write_text("""
+    docs["sample.md"] = temp_files / "sample.md"
+    docs["sample.md"].write_text(
+        """
 # Machine Learning Guide
 
 Machine learning is a subset of artificial intelligence.
@@ -109,7 +116,8 @@ Machine learning is a subset of artificial intelligence.
 ## Applications
 
 Machine learning has many applications in various fields.
-    """)
+    """
+    )
 
     return docs
 
@@ -124,7 +132,7 @@ def mock_gemini_service():
             return EmbeddingResult(
                 embedding=[0.1] * 768,
                 token_count=len(text.split()),
-                model='mock-embedding-model'
+                model="mock-embedding-model",
             )
 
         async def generate_embeddings_batch(self, texts, **kwargs):
@@ -140,7 +148,7 @@ def mock_gemini_service():
             return SummaryResult(
                 summary=summary,
                 token_count=len(summary.split()),
-                model='mock-text-model'
+                model="mock-text-model",
             )
 
         async def health_check(self):
@@ -148,7 +156,7 @@ def mock_gemini_service():
                 "status": "healthy",
                 "embedding_model": "mock-embedding-model",
                 "text_model": "mock-text-model",
-                "embedding_dimension": 768
+                "embedding_dimension": 768,
             }
 
     return MockGeminiService()
@@ -169,14 +177,18 @@ def mock_qdrant_service():
         async def create_collection(self, vector_size=768, force_recreate=False):
             return True
 
-        async def store_embedding(self, embedding, text, metadata, collection_name="test"):
+        async def store_embedding(
+            self, embedding, text, metadata, collection_name="test"
+        ):
             point_id = len(self.points)
-            self.points.append({
-                "id": point_id,
-                "embedding": embedding,
-                "text": text,
-                "metadata": metadata
-            })
+            self.points.append(
+                {
+                    "id": point_id,
+                    "embedding": embedding,
+                    "text": text,
+                    "metadata": metadata,
+                }
+            )
             return point_id
 
         async def search_similar(self, query_embedding, limit=5, score_threshold=0.5):
@@ -186,7 +198,7 @@ def mock_qdrant_service():
                     "id": 0,
                     "score": 0.9,
                     "text": "Mock search result",
-                    "metadata": {"test": True}
+                    "metadata": {"test": True},
                 }
             ]
 
@@ -194,7 +206,7 @@ def mock_qdrant_service():
             return {
                 "name": TestSettings.qdrant_collection_name,
                 "vectors_count": len(self.points),
-                "points_count": len(self.points)
+                "points_count": len(self.points),
             }
 
     return MockQdrantService()
@@ -216,7 +228,7 @@ def mock_task_manager():
                 "status": "pending",
                 "source_data": source_data,
                 "metadata": metadata or {},
-                "result": None
+                "result": None,
             }
             return task_id
 
@@ -265,7 +277,7 @@ def mock_youtube_metadata():
         channel_url="https://youtube.com/channel/UC_test_channel",
         playlist_id=None,
         playlist_title=None,
-        playlist_index=None
+        playlist_index=None,
     )
 
 

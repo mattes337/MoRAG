@@ -2,28 +2,42 @@
 """Test script for bug fixes in MoRAG system."""
 
 import asyncio
+import logging
 import sys
 import tempfile
-import logging
 from pathlib import Path
 
 # Add the packages to the path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "packages" / "morag" / "src"))
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "packages" / "morag-core" / "src"))
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "packages" / "morag-services" / "src"))
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "packages" / "morag-image" / "src"))
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "packages" / "morag-web" / "src"))
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "packages" / "morag-youtube" / "src"))
+sys.path.insert(
+    0, str(Path(__file__).parent.parent.parent / "packages" / "morag" / "src")
+)
+sys.path.insert(
+    0, str(Path(__file__).parent.parent.parent / "packages" / "morag-core" / "src")
+)
+sys.path.insert(
+    0, str(Path(__file__).parent.parent.parent / "packages" / "morag-services" / "src")
+)
+sys.path.insert(
+    0, str(Path(__file__).parent.parent.parent / "packages" / "morag-image" / "src")
+)
+sys.path.insert(
+    0, str(Path(__file__).parent.parent.parent / "packages" / "morag-web" / "src")
+)
+sys.path.insert(
+    0, str(Path(__file__).parent.parent.parent / "packages" / "morag-youtube" / "src")
+)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
 
 def print_section(title: str):
     """Print a section header."""
     print(f"\n{'='*60}")
     print(f"🔧 {title}")
     print(f"{'='*60}")
+
 
 def test_content_type_normalization():
     """Test content type normalization fixes."""
@@ -68,7 +82,9 @@ def test_content_type_normalization():
     except Exception as e:
         print(f"❌ Content type normalization test failed: {e}")
         import traceback
+
         traceback.print_exc()
+
 
 def test_processing_config_parameters():
     """Test ProcessingConfig parameter handling."""
@@ -87,7 +103,7 @@ def test_processing_config_parameters():
             "generate_embeddings": True,
             "chunk_size": 1000,
             "extract_metadata": True,
-            "remote": False
+            "remote": False,
         }
 
         print("Testing ProcessingConfig with additional parameters:")
@@ -105,6 +121,7 @@ def test_processing_config_parameters():
         except Exception as e:
             print(f"❌ ProcessingConfig creation failed: {e}")
             import traceback
+
             traceback.print_exc()
             return
 
@@ -117,7 +134,9 @@ def test_processing_config_parameters():
     except Exception as e:
         print(f"❌ ProcessingConfig test failed: {e}")
         import traceback
+
         traceback.print_exc()
+
 
 def test_content_type_enum_validation():
     """Test ContentType enum validation."""
@@ -127,7 +146,16 @@ def test_content_type_enum_validation():
         from morag_services import ContentType
 
         # Test valid content types
-        valid_types = ["document", "audio", "video", "image", "web", "youtube", "text", "unknown"]
+        valid_types = [
+            "document",
+            "audio",
+            "video",
+            "image",
+            "web",
+            "youtube",
+            "text",
+            "unknown",
+        ]
 
         print("Testing valid ContentType enum values:")
         for content_type in valid_types:
@@ -144,18 +172,24 @@ def test_content_type_enum_validation():
         for content_type in invalid_types:
             try:
                 enum_value = ContentType(content_type)
-                print(f"❌ ContentType('{content_type}') should have failed but got: {enum_value}")
+                print(
+                    f"❌ ContentType('{content_type}') should have failed but got: {enum_value}"
+                )
             except ValueError as e:
                 print(f"✅ ContentType('{content_type}') correctly failed: {e}")
             except Exception as e:
-                print(f"❌ ContentType('{content_type}') failed with unexpected error: {e}")
+                print(
+                    f"❌ ContentType('{content_type}') failed with unexpected error: {e}"
+                )
 
         print("\n✅ ContentType enum validation tests completed")
 
     except Exception as e:
         print(f"❌ ContentType enum test failed: {e}")
         import traceback
+
         traceback.print_exc()
+
 
 async def test_api_content_type_handling():
     """Test API content type handling with file processing."""
@@ -175,7 +209,7 @@ async def test_api_content_type_handling():
             "test.mp4",
             "test.jpg",
             "test.html",
-            "test.unknown"
+            "test.unknown",
         ]
 
         print("Testing file content type detection:")
@@ -183,10 +217,13 @@ async def test_api_content_type_handling():
             try:
                 detected_type = api._detect_content_type_from_file(Path(filename))
                 normalized_type = api._normalize_content_type(detected_type)
-                print(f"✅ {filename} -> detected: {detected_type}, normalized: {normalized_type}")
+                print(
+                    f"✅ {filename} -> detected: {detected_type}, normalized: {normalized_type}"
+                )
 
                 # Verify normalized type can create ContentType enum
                 from morag_services import ContentType
+
                 content_type_enum = ContentType(normalized_type)
                 print(f"   ✅ ContentType({normalized_type}) = {content_type_enum}")
 
@@ -198,23 +235,27 @@ async def test_api_content_type_handling():
     except Exception as e:
         print(f"❌ API content type handling test failed: {e}")
         import traceback
+
         traceback.print_exc()
+
 
 async def test_image_processing_api_fix():
     """Test that image processing no longer fails with genai.get_api_key() error."""
     print_section("Testing Image Processing API Fix")
 
     try:
-        from morag_image.processor import ImageProcessor, ImageConfig
+        from morag_image.processor import ImageConfig, ImageProcessor
 
         # Test without API key (should fail gracefully)
         processor = ImageProcessor()
         config = ImageConfig(generate_caption=True)
 
         # Create a dummy image file
-        with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as tmp:
+        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
             # Create a minimal JPEG file
-            tmp.write(b'\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x01\x00H\x00H\x00\x00\xff\xdb\x00C\x00\x08\x06\x06\x07\x06\x05\x08\x07\x07\x07\t\t\x08\n\x0c\x14\r\x0c\x0b\x0b\x0c\x19\x12\x13\x0f\x14\x1d\x1a\x1f\x1e\x1d\x1a\x1c\x1c $.\' ",#\x1c\x1c(7),01444\x1f\'9=82<.342\xff\xc0\x00\x11\x08\x00\x01\x00\x01\x01\x01\x11\x00\x02\x11\x01\x03\x11\x01\xff\xc4\x00\x14\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x08\xff\xc4\x00\x14\x10\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xff\xda\x00\x0c\x03\x01\x00\x02\x11\x03\x11\x00\x3f\x00\xaa\xff\xd9')
+            tmp.write(
+                b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x01\x00H\x00H\x00\x00\xff\xdb\x00C\x00\x08\x06\x06\x07\x06\x05\x08\x07\x07\x07\t\t\x08\n\x0c\x14\r\x0c\x0b\x0b\x0c\x19\x12\x13\x0f\x14\x1d\x1a\x1f\x1e\x1d\x1a\x1c\x1c $.' \",#\x1c\x1c(7),01444\x1f'9=82<.342\xff\xc0\x00\x11\x08\x00\x01\x00\x01\x01\x01\x11\x00\x02\x11\x01\x03\x11\x01\xff\xc4\x00\x14\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x08\xff\xc4\x00\x14\x10\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xff\xda\x00\x0c\x03\x01\x00\x02\x11\x03\x11\x00\x3f\x00\xaa\xff\xd9"
+            )
             tmp_path = Path(tmp.name)
 
         try:
@@ -239,6 +280,7 @@ async def test_image_processing_api_fix():
         print(f"❌ Import error: {e}")
         return False
 
+
 async def test_web_service_method_signature_fix():
     """Test that web service method signature mismatch is fixed."""
     print_section("Testing Web Service Method Signature Fix")
@@ -262,12 +304,15 @@ async def test_web_service_method_signature_fix():
                 return False
         except Exception as e:
             # Other exceptions are fine (network issues, etc.)
-            print(f"✅ Web service method signature fix working (got expected error: {type(e).__name__})")
+            print(
+                f"✅ Web service method signature fix working (got expected error: {type(e).__name__})"
+            )
             return True
 
     except ImportError as e:
         print(f"❌ Import error: {e}")
         return False
+
 
 async def test_search_endpoint_implementation():
     """Test that search endpoint is now implemented."""
@@ -293,15 +338,18 @@ async def test_search_endpoint_implementation():
         print(f"❌ Search implementation error: {e}")
         return False
 
+
 async def test_youtube_bot_detection_fix():
     """Test that YouTube processing has bot detection avoidance."""
     print_section("Testing YouTube Bot Detection Fix")
 
     try:
-        from morag_youtube.processor import YouTubeProcessor, YouTubeConfig
+        from morag_youtube.processor import YouTubeConfig, YouTubeProcessor
 
         processor = YouTubeProcessor()
-        config = YouTubeConfig(extract_metadata_only=True)  # Only metadata to avoid downloads
+        config = YouTubeConfig(
+            extract_metadata_only=True
+        )  # Only metadata to avoid downloads
 
         # Test with a simple YouTube URL (metadata only)
         test_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"  # Rick Roll - always available
@@ -309,7 +357,9 @@ async def test_youtube_bot_detection_fix():
         try:
             result = await processor.process_url(test_url, config)
             if result.success:
-                print("✅ YouTube bot detection fix working - metadata extracted successfully")
+                print(
+                    "✅ YouTube bot detection fix working - metadata extracted successfully"
+                )
                 return True
             else:
                 error_msg = result.error_message or "Unknown error"
@@ -317,19 +367,24 @@ async def test_youtube_bot_detection_fix():
                     print(f"❌ Bot detection still occurring: {error_msg}")
                     return False
                 else:
-                    print(f"✅ YouTube bot detection fix working (different error, not bot detection): {error_msg}")
+                    print(
+                        f"✅ YouTube bot detection fix working (different error, not bot detection): {error_msg}"
+                    )
                     return True
         except Exception as e:
             if "Sign in to confirm you're not a bot" in str(e):
                 print(f"❌ Bot detection still occurring: {e}")
                 return False
             else:
-                print(f"✅ YouTube bot detection fix working (different error, not bot detection): {e}")
+                print(
+                    f"✅ YouTube bot detection fix working (different error, not bot detection): {e}"
+                )
                 return True
 
     except ImportError as e:
         print(f"❌ Import error: {e}")
         return False
+
 
 async def main():
     """Run all bug fix tests."""
@@ -400,6 +455,7 @@ async def main():
     else:
         print("⚠️  Some critical bug fixes need attention")
         return 1
+
 
 if __name__ == "__main__":
     exit_code = asyncio.run(main())

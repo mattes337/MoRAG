@@ -2,7 +2,7 @@
 
 import importlib
 import warnings
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
 
 from .utils.logging import get_logger
 
@@ -18,7 +18,7 @@ class OptionalDependency:
         import_path: str,
         feature_name: str,
         fallback_message: Optional[str] = None,
-        install_command: Optional[str] = None
+        install_command: Optional[str] = None,
     ):
         self.name = name
         self.import_path = import_path
@@ -41,7 +41,7 @@ class OptionalDependency:
                 logger.warning(
                     f"{self.fallback_message}",
                     feature=self.feature_name,
-                    install_command=self.install_command
+                    install_command=self.install_command,
                 )
         return self._available
 
@@ -77,28 +77,28 @@ class OptionalDependencyManager:
             name="playwright",
             import_path="playwright",
             feature_name="Dynamic content extraction",
-            install_command="pip install playwright && playwright install"
+            install_command="pip install playwright && playwright install",
         )
 
         self.dependencies["trafilatura"] = OptionalDependency(
             name="trafilatura",
             import_path="trafilatura",
             feature_name="Advanced content extraction",
-            install_command="pip install trafilatura"
+            install_command="pip install trafilatura",
         )
 
         self.dependencies["readability"] = OptionalDependency(
             name="readability-lxml",
             import_path="readability",
             feature_name="Content cleaning",
-            install_command="pip install readability-lxml"
+            install_command="pip install readability-lxml",
         )
 
         self.dependencies["newspaper3k"] = OptionalDependency(
             name="newspaper3k",
             import_path="newspaper",
             feature_name="Article extraction",
-            install_command="pip install newspaper3k"
+            install_command="pip install newspaper3k",
         )
 
         # Audio processing dependencies
@@ -106,14 +106,14 @@ class OptionalDependencyManager:
             name="pyannote.audio",
             import_path="pyannote.audio",
             feature_name="Speaker diarization",
-            install_command="pip install pyannote.audio"
+            install_command="pip install pyannote.audio",
         )
 
         self.dependencies["faster_whisper"] = OptionalDependency(
             name="faster-whisper",
             import_path="faster_whisper",
             feature_name="Fast speech recognition",
-            install_command="pip install faster-whisper"
+            install_command="pip install faster-whisper",
         )
 
         # Video processing dependencies
@@ -121,14 +121,14 @@ class OptionalDependencyManager:
             name="opencv-python",
             import_path="cv2",
             feature_name="Video processing",
-            install_command="pip install opencv-python"
+            install_command="pip install opencv-python",
         )
 
         self.dependencies["moviepy"] = OptionalDependency(
             name="moviepy",
             import_path="moviepy",
             feature_name="Video editing",
-            install_command="pip install moviepy"
+            install_command="pip install moviepy",
         )
 
         # Image processing dependencies
@@ -136,14 +136,14 @@ class OptionalDependencyManager:
             name="pytesseract",
             import_path="pytesseract",
             feature_name="OCR processing",
-            install_command="pip install pytesseract"
+            install_command="pip install pytesseract",
         )
 
         self.dependencies["easyocr"] = OptionalDependency(
             name="easyocr",
             import_path="easyocr",
             feature_name="Easy OCR",
-            install_command="pip install easyocr"
+            install_command="pip install easyocr",
         )
 
         # Document processing dependencies
@@ -151,7 +151,7 @@ class OptionalDependencyManager:
             name="docling",
             import_path="docling",
             feature_name="Advanced PDF processing",
-            install_command="pip install docling"
+            install_command="pip install docling",
         )
 
         # Graph processing dependencies
@@ -159,7 +159,7 @@ class OptionalDependencyManager:
             name="morag-graph",
             import_path="morag_graph",
             feature_name="Graph processing",
-            install_command="pip install -e packages/morag-graph"
+            install_command="pip install -e packages/morag-graph",
         )
 
         # NLP dependencies
@@ -167,14 +167,14 @@ class OptionalDependencyManager:
             name="spacy",
             import_path="spacy",
             feature_name="NLP processing",
-            install_command="pip install spacy"
+            install_command="pip install spacy",
         )
 
         self.dependencies["langdetect"] = OptionalDependency(
             name="langdetect",
             import_path="langdetect",
             feature_name="Language detection",
-            install_command="pip install langdetect"
+            install_command="pip install langdetect",
         )
 
         # ML/Scientific computing dependencies (heavy - should be optional)
@@ -182,35 +182,35 @@ class OptionalDependencyManager:
             name="torch",
             import_path="torch",
             feature_name="PyTorch tensor operations",
-            install_command="pip install torch>=2.1.0,<2.7.0"
+            install_command="pip install torch>=2.1.0,<2.7.0",
         )
 
         self.dependencies["torchaudio"] = OptionalDependency(
             name="torchaudio",
             import_path="torchaudio",
             feature_name="PyTorch audio processing",
-            install_command="pip install torchaudio>=2.1.0,<2.7.0"
+            install_command="pip install torchaudio>=2.1.0,<2.7.0",
         )
 
         self.dependencies["scipy"] = OptionalDependency(
             name="scipy",
             import_path="scipy",
             feature_name="Scientific computing",
-            install_command="pip install scipy>=1.13.0,<1.15.0"
+            install_command="pip install scipy>=1.13.0,<1.15.0",
         )
 
         self.dependencies["scikit_learn"] = OptionalDependency(
             name="scikit-learn",
             import_path="sklearn",
             feature_name="Machine learning algorithms",
-            install_command="pip install scikit-learn>=1.5.0,<1.6.0"
+            install_command="pip install scikit-learn>=1.5.0,<1.6.0",
         )
 
         self.dependencies["sentence_transformers"] = OptionalDependency(
             name="sentence-transformers",
             import_path="sentence_transformers",
             feature_name="Sentence embeddings",
-            install_command="pip install sentence-transformers>=3.0.0,<5.0.0"
+            install_command="pip install sentence-transformers>=3.0.0,<5.0.0",
         )
 
     def get_dependency(self, name: str) -> OptionalDependency:
@@ -233,11 +233,7 @@ class OptionalDependencyManager:
 
     def get_available_features(self) -> List[str]:
         """Get list of available features."""
-        return [
-            dep.feature_name
-            for dep in self.dependencies.values()
-            if dep.available
-        ]
+        return [dep.feature_name for dep in self.dependencies.values() if dep.available]
 
     def get_missing_features(self) -> List[Dict[str, str]]:
         """Get list of missing features with install instructions."""
@@ -245,7 +241,7 @@ class OptionalDependencyManager:
             {
                 "feature": dep.feature_name,
                 "package": dep.name,
-                "install_command": dep.install_command
+                "install_command": dep.install_command,
             }
             for dep in self.dependencies.values()
             if not dep.available
@@ -253,9 +249,9 @@ class OptionalDependencyManager:
 
     def print_status(self):
         """Print status of all dependencies."""
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("  MoRAG Optional Dependencies Status")
-        print("="*60)
+        print("=" * 60)
 
         available = self.get_available_features()
         missing = self.get_missing_features()
@@ -272,7 +268,7 @@ class OptionalDependencyManager:
                 print(f"     Install: {item['install_command']}")
 
         print(f"\nTotal: {len(available)} available, {len(missing)} missing")
-        print("="*60)
+        print("=" * 60)
 
 
 # Global instance

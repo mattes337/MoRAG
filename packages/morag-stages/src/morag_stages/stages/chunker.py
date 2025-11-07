@@ -3,24 +3,36 @@
 import json
 import re
 from datetime import datetime
-from typing import List, Dict, Any, Optional, TYPE_CHECKING
 from pathlib import Path
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
+
 import structlog
 
-from ..models import Stage, StageType, StageStatus, StageResult, StageContext, StageMetadata
-from ..exceptions import StageExecutionError, StageValidationError
 from ..error_handling import stage_error_handler, validation_error_handler
+from ..exceptions import StageExecutionError, StageValidationError
+from ..models import (
+    Stage,
+    StageContext,
+    StageMetadata,
+    StageResult,
+    StageStatus,
+    StageType,
+)
 
 # Import services with graceful fallback
 if TYPE_CHECKING:
-    from agents import get_agent, SummarizationAgent
-    from morag_embedding import GeminiEmbeddingService
     from morag_core.config.unified import ChunkerConfig
+    from morag_embedding import GeminiEmbeddingService
+
+    from agents import SummarizationAgent, get_agent
 
 try:
-    from agents import get_agent as _get_agent, SummarizationAgent as _SummarizationAgent
-    from morag_embedding import GeminiEmbeddingService as _GeminiEmbeddingService
     from morag_core.config.unified import ChunkerConfig as _ChunkerConfig
+    from morag_embedding import GeminiEmbeddingService as _GeminiEmbeddingService
+
+    from agents import SummarizationAgent as _SummarizationAgent
+    from agents import get_agent as _get_agent
+
     get_agent = _get_agent
     SummarizationAgent = _SummarizationAgent
     GeminiEmbeddingService = _GeminiEmbeddingService
@@ -49,11 +61,14 @@ class ChunkerStage(Stage):
         # Initialize embedding service with API key from environment
         if SERVICES_AVAILABLE and GeminiEmbeddingService is not None:
             import os
-            api_key = os.getenv('GEMINI_API_KEY')
+
+            api_key = os.getenv("GEMINI_API_KEY")
             if api_key:
                 self.embedding_service = GeminiEmbeddingService(api_key=api_key)
             else:
-                logger.warning("GEMINI_API_KEY not found - embedding generation disabled")
+                logger.warning(
+                    "GEMINI_API_KEY not found - embedding generation disabled"
+                )
                 self.embedding_service = None
         else:
             self.embedding_service = None
@@ -63,16 +78,18 @@ class ChunkerStage(Stage):
         """Get configuration value from either dict or config object."""
         if hasattr(config, key):
             return getattr(config, key)
-        elif hasattr(config, 'get'):
+        elif hasattr(config, "get"):
             return config.get(key, default)
         else:
             return default
 
     @stage_error_handler("chunker_execute")
-    async def execute(self,
-                     input_files: List[Path],
-                     context: StageContext,
-                     output_dir: Optional[Path] = None) -> StageResult:
+    async def execute(
+        self,
+        input_files: List[Path],
+        context: StageContext,
+        output_dir: Optional[Path] = None,
+    ) -> StageResult:
         """Execute chunking on input markdown files.
 
         Args:
@@ -87,7 +104,7 @@ class ChunkerStage(Stage):
             raise StageValidationError(
                 "Chunker stage requires exactly one input file",
                 stage_type=self.stage_type.value,
-                invalid_files=[str(f) for f in input_files]
+                invalid_files=[str(f) for f in input_files],
             )
 
         input_file = input_files[0]
@@ -101,26 +118,30 @@ class ChunkerStage(Stage):
             config = context_config
 
         # Store model override for agent creation from context config
-        self._model_override = context_config.get('model') if context_config else None
+        self._model_override = context_config.get("model") if context_config else None
 
         # Check for agent-specific model overrides from context
         self._summarization_model_override = None
         if context_config:
-            model_config = context_config.get('model_config', {})
+            model_config = context_config.get("model_config", {})
             if model_config:
                 # Check for summarization specific model
-                summarization_model = model_config.get('agent_models', {}).get('summarization')
+                summarization_model = model_config.get("agent_models", {}).get(
+                    "summarization"
+                )
                 if summarization_model:
                     self._summarization_model_override = summarization_model
-                    logger.info(f"Using summarization agent model override: {summarization_model}")
+                    logger.info(
+                        f"Using summarization agent model override: {summarization_model}"
+                    )
                 # Check for default model override
-                elif model_config.get('default_model'):
-                    self._summarization_model_override = model_config['default_model']
-                    logger.info(f"Using default model override for summarization: {model_config['default_model']}")
+                elif model_config.get("default_model"):
+                    self._summarization_model_override = model_config["default_model"]
+                    logger.info(
+                        f"Using default model override for summarization: {model_config['default_model']}"
+                    )
 
-        logger.info("Starting chunking",
-                   input_file=str(input_file),
-                   config=config)
+        logger.info("Starting chunking", input_file=str(input_file), config=config)
 
         try:
             # Generate output filename
@@ -128,14 +149,14 @@ class ChunkerStage(Stage):
             context.output_dir.mkdir(parents=True, exist_ok=True)
 
             # Read input markdown
-            markdown_content = input_file.read_text(encoding='utf-8')
+            markdown_content = input_file.read_text(encoding="utf-8")
 
             # Extract metadata and content
             metadata, content = self._extract_metadata_and_content(markdown_content)
 
             # Generate document summary
             summary = ""
-            if self._get_config_value(config, 'generate_summary', True):
+            if self._get_config_value(config, "generate_summary", True):
                 summary = await self._generate_summary(content, metadata, config)
 
             # Create chunks based on strategy
@@ -154,23 +175,29 @@ class ChunkerStage(Stage):
                 "chunks": chunks,
                 "metadata": {
                     "total_chunks": len(chunks),
-                    "chunk_strategy": self._get_config_value(config, 'chunk_strategy', 'semantic'),
-                    "chunk_size": self._get_config_value(config, 'chunk_size', 4000),
-                    "overlap": self._get_config_value(config, 'overlap', 200),
-                    "embedding_model": self._get_config_value(config, 'embedding_model', 'text-embedding-004'),
+                    "chunk_strategy": self._get_config_value(
+                        config, "chunk_strategy", "semantic"
+                    ),
+                    "chunk_size": self._get_config_value(config, "chunk_size", 4000),
+                    "overlap": self._get_config_value(config, "overlap", 200),
+                    "embedding_model": self._get_config_value(
+                        config, "embedding_model", "text-embedding-004"
+                    ),
                     "source_file": str(input_file),
                     "source_metadata": metadata,
-                    "created_at": datetime.now().isoformat()
-                }
+                    "created_at": datetime.now().isoformat(),
+                },
             }
 
             # Write to file
-            with open(output_file, 'w', encoding='utf-8') as f:
+            with open(output_file, "w", encoding="utf-8") as f:
                 json.dump(output_data, f, indent=2, ensure_ascii=False)
 
             # Create metadata
             # Convert config to dict if it's a config object
-            config_dict = config.model_dump() if hasattr(config, 'model_dump') else config
+            config_dict = (
+                config.model_dump() if hasattr(config, "model_dump") else config
+            )
 
             stage_metadata = StageMetadata(
                 execution_time=0.0,  # Will be set by manager
@@ -180,11 +207,14 @@ class ChunkerStage(Stage):
                 config_used=config_dict,
                 metrics={
                     "total_chunks": len(chunks),
-                    "average_chunk_size": sum(len(chunk['content']) for chunk in chunks) / len(chunks) if chunks else 0,
+                    "average_chunk_size": sum(len(chunk["content"]) for chunk in chunks)
+                    / len(chunks)
+                    if chunks
+                    else 0,
                     "content_length": len(content),
                     "has_summary": bool(summary),
-                    "has_embeddings": any('embedding' in chunk for chunk in chunks)
-                }
+                    "has_embeddings": any("embedding" in chunk for chunk in chunks),
+                },
             )
 
             return StageResult(
@@ -195,18 +225,18 @@ class ChunkerStage(Stage):
                 data={
                     "total_chunks": len(chunks),
                     "summary_length": len(summary),
-                    "chunk_strategy": self._get_config_value(config, 'chunk_strategy', 'semantic')
-                }
+                    "chunk_strategy": self._get_config_value(
+                        config, "chunk_strategy", "semantic"
+                    ),
+                },
             )
 
         except Exception as e:
-            logger.error("Chunking failed",
-                        input_file=str(input_file),
-                        error=str(e))
+            logger.error("Chunking failed", input_file=str(input_file), error=str(e))
             raise StageExecutionError(
                 f"Chunking failed: {e}",
                 stage_type=self.stage_type.value,
-                original_error=e
+                original_error=e,
             )
 
     @validation_error_handler("chunker_validate_inputs")
@@ -228,7 +258,7 @@ class ChunkerStage(Stage):
         if not input_file.exists():
             return False
 
-        if input_file.suffix.lower() not in ['.md', '.markdown']:
+        if input_file.suffix.lower() not in [".md", ".markdown"]:
             return False
 
         return True
@@ -241,7 +271,9 @@ class ChunkerStage(Stage):
         """
         return [StageType.MARKDOWN_CONVERSION]
 
-    def get_expected_outputs(self, input_files: List[Path], context: StageContext) -> List[Path]:
+    def get_expected_outputs(
+        self, input_files: List[Path], context: StageContext
+    ) -> List[Path]:
         """Get expected output file paths.
 
         Args:
@@ -256,11 +288,14 @@ class ChunkerStage(Stage):
 
         input_file = input_files[0]
         from ..file_manager import sanitize_filename
+
         sanitized_name = sanitize_filename(input_file.stem)
         output_file = context.output_dir / f"{sanitized_name}.chunks.json"
         return [output_file]
 
-    def _extract_metadata_and_content(self, markdown: str) -> tuple[Dict[str, Any], str]:
+    def _extract_metadata_and_content(
+        self, markdown: str
+    ) -> tuple[Dict[str, Any], str]:
         """Extract metadata and content from markdown (supports both YAML frontmatter and H1+H2 format).
 
         Args:
@@ -270,38 +305,40 @@ class ChunkerStage(Stage):
             Tuple of (metadata dict, content string)
         """
         # Check for YAML frontmatter (legacy format)
-        if markdown.startswith('---\n'):
-            parts = markdown.split('---\n', 2)
+        if markdown.startswith("---\n"):
+            parts = markdown.split("---\n", 2)
             if len(parts) >= 3:
                 yaml_content = parts[1]
                 content = parts[2]
 
                 # Parse YAML metadata (simple parsing)
                 metadata = {}
-                for line in yaml_content.strip().split('\n'):
-                    if ':' in line:
-                        key, value = line.split(':', 1)
+                for line in yaml_content.strip().split("\n"):
+                    if ":" in line:
+                        key, value = line.split(":", 1)
                         key = key.strip()
-                        value = value.strip().strip('"\'')
+                        value = value.strip().strip("\"'")
                         metadata[key] = value
 
                 return metadata, content
 
         # Check for new H1+H2 format
-        lines = markdown.split('\n')
-        if lines and lines[0].startswith('# '):
+        lines = markdown.split("\n")
+        if lines and lines[0].startswith("# "):
             # Extract title from H1
             title_line = lines[0][2:].strip()
-            metadata = {'title': title_line}
+            metadata = {"title": title_line}
 
             # Look for information section
             info_section_start = -1
             content_section_start = -1
 
             for i, line in enumerate(lines):
-                if line.startswith('## ') and 'Information' in line:
+                if line.startswith("## ") and "Information" in line:
                     info_section_start = i
-                elif line.startswith('## ') and ('Content' in line or 'Transcript' in line):
+                elif line.startswith("## ") and (
+                    "Content" in line or "Transcript" in line
+                ):
                     content_section_start = i
                     break
 
@@ -309,21 +346,23 @@ class ChunkerStage(Stage):
                 # Extract metadata from information section
                 for i in range(info_section_start + 1, len(lines)):
                     line = lines[i].strip()
-                    if line.startswith('- **') and '**:' in line:
+                    if line.startswith("- **") and "**:" in line:
                         # Parse metadata line: - **Key**: Value
-                        key_end = line.find('**:', 4)
+                        key_end = line.find("**:", 4)
                         if key_end > 4:
                             key = line[4:key_end].strip()
-                            value = line[key_end + 3:].strip()
-                            metadata[key.lower().replace(' ', '_')] = value
-                    elif line.startswith('## '):
+                            value = line[key_end + 3 :].strip()
+                            metadata[key.lower().replace(" ", "_")] = value
+                    elif line.startswith("## "):
                         # End of information section
                         break
 
             # Extract content from content/transcript section
             if content_section_start > 0:
-                content_lines = lines[content_section_start + 2:]  # Skip section header and empty line
-                content = '\n'.join(content_lines)
+                content_lines = lines[
+                    content_section_start + 2 :
+                ]  # Skip section header and empty line
+                content = "\n".join(content_lines)
             else:
                 # Fallback: exclude metadata sections and only include actual content
                 content_lines = []
@@ -331,40 +370,55 @@ class ChunkerStage(Stage):
 
                 for i, line in enumerate(lines):
                     # Skip title line
-                    if i == 0 and line.startswith('# '):
+                    if i == 0 and line.startswith("# "):
                         continue
 
                     # Check if this is a metadata section (Information, File Information, Video Information, etc.)
-                    if line.startswith('## ') and any(keyword in line.lower() for keyword in ['information', 'metadata', 'properties', 'details']):
+                    if line.startswith("## ") and any(
+                        keyword in line.lower()
+                        for keyword in [
+                            "information",
+                            "metadata",
+                            "properties",
+                            "details",
+                        ]
+                    ):
                         skip_metadata = True
                         continue
 
                     # Check if this is a content section
-                    if line.startswith('## ') and any(keyword in line.lower() for keyword in ['content', 'transcript', 'text', 'body']):
+                    if line.startswith("## ") and any(
+                        keyword in line.lower()
+                        for keyword in ["content", "transcript", "text", "body"]
+                    ):
                         skip_metadata = False
                         continue
 
                     # Skip other metadata sections
-                    if line.startswith('## ') and skip_metadata:
+                    if line.startswith("## ") and skip_metadata:
                         continue
 
                     # Include content lines (not in metadata sections)
                     if not skip_metadata:
                         content_lines.append(line)
 
-                content = '\n'.join(content_lines).strip()
+                content = "\n".join(content_lines).strip()
 
                 # If no content found, use original markdown but log warning
                 if not content:
                     content = markdown
-                    logger.warning("No content section found, using full markdown",
-                                 title=metadata.get('title', 'unknown'))
+                    logger.warning(
+                        "No content section found, using full markdown",
+                        title=metadata.get("title", "unknown"),
+                    )
 
             return metadata, content
 
         return {}, markdown
 
-    async def _generate_summary(self, content: str, metadata: Dict[str, Any], config: Dict[str, Any]) -> str:
+    async def _generate_summary(
+        self, content: str, metadata: Dict[str, Any], config: Dict[str, Any]
+    ) -> str:
         """Generate document summary using LLM.
 
         Args:
@@ -380,24 +434,28 @@ class ChunkerStage(Stage):
 
         # Check if API key is available before attempting to create agent
         import os
-        api_key = os.getenv('GEMINI_API_KEY') or os.getenv('GOOGLE_API_KEY')
+
+        api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
         if not api_key:
             logger.info("No API key available for summary generation - skipping")
             return ""
 
         try:
             # Use summarization-specific model override if available, otherwise fall back to general model override
-            model_override = getattr(self, '_summarization_model_override', None) or getattr(self, '_model_override', None)
+            model_override = getattr(
+                self, "_summarization_model_override", None
+            ) or getattr(self, "_model_override", None)
             if model_override:
-                logger.info(f"Creating summarization agent with model override: {model_override}")
+                logger.info(
+                    f"Creating summarization agent with model override: {model_override}"
+                )
                 # Import agent creation directly to avoid caching
-                from agents.factory.utils import create_agent
                 from agents.base.config import AgentConfig, ModelConfig
+                from agents.factory.utils import create_agent
 
                 # Create custom config with model override
                 config = AgentConfig(
-                    name="summarization",
-                    model=ModelConfig(model=model_override)
+                    name="summarization", model=ModelConfig(model=model_override)
                 )
                 self.summarization_agent = create_agent("summarization", config)
             else:
@@ -405,20 +463,21 @@ class ChunkerStage(Stage):
                     self.summarization_agent = get_agent("summarization")
 
             # Create summarization using the agents framework
-            content_type = metadata.get('type', 'text')
+            content_type = metadata.get("type", "text")
 
             response = await self.summarization_agent.summarize(
-                text=content[:8000],  # Limit content length
-                content_type=content_type
+                text=content[:8000], content_type=content_type  # Limit content length
             )
             # The agents framework returns a SummarizationResult
-            return response.summary if hasattr(response, 'summary') else str(response)
+            return response.summary if hasattr(response, "summary") else str(response)
 
         except Exception as e:
             logger.warning("Summary generation failed", error=str(e))
             return ""
 
-    async def _create_chunks(self, content: str, metadata: Dict[str, Any], config: Dict[str, Any]) -> List[Dict[str, Any]]:
+    async def _create_chunks(
+        self, content: str, metadata: Dict[str, Any], config: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
         """Create chunks from content based on strategy.
 
         Args:
@@ -429,20 +488,22 @@ class ChunkerStage(Stage):
         Returns:
             List of chunk dictionaries
         """
-        strategy = self._get_config_value(config, 'chunk_strategy', 'semantic')
-        chunk_size = self._get_config_value(config, 'chunk_size', 4000)
-        overlap = self._get_config_value(config, 'overlap', 200)
+        strategy = self._get_config_value(config, "chunk_strategy", "semantic")
+        chunk_size = self._get_config_value(config, "chunk_size", 4000)
+        overlap = self._get_config_value(config, "overlap", 200)
 
-        if strategy == 'semantic':
+        if strategy == "semantic":
             return await self._semantic_chunking(content, metadata, chunk_size, overlap)
-        elif strategy == 'page-level':
+        elif strategy == "page-level":
             return self._page_level_chunking(content, metadata, chunk_size)
-        elif strategy == 'topic-based':
+        elif strategy == "topic-based":
             return self._topic_based_chunking(content, metadata, chunk_size)
         else:  # fixed-size
             return self._fixed_size_chunking(content, chunk_size, overlap)
 
-    def _fixed_size_chunking(self, content: str, chunk_size: int, overlap: int) -> List[Dict[str, Any]]:
+    def _fixed_size_chunking(
+        self, content: str, chunk_size: int, overlap: int
+    ) -> List[Dict[str, Any]]:
         """Create fixed-size chunks with overlap.
 
         Args:
@@ -462,28 +523,32 @@ class ChunkerStage(Stage):
 
             # Try to break at word boundary
             if end < len(content):
-                last_space = content.rfind(' ', start, end)
+                last_space = content.rfind(" ", start, end)
                 if last_space > start:
                     end = last_space
 
             chunk_content = content[start:end].strip()
             if chunk_content:
-                chunks.append({
-                    "id": f"chunk_{chunk_id:03d}",
-                    "content": chunk_content,
-                    "metadata": {
-                        "start_char": start,
-                        "end_char": end,
-                        "chunk_size": len(chunk_content)
+                chunks.append(
+                    {
+                        "id": f"chunk_{chunk_id:03d}",
+                        "content": chunk_content,
+                        "metadata": {
+                            "start_char": start,
+                            "end_char": end,
+                            "chunk_size": len(chunk_content),
+                        },
                     }
-                })
+                )
                 chunk_id += 1
 
             start = max(start + 1, end - overlap)
 
         return chunks
 
-    async def _semantic_chunking(self, content: str, metadata: Dict[str, Any], chunk_size: int, overlap: int) -> List[Dict[str, Any]]:
+    async def _semantic_chunking(
+        self, content: str, metadata: Dict[str, Any], chunk_size: int, overlap: int
+    ) -> List[Dict[str, Any]]:
         """Create semantic chunks based on content structure.
 
         Args:
@@ -496,7 +561,7 @@ class ChunkerStage(Stage):
             List of chunk dictionaries
         """
         # For now, use paragraph-based chunking as a semantic approximation
-        paragraphs = [p.strip() for p in content.split('\n\n') if p.strip()]
+        paragraphs = [p.strip() for p in content.split("\n\n") if p.strip()]
 
         chunks = []
         current_chunk = ""
@@ -505,21 +570,23 @@ class ChunkerStage(Stage):
         for paragraph in paragraphs:
             # If adding this paragraph would exceed chunk size, finalize current chunk
             if current_chunk and len(current_chunk) + len(paragraph) > chunk_size:
-                chunks.append({
-                    "id": f"chunk_{chunk_id:03d}",
-                    "content": current_chunk.strip(),
-                    "metadata": {
-                        "chunk_type": "semantic",
-                        "chunk_size": len(current_chunk.strip()),
-                        "has_context": bool(overlap > 0)
+                chunks.append(
+                    {
+                        "id": f"chunk_{chunk_id:03d}",
+                        "content": current_chunk.strip(),
+                        "metadata": {
+                            "chunk_type": "semantic",
+                            "chunk_size": len(current_chunk.strip()),
+                            "has_context": bool(overlap > 0),
+                        },
                     }
-                })
+                )
                 chunk_id += 1
 
                 # Start new chunk with overlap
                 if overlap > 0:
                     words = current_chunk.split()
-                    overlap_words = words[-overlap // 10:]  # Approximate word overlap
+                    overlap_words = words[-overlap // 10 :]  # Approximate word overlap
                     current_chunk = " ".join(overlap_words) + " " + paragraph
                 else:
                     current_chunk = paragraph
@@ -527,17 +594,21 @@ class ChunkerStage(Stage):
                 # If the paragraph itself is too large, split it further
                 if len(current_chunk) > chunk_size:
                     # Split large paragraph into smaller chunks
-                    large_chunks = self._split_large_content(current_chunk, chunk_size, overlap)
+                    large_chunks = self._split_large_content(
+                        current_chunk, chunk_size, overlap
+                    )
                     for large_chunk in large_chunks:
-                        chunks.append({
-                            "id": f"chunk_{chunk_id:03d}",
-                            "content": large_chunk.strip(),
-                            "metadata": {
-                                "chunk_type": "semantic",
-                                "chunk_size": len(large_chunk.strip()),
-                                "has_context": bool(overlap > 0)
+                        chunks.append(
+                            {
+                                "id": f"chunk_{chunk_id:03d}",
+                                "content": large_chunk.strip(),
+                                "metadata": {
+                                    "chunk_type": "semantic",
+                                    "chunk_size": len(large_chunk.strip()),
+                                    "has_context": bool(overlap > 0),
+                                },
                             }
-                        })
+                        )
                         chunk_id += 1
                     current_chunk = ""
             else:
@@ -550,32 +621,40 @@ class ChunkerStage(Stage):
         if current_chunk.strip():
             # Check if final chunk is too large and split if necessary
             if len(current_chunk.strip()) > chunk_size:
-                large_chunks = self._split_large_content(current_chunk.strip(), chunk_size, overlap)
+                large_chunks = self._split_large_content(
+                    current_chunk.strip(), chunk_size, overlap
+                )
                 for large_chunk in large_chunks:
-                    chunks.append({
-                        "id": f"chunk_{chunk_id:03d}",
-                        "content": large_chunk.strip(),
-                        "metadata": {
-                            "chunk_type": "semantic",
-                            "chunk_size": len(large_chunk.strip()),
-                            "has_context": bool(overlap > 0)
+                    chunks.append(
+                        {
+                            "id": f"chunk_{chunk_id:03d}",
+                            "content": large_chunk.strip(),
+                            "metadata": {
+                                "chunk_type": "semantic",
+                                "chunk_size": len(large_chunk.strip()),
+                                "has_context": bool(overlap > 0),
+                            },
                         }
-                    })
+                    )
                     chunk_id += 1
             else:
-                chunks.append({
-                    "id": f"chunk_{chunk_id:03d}",
-                    "content": current_chunk.strip(),
-                    "metadata": {
-                        "chunk_type": "semantic",
-                        "chunk_size": len(current_chunk.strip()),
-                        "has_context": bool(overlap > 0)
+                chunks.append(
+                    {
+                        "id": f"chunk_{chunk_id:03d}",
+                        "content": current_chunk.strip(),
+                        "metadata": {
+                            "chunk_type": "semantic",
+                            "chunk_size": len(current_chunk.strip()),
+                            "has_context": bool(overlap > 0),
+                        },
                     }
-                })
+                )
 
         return chunks
 
-    def _split_large_content(self, content: str, chunk_size: int, overlap: int) -> List[str]:
+    def _split_large_content(
+        self, content: str, chunk_size: int, overlap: int
+    ) -> List[str]:
         """Split large content into smaller chunks respecting the size limit.
 
         Args:
@@ -598,12 +677,14 @@ class ChunkerStage(Stage):
             # Try to break at sentence boundary first
             if end < len(content):
                 # Look for sentence endings within the last 200 characters
-                sentence_break = content.rfind('.', start, end)
-                if sentence_break > start + chunk_size // 2:  # Only if it's not too early
+                sentence_break = content.rfind(".", start, end)
+                if (
+                    sentence_break > start + chunk_size // 2
+                ):  # Only if it's not too early
                     end = sentence_break + 1
                 else:
                     # Fall back to word boundary
-                    word_break = content.rfind(' ', start, end)
+                    word_break = content.rfind(" ", start, end)
                     if word_break > start:
                         end = word_break
 
@@ -616,7 +697,9 @@ class ChunkerStage(Stage):
 
         return chunks
 
-    def _page_level_chunking(self, content: str, metadata: Dict[str, Any], chunk_size: int) -> List[Dict[str, Any]]:
+    def _page_level_chunking(
+        self, content: str, metadata: Dict[str, Any], chunk_size: int
+    ) -> List[Dict[str, Any]]:
         """Create page-level chunks for documents.
 
         Args:
@@ -628,7 +711,7 @@ class ChunkerStage(Stage):
             List of chunk dictionaries
         """
         # Look for page markers or use fixed-size as fallback
-        page_pattern = r'\[Page \d+\]|\f|<!-- page \d+ -->'
+        page_pattern = r"\[Page \d+\]|\f|<!-- page \d+ -->"
         page_breaks = list(re.finditer(page_pattern, content, re.IGNORECASE))
 
         if page_breaks:
@@ -637,39 +720,45 @@ class ChunkerStage(Stage):
             start = 0
 
             for i, page_break in enumerate(page_breaks):
-                page_content = content[start:page_break.start()].strip()
+                page_content = content[start : page_break.start()].strip()
                 if page_content:
-                    chunks.append({
-                        "id": f"chunk_{chunk_id:03d}",
-                        "content": page_content,
-                        "metadata": {
-                            "chunk_type": "page",
-                            "page": i + 1,
-                            "chunk_size": len(page_content)
+                    chunks.append(
+                        {
+                            "id": f"chunk_{chunk_id:03d}",
+                            "content": page_content,
+                            "metadata": {
+                                "chunk_type": "page",
+                                "page": i + 1,
+                                "chunk_size": len(page_content),
+                            },
                         }
-                    })
+                    )
                     chunk_id += 1
                 start = page_break.end()
 
             # Add final page
             final_content = content[start:].strip()
             if final_content:
-                chunks.append({
-                    "id": f"chunk_{chunk_id:03d}",
-                    "content": final_content,
-                    "metadata": {
-                        "chunk_type": "page",
-                        "page": len(page_breaks) + 1,
-                        "chunk_size": len(final_content)
+                chunks.append(
+                    {
+                        "id": f"chunk_{chunk_id:03d}",
+                        "content": final_content,
+                        "metadata": {
+                            "chunk_type": "page",
+                            "page": len(page_breaks) + 1,
+                            "chunk_size": len(final_content),
+                        },
                     }
-                })
+                )
 
             return chunks
         else:
             # Fallback to fixed-size chunking
             return self._fixed_size_chunking(content, chunk_size, 200)
 
-    def _topic_based_chunking(self, content: str, metadata: Dict[str, Any], chunk_size: int) -> List[Dict[str, Any]]:
+    def _topic_based_chunking(
+        self, content: str, metadata: Dict[str, Any], chunk_size: int
+    ) -> List[Dict[str, Any]]:
         """Create topic-based chunks for audio/video content.
 
         Args:
@@ -681,10 +770,12 @@ class ChunkerStage(Stage):
             List of chunk dictionaries
         """
         # Look for timestamp patterns and topic headers
-        timestamp_pattern = r'\[(\d{2}:\d{2}(?::\d{2})?)\s*-\s*(\d{2}:\d{2}(?::\d{2})?)\]'
-        topic_pattern = r'^#+\s+(.+)$'
+        timestamp_pattern = (
+            r"\[(\d{2}:\d{2}(?::\d{2})?)\s*-\s*(\d{2}:\d{2}(?::\d{2})?)\]"
+        )
+        topic_pattern = r"^#+\s+(.+)$"
 
-        lines = content.split('\n')
+        lines = content.split("\n")
         chunks = []
         current_chunk = ""
         current_topic = None
@@ -698,17 +789,19 @@ class ChunkerStage(Stage):
             if topic_match:
                 # Finalize previous chunk
                 if current_chunk.strip():
-                    chunks.append({
-                        "id": f"chunk_{chunk_id:03d}",
-                        "content": current_chunk.strip(),
-                        "metadata": {
-                            "chunk_type": "topic",
-                            "topic": current_topic,
-                            "start_time": current_start_time,
-                            "end_time": current_end_time,
-                            "chunk_size": len(current_chunk.strip())
+                    chunks.append(
+                        {
+                            "id": f"chunk_{chunk_id:03d}",
+                            "content": current_chunk.strip(),
+                            "metadata": {
+                                "chunk_type": "topic",
+                                "topic": current_topic,
+                                "start_time": current_start_time,
+                                "end_time": current_end_time,
+                                "chunk_size": len(current_chunk.strip()),
+                            },
                         }
-                    })
+                    )
                     chunk_id += 1
 
                 # Start new chunk
@@ -733,17 +826,19 @@ class ChunkerStage(Stage):
 
             # Check if chunk is getting too large
             if len(current_chunk) > chunk_size:
-                chunks.append({
-                    "id": f"chunk_{chunk_id:03d}",
-                    "content": current_chunk.strip(),
-                    "metadata": {
-                        "chunk_type": "topic",
-                        "topic": current_topic,
-                        "start_time": current_start_time,
-                        "end_time": current_end_time,
-                        "chunk_size": len(current_chunk.strip())
+                chunks.append(
+                    {
+                        "id": f"chunk_{chunk_id:03d}",
+                        "content": current_chunk.strip(),
+                        "metadata": {
+                            "chunk_type": "topic",
+                            "topic": current_topic,
+                            "start_time": current_start_time,
+                            "end_time": current_end_time,
+                            "chunk_size": len(current_chunk.strip()),
+                        },
                     }
-                })
+                )
                 chunk_id += 1
                 current_chunk = ""
                 current_start_time = None
@@ -751,21 +846,25 @@ class ChunkerStage(Stage):
 
         # Add final chunk
         if current_chunk.strip():
-            chunks.append({
-                "id": f"chunk_{chunk_id:03d}",
-                "content": current_chunk.strip(),
-                "metadata": {
-                    "chunk_type": "topic",
-                    "topic": current_topic,
-                    "start_time": current_start_time,
-                    "end_time": current_end_time,
-                    "chunk_size": len(current_chunk.strip())
+            chunks.append(
+                {
+                    "id": f"chunk_{chunk_id:03d}",
+                    "content": current_chunk.strip(),
+                    "metadata": {
+                        "chunk_type": "topic",
+                        "topic": current_topic,
+                        "start_time": current_start_time,
+                        "end_time": current_end_time,
+                        "chunk_size": len(current_chunk.strip()),
+                    },
                 }
-            })
+            )
 
         return chunks
 
-    async def _add_embeddings(self, chunks: List[Dict[str, Any]], config: Dict[str, Any]) -> List[Dict[str, Any]]:
+    async def _add_embeddings(
+        self, chunks: List[Dict[str, Any]], config: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
         """Add embeddings to chunks.
 
         Args:
@@ -780,33 +879,43 @@ class ChunkerStage(Stage):
 
         try:
             # Extract content for embedding
-            texts = [chunk['content'] for chunk in chunks]
+            texts = [chunk["content"] for chunk in chunks]
 
             # Generate embeddings in batches
-            batch_size = self._get_config_value(config, 'batch_size', 50)
-            model = self._get_config_value(config, 'embedding_model', 'text-embedding-004')
+            batch_size = self._get_config_value(config, "batch_size", 50)
+            model = self._get_config_value(
+                config, "embedding_model", "text-embedding-004"
+            )
 
             # Process in batches for better performance
             all_embeddings = []
             for i in range(0, len(texts), batch_size):
-                batch_texts = texts[i:i + batch_size]
-                logger.debug("Generating embeddings for batch",
-                           batch_start=i, batch_size=len(batch_texts), model=model)
+                batch_texts = texts[i : i + batch_size]
+                logger.debug(
+                    "Generating embeddings for batch",
+                    batch_start=i,
+                    batch_size=len(batch_texts),
+                    model=model,
+                )
 
                 # Use the correct method name for batch embeddings
-                batch_result = await self.embedding_service.generate_batch_embeddings(batch_texts)
+                batch_result = await self.embedding_service.generate_batch_embeddings(
+                    batch_texts
+                )
                 all_embeddings.extend(batch_result.embeddings)
 
             # Add embeddings to chunks
             for i, chunk in enumerate(chunks):
                 if i < len(all_embeddings):
-                    chunk['embedding'] = all_embeddings[i]
+                    chunk["embedding"] = all_embeddings[i]
 
-            logger.info("Generated embeddings for chunks",
-                       total_chunks=len(chunks),
-                       total_embeddings=len(all_embeddings),
-                       batch_size=batch_size,
-                       model=model)
+            logger.info(
+                "Generated embeddings for chunks",
+                total_chunks=len(chunks),
+                total_embeddings=len(all_embeddings),
+                batch_size=batch_size,
+                model=model,
+            )
 
             return chunks
 
@@ -814,7 +923,9 @@ class ChunkerStage(Stage):
             logger.warning("Failed to generate embeddings", error=str(e))
             return chunks
 
-    def _add_context_to_chunks(self, chunks: List[Dict[str, Any]], config: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def _add_context_to_chunks(
+        self, chunks: List[Dict[str, Any]], config: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
         """Add contextual information to chunks.
 
         Args:
@@ -824,10 +935,10 @@ class ChunkerStage(Stage):
         Returns:
             Chunks with context added
         """
-        if not self._get_config_value(config, 'include_context', True):
+        if not self._get_config_value(config, "include_context", True):
             return chunks
 
-        context_window = self._get_config_value(config, 'context_window', 2)
+        context_window = self._get_config_value(config, "context_window", 2)
 
         for i, chunk in enumerate(chunks):
             # Add surrounding context
@@ -836,20 +947,22 @@ class ChunkerStage(Stage):
 
             # Get context before
             for j in range(max(0, i - context_window), i):
-                context_before.append(chunks[j]['content'][:200])  # First 200 chars
+                context_before.append(chunks[j]["content"][:200])  # First 200 chars
 
             # Get context after
             for j in range(i + 1, min(len(chunks), i + context_window + 1)):
-                context_after.append(chunks[j]['content'][:200])  # First 200 chars
+                context_after.append(chunks[j]["content"][:200])  # First 200 chars
 
             # Create context summary
             context_summary = ""
             if context_before:
-                context_summary += "Previous context: " + " ... ".join(context_before) + " ... "
+                context_summary += (
+                    "Previous context: " + " ... ".join(context_before) + " ... "
+                )
             if context_after:
                 context_summary += "Following context: " + " ... ".join(context_after)
 
-            chunk['context_summary'] = context_summary.strip()
-            chunk['metadata']['has_context'] = bool(context_summary)
+            chunk["context_summary"] = context_summary.strip()
+            chunk["metadata"]["has_context"] = bool(context_summary)
 
         return chunks
