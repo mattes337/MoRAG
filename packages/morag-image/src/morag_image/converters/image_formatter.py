@@ -2,7 +2,7 @@
 
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 
 import structlog
 
@@ -127,7 +127,7 @@ class ImageFormatter:
         # Try to identify different types of content
         lines = raw_content.split("\n")
         current_section = "visual"  # Default section
-        current_content = []
+        current_content: list[str] = []
 
         for line in lines:
             line_lower = line.lower().strip()
@@ -300,7 +300,7 @@ class ImageFormatter:
         Returns:
             Dictionary containing image metadata
         """
-        metadata = {}
+        metadata: dict[str, Any] = {}
 
         try:
             # Try to get image dimensions and other metadata

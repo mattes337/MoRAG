@@ -3,7 +3,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, Optional, Union
 
 from ..exceptions import ProcessingError
 
@@ -42,7 +42,7 @@ class ProcessingConfig:
         self.remote: Optional[bool] = kwargs.get("remote")
 
         # Progress callback for long-running operations
-        self.progress_callback: Optional[callable] = kwargs.get("progress_callback")
+        self.progress_callback: Optional[Callable] = kwargs.get("progress_callback")
 
         # Store any additional unknown parameters for potential use by converters
         self.additional_options: Dict[str, Any] = {

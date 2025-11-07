@@ -7,9 +7,7 @@ of documents, chunks, entities, and relations.
 
 import hashlib
 import re
-import uuid
-from datetime import datetime
-from typing import List, Optional, Union
+from typing import List, Optional
 
 
 class IDValidationError(Exception):
@@ -28,7 +26,7 @@ class UnifiedIDGenerator:
     """Unified ID generation for cross-system compatibility."""
 
     @staticmethod
-    def generate_document_id(source_file: str, checksum: str = None) -> str:
+    def generate_document_id(source_file: str, checksum: Optional[str] = None) -> str:
         """Generate deterministic document ID.
 
         Args:
@@ -276,7 +274,9 @@ class IDCollisionDetector:
         self.seen_ids = set()
         self.collision_count = 0
 
-    def check_collision(self, id_value: str, existing_ids: List[str] = None) -> bool:
+    def check_collision(
+        self, id_value: str, existing_ids: Optional[List[str]] = None
+    ) -> bool:
         """Check if ID already exists.
 
         Args:

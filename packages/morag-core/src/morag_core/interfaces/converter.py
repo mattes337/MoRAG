@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
 from ..exceptions import MoRAGException
 
@@ -61,7 +61,7 @@ class ConversionOptions:
     fix_encoding_issues: bool = True
 
     # Progress callback for long-running operations
-    progress_callback: Optional[callable] = None
+    progress_callback: Optional[Callable] = None
 
     # Output options
     include_page_numbers: bool = True

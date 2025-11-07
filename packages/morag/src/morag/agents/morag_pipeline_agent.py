@@ -1,17 +1,17 @@
 """Unified MoRAG Pipeline Agent for complete workflow orchestration."""
 
-import asyncio
 import time
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, NamedTuple, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 import structlog
+from morag_services import ContentType, ServiceConfig
+
 from morag_core.config import get_settings
 from morag_core.exceptions import ProcessingError
-from morag_core.models import Document, DocumentChunk, ProcessingResult
-from morag_services import ContentType, MoRAGServices, ServiceConfig
+from morag_core.models import Document, ProcessingResult
 
 from ..orchestrator import MoRAGOrchestrator
 
@@ -157,7 +157,7 @@ class MoRAGPipelineAgent:
         self.intermediate_dir.mkdir(exist_ok=True)
 
         # Performance tracking
-        self.stage_timings = {}
+        self.stage_timings: dict[str, float] = {}
         self.total_processing_time = 0.0
 
         logger.info(
@@ -265,7 +265,7 @@ class MoRAGPipelineAgent:
             Resolution result with response and metadata
         """
         start_time = time.time()
-        intermediate_files = []
+        intermediate_files: list[str] = []
 
         try:
             logger.info(

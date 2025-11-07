@@ -8,20 +8,12 @@ from pydantic import BaseModel, Field
 class SourceMetadata(BaseModel):
     """Detailed source metadata for facts."""
 
-    document_name: Optional[str] = Field(
-        None, description="Name of the source document"
-    )
-    chunk_index: Optional[int] = Field(
-        None, description="Index of the chunk within the document"
-    )
-    page_number: Optional[int] = Field(None, description="Page number if applicable")
-    section: Optional[str] = Field(None, description="Document section")
-    timestamp: Optional[str] = Field(
-        None, description="Timestamp for audio/video content"
-    )
-    additional_metadata: Dict[str, Any] = Field(
-        default_factory=dict, description="Additional source metadata"
-    )
+    document_name: Optional[str] = None
+    chunk_index: Optional[int] = None
+    page_number: Optional[int] = None
+    section: Optional[str] = None
+    timestamp: Optional[str] = None
+    additional_metadata: Dict[str, Any] = Field(default_factory=dict)
 
 
 class RawFact(BaseModel):
@@ -41,7 +33,7 @@ class RawFact(BaseModel):
         None, description="Optional ID of Qdrant chunk if fact from chunk content"
     )
     source_metadata: SourceMetadata = Field(
-        default_factory=SourceMetadata, description="Detailed source metadata"
+        default_factory=lambda: SourceMetadata(), description="Detailed source metadata"
     )
     extracted_from_depth: int = Field(
         ...,
@@ -66,7 +58,7 @@ class ScoredFact(BaseModel):
         None, description="Optional ID of Qdrant chunk if fact from chunk content"
     )
     source_metadata: SourceMetadata = Field(
-        default_factory=SourceMetadata, description="Detailed source metadata"
+        default_factory=lambda: SourceMetadata(), description="Detailed source metadata"
     )
     extracted_from_depth: int = Field(
         ...,
@@ -97,7 +89,7 @@ class FinalFact(BaseModel):
         None, description="Optional ID of Qdrant chunk if fact from chunk content"
     )
     source_metadata: SourceMetadata = Field(
-        default_factory=SourceMetadata, description="Detailed source metadata"
+        default_factory=lambda: SourceMetadata(), description="Detailed source metadata"
     )
     extracted_from_depth: int = Field(
         ...,

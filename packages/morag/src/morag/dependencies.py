@@ -49,7 +49,6 @@ try:
         PathSelectionAgent,
         ReasoningPathFinder,
         RecursiveFactRetrievalService,
-        RetrievalContext,
     )
 
     REASONING_AVAILABLE = True
@@ -62,7 +61,6 @@ except ImportError as e:
     PathSelectionAgent = None
     ReasoningPathFinder = None
     IterativeRetriever = None
-    RetrievalContext = None
     RecursiveFactRetrievalService = None
 
 logger = structlog.get_logger(__name__)
@@ -421,6 +419,11 @@ async def get_recursive_fact_retrieval_service() -> Optional[
         return None
 
     try:
+        from morag.database_factory import (
+            get_connected_default_neo4j_storage,
+            get_connected_default_qdrant_storage,
+        )
+
         # Get LLM client
         llm_client = get_llm_client()
         if not llm_client:
@@ -599,15 +602,15 @@ def create_dynamic_graph_engine(
     return get_graph_engine()
 
 
-def create_dynamic_hybrid_retrieval_coordinator(
+async def create_dynamic_hybrid_retrieval_coordinator(
     database_servers: Optional[List[Dict[str, Any]]] = None
 ):
     """Create a hybrid retrieval coordinator with dynamic database connections."""
     if database_servers:
         from morag.database_factory import get_neo4j_storages, get_qdrant_storages
 
-        qdrant_storages = get_qdrant_storages(database_servers)
-        neo4j_storages = get_neo4j_storages(database_servers)
+        qdrant_storages = await get_qdrant_storages(database_servers)
+        neo4j_storages = await get_neo4j_storages(database_servers)
 
         # Create custom vector retriever if Qdrant storages are available
         if qdrant_storages:

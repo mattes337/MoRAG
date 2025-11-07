@@ -3,10 +3,9 @@
 Provides comprehensive validation for all maintenance job configurations
 with helpful error messages and recommendations.
 """
-from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List
 
 import structlog
 
@@ -218,9 +217,9 @@ class MaintenanceConfigValidator:
             )
 
         schema = cls.SCHEMAS[job_name]
-        errors = []
-        warnings = []
-        recommendations = []
+        errors: list[str] = []
+        warnings: list[str] = []
+        recommendations: list[str] = []
 
         # Validate each configuration parameter
         for param_name, param_schema in schema.items():
