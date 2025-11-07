@@ -166,20 +166,30 @@ class MarkdownConversionStage(Stage):
         if output_dir is None:
             output_dir = context.output_dir or Path.cwd()
 
-        stage_metadata = StageMetadata(
-            stage_type=self.stage_type,
-            start_time=datetime.now(),
-            input_count=len(input_files),
-            config=self.config,
-        )
+        start_time = datetime.now()
+        output_files_list = []
 
         try:
             # Validate inputs
             if not self.validate_inputs(input_files):
+                end_time = datetime.now()
+                execution_time = (end_time - start_time).total_seconds()
+
+                stage_metadata = StageMetadata(
+                    execution_time=execution_time,
+                    start_time=start_time,
+                    end_time=end_time,
+                    input_files=[str(f) for f in input_files],
+                    output_files=[],
+                    config_used=self.config,
+                )
+
                 return StageResult(
+                    stage_type=self.stage_type,
                     status=StageStatus.FAILED,
+                    output_files=[],
                     metadata=stage_metadata,
-                    error="Input validation failed",
+                    error_message="Input validation failed",
                 )
 
             # Create output directory
@@ -232,6 +242,7 @@ class MarkdownConversionStage(Stage):
                     )
 
                     if result["success"]:
+                        output_files_list.append(output_file)
                         results.append(
                             {
                                 "input_file": str(input_file),
@@ -280,23 +291,53 @@ class MarkdownConversionStage(Stage):
             else:
                 status = StageStatus.FAILED
 
-            # Update metadata
-            stage_metadata.end_time = datetime.now()
-            stage_metadata.output_count = successful_files
-            stage_metadata.success_rate = (
-                successful_files / total_files if total_files > 0 else 0.0
+            # Create metadata
+            end_time = datetime.now()
+            execution_time = (end_time - start_time).total_seconds()
+
+            stage_metadata = StageMetadata(
+                execution_time=execution_time,
+                start_time=start_time,
+                end_time=end_time,
+                input_files=[str(f) for f in input_files],
+                output_files=[str(f) for f in output_files_list],
+                config_used=self.config,
+                metrics={
+                    "total_files": total_files,
+                    "successful_files": successful_files,
+                    "failed_files": len(errors),
+                    "success_rate": successful_files / total_files if total_files > 0 else 0.0,
+                }
             )
 
             return StageResult(
-                status=status, metadata=stage_metadata, outputs=results, errors=errors
+                stage_type=self.stage_type,
+                status=status,
+                output_files=output_files_list,
+                metadata=stage_metadata,
+                data={"results": results, "errors": errors}
             )
 
         except Exception as e:
-            stage_metadata.end_time = datetime.now()
+            end_time = datetime.now()
+            execution_time = (end_time - start_time).total_seconds()
             logger.error("Stage execution failed", error=str(e))
 
+            stage_metadata = StageMetadata(
+                execution_time=execution_time,
+                start_time=start_time,
+                end_time=end_time,
+                input_files=[str(f) for f in input_files],
+                output_files=[str(f) for f in output_files_list],
+                config_used=self.config,
+            )
+
             return StageResult(
-                status=StageStatus.FAILED, metadata=stage_metadata, error=str(e)
+                stage_type=self.stage_type,
+                status=StageStatus.FAILED,
+                output_files=output_files_list,
+                metadata=stage_metadata,
+                error_message=str(e)
             )
 
     @validation_error_handler("markdown_conversion_validate_inputs")
