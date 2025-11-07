@@ -221,6 +221,24 @@ class FactGeneratorStage(Stage):
         # Merge context config into self.config (preserving defaults)
         self.config.update(context_config)
 
+        # Create FactGeneratorConfig object for extraction engine
+        try:
+            from morag_core.config import FactGeneratorConfig as CoreFactGeneratorConfig
+            # Create config object from merged dict
+            fact_gen_config = CoreFactGeneratorConfig.from_env_and_overrides(context_config)
+        except ImportError:
+            # Fallback: create a simple object with dict attributes
+            class SimpleConfig:
+                def __init__(self, config_dict):
+                    for key, value in config_dict.items():
+                        setattr(self, key, value)
+                    # Add required attributes with defaults
+                    if not hasattr(self, 'enable_batch_processing'):
+                        self.enable_batch_processing = True
+                    if not hasattr(self, 'max_chunks_per_batch'):
+                        self.max_chunks_per_batch = 10
+            fact_gen_config = SimpleConfig(self.config)
+
         start_time = datetime.now()
         output_files_list = []
 
@@ -299,7 +317,7 @@ class FactGeneratorStage(Stage):
 
                     # Extract facts from chunks
                     extracted_results = (
-                        await self.extraction_engine.extract_from_chunks(chunks, config)
+                        await self.extraction_engine.extract_from_chunks(chunks, fact_gen_config)
                     )
 
                     # Compile results
