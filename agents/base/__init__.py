@@ -1,16 +1,20 @@
-"""Base classes and utilities for MoRAG agents."""
+"""Base classes and utilities for MoRAG agents.
+
+Note: BaseAgent has been moved to morag_core.ai.base_agent
+This module provides backward compatibility imports.
+"""
 
 from .agent import BaseAgent
 from .config import AgentConfig
-from .template import PromptTemplate
-from .response_parser import LLMResponseParser, LLMResponseParseError
 from .exceptions import (
     AgentError,
     ConfigurationError,
     PromptGenerationError,
-    ValidationError,
     RetryExhaustedError,
+    ValidationError,
 )
+from .response_parser import LLMResponseParseError, LLMResponseParser
+from .template import PromptTemplate
 
 __all__ = [
     "BaseAgent",

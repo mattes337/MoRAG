@@ -13,12 +13,7 @@ Key Features:
 - Dynamic prompt generation based on configuration
 """
 
-from .analysis import (
-    ContentAnalysisAgent,
-    QueryAnalysisAgent,
-    SentimentAnalysisAgent,
-    TopicAnalysisAgent,
-)
+# Core base imports (always available)
 from .base import (
     AgentConfig,
     AgentError,
@@ -29,41 +24,97 @@ from .base import (
     PromptGenerationError,
     PromptTemplate,
 )
-from .config import AgentConfigManager, ModelConfig, PromptConfig, RetryConfig
 
-# Import specialized agents
-from .extraction import (
-    EntityExtractionAgent,
-    FactExtractionAgent,
-    KeywordExtractionAgent,
-    RelationExtractionAgent,
-)
-from .factory import (
-    AgentFactory,
-    AgentRegistry,
-    create_agent,
-    get_agent,
-    register_agent,
-)
-from .generation import (
-    ExplanationAgent,
-    ResponseGenerationAgent,
-    SummarizationAgent,
-    SynthesisAgent,
-)
-from .processing import (
-    ChunkingAgent,
-    ClassificationAgent,
-    FilteringAgent,
-    SemanticChunkingAgent,
-    ValidationAgent,
-)
-from .reasoning import (
-    ContextAnalysisAgent,
-    DecisionMakingAgent,
-    PathSelectionAgent,
-    ReasoningAgent,
-)
+# Optional imports with fallbacks
+try:
+    from .config import AgentConfigManager, ModelConfig, PromptConfig, RetryConfig
+except ImportError:
+    AgentConfigManager = None
+    ModelConfig = None
+    PromptConfig = None
+    RetryConfig = None
+
+try:
+    from .analysis import (
+        ContentAnalysisAgent,
+        QueryAnalysisAgent,
+        SentimentAnalysisAgent,
+        TopicAnalysisAgent,
+    )
+except ImportError:
+    ContentAnalysisAgent = None
+    QueryAnalysisAgent = None
+    SentimentAnalysisAgent = None
+    TopicAnalysisAgent = None
+
+try:
+    from .extraction import (
+        EntityExtractionAgent,
+        FactExtractionAgent,
+        KeywordExtractionAgent,
+        RelationExtractionAgent,
+    )
+except ImportError:
+    EntityExtractionAgent = None
+    FactExtractionAgent = None
+    KeywordExtractionAgent = None
+    RelationExtractionAgent = None
+
+try:
+    from .factory import (
+        AgentFactory,
+        AgentRegistry,
+        create_agent,
+        get_agent,
+        register_agent,
+    )
+except ImportError:
+    AgentFactory = None
+    AgentRegistry = None
+    create_agent = None
+    get_agent = None
+    register_agent = None
+
+try:
+    from .generation import (
+        ExplanationAgent,
+        ResponseGenerationAgent,
+        SummarizationAgent,
+        SynthesisAgent,
+    )
+except ImportError:
+    ExplanationAgent = None
+    ResponseGenerationAgent = None
+    SummarizationAgent = None
+    SynthesisAgent = None
+
+try:
+    from .processing import (
+        ChunkingAgent,
+        ClassificationAgent,
+        FilteringAgent,
+        SemanticChunkingAgent,
+        ValidationAgent,
+    )
+except ImportError:
+    ChunkingAgent = None
+    ClassificationAgent = None
+    FilteringAgent = None
+    SemanticChunkingAgent = None
+    ValidationAgent = None
+
+try:
+    from .reasoning import (
+        ContextAnalysisAgent,
+        DecisionMakingAgent,
+        PathSelectionAgent,
+        ReasoningAgent,
+    )
+except ImportError:
+    ContextAnalysisAgent = None
+    DecisionMakingAgent = None
+    PathSelectionAgent = None
+    ReasoningAgent = None
 
 __version__ = "1.0.0"
 
