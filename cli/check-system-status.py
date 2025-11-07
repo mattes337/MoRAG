@@ -8,7 +8,29 @@ from pathlib import Path
 # Add the project root to the Python path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
-sys.path.insert(0, str(project_root / "packages" / "morag-core" / "src"))
+
+# Add all package source directories to Python path
+package_dirs = [
+    "morag-core",
+    "morag-agents",
+    "morag-services",
+    "morag-embedding",
+    "morag-document",
+    "morag-audio",
+    "morag-video",
+    "morag-image",
+    "morag-web",
+    "morag-youtube",
+    "morag-graph",
+    "morag-stages",
+    "morag-reasoning",
+    "morag",
+]
+
+for package_dir in package_dirs:
+    package_path = project_root / "packages" / package_dir / "src"
+    if package_path.exists():
+        sys.path.insert(0, str(package_path))
 
 import structlog
 
@@ -108,18 +130,14 @@ def check_graph_processing():
         # Test basic functionality - BaseExtractor is abstract, so skip instantiation
         print("✅ BaseExtractor class available")
 
-        # Test entity creation with UUID format
-        import uuid
-
-        entity = Entity(
-            id=str(uuid.uuid4()), name="Test Entity", type="test", properties={}
-        )
+        # Test entity creation - let the model auto-generate IDs
+        entity = Entity(name="Test Entity", type="test", properties={})
         print("✅ Entity model working")
 
+        # Test relation creation - let the model auto-generate IDs
         relation = Relation(
-            id=str(uuid.uuid4()),
-            source_id=str(uuid.uuid4()),
-            target_id=str(uuid.uuid4()),
+            source_entity_id=entity.id,
+            target_entity_id=entity.id,
             type="test_relation",
             properties={},
         )

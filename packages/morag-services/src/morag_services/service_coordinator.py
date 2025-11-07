@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 import structlog
-from morag_audio.service import AudioService
 from morag_core.exceptions import ProcessingError, UnsupportedFormatError
 from morag_core.interfaces import IServiceCoordinator
 from morag_core.interfaces.service import BaseService
@@ -18,10 +17,40 @@ from morag_core.models import ProcessingConfig
 from morag_document.service import DocumentService
 from morag_embedding import GeminiEmbeddingService
 from morag_image.service import ImageService
-from morag_video.service import VideoService
 from morag_web.service import WebService
-from morag_youtube.service import YouTubeService
 from pydantic import BaseModel
+
+logger = structlog.get_logger(__name__)
+
+# Import YouTube service with graceful fallback (requires apify_client)
+try:
+    from morag_youtube.service import YouTubeService
+
+    YOUTUBE_SERVICE_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"YouTube service not available: {e}")
+    YouTubeService = None
+    YOUTUBE_SERVICE_AVAILABLE = False
+
+# Import audio service with graceful fallback (requires ffmpeg-python)
+try:
+    from morag_audio.service import AudioService
+
+    AUDIO_SERVICE_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"Audio service not available: {e}")
+    AudioService = None
+    AUDIO_SERVICE_AVAILABLE = False
+
+# Import video service with graceful fallback (requires ffmpeg-python)
+try:
+    from morag_video.service import VideoService
+
+    VIDEO_SERVICE_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"Video service not available: {e}")
+    VideoService = None
+    VIDEO_SERVICE_AVAILABLE = False
 
 # Import graph processing
 from .graph_processor import (
@@ -220,16 +249,24 @@ class MoRAGServiceCoordinator(IServiceCoordinator):
                 logger.debug("Document service initialized")
 
             # Initialize audio service
-            if self.config.audio_config:
+            if self.config.audio_config and AUDIO_SERVICE_AVAILABLE:
                 self.audio_service = AudioService(config=self.config.audio_config)
                 await self.audio_service.initialize()
                 logger.debug("Audio service initialized")
+            elif self.config.audio_config and not AUDIO_SERVICE_AVAILABLE:
+                logger.warning(
+                    "Audio service requested but not available (missing ffmpeg-python)"
+                )
 
             # Initialize video service
-            if self.config.video_config:
+            if self.config.video_config and VIDEO_SERVICE_AVAILABLE:
                 self.video_service = VideoService(config=self.config.video_config)
                 await self.video_service.initialize()
                 logger.debug("Video service initialized")
+            elif self.config.video_config and not VIDEO_SERVICE_AVAILABLE:
+                logger.warning(
+                    "Video service requested but not available (missing ffmpeg-python)"
+                )
 
             # Initialize image service
             if self.config.image_config:
@@ -249,10 +286,14 @@ class MoRAGServiceCoordinator(IServiceCoordinator):
                 logger.debug("Web service initialized")
 
             # Initialize YouTube service
-            if self.config.youtube_config:
+            if self.config.youtube_config and YOUTUBE_SERVICE_AVAILABLE:
                 self.youtube_service = YouTubeService(config=self.config.youtube_config)
                 await self.youtube_service.initialize()
                 logger.debug("YouTube service initialized")
+            elif self.config.youtube_config and not YOUTUBE_SERVICE_AVAILABLE:
+                logger.warning(
+                    "YouTube service requested but not available (missing apify_client)"
+                )
 
             # Initialize graph processor if config provided
             if self.graph_config:

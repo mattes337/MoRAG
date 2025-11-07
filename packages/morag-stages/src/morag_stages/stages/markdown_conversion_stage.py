@@ -126,20 +126,20 @@ class MarkdownConversionStage(Stage):
 
     def __init__(self, stage_type: StageType = StageType.MARKDOWN_CONVERSION):
         """Initialize the markdown conversion stage."""
-        super().__init__(
-            stage_type,
-            {
-                "markitdown_enabled": True,
-                "process_images": True,
-                "process_audio": True,
-                "process_video": True,
-                "process_documents": True,
-                "process_web": True,
-                "output_format": "markdown",
-                "quality_threshold": 0.3,
-                "max_file_size_mb": 100,
-            },
-        )
+        super().__init__(stage_type)
+
+        # Store default configuration
+        self.config = {
+            "markitdown_enabled": True,
+            "process_images": True,
+            "process_audio": True,
+            "process_video": True,
+            "process_documents": True,
+            "process_web": True,
+            "output_format": "markdown",
+            "quality_threshold": 0.3,
+            "max_file_size_mb": 100,
+        }
 
         # Initialize components
         self.converter_factory = ConverterFactory()

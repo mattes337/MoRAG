@@ -29,7 +29,12 @@ except ImportError as e:
 
 # Extraction components - import with graceful fallback
 try:
-    from .extraction import EntityExtractor, RelationExtractor
+    from .extraction import (
+        BaseExtractor,
+        DummyExtractor,
+        EntityExtractor,
+        RelationExtractor,
+    )
 
     _EXTRACTION_AVAILABLE = True
 except ImportError as e:
@@ -39,6 +44,12 @@ except ImportError as e:
     _EXTRACTION_AVAILABLE = False
 
     # Create placeholder classes
+    class BaseExtractor:
+        pass
+
+    class DummyExtractor:
+        pass
+
     class EntityExtractor:
         pass
 
@@ -48,7 +59,13 @@ except ImportError as e:
 
 # Storage backends - import with graceful fallback
 try:
-    from .storage import Neo4jConfig, Neo4jStorage, QdrantConfig, QdrantStorage
+    from .storage import (
+        GraphStorage,
+        Neo4jConfig,
+        Neo4jStorage,
+        QdrantConfig,
+        QdrantStorage,
+    )
 
     _STORAGE_AVAILABLE = True
 except ImportError as e:
@@ -58,6 +75,9 @@ except ImportError as e:
     _STORAGE_AVAILABLE = False
 
     # Create placeholder classes
+    class GraphStorage:
+        pass
+
     class Neo4jStorage:
         pass
 
@@ -214,8 +234,11 @@ __all__ = [
     "Entity",
     "Relation",
     "Graph",
+    "BaseExtractor",
+    "DummyExtractor",
     "EntityExtractor",
     "RelationExtractor",
+    "GraphStorage",
     "Neo4jStorage",
     "QdrantStorage",
     "Neo4jConfig",
