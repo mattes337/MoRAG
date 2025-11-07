@@ -17,7 +17,7 @@ from morag_services.embedding import GeminiEmbeddingService
 
 class FactExtractionService:
     """Service for extracting and storing facts from document chunks."""
-    
+
     def __init__(
         self,
         neo4j_storage: Neo4jStorage,
@@ -80,7 +80,7 @@ class FactExtractionService:
                 collection_name=f"{qdrant_storage.collection_name}_facts",
                 embedding_service=embedding_service
             )
-    
+
     async def extract_facts_from_chunks(
         self,
         chunks: List[DocumentChunk],
@@ -89,12 +89,12 @@ class FactExtractionService:
         query_context: Optional[str] = None
     ) -> Dict[str, Any]:
         """Extract facts from document chunks.
-        
+
         Args:
             chunks: List of document chunks to process
             domain: Optional domain context
             language: Language of the content
-            
+
         Returns:
             Dictionary with extraction results
         """
@@ -108,14 +108,14 @@ class FactExtractionService:
                     'relationships_created': 0
                 }
             }
-        
+
         self.logger.info(
             "Starting fact extraction from chunks",
             num_chunks=len(chunks),
             domain=domain,
             language=language
         )
-        
+
         try:
             # Extract facts from all chunks
             all_facts = []
@@ -124,7 +124,7 @@ class FactExtractionService:
                 'language': language,
                 'query_context': query_context
             }
-            
+
             # Process chunks in parallel batches
             batch_size = 5
             for i in range(0, len(chunks), batch_size):
@@ -133,9 +133,9 @@ class FactExtractionService:
                     self._extract_facts_from_chunk(chunk, extraction_context)
                     for chunk in batch
                 ]
-                
+
                 batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
-                
+
                 for result in batch_results:
                     if isinstance(result, Exception):
                         self.logger.warning(
@@ -143,10 +143,10 @@ class FactExtractionService:
                             error=str(result)
                         )
                         continue
-                    
+
                     if isinstance(result, list):
                         all_facts.extend(result)
-            
+
             # Store facts in Neo4j
             stored_fact_ids = []
             vector_point_ids = []
@@ -168,23 +168,23 @@ class FactExtractionService:
                             error=str(e),
                             num_facts=len(all_facts)
                         )
-            
+
             # Extract relationships if enabled
             relationships = []
             if self.enable_relationships and len(all_facts) > 1:
                 try:
                     graph = await self.graph_builder.build_fact_graph(all_facts)
                     relationships = self._extract_relationships_from_graph(graph)
-                    
+
                     if relationships:
                         await self.fact_operations.store_fact_relations(relationships)
-                        
+
                 except Exception as e:
                     self.logger.warning(
                         "Relationship extraction failed",
                         error=str(e)
                     )
-            
+
             statistics = {
                 'chunks_processed': len(chunks),
                 'facts_extracted': len(all_facts),
@@ -193,18 +193,18 @@ class FactExtractionService:
                 'relationships_created': len(relationships),
                 'vector_storage_enabled': self.enable_vector_storage
             }
-            
+
             self.logger.info(
                 "Fact extraction completed",
                 **statistics
             )
-            
+
             return {
                 'facts': all_facts,
                 'relationships': relationships,
                 'statistics': statistics
             }
-            
+
         except Exception as e:
             self.logger.error(
                 "Fact extraction service failed",
@@ -212,18 +212,18 @@ class FactExtractionService:
                 error_type=type(e).__name__
             )
             raise
-    
+
     async def _extract_facts_from_chunk(
         self,
         chunk: DocumentChunk,
         context: Dict[str, Any]
     ) -> List[Fact]:
         """Extract facts from a single chunk.
-        
+
         Args:
             chunk: Document chunk to process
             context: Extraction context
-            
+
         Returns:
             List of extracted facts
         """
@@ -244,15 +244,15 @@ class FactExtractionService:
                 document_id=chunk.document_id,
                 context=enhanced_context
             )
-            
+
             self.logger.debug(
                 "Facts extracted from chunk",
                 chunk_id=chunk.id,
                 facts_count=len(facts)
             )
-            
+
             return facts
-            
+
         except Exception as e:
             self.logger.warning(
                 "Failed to extract facts from chunk",
@@ -260,18 +260,18 @@ class FactExtractionService:
                 error=str(e)
             )
             return []
-    
+
     def _extract_relationships_from_graph(self, graph) -> List[FactRelation]:
         """Extract FactRelation objects from graph edges.
-        
+
         Args:
             graph: Graph object with edges
-            
+
         Returns:
             List of FactRelation objects
         """
         relationships = []
-        
+
         for edge in graph.edges:
             try:
                 # Convert graph edge to FactRelation
@@ -283,7 +283,7 @@ class FactExtractionService:
                     context=edge.properties.get('context', '')
                 )
                 relationships.append(relation)
-                
+
             except Exception as e:
                 self.logger.warning(
                     "Failed to convert graph edge to relation",
@@ -291,9 +291,9 @@ class FactExtractionService:
                     error=str(e)
                 )
                 continue
-        
+
         return relationships
-    
+
     async def extract_facts_from_document(
         self,
         document_id: str,
@@ -301,18 +301,18 @@ class FactExtractionService:
         language: str = "en"
     ) -> Dict[str, Any]:
         """Extract facts from all chunks of a document.
-        
+
         Args:
             document_id: Document ID to process
             domain: Optional domain context
             language: Language of the content
-            
+
         Returns:
             Dictionary with extraction results
         """
         # Get document chunks from storage
         chunks = await self._get_document_chunks(document_id)
-        
+
         if not chunks:
             self.logger.warning(
                 "No chunks found for document",
@@ -327,15 +327,15 @@ class FactExtractionService:
                     'relationships_created': 0
                 }
             }
-        
+
         return await self.extract_facts_from_chunks(chunks, domain, language)
-    
+
     async def _get_document_chunks(self, document_id: str) -> List[DocumentChunk]:
         """Get document chunks from storage.
-        
+
         Args:
             document_id: Document ID
-            
+
         Returns:
             List of document chunks
         """
@@ -347,10 +347,10 @@ class FactExtractionService:
                 RETURN c
                 ORDER BY c.index
                 """
-                
+
                 result = await session.run(query, document_id=document_id)
                 chunks = []
-                
+
                 async for record in result:
                     chunk_data = dict(record["c"])
                     chunk = DocumentChunk(
@@ -361,9 +361,9 @@ class FactExtractionService:
                         metadata=chunk_data.get('metadata', {})
                     )
                     chunks.append(chunk)
-                
+
                 return chunks
-                
+
         except Exception as e:
             self.logger.error(
                 "Failed to get document chunks",
@@ -371,18 +371,18 @@ class FactExtractionService:
                 error=str(e)
             )
             return []
-    
+
     async def get_facts_by_document(self, document_id: str) -> List[Fact]:
         """Get all facts extracted from a document.
-        
+
         Args:
             document_id: Document ID
-            
+
         Returns:
             List of facts from the document
         """
         return await self.fact_operations.get_facts_by_document(document_id)
-    
+
     async def search_facts(
         self,
         query_text: str,
@@ -392,14 +392,14 @@ class FactExtractionService:
         limit: int = 50
     ) -> List[Fact]:
         """Search facts by text content.
-        
+
         Args:
             query_text: Text to search for
             fact_type: Optional fact type filter
             domain: Optional domain filter
             min_confidence: Minimum confidence threshold
             limit: Maximum results to return
-            
+
         Returns:
             List of matching facts
         """
@@ -410,21 +410,21 @@ class FactExtractionService:
             min_confidence=min_confidence,
             limit=limit
         )
-    
+
     async def get_fact_statistics(self) -> Dict[str, Any]:
         """Get statistics about stored facts.
-        
+
         Returns:
             Dictionary with fact statistics
         """
         return await self.fact_operations.get_fact_statistics()
-    
+
     async def cleanup_low_quality_facts(self, min_confidence: float = 0.5) -> int:
         """Remove facts below confidence threshold.
-        
+
         Args:
             min_confidence: Minimum confidence to keep
-            
+
         Returns:
             Number of facts removed
         """
@@ -436,20 +436,20 @@ class FactExtractionService:
                 DETACH DELETE f
                 RETURN count(f) as deleted_count
                 """
-                
+
                 result = await session.run(query, min_confidence=min_confidence)
                 record = await result.single()
-                
+
                 deleted_count = record["deleted_count"] if record else 0
-                
+
                 self.logger.info(
                     "Low quality facts cleaned up",
                     deleted_count=deleted_count,
                     min_confidence=min_confidence
                 )
-                
+
                 return deleted_count
-                
+
         except Exception as e:
             self.logger.error(
                 "Failed to cleanup low quality facts",

@@ -42,20 +42,20 @@ class Neo4jConfig(BaseModel):
 
 class Neo4jStorage(BaseStorage):
     """Neo4J storage backend for graph data.
-    
+
     This class implements the BaseStorage interface using Neo4J as the backend.
     It provides efficient storage and retrieval of entities and relations.
     """
-    
+
     def __init__(self, config: Neo4jConfig):
         """Initialize Neo4J storage.
-        
+
         Args:
             config: Neo4J configuration
         """
         self.config = config
         self.driver: Optional[AsyncDriver] = None
-        
+
         # Initialize operation handlers
         self._connection_ops: Optional[ConnectionOperations] = None
         self._document_ops: Optional[DocumentOperations] = None
@@ -65,16 +65,16 @@ class Neo4jStorage(BaseStorage):
         self._graph_ops: Optional[GraphOperations] = None
         self._query_ops: Optional[QueryOperations] = None
 
-    
+
     async def connect(self) -> None:
         """Connect to Neo4J database."""
         # Initialize connection operations
         self._connection_ops = ConnectionOperations(self.config)
         await self._connection_ops.connect()
-        
+
         # Store driver reference for other operations
         self.driver = self._connection_ops.driver
-        
+
         # Initialize other operation handlers
         self._document_ops = DocumentOperations(self.driver, self.config.database)
         self._entity_ops = EntityOperations(self.driver, self.config.database)
@@ -84,13 +84,13 @@ class Neo4jStorage(BaseStorage):
         self._query_ops = QueryOperations(self.driver, self.config.database)
 
         logger.info("Neo4J storage initialized with modular operations")
-    
+
     async def disconnect(self) -> None:
         """Disconnect from Neo4J database."""
         if self._connection_ops:
             await self._connection_ops.disconnect()
             self.driver = None
-            
+
             # Clear operation handlers
             self._connection_ops = None
             self._document_ops = None
@@ -106,44 +106,44 @@ class Neo4jStorage(BaseStorage):
         if not self._connection_ops:
             raise RuntimeError("Connection not initialized")
         return await self._connection_ops.create_database_if_not_exists(database_name)
-    
+
     # Document operations delegation
     async def store_document_with_unified_id(self, document: Document) -> str:
         """Store document with unified ID format."""
         if not self._document_ops:
             raise RuntimeError("Connection not initialized")
         return await self._document_ops.store_document_with_unified_id(document)
-    
+
     async def store_chunk_with_unified_id(self, chunk: DocumentChunk) -> str:
         """Store document chunk with unified ID format."""
         if not self._document_ops:
             raise RuntimeError("Connection not initialized")
         return await self._document_ops.store_chunk_with_unified_id(chunk)
-    
+
     async def get_document_by_unified_id(self, document_id: str) -> Optional[Document]:
         """Retrieve document by unified ID."""
         if not self._document_ops:
             raise RuntimeError("Connection not initialized")
         return await self._document_ops.get_document_by_unified_id(document_id)
-    
+
     async def get_chunks_by_document_id(self, document_id: str) -> List[DocumentChunk]:
         """Get all chunks for a document by unified ID."""
         if not self._document_ops:
             raise RuntimeError("Connection not initialized")
         return await self._document_ops.get_chunks_by_document_id(document_id)
-    
+
     async def validate_id_consistency(self) -> Dict[str, Any]:
         """Validate ID consistency across the database."""
         if not self._document_ops:
             raise RuntimeError("Connection not initialized")
         return await self._document_ops.validate_id_consistency()
-    
+
     async def store_document(self, document: Document) -> str:
         """Store a document in Neo4J."""
         if not self._document_ops:
             raise RuntimeError("Connection not initialized")
         return await self._document_ops.store_document(document)
-    
+
     async def store_document_chunk(self, chunk: DocumentChunk) -> str:
         """Store a document chunk in Neo4J."""
         if not self._document_ops:
@@ -167,110 +167,110 @@ class Neo4jStorage(BaseStorage):
         if not self._document_ops:
             raise RuntimeError("Connection not initialized")
         return await self._document_ops.create_document_contains_chunk_relation(document_id, chunk_id)
-    
+
     async def get_document_checksum(self, document_id: str) -> Optional[str]:
         """Get stored checksum for a document."""
         if not self._document_ops:
             raise RuntimeError("Connection not initialized")
         return await self._document_ops.get_document_checksum(document_id)
-    
+
     async def store_document_checksum(self, document_id: str, checksum: str) -> None:
         """Store document checksum."""
         if not self._document_ops:
             raise RuntimeError("Connection not initialized")
         return await self._document_ops.store_document_checksum(document_id, checksum)
-    
+
     async def delete_document_checksum(self, document_id: str) -> None:
         """Remove stored checksum for a document."""
         if not self._document_ops:
             raise RuntimeError("Connection not initialized")
         return await self._document_ops.delete_document_checksum(document_id)
-    
+
     # Entity operations delegation
     async def store_entity(self, entity: Entity) -> EntityId:
         """Store an entity in Neo4J."""
         if not self._entity_ops:
             raise RuntimeError("Connection not initialized")
         return await self._entity_ops.store_entity(entity)
-    
+
     async def store_entities(self, entities: List[Entity]) -> List[EntityId]:
         """Store multiple entities in Neo4J."""
         if not self._entity_ops:
             raise RuntimeError("Connection not initialized")
         return await self._entity_ops.store_entities(entities)
-    
+
     async def store_entity_with_chunk_references(self, entity: Entity, chunk_ids: List[str]) -> EntityId:
         """Store entity with references to chunks where it's mentioned."""
         if not self._entity_ops:
             raise RuntimeError("Connection not initialized")
         return await self._entity_ops.store_entity_with_chunk_references(entity, chunk_ids)
-    
+
     async def get_entity(self, entity_id: EntityId) -> Optional[Entity]:
         """Get an entity by ID."""
         if not self._entity_ops:
             raise RuntimeError("Connection not initialized")
         return await self._entity_ops.get_entity(entity_id)
-    
+
     async def get_entities(self, entity_ids: List[EntityId]) -> List[Entity]:
         """Get multiple entities by IDs."""
         if not self._entity_ops:
             raise RuntimeError("Connection not initialized")
         return await self._entity_ops.get_entities(entity_ids)
-    
+
     async def get_all_entities(self) -> List[Entity]:
         """Get all entities from the storage."""
         if not self._entity_ops:
             raise RuntimeError("Connection not initialized")
         return await self._entity_ops.get_all_entities()
-    
+
     async def search_entities(self, query: str, entity_type: Optional[str] = None, limit: int = 10) -> List[Entity]:
         """Search for entities by name or content."""
         if not self._entity_ops:
             raise RuntimeError("Connection not initialized")
         return await self._entity_ops.search_entities(query, entity_type, limit)
-    
+
     async def update_entity(self, entity: Entity) -> bool:
         """Update an existing entity."""
         if not self._entity_ops:
             raise RuntimeError("Connection not initialized")
         return await self._entity_ops.update_entity(entity)
-    
+
     async def delete_entity(self, entity_id: EntityId) -> bool:
         """Delete an entity and all its relations."""
         if not self._entity_ops:
             raise RuntimeError("Connection not initialized")
         return await self._entity_ops.delete_entity(entity_id)
-    
+
     async def get_entities_by_chunk_id(self, chunk_id: str) -> List[Entity]:
         """Get all entities mentioned in a specific chunk."""
         if not self._entity_ops:
             raise RuntimeError("Connection not initialized")
         return await self._entity_ops.get_entities_by_chunk_id(chunk_id)
-    
+
     async def get_chunks_by_entity_id(self, entity_id: EntityId) -> List[str]:
         """Get all chunk IDs where an entity is mentioned."""
         if not self._entity_ops:
             raise RuntimeError("Connection not initialized")
         return await self._entity_ops.get_chunks_by_entity_id(entity_id)
-    
+
     async def get_document_chunks_by_entity_names(self, entity_names: List[str]) -> List[Dict[str, Any]]:
         """Get all DocumentChunk nodes related to specific entity names with full metadata."""
         if not self._entity_ops:
             raise RuntimeError("Connection not initialized")
         return await self._entity_ops.get_document_chunks_by_entity_names(entity_names)
-    
+
     async def update_entity_chunk_references(self, entity_id: EntityId, chunk_ids: List[str]) -> None:
         """Update entity's chunk references by replacing all existing relationships."""
         if not self._entity_ops:
             raise RuntimeError("Connection not initialized")
         return await self._entity_ops.update_entity_chunk_references(entity_id, chunk_ids)
-    
+
     async def get_entities_by_document(self, document_id: str) -> List[Entity]:
         """Get all entities associated with a document."""
         if not self._entity_ops:
             raise RuntimeError("Connection not initialized")
         return await self._entity_ops.get_entities_by_document(document_id)
-    
+
     async def create_chunk_mentions_entity_relation(self, chunk_id: str, entity_id: str, context: str) -> None:
         """Create a MENTIONS relationship between a chunk and an entity."""
         if not self._entity_ops:

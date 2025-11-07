@@ -2,8 +2,8 @@
 
 ## Overview
 
-**Priority**: 📋 **Planned** (2 weeks, Medium Impact, Medium ROI)  
-**Source**: GraphRAG adaptive benchmarking concepts  
+**Priority**: 📋 **Planned** (2 weeks, Medium Impact, Medium ROI)
+**Source**: GraphRAG adaptive benchmarking concepts
 **Expected Impact**: Visibility into system performance and regression detection
 
 ## Problem Statement
@@ -85,7 +85,7 @@ class EvaluationFramework:
         self.test_suites = {}
         self.baseline_scores = {}
         self.evaluation_history = []
-        
+
         # Register default evaluators
         self._register_default_evaluators()
 
@@ -97,45 +97,45 @@ class EvaluationFramework:
         """Register a test suite."""
         self.test_suites[name] = test_cases
 
-    async def run_evaluation(self, 
-                           test_suite_name: str, 
+    async def run_evaluation(self,
+                           test_suite_name: str,
                            system_components: Dict[str, Any],
                            metrics: List[EvaluationMetric] = None) -> EvaluationReport:
         """Run evaluation on a test suite."""
-        
+
         if test_suite_name not in self.test_suites:
             raise ValueError(f"Test suite '{test_suite_name}' not found")
-        
+
         test_cases = self.test_suites[test_suite_name]
         metrics = metrics or list(self.evaluators.keys())
-        
+
         all_results = []
         performance_metrics = {}
-        
+
         for test_case in test_cases:
             # Execute system with test case input
             system_output = await self._execute_system(test_case, system_components)
-            
+
             # Evaluate with each metric
             for metric in metrics:
                 if metric in self.evaluators:
                     result = await self.evaluators[metric].evaluate(test_case, system_output)
                     result.test_case_id = test_case.id
                     all_results.append(result)
-        
+
         # Calculate overall metrics
         overall_score = sum(r.score / r.max_score for r in all_results) / len(all_results) if all_results else 0
         passed_tests = sum(1 for r in all_results if r.score / r.max_score >= 0.7)  # 70% threshold
-        
+
         # Calculate performance metrics
         processing_times = [r.details.get('processing_time', 0) for r in all_results if 'processing_time' in r.details]
         if processing_times:
             performance_metrics['avg_processing_time'] = sum(processing_times) / len(processing_times)
             performance_metrics['max_processing_time'] = max(processing_times)
-        
+
         # Generate recommendations
         recommendations = self._generate_recommendations(all_results)
-        
+
         report = EvaluationReport(
             test_suite_name=test_suite_name,
             timestamp=datetime.now(),
@@ -146,21 +146,21 @@ class EvaluationFramework:
             performance_metrics=performance_metrics,
             recommendations=recommendations
         )
-        
+
         # Store in history
         self.evaluation_history.append(report)
-        
+
         return report
 
     async def _execute_system(self, test_case: TestCase, system_components: Dict[str, Any]) -> Dict[str, Any]:
         """Execute system with test case input."""
-        
+
         input_data = test_case.input_data
         output = {}
-        
+
         # Measure processing time
         start_time = datetime.now()
-        
+
         try:
             if 'query' in input_data and 'graph_agent' in system_components:
                 # Query processing test
@@ -170,13 +170,13 @@ class EvaluationFramework:
                     input_data.get('context', {})
                 )
                 output['query_result'] = result
-                
+
             elif 'text' in input_data and 'entity_extractor' in system_components:
                 # Entity extraction test
                 entity_extractor = system_components['entity_extractor']
                 entities = await entity_extractor.extract_entities(input_data['text'])
                 output['extracted_entities'] = entities
-                
+
             elif 'document' in input_data and 'document_processor' in system_components:
                 # Document processing test
                 doc_processor = system_components['document_processor']
@@ -185,16 +185,16 @@ class EvaluationFramework:
                     input_data.get('metadata', {})
                 )
                 output['processed_document'] = result
-                
+
         except Exception as e:
             output['error'] = str(e)
             output['success'] = False
         else:
             output['success'] = True
-        
+
         end_time = datetime.now()
         output['processing_time'] = (end_time - start_time).total_seconds()
-        
+
         return output
 
     def _register_default_evaluators(self):
@@ -208,18 +208,18 @@ class EvaluationFramework:
     def _generate_recommendations(self, results: List[EvaluationResult]) -> List[str]:
         """Generate recommendations based on evaluation results."""
         recommendations = []
-        
+
         # Group results by metric
         metric_scores = {}
         for result in results:
             if result.metric not in metric_scores:
                 metric_scores[result.metric] = []
             metric_scores[result.metric].append(result.score / result.max_score)
-        
+
         # Analyze each metric
         for metric, scores in metric_scores.items():
             avg_score = sum(scores) / len(scores)
-            
+
             if avg_score < 0.6:  # Poor performance
                 if metric == EvaluationMetric.ENTITY_EXTRACTION_ACCURACY:
                     recommendations.append("Entity extraction accuracy is low - consider improving extraction models or rules")
@@ -229,48 +229,48 @@ class EvaluationFramework:
                     recommendations.append("Graph connectivity is poor - improve relationship extraction")
                 elif metric == EvaluationMetric.QUERY_PROCESSING_TIME:
                     recommendations.append("Query processing is slow - optimize retrieval and caching")
-            
+
             elif avg_score < 0.8:  # Room for improvement
                 recommendations.append(f"{metric.value} has room for improvement (current: {avg_score:.2f})")
-        
+
         if not recommendations:
             recommendations.append("System performance looks good across all metrics")
-        
+
         return recommendations
 
     def compare_with_baseline(self, current_report: EvaluationReport) -> Dict[str, float]:
         """Compare current results with baseline."""
         if not self.baseline_scores:
             return {}
-        
+
         comparisons = {}
-        
+
         # Group current results by metric
         current_scores = {}
         for result in current_report.results:
             if result.metric not in current_scores:
                 current_scores[result.metric] = []
             current_scores[result.metric].append(result.score / result.max_score)
-        
+
         # Calculate average scores and compare
         for metric, scores in current_scores.items():
             current_avg = sum(scores) / len(scores)
             baseline_avg = self.baseline_scores.get(metric, current_avg)
-            
+
             improvement = current_avg - baseline_avg
             comparisons[metric.value] = improvement
-        
+
         return comparisons
 
     def set_baseline(self, report: EvaluationReport):
         """Set baseline scores from a report."""
         metric_scores = {}
-        
+
         for result in report.results:
             if result.metric not in metric_scores:
                 metric_scores[result.metric] = []
             metric_scores[result.metric].append(result.score / result.max_score)
-        
+
         # Calculate average scores
         for metric, scores in metric_scores.items():
             self.baseline_scores[metric] = sum(scores) / len(scores)
@@ -289,22 +289,22 @@ from datetime import datetime
 class EntityExtractionEvaluator(BaseEvaluator):
     async def evaluate(self, test_case: TestCase, system_output: Any) -> EvaluationResult:
         """Evaluate entity extraction accuracy."""
-        
+
         expected_entities = set(test_case.expected_output.get('entities', []))
         extracted_entities = set()
-        
+
         if 'extracted_entities' in system_output:
             extracted_entities = set(entity['name'] for entity in system_output['extracted_entities'])
-        
+
         # Calculate precision, recall, F1
         true_positives = len(expected_entities & extracted_entities)
         false_positives = len(extracted_entities - expected_entities)
         false_negatives = len(expected_entities - extracted_entities)
-        
+
         precision = true_positives / (true_positives + false_positives) if (true_positives + false_positives) > 0 else 0
         recall = true_positives / (true_positives + false_negatives) if (true_positives + false_negatives) > 0 else 0
         f1_score = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
-        
+
         return EvaluationResult(
             metric=EvaluationMetric.ENTITY_EXTRACTION_ACCURACY,
             score=f1_score,
@@ -327,24 +327,24 @@ class ResponseRelevanceEvaluator(BaseEvaluator):
         # This would typically use an LLM for evaluation
         # For now, implement simple keyword-based relevance
         pass
-    
+
     async def evaluate(self, test_case: TestCase, system_output: Any) -> EvaluationResult:
         """Evaluate response relevance using keyword matching."""
-        
+
         expected_keywords = test_case.expected_output.get('keywords', [])
         response_text = ""
-        
+
         if 'query_result' in system_output:
             response_text = system_output['query_result'].get('answer', '')
-        
+
         # Simple keyword-based relevance scoring
         matched_keywords = 0
         for keyword in expected_keywords:
             if keyword.lower() in response_text.lower():
                 matched_keywords += 1
-        
+
         relevance_score = matched_keywords / len(expected_keywords) if expected_keywords else 0
-        
+
         return EvaluationResult(
             metric=EvaluationMetric.RESPONSE_RELEVANCE,
             score=relevance_score,
@@ -361,22 +361,22 @@ class ResponseRelevanceEvaluator(BaseEvaluator):
 class ResponseCompletenessEvaluator(BaseEvaluator):
     async def evaluate(self, test_case: TestCase, system_output: Any) -> EvaluationResult:
         """Evaluate response completeness."""
-        
+
         expected_aspects = test_case.expected_output.get('aspects', [])
         response_text = ""
-        
+
         if 'query_result' in system_output:
             response_text = system_output['query_result'].get('answer', '')
-        
+
         # Check if response addresses expected aspects
         covered_aspects = 0
         for aspect in expected_aspects:
             # Simple keyword-based check
             if any(keyword in response_text.lower() for keyword in aspect.lower().split()):
                 covered_aspects += 1
-        
+
         completeness_score = covered_aspects / len(expected_aspects) if expected_aspects else 1.0
-        
+
         return EvaluationResult(
             metric=EvaluationMetric.RESPONSE_COMPLETENESS,
             score=completeness_score,
@@ -393,12 +393,12 @@ class ResponseCompletenessEvaluator(BaseEvaluator):
 class GraphConnectivityEvaluator(BaseEvaluator):
     async def evaluate(self, test_case: TestCase, system_output: Any) -> EvaluationResult:
         """Evaluate graph connectivity metrics."""
-        
+
         # This would typically query the graph database
         # For now, return a placeholder score
-        
+
         connectivity_score = 0.7  # Placeholder
-        
+
         return EvaluationResult(
             metric=EvaluationMetric.GRAPH_CONNECTIVITY,
             score=connectivity_score,
@@ -414,17 +414,17 @@ class GraphConnectivityEvaluator(BaseEvaluator):
 class ProcessingTimeEvaluator(BaseEvaluator):
     async def evaluate(self, test_case: TestCase, system_output: Any) -> EvaluationResult:
         """Evaluate query processing time."""
-        
+
         processing_time = system_output.get('processing_time', 0)
         expected_max_time = test_case.expected_output.get('max_processing_time', 5.0)  # 5 seconds default
-        
+
         # Score based on how much under the expected time
         if processing_time <= expected_max_time:
             score = 1.0
         else:
             # Penalty for exceeding expected time
             score = max(0, 1.0 - (processing_time - expected_max_time) / expected_max_time)
-        
+
         return EvaluationResult(
             metric=EvaluationMetric.QUERY_PROCESSING_TIME,
             score=score,
@@ -570,33 +570,33 @@ from morag_core.evaluation.test_cases import create_entity_extraction_test_cases
 
 async def main():
     parser = argparse.ArgumentParser(description='Run MoRAG evaluation')
-    parser.add_argument('--test-suite', choices=['entity_extraction', 'query_response', 'all'], 
+    parser.add_argument('--test-suite', choices=['entity_extraction', 'query_response', 'all'],
                        default='all', help='Test suite to run')
     parser.add_argument('--output', help='Output file for results')
     parser.add_argument('--baseline', action='store_true', help='Set results as baseline')
-    
+
     args = parser.parse_args()
-    
+
     # Initialize evaluation framework
     framework = EvaluationFramework()
-    
+
     # Register test suites
     framework.register_test_suite('entity_extraction', create_entity_extraction_test_cases())
     framework.register_test_suite('query_response', create_query_response_test_cases())
-    
+
     # Initialize system components (would be actual components in real implementation)
     system_components = {
         'entity_extractor': None,  # Would be actual EntityExtractor
         'graph_agent': None,       # Would be actual GraphTraversalAgent
         'document_processor': None # Would be actual DocumentProcessor
     }
-    
+
     # Run evaluations
     test_suites = ['entity_extraction', 'query_response'] if args.test_suite == 'all' else [args.test_suite]
-    
+
     for suite_name in test_suites:
         print(f"Running evaluation for {suite_name}...")
-        
+
         report = await framework.run_evaluation(
             suite_name,
             system_components,
@@ -606,16 +606,16 @@ async def main():
                 EvaluationMetric.QUERY_PROCESSING_TIME
             ]
         )
-        
+
         print(f"Results for {suite_name}:")
         print(f"  Overall Score: {report.overall_score:.3f}")
         print(f"  Passed Tests: {report.passed_tests}/{report.total_tests}")
         print(f"  Recommendations: {', '.join(report.recommendations)}")
-        
+
         if args.baseline:
             framework.set_baseline(report)
             print(f"  Set as baseline for future comparisons")
-        
+
         # Save results if output file specified
         if args.output:
             with open(args.output, 'w') as f:
@@ -638,27 +638,27 @@ if __name__ == "__main__":
 # evaluation.yml
 evaluation:
   enabled: true
-  
+
   test_suites:
     entity_extraction:
       enabled: true
       test_cases_file: "test_cases/entity_extraction.json"
-      
+
     query_response:
       enabled: true
       test_cases_file: "test_cases/query_response.json"
-      
+
     graph_quality:
       enabled: true
-      
+
   thresholds:
     passing_score: 0.7
     warning_score: 0.5
-    
+
   performance:
     max_query_time: 5.0
     max_extraction_time: 2.0
-    
+
   reporting:
     save_detailed_results: true
     results_directory: "evaluation_results"

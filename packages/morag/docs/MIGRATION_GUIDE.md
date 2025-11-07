@@ -123,7 +123,7 @@ def query_v1(query, max_results=10):
         "max_results": max_results,
         "min_score": 0.1
     })
-    
+
     data = response.json()
     return [
         {
@@ -147,7 +147,7 @@ def query_v2(query, max_results=10, query_type="simple"):
         "min_relevance_score": 0.1,
         "include_graph_context": True
     })
-    
+
     data = response.json()
     return [
         {
@@ -167,11 +167,11 @@ def query_v2(query, max_results=10, query_type="simple"):
 ```python
 def extract_graph_context(response_data):
     graph_context = response_data.get("graph_context", {})
-    
+
     entities = graph_context.get("entities", {})
     relations = graph_context.get("relations", [])
     reasoning_steps = graph_context.get("reasoning_steps", [])
-    
+
     return {
         "entity_count": len(entities),
         "relation_count": len(relations),
@@ -204,7 +204,7 @@ def migrate_basic(query, max_results=10):
         "include_graph_context": False,  # Disable new features initially
         "enable_multi_hop": False
     })
-    
+
     # Extract results in v1 format
     data = response.json()
     return {
@@ -239,7 +239,7 @@ def migrate_enhanced(query, max_results=10):
         "include_graph_context": True,   # Enable graph context
         "enable_multi_hop": True
     })
-    
+
     return response.json()
 ```
 
@@ -250,7 +250,7 @@ Use advanced features for optimal results:
 def migrate_advanced(query, max_results=10):
     # Determine query type based on content
     query_type = "multi_hop" if "how" in query.lower() or "why" in query.lower() else "entity_focused"
-    
+
     response = requests.post("http://localhost:8000/api/v2/query", json={
         "query": query,
         "query_type": query_type,
@@ -263,7 +263,7 @@ def migrate_advanced(query, max_results=10):
         "entity_types": ["CONCEPT", "TECHNOLOGY", "PERSON"],
         "min_relevance_score": 0.2
     })
-    
+
     return response.json()
 ```
 
@@ -303,7 +303,7 @@ def test_compatibility():
         "Explain neural networks",
         "What are the applications of deep learning?"
     ]
-    
+
     for query in test_queries:
         try:
             # Test v1 endpoint
@@ -311,7 +311,7 @@ def test_compatibility():
                 "query": query,
                 "max_results": 5
             })
-            
+
             # Test v2 endpoint
             v2_response = requests.post("http://localhost:8000/api/v2/query", json={
                 "query": query,
@@ -319,12 +319,12 @@ def test_compatibility():
                 "max_results": 5,
                 "include_graph_context": False
             })
-            
+
             print(f"Query: {query}")
             print(f"v1 results: {len(v1_response.json()['results'])}")
             print(f"v2 results: {len(v2_response.json()['results'])}")
             print("---")
-            
+
         except Exception as e:
             print(f"Error testing query '{query}': {e}")
 ```
@@ -335,7 +335,7 @@ import time
 
 def compare_performance():
     query = "What is machine learning?"
-    
+
     # Test v1 performance
     start_time = time.time()
     v1_response = requests.post("http://localhost:8000/api/v1/query", json={
@@ -343,7 +343,7 @@ def compare_performance():
         "max_results": 10
     })
     v1_time = time.time() - start_time
-    
+
     # Test v2 performance
     start_time = time.time()
     v2_response = requests.post("http://localhost:8000/api/v2/query", json={
@@ -352,7 +352,7 @@ def compare_performance():
         "max_results": 10
     })
     v2_time = time.time() - start_time
-    
+
     print(f"v1 response time: {v1_time:.3f}s")
     print(f"v2 response time: {v2_time:.3f}s")
     print(f"v2 server processing: {v2_response.json()['processing_time_ms']}ms")

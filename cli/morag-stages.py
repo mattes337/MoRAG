@@ -30,7 +30,7 @@ from morag_stages.models import StageContext
 async def execute_stage(args):
     """Execute a single stage."""
     stage_manager = StageManager()
-    
+
     # Create CLI overrides from arguments
     cli_overrides = {}
 
@@ -97,7 +97,7 @@ async def execute_stage(args):
         webhook_url=args.webhook_url,
         config=config_overrides
     )
-    
+
     # Execute stage
     try:
         stage_type = StageType(args.stage)
@@ -108,7 +108,7 @@ async def execute_stage(args):
 
     try:
         result = await stage_manager.execute_stage(stage_type, [Path(args.input)], context)
-        
+
         if result.status == StageStatus.COMPLETED:
             print(f"✅ Stage {args.stage} completed successfully")
             print(f"📁 Output files: {[str(f) for f in result.output_files]}")
@@ -120,7 +120,7 @@ async def execute_stage(args):
         else:
             print(f"❌ Stage {args.stage} failed: {result.error_message}")
             sys.exit(1)
-            
+
     except Exception as e:
         print(f"❌ Error executing stage {args.stage}: {str(e)}")
         sys.exit(1)
@@ -142,7 +142,7 @@ async def execute_stage_chain(args):
             print(f"❌ Invalid stage name: {name}")
             print(f"Valid stages: {[s.value for s in StageType]}")
             sys.exit(1)
-    
+
     # Create CLI overrides from arguments
     cli_overrides = {}
 
@@ -203,15 +203,15 @@ async def execute_stage_chain(args):
         webhook_url=args.webhook_url,
         config=config_overrides
     )
-    
+
     try:
         # Execute stage chain
         results = await stage_manager.execute_stage_chain(stage_types, [Path(args.input)], context)
-        
+
         # Report results
         successful = 0
         failed = 0
-        
+
         for result in results:
             if result.status == StageStatus.COMPLETED:
                 print(f"✅ Stage {result.stage_type.value} completed")
@@ -222,12 +222,12 @@ async def execute_stage_chain(args):
             else:
                 print(f"❌ Stage {result.stage_type.value} failed: {result.error_message}")
                 failed += 1
-        
+
         print(f"\n📊 Stage Chain Results: {successful}/{len(results)} stages completed successfully")
-        
+
         if failed > 0:
             sys.exit(1)
-            
+
     except Exception as e:
         print(f"❌ Error executing stage chain: {str(e)}")
         sys.exit(1)
@@ -236,7 +236,7 @@ async def execute_stage_chain(args):
 async def execute_full_pipeline(args):
     """Execute full pipeline (backward compatibility)."""
     stage_manager = StageManager()
-    
+
     # Determine which stages to run
     stages = [StageType.MARKDOWN_CONVERSION, StageType.CHUNKER, StageType.FACT_GENERATOR, StageType.INGESTOR]
 
@@ -253,7 +253,7 @@ async def execute_full_pipeline(args):
                 print(f"❌ Invalid stage name to skip: {name}")
                 sys.exit(1)
         stages = [s for s in stages if s not in skip_stages]
-    
+
     # Create context - configuration loaded from environment variables
     context = StageContext(
         source_path=Path(args.input),
@@ -265,17 +265,17 @@ async def execute_full_pipeline(args):
     try:
         # Execute pipeline
         results = await stage_manager.execute_stage_chain(stages, [Path(args.input)], context)
-        
+
         # Report final results
         successful = sum(1 for r in results if r.status == StageStatus.COMPLETED)
         skipped = sum(1 for r in results if r.status == StageStatus.SKIPPED)
         total = len(results)
-        
+
         print(f"\n📊 Pipeline Results: {successful + skipped}/{total} stages completed successfully")
-        
+
         if successful + skipped < total:
             sys.exit(1)
-            
+
     except Exception as e:
         print(f"❌ Error executing pipeline: {str(e)}")
         sys.exit(1)
@@ -285,7 +285,7 @@ def setup_parser():
     """Set up command line argument parser."""
     parser = argparse.ArgumentParser(description="MoRAG Stage-Based Processing")
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
-    
+
     # Single stage execution using canonical names
     stage_parser = subparsers.add_parser("stage", help="Execute a single stage")
     stage_parser.add_argument("stage", choices=["markdown-conversion", "markdown-optimizer", "chunker", "fact-generator", "ingestor"], help="Stage name to execute")
@@ -340,7 +340,7 @@ def setup_parser():
     # YouTube-specific overrides for chain
     chain_parser.add_argument("--transcript-only", action="store_true", help="For YouTube URLs: only extract transcript, don't download video")
     chain_parser.add_argument("--transcript-language", help="For YouTube URLs: transcript language code (e.g., 'en', 'es')")
-    
+
     # Full pipeline (backward compatibility)
     pipeline_parser = subparsers.add_parser("process", help="Execute full pipeline")
     pipeline_parser.add_argument("input", help="Input file")
@@ -348,10 +348,10 @@ def setup_parser():
     pipeline_parser.add_argument("--optimize", action="store_true", help="Include markdown optimization stage")
     pipeline_parser.add_argument("--skip-stages", help="Comma-separated list of stages to skip")
     pipeline_parser.add_argument("--webhook-url", help="Webhook URL for notifications")
-    
+
     # List available stages
     list_parser = subparsers.add_parser("list", help="List available stages")
-    
+
     return parser
 
 
@@ -359,7 +359,7 @@ async def main():
     """Main CLI entry point."""
     parser = setup_parser()
     args = parser.parse_args()
-    
+
     if args.command == "stage":
         await execute_stage(args)
     elif args.command == "stages":

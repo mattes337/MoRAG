@@ -15,7 +15,7 @@ This file contains the historical record of all completed tasks in the MoRAG pro
 - **Description**: Initial project structure and configuration
 - **Deliverables**: Project structure, configuration files, development environment setup
 
-### Task 02: FastAPI Service Setup with Async Support  
+### Task 02: FastAPI Service Setup with Async Support
 - **Status**: COMPLETED ✅
 - **Description**: FastAPI service setup with async support
 - **Deliverables**: FastAPI application, async endpoints, middleware configuration

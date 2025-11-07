@@ -173,10 +173,10 @@ import os
 async def process_image():
     # Get API key from environment
     api_key = os.environ.get("GOOGLE_API_KEY")
-    
+
     # Create processor
     processor = ImageProcessor(api_key=api_key)
-    
+
     # Configure processing options
     config = ImageConfig(
         extract_metadata=True,
@@ -185,10 +185,10 @@ async def process_image():
         ocr_engine="tesseract",
         max_dimension=1024
     )
-    
+
     # Process image
     result = await processor.process_image("path/to/image.jpg", config)
-    
+
     # Print results
     print(f"Caption: {result.caption}")
     print(f"Extracted text: {result.text}")
@@ -210,7 +210,7 @@ import json
 async def process_batch():
     # Get API key from environment
     api_key = os.environ.get("GOOGLE_API_KEY")
-    
+
     # Create service config
     service_config = ServiceConfig(
         name="image_service",
@@ -224,14 +224,14 @@ async def process_batch():
             "max_concurrency": 4
         }
     )
-    
+
     # Initialize service
     service = ImageService(service_config)
-    
+
     # Process a batch of images
     image_paths = ["image1.jpg", "image2.jpg", "image3.jpg"]
     results = await service.process_batch(image_paths)
-    
+
     # Save results to file
     with open("results.json", "w") as f:
         json.dump(results, f, indent=2)

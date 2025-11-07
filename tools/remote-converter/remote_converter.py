@@ -170,7 +170,7 @@ def convert_to_unified_result(result: Any, processing_time: float = None) -> Pro
 
 class RemoteConverter:
     """Remote conversion worker that processes MoRAG jobs."""
-    
+
     def __init__(self, config: Dict[str, Any]):
         self.config = config
         self.worker_id = config['worker_id']
@@ -182,10 +182,10 @@ class RemoteConverter:
         self.temp_dir = config.get('temp_dir', '/tmp/morag_remote')
         self.running = False
         self.active_jobs = {}
-        
+
         # Ensure temp directory exists
         os.makedirs(self.temp_dir, exist_ok=True)
-        
+
         # Initialize processors
         self.processors = {}
         try:
@@ -204,23 +204,23 @@ class RemoteConverter:
         except Exception as e:
             logger.error("Failed to initialize processors", error=str(e))
             raise
-        
+
         logger.info("Remote converter initialized",
                    worker_id=self.worker_id,
                    content_types=self.content_types,
                    api_base_url=self.api_base_url,
                    temp_dir=self.temp_dir)
-    
+
     def start(self):
         """Start the remote converter."""
         self.running = True
-        
+
         # Set up signal handlers for graceful shutdown
         signal.signal(signal.SIGINT, self._signal_handler)
         signal.signal(signal.SIGTERM, self._signal_handler)
-        
+
         logger.info("Starting remote converter", worker_id=self.worker_id)
-        
+
         try:
             asyncio.run(self._main_loop())
         except KeyboardInterrupt:
@@ -230,21 +230,21 @@ class RemoteConverter:
             raise
         finally:
             self._cleanup()
-    
+
     def _signal_handler(self, signum, frame):
         """Handle shutdown signals."""
         logger.info("Received shutdown signal", signal=signum)
         self.running = False
-    
+
     async def _main_loop(self):
         """Main processing loop."""
         logger.info("Remote converter main loop started")
-        
+
         while self.running:
             try:
                 # Clean up completed jobs
                 await self._cleanup_completed_jobs()
-                
+
                 # Check if we can take more jobs
                 if len(self.active_jobs) < self.max_concurrent_jobs:
                     # Poll for new jobs
@@ -253,29 +253,29 @@ class RemoteConverter:
                         # Start processing job asynchronously
                         task = asyncio.create_task(self._process_job(job))
                         self.active_jobs[job['job_id']] = task
-                
+
                 # Wait before next poll
                 await asyncio.sleep(self.poll_interval)
-                
+
             except Exception as e:
                 logger.error("Error in main loop", error=str(e))
                 await asyncio.sleep(self.poll_interval)
-        
+
         # Wait for active jobs to complete
         if self.active_jobs:
             logger.info("Waiting for active jobs to complete", count=len(self.active_jobs))
             await asyncio.gather(*self.active_jobs.values(), return_exceptions=True)
-    
+
     async def _cleanup_completed_jobs(self):
         """Remove completed jobs from active jobs list."""
         completed_jobs = []
         for job_id, task in self.active_jobs.items():
             if task.done():
                 completed_jobs.append(job_id)
-        
+
         for job_id in completed_jobs:
             del self.active_jobs[job_id]
-    
+
     async def _poll_for_job(self) -> Optional[Dict[str, Any]]:
         """Poll the API for available jobs."""
         try:
@@ -285,34 +285,34 @@ class RemoteConverter:
                 'content_types': ','.join(self.content_types),
                 'max_jobs': 1
             }
-            
+
             headers = {}
             if self.api_key:
                 headers['Authorization'] = f'Bearer {self.api_key}'
-            
+
             response = httpx.get(url, params=params, headers=headers, timeout=30)
-            
+
             if response.status_code == 200:
                 data = response.json()
                 if data.get('job_id'):
                     return data
             elif response.status_code != 204:  # 204 = no jobs available
-                logger.warning("Failed to poll for jobs", 
+                logger.warning("Failed to poll for jobs",
                              status_code=response.status_code,
                              response=response.text)
-            
+
             return None
-            
+
         except Exception as e:
             logger.error("Exception polling for jobs", error=str(e))
             return None
-    
+
     async def _process_job(self, job: Dict[str, Any]):
         """Process a single job."""
         job_id = job['job_id']
         content_type = job['content_type']
         task_options = job.get('task_options', {})
-        
+
         logger.info("Starting job processing",
                    job_id=job_id,
                    content_type=content_type)
@@ -330,7 +330,7 @@ class RemoteConverter:
             # Process the file
             logger.info("Processing file", job_id=job_id, content_type=content_type)
             result = await self._process_file(file_path, content_type, task_options)
-            
+
             # Submit result
             if result and result.success:
                 logger.info("Job processing completed successfully", job_id=job_id, processing_time=time.time() - start_time)
@@ -339,11 +339,11 @@ class RemoteConverter:
                 error_msg = result.error_message if result else "Processing failed"
                 logger.warning("Job processing failed", job_id=job_id, error=error_msg)
                 await self._submit_error_result(job_id, error_msg)
-            
+
         except Exception as e:
             logger.error("Exception processing job", job_id=job_id, error=str(e))
             await self._submit_error_result(job_id, f"Processing exception: {str(e)}")
-        
+
         finally:
             # Clean up temporary files
             try:
@@ -351,7 +351,7 @@ class RemoteConverter:
                     os.unlink(file_path)
             except Exception as e:
                 logger.warning("Failed to clean up temp file", error=str(e))
-    
+
     async def _download_source_file(self, job_id: str, source_file_url: str) -> Optional[str]:
         """Download source file for processing."""
         try:

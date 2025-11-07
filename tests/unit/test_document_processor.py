@@ -10,7 +10,7 @@ def test_document_type_detection():
     assert document_processor.detect_document_type("test.docx") == DocumentType.DOCX
     assert document_processor.detect_document_type("test.md") == DocumentType.MARKDOWN
     assert document_processor.detect_document_type("test.txt") == DocumentType.TXT
-    
+
     with pytest.raises(ValidationError):
         document_processor.detect_document_type("test.xyz")
 
@@ -33,15 +33,15 @@ Some content in section 1.
 Some content in section 2.
         """)
         temp_path = f.name
-    
+
     try:
         result = await document_processor.parse_document(temp_path)
-        
+
         assert len(result.chunks) > 0
         assert result.word_count > 0
         assert result.metadata["parser"] in ["unstructured", "basic_text"]
         assert result.metadata["file_name"] == Path(temp_path).name
-        
+
     finally:
         Path(temp_path).unlink()
 
@@ -52,14 +52,14 @@ async def test_text_file_parsing():
     with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
         f.write("This is a simple text file for testing.\n\nIt has multiple paragraphs.")
         temp_path = f.name
-    
+
     try:
         result = await document_processor.parse_document(temp_path)
-        
+
         assert len(result.chunks) > 0
         assert result.word_count > 0
         assert result.metadata["parser"] in ["unstructured", "basic_text"]
-        
+
     finally:
         Path(temp_path).unlink()
 
@@ -68,11 +68,11 @@ def test_file_validation():
     # Test non-existent file
     with pytest.raises(ValidationError, match="File not found"):
         document_processor.validate_file("non_existent_file.pdf")
-    
+
     # Test unsupported file type
     with tempfile.NamedTemporaryFile(suffix='.xyz', delete=False) as f:
         temp_path = f.name
-    
+
     try:
         with pytest.raises(ValidationError, match="Unsupported file type"):
             document_processor.validate_file(temp_path)
@@ -85,15 +85,15 @@ def test_file_size_validation():
     with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
         f.write("Small test file")
         temp_path = f.name
-    
+
     try:
         # Should pass with default max size
         assert document_processor.validate_file(temp_path) == True
-        
+
         # Should fail with very small max size
         with pytest.raises(ValidationError, match="File too large"):
             document_processor.validate_file(temp_path, max_size_mb=0.000001)
-            
+
     finally:
         Path(temp_path).unlink()
 
@@ -104,15 +104,15 @@ async def test_docling_fallback():
     with tempfile.NamedTemporaryFile(mode='w', suffix='.pdf', delete=False) as f:
         f.write("This is a fake PDF file for testing fallback.")
         temp_path = f.name
-    
+
     try:
         # This should fallback to unstructured since docling might not be installed
         result = await document_processor.parse_document(temp_path, use_docling=True)
-        
+
         # Should still get a result (from unstructured fallback)
         assert result is not None
         assert result.metadata["parser"] in ["unstructured", "docling", "basic_text"]
-        
+
     finally:
         Path(temp_path).unlink()
 
@@ -138,15 +138,15 @@ async def test_empty_file_handling():
     # Create an empty file
     with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
         temp_path = f.name
-    
+
     try:
         result = await document_processor.parse_document(temp_path)
-        
+
         # Should handle empty file gracefully
         assert result is not None
         assert len(result.chunks) == 0
         assert result.word_count == 0
-        
+
     finally:
         Path(temp_path).unlink()
 
@@ -155,29 +155,29 @@ async def test_large_document_chunking():
     """Test processing of larger documents."""
     # Create a larger test document
     large_content = "\n\n".join([f"This is paragraph {i} with some content." for i in range(50)])
-    
+
     with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
         f.write(large_content)
         temp_path = f.name
-    
+
     try:
         result = await document_processor.parse_document(temp_path)
-        
+
         assert len(result.chunks) > 0
         assert result.word_count > 100
         assert result.metadata["total_chunks"] == len(result.chunks)
-        
+
     finally:
         Path(temp_path).unlink()
 
 def test_supported_file_types():
     """Test that all supported file types are recognized."""
     supported_extensions = [".pdf", ".docx", ".doc", ".md", ".markdown", ".txt"]
-    
+
     for ext in supported_extensions:
         doc_type = document_processor.detect_document_type(f"test{ext}")
         assert doc_type in DocumentType
-        
+
 def test_case_insensitive_extensions():
     """Test that file extensions are case insensitive."""
     assert document_processor.detect_document_type("test.PDF") == DocumentType.PDF

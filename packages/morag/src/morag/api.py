@@ -13,16 +13,16 @@ logger = structlog.get_logger(__name__)
 
 class MoRAGAPI:
     """Main API interface for the MoRAG system."""
-    
+
     def __init__(self, config: Optional[ServiceConfig] = None):
         """Initialize the MoRAG API.
-        
+
         Args:
             config: Service configuration
         """
         self.orchestrator = MoRAGOrchestrator(config)
         logger.info("MoRAG API initialized")
-    
+
     async def process_url(
         self,
         url: str,
@@ -30,12 +30,12 @@ class MoRAGAPI:
         options: Optional[Dict[str, Any]] = None
     ) -> ProcessingResult:
         """Process content from a URL.
-        
+
         Args:
             url: URL to process
             content_type: Type of content (auto-detected if not provided)
             options: Processing options
-            
+
         Returns:
             Processing result
         """
@@ -52,7 +52,7 @@ class MoRAGAPI:
             content_type_enum = ContentType(content_type)
 
         return await self.orchestrator.process_content(url, content_type_enum, options)
-    
+
     async def process_file(
         self,
         file_path: Union[str, Path],
@@ -60,17 +60,17 @@ class MoRAGAPI:
         options: Optional[Dict[str, Any]] = None
     ) -> ProcessingResult:
         """Process content from a file.
-        
+
         Args:
             file_path: Path to file
             content_type: Type of content (auto-detected if not provided)
             options: Processing options
-            
+
         Returns:
             Processing result
         """
         file_path = Path(file_path)
-        
+
         # Auto-detect content type if not provided
         if content_type is None:
             content_type = self._detect_content_type_from_file(file_path)
@@ -84,71 +84,71 @@ class MoRAGAPI:
             content_type_enum = ContentType(content_type)
 
         return await self.orchestrator.process_content(file_path, content_type_enum, options)
-    
+
     async def process_web_page(
         self,
         url: str,
         options: Optional[Dict[str, Any]] = None
     ) -> ProcessingResult:
         """Process a web page.
-        
+
         Args:
             url: Web page URL
             options: Processing options
-            
+
         Returns:
             Processing result
         """
         return await self.orchestrator.process_content(url, ContentType.WEB, options)
-    
+
     async def process_youtube_video(
         self,
         url: str,
         options: Optional[Dict[str, Any]] = None
     ) -> ProcessingResult:
         """Process a YouTube video.
-        
+
         Args:
             url: YouTube video URL
             options: Processing options
-            
+
         Returns:
             Processing result
         """
         return await self.orchestrator.process_content(url, ContentType.YOUTUBE, options)
-    
+
     async def process_document(
         self,
         file_path: Union[str, Path],
         options: Optional[Dict[str, Any]] = None
     ) -> ProcessingResult:
         """Process a document file.
-        
+
         Args:
             file_path: Path to document
             options: Processing options
-            
+
         Returns:
             Processing result
         """
         return await self.orchestrator.process_content(file_path, ContentType.DOCUMENT, options)
-    
+
     async def process_audio(
         self,
         file_path: Union[str, Path],
         options: Optional[Dict[str, Any]] = None
     ) -> ProcessingResult:
         """Process an audio file.
-        
+
         Args:
             file_path: Path to audio file
             options: Processing options
-            
+
         Returns:
             Processing result
         """
         return await self.orchestrator.process_content(file_path, ContentType.AUDIO, options)
-    
+
     async def process_video(
         self,
         file_path: Union[str, Path],
@@ -180,23 +180,23 @@ class MoRAGAPI:
             Processing result
         """
         return await self.orchestrator.process_content(file_path, ContentType.IMAGE, options)
-    
+
     async def process_batch(
         self,
         items: List[Dict[str, Any]],
         options: Optional[Dict[str, Any]] = None
     ) -> List[ProcessingResult]:
         """Process multiple items in batch.
-        
+
         Args:
             items: List of items to process
             options: Global processing options
-            
+
         Returns:
             List of processing results
         """
         return await self.orchestrator.process_batch(items, options)
-    
+
     async def search(
         self,
         query: str,
@@ -204,47 +204,47 @@ class MoRAGAPI:
         filters: Optional[Dict[str, Any]] = None
     ) -> List[Dict[str, Any]]:
         """Search for similar content.
-        
+
         Args:
             query: Search query
             limit: Maximum number of results
             filters: Optional filters
-            
+
         Returns:
             List of similar content items
         """
         return await self.orchestrator.search_similar(query, limit, filters)
-    
+
     async def health_check(self) -> Dict[str, Any]:
         """Get health status of all components.
-        
+
         Returns:
             Health status information
         """
         return await self.orchestrator.get_health_status()
-    
+
     def _detect_content_type(self, url: str) -> str:
         """Auto-detect content type from URL.
-        
+
         Args:
             url: URL to analyze
-            
+
         Returns:
             Detected content type
         """
         url_lower = url.lower()
-        
+
         # YouTube detection
         if 'youtube.com' in url_lower or 'youtu.be' in url_lower:
             return 'youtube'
-        
+
         # Default to web for URLs
         if url_lower.startswith(('http://', 'https://')):
             return 'web'
-        
+
         # If it's not a URL, treat as file path
         return self._detect_content_type_from_file(Path(url))
-    
+
     def _detect_content_type_from_file(self, file_path: Path) -> str:
         """Auto-detect content type from file extension.
 
@@ -341,7 +341,7 @@ class MoRAGAPI:
 
         # Default to unknown for unrecognized types
         return 'unknown'
-    
+
     async def cleanup(self) -> None:
         """Clean up resources."""
         await self.orchestrator.cleanup()

@@ -12,7 +12,7 @@ logger = structlog.get_logger(__name__)
 
 class StructuredEntity(BaseModel):
     """Entity with structured ID format."""
-    
+
     entity_id: str = Field(
         description="Unique entity ID in format: ent_[name]_[8-char-hex]",
         pattern=r"^ent_[a-zA-Z0-9_]+_[a-f0-9]{8}$"
@@ -25,7 +25,7 @@ class StructuredEntity(BaseModel):
 
 class StructuredRelation(BaseModel):
     """Relation with structured ID format."""
-    
+
     relation_id: str = Field(
         description="Unique relation ID in format: rel_[type]_[8-char-hex]",
         pattern=r"^rel_[a-zA-Z0-9_]+_[a-f0-9]{8}$"
@@ -35,7 +35,7 @@ class StructuredRelation(BaseModel):
         pattern=r"^ent_[a-zA-Z0-9_]+_[a-f0-9]{8}$"
     )
     target_entity_id: str = Field(
-        description="Target entity ID", 
+        description="Target entity ID",
         pattern=r"^ent_[a-zA-Z0-9_]+_[a-f0-9]{8}$"
     )
     relation_type: str = Field(description="Type of relation")
@@ -45,7 +45,7 @@ class StructuredRelation(BaseModel):
 
 class AdvancedExtractionResult(BaseModel):
     """Result from advanced extraction with structured IDs."""
-    
+
     entities: List[StructuredEntity] = Field(description="Extracted entities with structured IDs")
     relations: List[StructuredRelation] = Field(description="Extracted relations with structured IDs")
     total_entities: int = Field(description="Total number of entities")
@@ -57,10 +57,10 @@ class AdvancedExtractionResult(BaseModel):
 
 class AdvancedExtractionAgent(MoRAGBaseAgent[AdvancedExtractionResult]):
     """Advanced extraction agent with regex constraints for structured IDs."""
-    
+
     def __init__(self, config: Optional[AgentConfig] = None):
         """Initialize the advanced extraction agent.
-        
+
         Args:
             config: Agent configuration
         """
@@ -70,12 +70,12 @@ class AdvancedExtractionAgent(MoRAGBaseAgent[AdvancedExtractionResult]):
                 temperature=0.1,
                 outlines_provider="gemini"
             )
-        
+
         super().__init__(config)
-        
+
         # Advanced extraction configuration
         self.entity_types = [
-            "PERSON", "ORGANIZATION", "LOCATION", "CONCEPT", "PRODUCT", 
+            "PERSON", "ORGANIZATION", "LOCATION", "CONCEPT", "PRODUCT",
             "EVENT", "DATE", "QUANTITY", "TECHNOLOGY", "PROCESS"
         ]
         self.relation_types = [
@@ -84,18 +84,18 @@ class AdvancedExtractionAgent(MoRAGBaseAgent[AdvancedExtractionResult]):
             "PART_OF", "CREATED_BY", "RELATED_TO"
         ]
         self.min_confidence = 0.6
-    
+
     def get_result_type(self) -> Type[AdvancedExtractionResult]:
         """Return the Pydantic model for advanced extraction results.
-        
+
         Returns:
             AdvancedExtractionResult class
         """
         return AdvancedExtractionResult
-    
+
     def get_system_prompt(self) -> str:
         """Return the system prompt for advanced extraction.
-        
+
         Returns:
             The system prompt string
         """
@@ -150,12 +150,12 @@ IMPORTANT CONSTRAINTS:
         min_confidence: Optional[float] = None
     ) -> AdvancedExtractionResult:
         """Extract entities and relations with structured IDs using regex constraints.
-        
+
         Args:
             text: Text to extract from
             domain: Domain context for extraction
             min_confidence: Minimum confidence threshold
-            
+
         Returns:
             AdvancedExtractionResult with structured IDs
         """
@@ -168,28 +168,28 @@ IMPORTANT CONSTRAINTS:
                 confidence=ConfidenceLevel.HIGH,
                 metadata={"error": "Empty text", "domain": domain}
             )
-        
+
         # Update configuration for this extraction
         if min_confidence is not None:
             self.min_confidence = min_confidence
-        
+
         self.logger.info(
             "Starting advanced extraction with structured IDs",
             text_length=len(text),
             domain=domain,
             structured_generation=self.is_outlines_available()
         )
-        
+
         # Prepare the extraction prompt
         prompt = self._create_extraction_prompt(text, domain)
-        
+
         try:
             # Use structured generation with Outlines
             result = await self.run(prompt)
-            
+
             # Post-process and validate the result
             result = self._post_process_result(result, text, domain)
-            
+
             self.logger.info(
                 "Advanced extraction completed",
                 entities_extracted=result.total_entities,
@@ -197,9 +197,9 @@ IMPORTANT CONSTRAINTS:
                 confidence=result.confidence,
                 used_outlines=self.is_outlines_available()
             )
-            
+
             return result
-            
+
         except Exception as e:
             self.logger.error("Advanced extraction failed", error=str(e))
             # Return a fallback result
@@ -215,14 +215,14 @@ IMPORTANT CONSTRAINTS:
                     "fallback": True
                 }
             )
-    
+
     def _create_extraction_prompt(self, text: str, domain: str) -> str:
         """Create the extraction prompt for the given text and domain.
-        
+
         Args:
             text: Text to extract from
             domain: Domain context
-            
+
         Returns:
             Formatted prompt string
         """
@@ -238,7 +238,7 @@ EXTRACTION PARAMETERS:
 - Ensure all relations reference valid entity IDs
 
 Extract high-quality entities and relations with properly formatted structured IDs."""
-    
+
     def _post_process_result(
         self,
         result: AdvancedExtractionResult,
@@ -246,22 +246,22 @@ Extract high-quality entities and relations with properly formatted structured I
         domain: str
     ) -> AdvancedExtractionResult:
         """Post-process and validate the extraction result.
-        
+
         Args:
             result: Raw extraction result
             original_text: Original input text
             domain: Domain context
-            
+
         Returns:
             Post-processed and validated result
         """
         import re
-        
+
         # Validate entity IDs
         entity_id_pattern = re.compile(r"^ent_[a-zA-Z0-9_]+_[a-f0-9]{8}$")
         valid_entities = []
         valid_entity_ids = set()
-        
+
         for entity in result.entities:
             if entity_id_pattern.match(entity.entity_id) and entity.confidence >= self.min_confidence:
                 valid_entities.append(entity)
@@ -272,11 +272,11 @@ Extract high-quality entities and relations with properly formatted structured I
                     entity_id=entity.entity_id,
                     confidence=entity.confidence
                 )
-        
+
         # Validate relation IDs and references
         relation_id_pattern = re.compile(r"^rel_[a-zA-Z0-9_]+_[a-f0-9]{8}$")
         valid_relations = []
-        
+
         for relation in result.relations:
             if (relation_id_pattern.match(relation.relation_id) and
                 relation.source_entity_id in valid_entity_ids and
@@ -291,7 +291,7 @@ Extract high-quality entities and relations with properly formatted structured I
                     target_id=relation.target_entity_id,
                     confidence=relation.confidence
                 )
-        
+
         # Update metadata
         metadata = result.metadata or {}
         metadata.update({
@@ -305,7 +305,7 @@ Extract high-quality entities and relations with properly formatted structured I
             "extraction_method": "outlines" if self.is_outlines_available() else "fallback",
             "id_validation": "regex_enforced"
         })
-        
+
         # Create updated result
         return AdvancedExtractionResult(
             entities=valid_entities,

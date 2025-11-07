@@ -11,13 +11,13 @@ from morag_graph.storage.base import BaseStorage
 
 class MockStorage(BaseStorage):
     """Mock storage for testing."""
-    
+
     def __init__(self):
         self.entities = {}
         self.relations = {}
         self.checksums = {}
         self.entity_relations = {}  # entity_id -> list of relations
-    
+
     async def get_entities_by_document(self, document_id: str):
         """Return entities for a document."""
         entities = []
@@ -25,30 +25,30 @@ class MockStorage(BaseStorage):
             if hasattr(entity, 'source_doc_id') and entity.source_doc_id == document_id:
                 entities.append(entity)
         return entities
-    
+
     async def get_entity_relations(self, entity_id, relation_type=None, direction="both"):
         """Return relations for an entity."""
         return self.entity_relations.get(entity_id, [])
-    
+
     async def delete_entity(self, entity_id):
         """Delete an entity."""
         if entity_id in self.entities:
             del self.entities[entity_id]
             return True
         return False
-    
+
     async def delete_relation(self, relation_id):
         """Delete a relation."""
         if relation_id in self.relations:
             del self.relations[relation_id]
             return True
         return False
-    
+
     async def delete_document_checksum(self, document_id: str):
         """Delete document checksum."""
         if document_id in self.checksums:
             del self.checksums[document_id]
-    
+
     # Required abstract methods (not used in tests)
     async def connect(self): pass
     async def disconnect(self): pass
@@ -122,14 +122,14 @@ def sample_relations(sample_entities):
 
 class TestDocumentCleanupManager:
     """Test cases for DocumentCleanupManager."""
-    
+
     @pytest.mark.asyncio
     async def test_cleanup_document_data_no_entities(self, cleanup_manager, mock_storage):
         """Test cleanup when document has no entities."""
         document_id = "empty_doc"
-        
+
         result = await cleanup_manager.cleanup_document_data(document_id)
-        
+
         assert isinstance(result, CleanupResult)
         assert result.document_id == document_id
         assert result.entities_deleted == 0
@@ -137,7 +137,7 @@ class TestDocumentCleanupManager:
         assert len(result.entity_ids_deleted) == 0
         assert len(result.relation_ids_deleted) == 0
         assert len(result.errors) == 0
-    
+
     @pytest.mark.asyncio
     async def test_cleanup_document_data_with_entities(self, cleanup_manager, mock_storage, sample_entities, sample_relations):
         """Test cleanup when document has entities and relations."""
@@ -180,7 +180,7 @@ class TestDocumentCleanupManager:
 
         # Verify checksum was deleted
         assert document_id not in mock_storage.checksums
-    
+
     @pytest.mark.asyncio
     async def test_cleanup_document_data_partial_failure(self, cleanup_manager, mock_storage, sample_entities):
         """Test cleanup with partial failures."""
@@ -210,7 +210,7 @@ class TestDocumentCleanupManager:
         assert sample_entities[1].id not in result.entity_ids_deleted
         assert len(result.errors) == 1
         assert f"Failed to delete entity {sample_entities[1].id}" in result.errors[0]
-    
+
     @pytest.mark.asyncio
     async def test_get_document_entities(self, cleanup_manager, mock_storage, sample_entities):
         """Test getting entities for a document."""
@@ -227,7 +227,7 @@ class TestDocumentCleanupManager:
         assert sample_entities[0].id in entity_ids
         assert sample_entities[1].id in entity_ids
         assert sample_entities[2].id not in entity_ids  # From different document
-    
+
     @pytest.mark.asyncio
     async def test_get_document_relations(self, cleanup_manager, mock_storage, sample_entities, sample_relations):
         """Test getting relations for entities."""
@@ -247,28 +247,28 @@ class TestDocumentCleanupManager:
         assert len(relation_ids) == 2
         assert sample_relations[0].id in relation_ids
         assert sample_relations[1].id in relation_ids
-    
+
     @pytest.mark.asyncio
     async def test_remove_document_checksum(self, cleanup_manager, mock_storage):
         """Test removing document checksum."""
         document_id = "test_doc"
         mock_storage.checksums[document_id] = "test_checksum"
-        
+
         await cleanup_manager._remove_document_checksum(document_id)
-        
+
         assert document_id not in mock_storage.checksums
-    
+
     def test_cleanup_result_initialization(self):
         """Test CleanupResult initialization."""
         result = CleanupResult(document_id="test_doc")
-        
+
         assert result.document_id == "test_doc"
         assert result.entities_deleted == 0
         assert result.relations_deleted == 0
         assert result.entity_ids_deleted == []
         assert result.relation_ids_deleted == []
         assert result.errors == []
-    
+
     def test_cleanup_result_with_data(self):
         """Test CleanupResult with data."""
         result = CleanupResult(
@@ -279,7 +279,7 @@ class TestDocumentCleanupManager:
             relation_ids_deleted=["r1"],
             errors=["error1"]
         )
-        
+
         assert result.document_id == "test_doc"
         assert result.entities_deleted == 2
         assert result.relations_deleted == 1

@@ -12,7 +12,7 @@ Implement storage mechanisms for facts in Neo4j and retrieval systems that can q
 ```python
 class FactStorage:
     """Comprehensive fact storage and management system."""
-    
+
     def __init__(
         self,
         neo4j_driver,
@@ -22,19 +22,19 @@ class FactStorage:
         self.neo4j_driver = neo4j_driver
         self.vector_storage = vector_storage
         self.enable_vector_indexing = enable_vector_indexing
-        
+
     async def store_fact_with_vectors(self, fact: Fact) -> str:
         """Store fact in both Neo4j and vector database."""
-        
+
     async def store_facts_batch(self, facts: List[Fact]) -> BatchResult:
         """Efficiently store multiple facts with relationships."""
-        
+
     async def update_fact(self, fact_id: str, updates: Dict[str, Any]) -> bool:
         """Update existing fact with new information."""
-        
+
     async def delete_fact(self, fact_id: str, cascade: bool = False) -> bool:
         """Delete fact and optionally its relationships."""
-        
+
     async def get_fact_statistics(self) -> FactStatistics:
         """Get statistics about stored facts."""
 ```
@@ -46,7 +46,7 @@ class FactStorage:
 ```python
 class FactRetrieval:
     """Advanced fact retrieval with multiple query strategies."""
-    
+
     def __init__(
         self,
         fact_storage: FactStorage,
@@ -56,27 +56,27 @@ class FactRetrieval:
         self.fact_storage = fact_storage
         self.embedding_model = embedding_model
         self.default_limit = default_limit
-        
+
     async def search_facts(self, query: FactQuery) -> FactSearchResult:
         """Search facts using multiple strategies."""
-        
+
     async def get_related_facts(
-        self, 
-        fact_id: str, 
+        self,
+        fact_id: str,
         relationship_types: Optional[List[str]] = None,
         max_depth: int = 2
     ) -> List[Fact]:
         """Get facts related through graph relationships."""
-        
+
     async def find_supporting_facts(self, fact_id: str) -> List[Fact]:
         """Find facts that support or elaborate on a given fact."""
-        
+
     async def find_contradicting_facts(self, fact_id: str) -> List[Fact]:
         """Find facts that contradict a given fact."""
-        
+
     async def get_fact_chain(self, start_fact_id: str, end_fact_id: str) -> Optional[List[Fact]]:
         """Find chain of facts connecting two facts."""
-        
+
     async def semantic_fact_search(self, query_text: str, limit: int = 10) -> List[Fact]:
         """Search facts using semantic similarity."""
 ```
@@ -88,42 +88,42 @@ class FactRetrieval:
 ```python
 class FactQuery(BaseModel):
     """Comprehensive fact query specification."""
-    
+
     # Text-based search
     text_query: Optional[str] = Field(description="Free text search query")
     semantic_search: bool = Field(default=True, description="Use semantic similarity")
-    
+
     # Structured filters
     fact_type: Optional[str] = Field(description="Filter by fact type")
     domain: Optional[str] = Field(description="Filter by domain")
     subject_contains: Optional[str] = Field(description="Subject must contain text")
     object_contains: Optional[str] = Field(description="Object must contain text")
-    
+
     # Confidence and quality filters
     min_confidence: float = Field(default=0.0, description="Minimum confidence score")
     max_confidence: float = Field(default=1.0, description="Maximum confidence score")
-    
+
     # Source filters
     source_document: Optional[str] = Field(description="Filter by source document")
     source_chunk: Optional[str] = Field(description="Filter by source chunk")
-    
+
     # Temporal filters
     created_after: Optional[datetime] = Field(description="Facts created after date")
     created_before: Optional[datetime] = Field(description="Facts created before date")
-    
+
     # Result configuration
     limit: int = Field(default=20, description="Maximum results to return")
     offset: int = Field(default=0, description="Results offset for pagination")
     sort_by: str = Field(default="confidence", description="Sort field")
     sort_order: str = Field(default="desc", description="Sort order")
-    
+
     # Relationship expansion
     include_related: bool = Field(default=False, description="Include related facts")
     max_relationship_depth: int = Field(default=1, description="Max depth for related facts")
 
 class FactSearchResult(BaseModel):
     """Result of fact search operation."""
-    
+
     facts: List[Fact] = Field(description="Found facts")
     total_count: int = Field(description="Total matching facts")
     query_time_ms: float = Field(description="Query execution time")
@@ -138,36 +138,36 @@ class FactSearchResult(BaseModel):
 ```python
 class FactQueryStrategy(ABC):
     """Abstract base for fact query strategies."""
-    
+
     @abstractmethod
     async def execute(self, query: FactQuery) -> FactSearchResult:
         """Execute the query strategy."""
 
 class TextSearchStrategy(FactQueryStrategy):
     """Full-text search on fact content."""
-    
+
     async def execute(self, query: FactQuery) -> FactSearchResult:
         """Execute text-based search using Neo4j full-text indexes."""
 
 class SemanticSearchStrategy(FactQueryStrategy):
     """Semantic search using vector embeddings."""
-    
+
     async def execute(self, query: FactQuery) -> FactSearchResult:
         """Execute semantic search using vector similarity."""
 
 class StructuredSearchStrategy(FactQueryStrategy):
     """Structured search using fact schema fields."""
-    
+
     async def execute(self, query: FactQuery) -> FactSearchResult:
         """Execute structured search on fact properties."""
 
 class HybridSearchStrategy(FactQueryStrategy):
     """Combine multiple search strategies."""
-    
+
     def __init__(self, strategies: List[FactQueryStrategy], weights: List[float]):
         self.strategies = strategies
         self.weights = weights
-        
+
     async def execute(self, query: FactQuery) -> FactSearchResult:
         """Execute hybrid search combining multiple strategies."""
 ```
@@ -179,17 +179,17 @@ class HybridSearchStrategy(FactQueryStrategy):
 ```python
 class FactQueries:
     """Optimized Neo4j queries for fact operations."""
-    
+
     # Basic fact queries
     FIND_FACTS_BY_TEXT = """
-    CALL db.index.fulltext.queryNodes('fact_content', $query) 
+    CALL db.index.fulltext.queryNodes('fact_content', $query)
     YIELD node, score
     WHERE node.confidence >= $min_confidence
     RETURN node, score
     ORDER BY score DESC, node.confidence DESC
     LIMIT $limit
     """
-    
+
     FIND_FACTS_BY_FILTERS = """
     MATCH (f:Fact)
     WHERE ($fact_type IS NULL OR f.fact_type = $fact_type)
@@ -200,7 +200,7 @@ class FactQueries:
     ORDER BY f.confidence DESC
     LIMIT $limit
     """
-    
+
     # Relationship queries
     FIND_RELATED_FACTS = """
     MATCH (f:Fact {id: $fact_id})-[r]->(related:Fact)
@@ -209,18 +209,18 @@ class FactQueries:
     ORDER BY r.confidence DESC
     LIMIT $limit
     """
-    
+
     FIND_FACT_CHAIN = """
     MATCH path = shortestPath((start:Fact {id: $start_id})-[*1..5]-(end:Fact {id: $end_id}))
     WHERE ALL(r IN relationships(path) WHERE r.confidence >= 0.5)
     RETURN [node IN nodes(path) | node] as fact_chain,
            [rel IN relationships(path) | {type: type(rel), confidence: rel.confidence}] as relationships
     """
-    
+
     # Aggregation queries
     FACT_STATISTICS = """
     MATCH (f:Fact)
-    RETURN 
+    RETURN
         count(f) as total_facts,
         avg(f.confidence) as avg_confidence,
         collect(DISTINCT f.fact_type) as fact_types,
@@ -266,21 +266,21 @@ class FactQueries:
 
 ```cypher
 -- Full-text search indexes
-CREATE FULLTEXT INDEX fact_content_index IF NOT EXISTS 
+CREATE FULLTEXT INDEX fact_content_index IF NOT EXISTS
 FOR (f:Fact) ON EACH [f.subject, f.object, f.approach, f.solution, f.remarks];
 
-CREATE FULLTEXT INDEX keyword_search_index IF NOT EXISTS 
+CREATE FULLTEXT INDEX keyword_search_index IF NOT EXISTS
 FOR (k:Keyword) ON EACH [k.name];
 
 -- Property indexes for filtering
-CREATE INDEX fact_type_confidence_index IF NOT EXISTS 
+CREATE INDEX fact_type_confidence_index IF NOT EXISTS
 FOR (f:Fact) ON (f.fact_type, f.confidence);
 
-CREATE INDEX fact_domain_created_index IF NOT EXISTS 
+CREATE INDEX fact_domain_created_index IF NOT EXISTS
 FOR (f:Fact) ON (f.domain, f.created_at);
 
 -- Composite indexes for common query patterns
-CREATE INDEX fact_search_composite IF NOT EXISTS 
+CREATE INDEX fact_search_composite IF NOT EXISTS
 FOR (f:Fact) ON (f.fact_type, f.domain, f.confidence);
 ```
 
@@ -289,16 +289,16 @@ FOR (f:Fact) ON (f.fact_type, f.domain, f.confidence);
 ```python
 class FactCache:
     """Caching layer for fact retrieval."""
-    
+
     def __init__(self, cache_backend: str = "redis"):
         self.cache = self._initialize_cache(cache_backend)
-        
+
     async def get_cached_facts(self, query_hash: str) -> Optional[FactSearchResult]:
         """Get cached search results."""
-        
+
     async def cache_facts(self, query_hash: str, result: FactSearchResult, ttl: int = 3600):
         """Cache search results with TTL."""
-        
+
     def _generate_query_hash(self, query: FactQuery) -> str:
         """Generate cache key from query parameters."""
 ```

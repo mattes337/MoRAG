@@ -99,18 +99,18 @@ class TestAudioConverterFix:
     ):
         """Test that audio converter handles method call errors gracefully."""
         test_file = Path("test_audio.m4a")
-        
+
         # Mock the audio processor to raise AttributeError (the original bug)
         with patch('morag.converters.audio.audio_processor') as mock_processor:
             # Simulate the original bug
             mock_processor.process_audio_file.side_effect = AttributeError("'AudioProcessor' object has no attribute 'process_audio'")
-            
+
             # Mock validation
             with patch.object(audio_converter, 'validate_input', new_callable=AsyncMock):
-                
+
                 # Call the converter
                 result = await audio_converter.convert(test_file, conversion_options)
-                
+
                 # Verify error handling
                 assert result.success is False
                 assert "Audio conversion failed" in result.error_message
@@ -125,17 +125,17 @@ class TestAudioConverterFix:
     ):
         """Test that parameters are passed correctly to process_audio_file."""
         test_file = Path("test_audio.wav")
-        
+
         # Mock the audio processor
         with patch('morag.converters.audio.audio_processor') as mock_processor:
             mock_processor.process_audio_file = AsyncMock(return_value=mock_audio_result)
-            
+
             # Mock other methods
             with patch.object(audio_converter, 'validate_input', new_callable=AsyncMock):
                 with patch.object(audio_converter, '_enhance_audio_processing', new_callable=AsyncMock) as mock_enhance:
                     with patch.object(audio_converter, '_create_enhanced_structured_markdown', new_callable=AsyncMock) as mock_markdown:
                         with patch.object(audio_converter.quality_validator, 'validate_conversion') as mock_quality:
-                            
+
                             # Setup return values
                             mock_enhance.return_value = MagicMock(
                                 transcript="Test transcript",
@@ -147,10 +147,10 @@ class TestAudioConverterFix:
                             )
                             mock_markdown.return_value = "# Audio Content"
                             mock_quality.return_value = MagicMock(overall_score=0.8)
-                            
+
                             # Call the converter
                             await audio_converter.convert(test_file, conversion_options)
-                            
+
                             # Verify the file path was passed as string
                             mock_processor.process_audio_file.assert_called_once_with(str(test_file))
 
@@ -162,11 +162,11 @@ class TestAudioConverterFix:
     ):
         """Test integration with real audio processor (method exists)."""
         from morag_audio import AudioProcessor
-        
+
         # Verify the method exists on the real class
         processor = AudioProcessor()
         assert hasattr(processor, 'process_audio_file')
         assert callable(getattr(processor, 'process_audio_file'))
-        
+
         # Verify the old method name doesn't exist
         assert not hasattr(processor, 'process_audio')

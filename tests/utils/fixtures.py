@@ -38,7 +38,7 @@ def temp_directory() -> Generator[Path, None, None]:
 def sample_files(temp_directory: Path) -> Dict[str, Path]:
     """Create sample files for testing."""
     files = {}
-    
+
     # Text file
     files['text'] = temp_directory / "sample.txt"
     files['text'].write_text("""
@@ -48,7 +48,7 @@ It contains multiple lines and paragraphs.
 This is the second paragraph with more content
 to test text processing capabilities.
     """.strip())
-    
+
     # Markdown file
     files['markdown'] = temp_directory / "sample.md"
     files['markdown'].write_text("""
@@ -66,7 +66,7 @@ This is a **sample** markdown document.
 
 Some more content with `code` and [links](https://example.com).
     """.strip())
-    
+
     # JSON file
     files['json'] = temp_directory / "sample.json"
     files['json'].write_text("""
@@ -80,16 +80,16 @@ Some more content with `code` and [links](https://example.com).
     }
 }
     """.strip())
-    
+
     # Binary file (fake)
     files['binary'] = temp_directory / "sample.bin"
     files['binary'].write_bytes(b'\x00\x01\x02\x03\x04\x05')
-    
+
     # Large text file
     files['large'] = temp_directory / "large.txt"
     large_content = "This is a large file. " * 1000
     files['large'].write_text(large_content)
-    
+
     return files
 
 
@@ -132,7 +132,7 @@ def sample_entities() -> List[Dict[str, Any]]:
             "attributes": {"field": "AI", "year_established": "1950s"}
         },
         {
-            "id": "entity_2", 
+            "id": "entity_2",
             "name": "John Doe",
             "type": "Person",
             "attributes": {"role": "Researcher", "expertise": "ML"}
@@ -160,7 +160,7 @@ def sample_relations() -> List[Dict[str, Any]]:
         {
             "id": "rel_2",
             "source_id": "entity_2",
-            "target_id": "entity_3", 
+            "target_id": "entity_3",
             "type": "AFFILIATED_WITH",
             "attributes": {"role": "Professor", "department": "Computer Science"}
         }
@@ -250,7 +250,7 @@ def sample_chunks() -> List[Dict[str, Any]]:
             "metadata": {"section": "introduction"}
         },
         {
-            "id": "chunk_2", 
+            "id": "chunk_2",
             "text": "This is the second chunk with different content to test chunking.",
             "start_index": 54,
             "end_index": 119,
@@ -299,7 +299,7 @@ def ai_service_config():
             "embedding_model": "embedding-001"
         },
         "openai": {
-            "api_key": "test-openai-key", 
+            "api_key": "test-openai-key",
             "model": "gpt-4",
             "embedding_model": "text-embedding-ada-002"
         }
@@ -323,13 +323,13 @@ def processing_config():
 def cleanup_temp_files():
     """Fixture to track and cleanup temporary files."""
     temp_files = []
-    
+
     def add_temp_file(file_path: Path):
         temp_files.append(file_path)
         return file_path
-    
+
     yield add_temp_file
-    
+
     # Cleanup
     for file_path in temp_files:
         try:
@@ -351,25 +351,25 @@ async def async_mock_services():
         "processor": MockProcessor(),
         "task_manager": MockTaskManager()
     }
-    
+
     # Connect storage
     await services["storage"].connect()
-    
+
     yield services
-    
+
     # Cleanup
     await services["storage"].disconnect()
 
 
 class TestDataGenerator:
     """Helper class to generate test data."""
-    
+
     @staticmethod
     def create_test_entities(count: int = 5) -> List[Dict[str, Any]]:
         """Create test entities."""
         entities = []
         entity_types = ["Person", "Organization", "Technology", "Location", "Concept"]
-        
+
         for i in range(count):
             entities.append({
                 "id": f"entity_{i}",
@@ -381,15 +381,15 @@ class TestDataGenerator:
                     "index": i
                 }
             })
-        
+
         return entities
-    
+
     @staticmethod
     def create_test_relations(entity_count: int = 5) -> List[Dict[str, Any]]:
         """Create test relations between entities."""
         relations = []
         relation_types = ["RELATED_TO", "PART_OF", "SIMILAR_TO", "DEPENDS_ON"]
-        
+
         for i in range(entity_count - 1):
             relations.append({
                 "id": f"relation_{i}",
@@ -401,15 +401,15 @@ class TestDataGenerator:
                     "created_at": "2024-01-01"
                 }
             })
-        
+
         return relations
-    
+
     @staticmethod
     def create_test_documents(count: int = 5) -> List[Dict[str, Any]]:
         """Create test documents."""
         documents = []
         document_types = ["article", "paper", "tutorial", "guide", "reference"]
-        
+
         for i in range(count):
             documents.append({
                 "id": f"doc_{i}",
@@ -422,7 +422,7 @@ class TestDataGenerator:
                     "word_count": 15 + i * 5
                 }
             })
-        
+
         return documents
 
 

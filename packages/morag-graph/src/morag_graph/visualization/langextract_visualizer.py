@@ -18,7 +18,7 @@ from ..models import Entity, Relation
 
 class LangExtractVisualizer:
     """Visualizer that uses LangExtract's HTML visualization capabilities."""
-    
+
     def __init__(
         self,
         model_id: str = "gemini-2.0-flash",
@@ -26,7 +26,7 @@ class LangExtractVisualizer:
         **kwargs
     ):
         """Initialize the LangExtract visualizer.
-        
+
         Args:
             model_id: LangExtract model ID
             api_key: API key for LangExtract
@@ -34,17 +34,17 @@ class LangExtractVisualizer:
         """
         if not LANGEXTRACT_AVAILABLE:
             raise ImportError("LangExtract is not available. Please install it with: pip install langextract")
-        
+
         self.model_id = model_id
         self.api_key = api_key or self._get_api_key()
-        
+
         if not self.api_key:
             raise ValueError("No API key found for LangExtract. Set LANGEXTRACT_API_KEY or GOOGLE_API_KEY.")
-    
+
     def _get_api_key(self) -> Optional[str]:
         """Get API key from environment variables."""
         return os.getenv("LANGEXTRACT_API_KEY") or os.getenv("GOOGLE_API_KEY")
-    
+
     def visualize_extraction(
         self,
         text: str,
@@ -55,7 +55,7 @@ class LangExtractVisualizer:
         **extraction_kwargs
     ) -> str:
         """Visualize entity and relation extraction using LangExtract.
-        
+
         Args:
             text: Text to visualize extraction for
             entities: Optional pre-extracted entities (for reference)
@@ -63,18 +63,18 @@ class LangExtractVisualizer:
             output_file: Optional output HTML file path
             open_browser: Whether to open the visualization in browser
             **extraction_kwargs: Additional arguments for LangExtract
-            
+
         Returns:
             Path to the generated HTML file
         """
         # Create extraction prompt
         prompt = "Extract entities and relationships from the text. Focus on meaningful connections between people, organizations, locations, and concepts."
-        
+
         # Create examples if we have pre-extracted data
         examples = []
         if entities or relations:
             examples = self._create_examples_from_data(text, entities, relations)
-        
+
         # Run LangExtract with visualization
         result = lx.extract(
             text_or_documents=text,
@@ -84,23 +84,23 @@ class LangExtractVisualizer:
             api_key=self.api_key,
             **extraction_kwargs
         )
-        
+
         # Generate HTML visualization
         html_content = self._generate_html_visualization(result, text, entities, relations)
-        
+
         # Save to file
         if output_file is None:
             output_file = tempfile.mktemp(suffix=".html")
-        
+
         with open(output_file, 'w', encoding='utf-8') as f:
             f.write(html_content)
-        
+
         # Open in browser if requested
         if open_browser:
             webbrowser.open(f"file://{os.path.abspath(output_file)}")
-        
+
         return output_file
-    
+
     def _create_examples_from_data(
         self,
         text: str,
@@ -109,14 +109,14 @@ class LangExtractVisualizer:
     ) -> List[Any]:
         """Create LangExtract examples from existing entity/relation data."""
         examples: List[Dict[str, Any]] = []
-        
+
         if not entities and not relations:
             return examples
-        
+
         try:
             # Create a simple example based on the data
             extractions = []
-            
+
             # Add entity extractions
             if entities:
                 for entity in entities[:5]:  # Limit to first 5 entities
@@ -130,7 +130,7 @@ class LangExtractVisualizer:
                             }
                         )
                     )
-            
+
             # Add relation extractions
             if relations:
                 for relation in relations[:5]:  # Limit to first 5 relations
@@ -146,7 +146,7 @@ class LangExtractVisualizer:
                             }
                         )
                     )
-            
+
             if extractions:
                 examples.append(
                     lx.data.ExampleData(
@@ -154,13 +154,13 @@ class LangExtractVisualizer:
                         extractions=extractions
                     )
                 )
-        
+
         except Exception:
             # If example creation fails, return empty list
             pass
-        
+
         return examples
-    
+
     def _generate_html_visualization(
         self,
         langextract_result: Any,
@@ -169,7 +169,7 @@ class LangExtractVisualizer:
         relations: Optional[List[Relation]] = None
     ) -> str:
         """Generate HTML visualization combining LangExtract results with MoRAG data."""
-        
+
         html_template = """
         <!DOCTYPE html>
         <html>
@@ -192,12 +192,12 @@ class LangExtractVisualizer:
         </head>
         <body>
             <h1>MoRAG Graph Visualization</h1>
-            
+
             <div class="section">
                 <h2>Original Text</h2>
                 <div class="text-content">{original_text}</div>
             </div>
-            
+
             <div class="section">
                 <h2>Extraction Statistics</h2>
                 <div class="stats">
@@ -215,22 +215,22 @@ class LangExtractVisualizer:
                     </div>
                 </div>
             </div>
-            
+
             {morag_entities_section}
-            
+
             {morag_relations_section}
-            
+
             {langextract_section}
-            
+
         </body>
         </html>
         """
-        
+
         # Format original text (truncate if too long)
         display_text = original_text
         if len(display_text) > 2000:
             display_text = display_text[:2000] + "... (truncated)"
-        
+
         # Generate MoRAG entities section
         morag_entities_section = ""
         if entities:
@@ -244,7 +244,7 @@ class LangExtractVisualizer:
                 </div>
                 """
             morag_entities_section += "</div>"
-        
+
         # Generate MoRAG relations section
         morag_relations_section = ""
         if relations:
@@ -258,7 +258,7 @@ class LangExtractVisualizer:
                 </div>
                 """
             morag_relations_section += "</div>"
-        
+
         # Generate LangExtract section
         langextract_section = ""
         if langextract_result and hasattr(langextract_result, 'extractions'):
@@ -271,7 +271,7 @@ class LangExtractVisualizer:
                 </div>
                 """
             langextract_section += "</div>"
-        
+
         # Fill in the template
         html_content = html_template.format(
             original_text=display_text,
@@ -282,9 +282,9 @@ class LangExtractVisualizer:
             morag_relations_section=morag_relations_section,
             langextract_section=langextract_section
         )
-        
+
         return html_content
-    
+
     def visualize_graph(
         self,
         entities: List[Entity],
@@ -293,35 +293,35 @@ class LangExtractVisualizer:
         open_browser: bool = True
     ) -> str:
         """Visualize a complete graph of entities and relations.
-        
+
         Args:
             entities: List of entities to visualize
             relations: List of relations to visualize
             output_file: Optional output HTML file path
             open_browser: Whether to open the visualization in browser
-            
+
         Returns:
             Path to the generated HTML file
         """
         # Create a simple graph visualization
         html_content = self._generate_graph_html(entities, relations)
-        
+
         # Save to file
         if output_file is None:
             output_file = tempfile.mktemp(suffix=".html")
-        
+
         with open(output_file, 'w', encoding='utf-8') as f:
             f.write(html_content)
-        
+
         # Open in browser if requested
         if open_browser:
             webbrowser.open(f"file://{os.path.abspath(output_file)}")
-        
+
         return output_file
-    
+
     def _generate_graph_html(self, entities: List[Entity], relations: List[Relation]) -> str:
         """Generate HTML for graph visualization."""
-        
+
         html_template = """
         <!DOCTYPE html>
         <html>
@@ -340,7 +340,7 @@ class LangExtractVisualizer:
         </head>
         <body>
             <h1>MoRAG Graph Network</h1>
-            
+
             <div class="stats">
                 <div class="stat-box">
                     <strong>{entity_count}</strong><br>
@@ -355,28 +355,28 @@ class LangExtractVisualizer:
                     Avg Confidence
                 </div>
             </div>
-            
+
             <div class="graph-container">
                 <p style="text-align: center; margin-top: 250px; color: #666;">
                     Interactive graph visualization would be rendered here.<br>
                     Consider integrating with D3.js, vis.js, or similar libraries for interactive graphs.
                 </p>
             </div>
-            
+
             <h2>Entities ({entity_count})</h2>
             <div class="entity-list">
                 {entity_list}
             </div>
-            
+
             <h2>Relations ({relation_count})</h2>
             <div class="relation-list">
                 {relation_list}
             </div>
-            
+
         </body>
         </html>
         """
-        
+
         # Generate entity list
         entity_list = ""
         for entity in entities:
@@ -386,7 +386,7 @@ class LangExtractVisualizer:
                 <span style="float: right;">Confidence: {entity.confidence:.2f}</span>
             </div>
             """
-        
+
         # Generate relation list
         relation_list = ""
         for relation in relations:
@@ -396,11 +396,11 @@ class LangExtractVisualizer:
                 <span style="float: right;">Confidence: {relation.confidence:.2f}</span>
             </div>
             """
-        
+
         # Calculate average confidence
         all_confidences = [e.confidence for e in entities] + [r.confidence for r in relations]
         avg_confidence = sum(all_confidences) / len(all_confidences) if all_confidences else 0
-        
+
         # Fill in the template
         html_content = html_template.format(
             entity_count=len(entities),
@@ -409,5 +409,5 @@ class LangExtractVisualizer:
             entity_list=entity_list,
             relation_list=relation_list
         )
-        
+
         return html_content

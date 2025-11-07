@@ -1,7 +1,7 @@
 """Entity identification service for intelligent retrieval."""
 
 import structlog
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Any
 from pydantic_ai import Agent
 from pydantic import BaseModel, Field
 
@@ -26,7 +26,7 @@ class EntityIdentificationResult(BaseModel):
 
 class EntityIdentificationService:
     """Service for identifying entities from user queries."""
-    
+
     def __init__(
         self,
         llm_client: LLMClient,
@@ -60,7 +60,7 @@ class EntityIdentificationService:
             result_type=EntityIdentificationResult,
             system_prompt=self._get_system_prompt()
         )
-    
+
     def _get_system_prompt(self) -> str:
         """Get the system prompt for entity identification."""
         return """You are an expert entity identification system. Your task is to identify key entities from user queries that would be useful for graph-based information retrieval.
@@ -86,7 +86,7 @@ Entity Types to Consider:
 - DOCUMENT: Specific papers, books, standards, specifications
 
 Return only the most relevant entities that would help retrieve information to answer the user's query."""
-    
+
     async def identify_entities(self, query: str) -> List[IdentifiedEntity]:
         """Identify entities from a user query.
 
@@ -130,29 +130,29 @@ Focus on entities that are likely to exist in a knowledge graph and are essentia
 
             result = await self.agent.run(prompt)
             entities = result.data.entities
-            
+
             # Filter by confidence and limit count
             filtered_entities = [
-                entity for entity in entities 
+                entity for entity in entities
                 if entity.confidence >= self.min_confidence
             ]
-            
+
             # Sort by confidence and limit
             filtered_entities.sort(key=lambda x: x.confidence, reverse=True)
             filtered_entities = filtered_entities[:self.max_entities]
-            
+
             # Link to graph entities if graph storage is available
             if self.graph_storage:
                 await self._link_to_graph_entities(filtered_entities)
-            
+
             self.logger.info(
                 "Entity identification completed",
                 total_entities=len(filtered_entities),
                 query=query
             )
-            
+
             return filtered_entities
-            
+
         except Exception as e:
             self.logger.error(
                 "Entity identification failed",
@@ -161,7 +161,7 @@ Focus on entities that are likely to exist in a knowledge graph and are essentia
                 query=query
             )
             raise
-    
+
     async def _link_to_graph_entities(self, entities: List[IdentifiedEntity]) -> None:
         """Link identified entities to existing graph entities using both exact search and vector similarity.
 
@@ -205,7 +205,7 @@ Focus on entities that are likely to exist in a knowledge graph and are essentia
                     # Find best match based on name similarity
                     best_match = None
                     best_score = 0.0
-                    
+
                     for candidate in candidates:
                         # Simple similarity scoring
                         similarity = self._calculate_name_similarity(
@@ -225,7 +225,7 @@ Focus on entities that are likely to exist in a knowledge graph and are essentia
                         if similarity > best_score and similarity >= 0.7:  # Lower threshold for cross-language matching
                             best_score = similarity
                             best_match = candidate
-                    
+
                     if best_match:
                         entity.graph_entity_id = best_match.id
                         self.logger.debug(
@@ -234,14 +234,14 @@ Focus on entities that are likely to exist in a knowledge graph and are essentia
                             graph_entity_id=best_match.id,
                             similarity=best_score
                         )
-                
+
             except Exception as e:
                 self.logger.warning(
                     "Failed to link entity to graph",
                     entity_name=entity.name,
                     error=str(e)
                 )
-    
+
     def _calculate_name_similarity(self, name1: str, name2: str) -> float:
         """Calculate similarity between two entity names.
 

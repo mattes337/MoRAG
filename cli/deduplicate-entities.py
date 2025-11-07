@@ -26,11 +26,11 @@ except ImportError as e:
 
 class EntityDeduplicationCLI:
     """CLI interface for entity deduplication."""
-    
+
     def __init__(self):
         self.neo4j_storage = None
         self.deduplicator = None
-    
+
     async def setup_services(self, neo4j_uri: str, neo4j_username: str, neo4j_password: str, neo4j_database: str = "neo4j"):
         """Setup Neo4j storage and deduplicator services."""
         try:
@@ -41,11 +41,11 @@ class EntityDeduplicationCLI:
                 password=neo4j_password,
                 database=neo4j_database
             )
-            
+
             # Initialize Neo4j storage
             self.neo4j_storage = Neo4jStorage(neo4j_config)
             await self.neo4j_storage.connect()
-            
+
             # Setup LLM service if API key is available
             llm_service = None
             if os.getenv("GEMINI_API_KEY"):
@@ -57,20 +57,20 @@ class EntityDeduplicationCLI:
                     print("   Falling back to rule-based normalization")
             else:
                 print("⚠️  GEMINI_API_KEY not found. Using rule-based normalization only.")
-            
+
             # Initialize deduplicator
             self.deduplicator = SystematicDeduplicator(
                 similarity_threshold=0.7,
                 merge_confidence_threshold=0.8,
                 enable_llm_validation=llm_service is not None
             )
-            
+
             print("✅ Services initialized successfully")
-            
+
         except Exception as e:
             print(f"❌ Failed to setup services: {e}")
             raise
-    
+
     async def run_deduplication(self, collection_name: Optional[str] = None, language: Optional[str] = None, dry_run: bool = False) -> Dict[str, Any]:
         """Run entity deduplication."""
         if not self.deduplicator:
@@ -99,17 +99,17 @@ class EntityDeduplicationCLI:
         except Exception as e:
             print(f"❌ Deduplication failed: {e}")
             raise
-    
+
     async def show_candidates(self, collection_name: Optional[str] = None, language: Optional[str] = None) -> None:
         """Show merge candidates without applying changes."""
         if not self.deduplicator:
             raise RuntimeError("Services not initialized. Call setup_services first.")
-        
+
         print(f"🔍 Finding duplicate entity candidates...")
         print(f"   Collection: {collection_name or 'All collections'}")
         print(f"   Language: {language or 'Auto-detect'}")
         print()
-        
+
         try:
             print("⚠️  Note: Candidate preview not available with current interface.")
             print("   Use the maintenance jobs for detailed deduplication analysis.")
@@ -118,7 +118,7 @@ class EntityDeduplicationCLI:
         except Exception as e:
             print(f"❌ Failed to find candidates: {e}")
             raise
-    
+
     async def cleanup(self):
         """Cleanup resources."""
         if self.neo4j_storage:
@@ -130,7 +130,7 @@ def print_results(result: Dict[str, Any], dry_run: bool = False):
     print("📊 Deduplication Results:")
     print(f"   Entities before: {result['total_entities_before']}")
     print(f"   Merge candidates found: {result['merge_candidates_found']}")
-    
+
     if dry_run:
         print(f"   Merges that would be applied: {len([c for c in result.get('candidates', []) if c['confidence'] >= 0.8])}")
         print()
@@ -174,7 +174,7 @@ Environment variables:
   GEMINI_API_KEY     Google Gemini API key for enhanced normalization (optional)
         """
     )
-    
+
     parser.add_argument('--collection', '-c', help='Collection name to deduplicate (optional)')
     parser.add_argument('--language', '-l', help='Language context for normalization (e.g., en, es, de)')
     parser.add_argument('--dry-run', '-d', action='store_true', help='Show candidates without applying merges')
@@ -184,29 +184,29 @@ Environment variables:
     parser.add_argument('--neo4j-password', default=os.getenv('NEO4J_PASSWORD'), help='Neo4j password')
     parser.add_argument('--neo4j-database', default=os.getenv('NEO4J_DATABASE', 'neo4j'), help='Neo4j database')
     parser.add_argument('--output', '-o', help='Output results to JSON file')
-    
+
     args = parser.parse_args()
-    
+
     # Validate required arguments
     if not args.neo4j_password:
         print("❌ Neo4j password is required. Set NEO4J_PASSWORD environment variable or use --neo4j-password")
         sys.exit(1)
-    
+
     # Handle aliases
     if args.candidates_only:
         args.dry_run = True
-    
+
     cli = EntityDeduplicationCLI()
-    
+
     try:
         # Setup services
         await cli.setup_services(
             args.neo4j_uri,
-            args.neo4j_username, 
+            args.neo4j_username,
             args.neo4j_password,
             args.neo4j_database
         )
-        
+
         # Run deduplication or show candidates
         if args.dry_run:
             await cli.show_candidates(args.collection, args.language)
@@ -235,7 +235,7 @@ Environment variables:
                 with open(args.output, 'w') as f:
                     json.dump(output_data, f, indent=2)
                 print(f"📄 Results saved to {args.output}")
-        
+
     except KeyboardInterrupt:
         print("\n⚠️  Operation cancelled by user")
         sys.exit(1)

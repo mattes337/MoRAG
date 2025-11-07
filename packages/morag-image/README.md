@@ -67,7 +67,7 @@ async def process_image():
         file_path=Path("path/to/image.jpg"),
         config=config
     )
-    
+
     # Access results
     print(f"Caption: {result.caption}")
     print(f"Extracted text: {result.extracted_text}")

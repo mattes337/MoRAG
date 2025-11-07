@@ -232,5 +232,5 @@ When adding new tests:
 
 For more information about specific test categories, see:
 - `unit/README.md` - Unit testing guidelines
-- `integration/README.md` - Integration testing guidelines  
+- `integration/README.md` - Integration testing guidelines
 - `manual/README.md` - Manual testing procedures

@@ -57,7 +57,7 @@ class TestIngestionIntegration:
         # Setup mocks
         mock_service = Mock()
         mock_service_class.return_value = mock_service
-        
+
         mock_job = RemoteJob.create_new(
             ingestion_task_id="test-task-123",
             source_file_path="/tmp/test.mp3",
@@ -69,9 +69,9 @@ class TestIngestionIntegration:
             }
         )
         mock_service.get_job_status.return_value = mock_job
-        
+
         mock_store.return_value = ["point-1", "point-2", "point-3"]
-        
+
         # Call continuation function
         result = await continue_ingestion_after_remote_processing(
             remote_job_id="remote-job-123",
@@ -79,15 +79,15 @@ class TestIngestionIntegration:
             metadata={"duration": 120.5, "speakers": ["Speaker_00", "Speaker_01"]},
             processing_time=45.2
         )
-        
+
         # Verify success
         assert result == True
-        
+
         # Verify vector storage was called
         mock_store.assert_called_once()
         store_args = mock_store.call_args
         assert store_args[0][0] == "Processed audio transcript"  # content
-        
+
         # Check metadata passed to vector storage
         vector_metadata = store_args[0][1]
         assert vector_metadata["source_type"] == "audio"
@@ -97,7 +97,7 @@ class TestIngestionIntegration:
         assert vector_metadata["remote_job_id"] == "remote-job-123"
         assert vector_metadata["duration"] == 120.5
         assert vector_metadata["source"] == "upload"  # From original metadata
-        
+
         # Verify webhook was called
         mock_webhook.assert_called_once()
         webhook_args = mock_webhook.call_args[0]
@@ -133,7 +133,7 @@ class TestIngestionIntegration:
         # Setup mocks
         mock_service = Mock()
         mock_service_class.return_value = mock_service
-        
+
         mock_job = RemoteJob.create_new(
             ingestion_task_id="test-task-123",
             source_file_path="/tmp/test.mp3",
@@ -141,10 +141,10 @@ class TestIngestionIntegration:
             task_options={"store_in_vector_db": True}
         )
         mock_service.get_job_status.return_value = mock_job
-        
+
         # Make storage fail
         mock_store.side_effect = Exception("Vector storage error")
-        
+
         # Call continuation function
         result = await continue_ingestion_after_remote_processing(
             remote_job_id="remote-job-123",
@@ -152,7 +152,7 @@ class TestIngestionIntegration:
             metadata={},
             processing_time=10.0
         )
-        
+
         # Verify failure
         assert result == False
 
@@ -163,7 +163,7 @@ class TestIngestionIntegration:
         # Setup mock
         mock_service = Mock()
         mock_service_class.return_value = mock_service
-        
+
         mock_job = RemoteJob.create_new(
             ingestion_task_id="test-task-123",
             source_file_path="/tmp/test.mp3",
@@ -174,7 +174,7 @@ class TestIngestionIntegration:
             }
         )
         mock_service.get_job_status.return_value = mock_job
-        
+
         # Call continuation function
         with patch('morag.ingest_tasks.send_webhook_notification') as mock_webhook:
             result = await continue_ingestion_after_remote_processing(
@@ -183,9 +183,9 @@ class TestIngestionIntegration:
                 metadata={},
                 processing_time=10.0
             )
-        
+
         # Verify success (even without vector storage)
         assert result == True
-        
+
         # Verify webhook was still called
         mock_webhook.assert_called_once()

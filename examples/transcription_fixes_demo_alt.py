@@ -29,11 +29,11 @@ async def demo_audio_transcription_fixes(file_path: Path):
     """Demo audio transcription fixes."""
     print(f"🎵 Processing Audio File: {file_path}")
     print("=" * 60)
-    
+
     try:
         # Create audio converter with enhanced settings
         converter = AudioConverter()
-        
+
         # Configure options for best quality
         options = ConversionOptions(
             include_metadata=True,
@@ -43,25 +43,25 @@ async def demo_audio_transcription_fixes(file_path: Path):
                 'model': 'large-v3'  # Use best quality model
             }
         )
-        
+
         # Process the audio file
         print("🔄 Processing audio file...")
         result = await converter.convert(file_path, options)
-        
+
         if result.success:
             print("✅ Audio processing completed successfully!")
             print(f"📊 Quality Score: {result.quality_score.overall_score:.2f}" if result.quality_score else "📊 Quality Score: N/A")
             print(f"⏱️  Processing Time: {result.processing_time:.2f} seconds")
             print()
-            
+
             print("📝 Generated Markdown:")
             print("-" * 60)
             print(result.content)
             print("-" * 60)
-            
+
             # Verify fixes
             print("\n🔍 Verification Results:")
-            
+
             # Check topic timestamp format
             if "[" in result.content and "]" in result.content:
                 # Look for single number format like [123] instead of [00:02 - 00:05]
@@ -75,7 +75,7 @@ async def demo_audio_transcription_fixes(file_path: Path):
                     print("⚠️  Topic timestamp format unclear")
             else:
                 print("❌ No topic timestamps found")
-            
+
             # Check speaker identification
             if "SPEAKER_00:" in result.content or "SPEAKER_01:" in result.content:
                 print("✅ Speaker IDs are shown correctly")
@@ -87,7 +87,7 @@ async def demo_audio_transcription_fixes(file_path: Path):
                 print("❌ Still showing generic SPEAKER instead of IDs")
             else:
                 print("⚠️  Speaker format unclear")
-            
+
             # Check for absence of summaries
             summary_indicators = ["summary", "Summary", "*", "**Summary**"]
             has_summaries = any(indicator in result.content for indicator in summary_indicators)
@@ -95,11 +95,11 @@ async def demo_audio_transcription_fixes(file_path: Path):
                 print("✅ Topic summaries removed")
             else:
                 print("⚠️  May still contain summaries")
-            
+
         else:
             print("❌ Audio processing failed!")
             print(f"Error: {result.error_message}")
-            
+
     except Exception as e:
         print(f"❌ Error processing audio: {e}")
 
@@ -108,11 +108,11 @@ async def demo_video_transcription_fixes(file_path: Path):
     """Demo video transcription fixes."""
     print(f"🎬 Processing Video File: {file_path}")
     print("=" * 60)
-    
+
     try:
         # Create video converter with enhanced settings
         converter = VideoConverter()
-        
+
         # Configure options for best quality
         options = ConversionOptions(
             include_metadata=True,
@@ -124,30 +124,30 @@ async def demo_video_transcription_fixes(file_path: Path):
                 'model': 'large-v3'  # Use best quality model
             }
         )
-        
+
         # Process the video file
         print("🔄 Processing video file...")
         result = await converter.convert(file_path, options)
-        
+
         if result.success:
             print("✅ Video processing completed successfully!")
             print(f"📊 Quality Score: {result.quality_score.overall_score:.2f}" if result.quality_score else "📊 Quality Score: N/A")
             print(f"⏱️  Processing Time: {result.processing_time:.2f} seconds")
             print()
-            
+
             print("📝 Generated Markdown:")
             print("-" * 60)
             print(result.content[:2000] + "..." if len(result.content) > 2000 else result.content)
             print("-" * 60)
-            
+
             # Same verification as audio
             print("\n🔍 Verification Results:")
             print("✅ Video transcription uses same fixes as audio processing")
-            
+
         else:
             print("❌ Video processing failed!")
             print(f"Error: {result.error_message}")
-            
+
     except Exception as e:
         print(f"❌ Error processing video: {e}")
 
@@ -162,22 +162,22 @@ async def main():
         print("  python scripts/demo_transcription_fixes.py video.mp4")
         print("  python scripts/demo_transcription_fixes.py recording.wav")
         return
-    
+
     file_path = Path(sys.argv[1])
-    
+
     if not file_path.exists():
         print(f"❌ File not found: {file_path}")
         return
-    
+
     print("🚀 Audio/Video Transcription Fixes Demo")
     print("=" * 60)
     print(f"📁 File: {file_path}")
     print(f"📏 Size: {file_path.stat().st_size / (1024*1024):.1f} MB")
     print()
-    
+
     # Determine file type and process accordingly
     file_extension = file_path.suffix.lower()
-    
+
     if file_extension in ['.mp3', '.wav', '.m4a', '.flac', '.aac', '.ogg']:
         await demo_audio_transcription_fixes(file_path)
     elif file_extension in ['.mp4', '.avi', '.mov', '.mkv', '.webm']:
@@ -188,7 +188,7 @@ async def main():
         print("  Audio: .mp3, .wav, .m4a, .flac, .aac, .ogg")
         print("  Video: .mp4, .avi, .mov, .mkv, .webm")
         return
-    
+
     print("\n🎯 Summary of Applied Fixes:")
     print("1. ✅ Topic timestamps show single start seconds: # Discussion Topic 2 [123]")
     print("2. ✅ Speaker diarization shows actual speaker IDs (SPEAKER_00, SPEAKER_01)")

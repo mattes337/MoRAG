@@ -69,23 +69,23 @@ class WebConverter(BaseConverter):
 
         # Initialize web processor
         self.web_processor = WebProcessor()
-    
+
     def supports_format(self, format_type: str) -> bool:
         """Check if this converter supports the given format."""
         return format_type.lower() in self.supported_formats
-    
+
     async def convert(self, file_path: Union[str, Path], options: ConversionOptions) -> ConversionResult:
         """Convert web content to structured markdown.
-        
+
         Args:
             file_path: URL or path to HTML file
             options: Conversion options
-            
+
         Returns:
             ConversionResult with markdown content
         """
         start_time = time.time()
-        
+
         # Handle both URLs and file paths
         if isinstance(file_path, Path) or (isinstance(file_path, str) and not file_path.startswith(('http://', 'https://'))):
             # Local HTML file
@@ -97,20 +97,20 @@ class WebConverter(BaseConverter):
             # URL
             url = str(file_path)
             is_local_file = False
-        
+
         logger.info(
             "Starting web content conversion",
             url=url,
             is_local_file=is_local_file,
             extract_main_content=options.format_options.get('extract_main_content', True)
         )
-        
+
         try:
             if is_local_file:
                 # Read local HTML file
                 with open(file_path, 'r', encoding='utf-8') as f:
                     html_content = f.read()
-                
+
                 # Create a simple web result for local files
                 web_result = type('WebResult', (), {
                     'content': html_content,
@@ -132,7 +132,7 @@ class WebConverter(BaseConverter):
                     remove_navigation=options.format_options.get('remove_navigation', True),
                     remove_footer=options.format_options.get('remove_footer', True)
                 )
-                
+
                 # Use web processor
                 web_result = await self.web_processor.process_url(url, web_config)
 
@@ -149,15 +149,15 @@ class WebConverter(BaseConverter):
                     'links': [{'url': link, 'text': 'Link'} for link in web_result.content.links],
                     'images': [{'src': img, 'alt': 'Image'} for img in web_result.content.images]
                 })()
-            
+
             # Convert to structured markdown
             markdown_content = await self._create_structured_markdown(web_result, options)
-            
+
             # Calculate quality score
             quality_score = self._calculate_quality_score(markdown_content, web_result.metadata)
-            
+
             processing_time = time.time() - start_time
-            
+
             result = ConversionResult(
                 content=markdown_content,
                 metadata=self._enhance_metadata(web_result.metadata, file_path),
@@ -167,7 +167,7 @@ class WebConverter(BaseConverter):
                 original_format='web',
                 converter_used=self.name
             )
-            
+
             logger.info(
                 "Web content conversion completed",
                 processing_time=processing_time,
@@ -175,13 +175,13 @@ class WebConverter(BaseConverter):
                 word_count=len(markdown_content.split()),
                 url=url
             )
-            
+
             return result
-            
+
         except Exception as e:
             processing_time = time.time() - start_time
             error_msg = f"Web content conversion failed: {str(e)}"
-            
+
             logger.error(
                 "Web content conversion failed",
                 error=str(e),
@@ -189,7 +189,7 @@ class WebConverter(BaseConverter):
                 processing_time=processing_time,
                 url=url
             )
-            
+
             return ConversionResult(
                 content="",
                 metadata={},
@@ -199,25 +199,25 @@ class WebConverter(BaseConverter):
                 original_format='web',
                 converter_used=self.name
             )
-    
+
     def _calculate_quality_score(self, content: str, metadata: dict) -> QualityScore:
         """Calculate quality score for web conversion."""
         word_count = len(content.split())
-        
+
         # Base score calculation
         completeness = min(1.0, word_count / 100)  # Assume 100 words is complete
         accuracy = 0.9  # Assume high accuracy for web content
         formatting = 0.8 if '# ' in content else 0.5  # Check for headers
-        
+
         overall_score = (completeness + accuracy + formatting) / 3
-        
+
         return QualityScore(
             overall_score=overall_score,
             completeness=completeness,
             accuracy=accuracy,
             formatting=formatting
         )
-    
+
     async def _create_structured_markdown(self, web_result, options: ConversionOptions) -> str:
         """Create structured markdown from web scraping result using formatter."""
         # Clean the raw content
@@ -243,17 +243,17 @@ class WebConverter(BaseConverter):
         )
 
         return formatted_content
-    
+
     def _enhance_metadata(self, original_metadata: dict, file_path: Union[str, Path]) -> dict:
         """Enhance metadata with additional information."""
         enhanced = original_metadata.copy()
-        
+
         # Add conversion information
         enhanced.update({
             'conversion_format': 'web_to_markdown',
             'converter_version': '1.0.0'
         })
-        
+
         # Add file information if it's a local file
         if isinstance(file_path, Path):
             enhanced.update({
@@ -263,5 +263,5 @@ class WebConverter(BaseConverter):
             })
         else:
             enhanced['source_url'] = str(file_path)
-        
+
         return enhanced

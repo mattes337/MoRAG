@@ -23,35 +23,35 @@ from agents.base.config import AgentConfig
 
 class TestChunkingAgent:
     """Test chunking agent."""
-    
+
     @pytest.fixture
     def chunking_agent(self):
         """Create a chunking agent for testing."""
         config = AgentConfig(name="chunking")
         return ChunkingAgent(config)
-    
+
     def test_agent_initialization(self, chunking_agent):
         """Test agent initialization."""
         assert chunking_agent.config.name == "chunking"
         assert chunking_agent.config.model.provider == "gemini"
-    
+
     @pytest.mark.asyncio
     async def test_semantic_chunking(self, chunking_agent):
         """Test semantic chunking."""
         text = """
         Introduction to Machine Learning
-        
+
         Machine learning is a subset of artificial intelligence that enables computers to learn without explicit programming.
-        
+
         Types of Machine Learning
-        
+
         There are three main types: supervised learning, unsupervised learning, and reinforcement learning.
-        
+
         Applications
-        
+
         Machine learning is used in image recognition, natural language processing, and recommendation systems.
         """
-        
+
         with patch.object(chunking_agent, '_call_model') as mock_llm:
             mock_llm.return_value = {
                 "chunks": [
@@ -84,20 +84,20 @@ class TestChunkingAgent:
                 "total_chunks": 3,
                 "confidence": "high"
             }
-            
+
             result = await chunking_agent.chunk_text(text, strategy="semantic")
-            
+
             assert isinstance(result, ChunkingResult)
             assert len(result.chunks) == 3
             assert result.chunking_method == "semantic"
             assert result.chunks[0]["chunk_type"] == "introduction"
             assert all(chunk["importance"] > 0.7 for chunk in result.chunks)
-    
+
     @pytest.mark.asyncio
     async def test_fixed_size_chunking(self, chunking_agent):
         """Test fixed size chunking."""
         text = "This is a long text that needs to be split into fixed-size chunks for processing. " * 10
-        
+
         with patch.object(chunking_agent, '_call_model') as mock_llm:
             mock_llm.return_value = {
                 "chunks": [
@@ -122,9 +122,9 @@ class TestChunkingAgent:
                 "total_chunks": 2,
                 "confidence": "high"
             }
-            
+
             result = await chunking_agent.chunk_text(text, strategy="fixed_size", chunk_size=200)
-            
+
             assert result.chunking_method == "fixed_size"
             assert len(result.chunks) == 2
             assert all(len(chunk["content"]) <= 200 for chunk in result.chunks)
@@ -132,13 +132,13 @@ class TestChunkingAgent:
 
 class TestClassificationAgent:
     """Test classification agent."""
-    
+
     @pytest.fixture
     def classification_agent(self):
         """Create a classification agent for testing."""
         config = AgentConfig(name="classification")
         return ClassificationAgent(config)
-    
+
     @pytest.mark.asyncio
     async def test_content_classification(self, classification_agent):
         """Test content classification."""
@@ -148,7 +148,7 @@ class TestClassificationAgent:
         Troponin levels are elevated at 15.2 ng/mL.
         Diagnosis: Acute myocardial infarction.
         """
-        
+
         with patch.object(classification_agent, '_call_model') as mock_llm:
             mock_llm.return_value = {
                 "primary_category": "medical_record",
@@ -165,15 +165,15 @@ class TestClassificationAgent:
                     "domain_specificity": 0.9
                 }
             }
-            
+
             result = await classification_agent.classify_content(text)
-            
+
             assert isinstance(result, ClassificationResult)
             assert result.primary_category == "medical_record"
             assert "cardiology" in result.subcategories
             assert result.confidence == "high"
             assert "diagnostic_tests" in result.metadata.get("classification_features", [])
-    
+
     @pytest.mark.asyncio
     async def test_research_paper_classification(self, classification_agent):
         """Test research paper classification."""
@@ -181,10 +181,10 @@ class TestClassificationAgent:
         Abstract: This study investigates the performance of transformer models
         on natural language understanding tasks. We evaluate BERT, RoBERTa, and GPT
         on the GLUE benchmark, achieving state-of-the-art results.
-        
+
         Keywords: transformers, BERT, natural language processing, GLUE
         """
-        
+
         with patch.object(classification_agent, '_call_model') as mock_llm:
             mock_llm.return_value = {
                 "primary_category": "research_paper",
@@ -200,9 +200,9 @@ class TestClassificationAgent:
                     "domain_specificity": 0.95
                 }
             }
-            
+
             result = await classification_agent.classify_content(text)
-            
+
             assert result.primary_category == "research_paper"
             assert "natural_language_processing" in result.subcategories
             assert result.metadata.get("domain_specificity", 0) > 0.9
@@ -210,13 +210,13 @@ class TestClassificationAgent:
 
 class TestValidationAgent:
     """Test validation agent."""
-    
+
     @pytest.fixture
     def validation_agent(self):
         """Create a validation agent for testing."""
         config = AgentConfig(name="validation")
         return ValidationAgent(config)
-    
+
     @pytest.mark.asyncio
     async def test_fact_validation(self, validation_agent):
         """Test fact validation."""
@@ -227,7 +227,7 @@ class TestValidationAgent:
             "solution": "reduced cardiovascular events",
             "confidence": 0.9
         }
-        
+
         with patch.object(validation_agent, '_call_model') as mock_llm:
             mock_llm.return_value = {
                 "validation_status": "valid",
@@ -243,16 +243,16 @@ class TestValidationAgent:
                     "suggestions": ["Consider adding dosage information"]
                 }
             }
-            
+
             result = await validation_agent.validate_fact(fact)
-            
+
             assert isinstance(result, ValidationResult)
             assert result.validation_status == "valid"
             assert result.is_valid == True
             assert result.confidence == "high"
             assert len(result.metadata.get("validation_checks", [])) == 3
             assert all(check["passed"] for check in result.metadata.get("validation_checks", []))
-    
+
     @pytest.mark.asyncio
     async def test_invalid_fact_validation(self, validation_agent):
         """Test validation of invalid fact."""
@@ -263,7 +263,7 @@ class TestValidationAgent:
             "solution": "complete cancer elimination",
             "confidence": 0.3
         }
-        
+
         with patch.object(validation_agent, '_call_model') as mock_llm:
             mock_llm.return_value = {
                 "validation_status": "invalid",
@@ -286,9 +286,9 @@ class TestValidationAgent:
                     "suggestions": ["Remove or correct this claim"]
                 }
             }
-            
+
             result = await validation_agent.validate_fact(fact)
-            
+
             assert result.validation_status == "invalid"
             assert result.is_valid == False
             assert len(result.issues_found) > 0
@@ -297,13 +297,13 @@ class TestValidationAgent:
 
 class TestFilteringAgent:
     """Test filtering agent."""
-    
+
     @pytest.fixture
     def filtering_agent(self):
         """Create a filtering agent for testing."""
         config = AgentConfig(name="filtering")
         return FilteringAgent(config)
-    
+
     @pytest.mark.asyncio
     async def test_relevance_filtering(self, filtering_agent):
         """Test relevance-based filtering."""
@@ -314,7 +314,7 @@ class TestFilteringAgent:
             {"text": "Weather forecast for tomorrow", "score": 0.1},
             {"text": "Dietary recommendations for diabetic patients", "score": 0.8}
         ]
-        
+
         with patch.object(filtering_agent, '_call_model') as mock_llm:
             mock_llm.return_value = {
                 "filtered_items": [
@@ -333,15 +333,15 @@ class TestFilteringAgent:
                     "items_filtered": 1
                 }
             }
-            
+
             result = await filtering_agent.filter_content(candidates, criteria={"query": query}, filter_type="relevance")
-            
+
             assert isinstance(result, FilteringResult)
             assert len(result.filtered_items) == 3
             assert result.metadata.get("items_kept") == 3
             assert result.metadata.get("items_filtered") == 1
             assert all(item["relevance"] > 0.8 for item in result.filtered_items)
-    
+
     @pytest.mark.asyncio
     async def test_quality_filtering(self, filtering_agent):
         """Test quality-based filtering."""
@@ -351,7 +351,7 @@ class TestFilteringAgent:
             {"text": "Peer-reviewed research study", "quality": 0.95},
             {"text": "Social media post with unverified claims", "quality": 0.2}
         ]
-        
+
         with patch.object(filtering_agent, '_call_model') as mock_llm:
             mock_llm.return_value = {
                 "filtered_items": [
@@ -370,9 +370,9 @@ class TestFilteringAgent:
                     "items_filtered": 2
                 }
             }
-            
+
             result = await filtering_agent.filter_content(candidates, criteria={"threshold": 0.8}, filter_type="quality")
-            
+
             assert len(result.filtered_items) == 2
             assert result.metadata.get("threshold_applied") == 0.8
             assert all(item["quality"] > 0.8 for item in result.filtered_items)
@@ -380,42 +380,42 @@ class TestFilteringAgent:
 
 class TestProcessingAgentsIntegration:
     """Test integration between processing agents."""
-    
+
     @pytest.mark.asyncio
     async def test_processing_pipeline(self):
         """Test complete processing pipeline."""
         raw_text = """
         Medical Research on Diabetes Treatment
-        
+
         Type 2 diabetes affects millions worldwide. Current treatments include metformin as first-line therapy.
         Insulin therapy is reserved for advanced cases. Lifestyle modifications remain crucial.
-        
+
         Recent Studies
-        
+
         New research shows promising results with GLP-1 agonists. These medications improve glucose control
         while promoting weight loss. Side effects are generally mild.
-        
+
         Conclusion
-        
+
         Multiple treatment options exist for diabetes management. Personalized approaches yield best outcomes.
         """
-        
+
         # Initialize agents
         chunking_config = AgentConfig(name="chunking")
         classification_config = AgentConfig(name="classification")
         validation_config = AgentConfig(name="validation")
         filtering_config = AgentConfig(name="filtering")
-        
+
         chunking_agent = ChunkingAgent(chunking_config)
         classification_agent = ClassificationAgent(classification_config)
         validation_agent = ValidationAgent(validation_config)
         filtering_agent = FilteringAgent(filtering_config)
-        
+
         # Mock responses
         with patch.object(chunking_agent, '_call_model') as mock_chunking, \
              patch.object(classification_agent, '_call_model') as mock_classification, \
              patch.object(filtering_agent, '_call_model') as mock_filtering:
-            
+
             mock_chunking.return_value = {
                 "chunks": [
                     {
@@ -439,7 +439,7 @@ class TestProcessingAgentsIntegration:
                 "total_chunks": 2,
                 "confidence": "high"
             }
-            
+
             mock_classification.return_value = {
                 "primary_category": "medical_research",
                 "subcategories": ["endocrinology", "diabetes"],
@@ -449,7 +449,7 @@ class TestProcessingAgentsIntegration:
                     "domain_specificity": 0.95
                 }
             }
-            
+
             mock_filtering.return_value = {
                 "filtered_items": [
                     {"content": "chunk1", "relevance": 0.9, "keep": True},
@@ -464,7 +464,7 @@ class TestProcessingAgentsIntegration:
                     "items_filtered": 0
                 }
             }
-            
+
             # Run processing pipeline
             chunking_result = await chunking_agent.chunk_text(raw_text)
             classification_result = await classification_agent.classify_content(raw_text)
@@ -472,12 +472,12 @@ class TestProcessingAgentsIntegration:
                 [{"text": chunk["content"]} for chunk in chunking_result.chunks],
                 criteria={"query": "diabetes treatment"}
             )
-            
+
             # Verify results
             assert len(chunking_result.chunks) == 2
             assert classification_result.primary_category == "medical_research"
             assert filtering_result.metadata.get("items_kept") == 2
-            
+
             print("✅ Processing pipeline test completed successfully")
 
 

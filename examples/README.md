@@ -5,7 +5,7 @@ This directory contains comprehensive examples demonstrating the MoRAG (Multi-mo
 ## 📋 Available Examples
 
 ### 1. API Demo (`api_demo.py`)
-**Purpose**: Demonstrates the complete MoRAG ingestion API functionality  
+**Purpose**: Demonstrates the complete MoRAG ingestion API functionality
 **What it shows**:
 - Health check endpoints
 - File upload and processing
@@ -34,7 +34,7 @@ python api_demo.py
 ---
 
 ### 2. Universal Converter Demo (`universal_converter_demo.py`)
-**Purpose**: Showcases the universal document conversion framework  
+**Purpose**: Showcases the universal document conversion framework
 **What it shows**:
 - Supported document formats
 - Conversion options and configuration
@@ -61,7 +61,7 @@ python universal_converter_demo.py
 ---
 
 ### 3. Page-Based Chunking Demo (`page_based_chunking_demo.py`)
-**Purpose**: Demonstrates page-level document chunking strategy  
+**Purpose**: Demonstrates page-level document chunking strategy
 **What it shows**:
 - Page-based vs sentence-based chunking comparison
 - Vector storage optimization
@@ -228,7 +228,7 @@ python transcription_fixes_demo_alt.py
    ```bash
    # Start the debug session (includes all services)
    ./scripts/debug-session.ps1
-   
+
    # Or manually start services
    docker-compose -f docker/docker-compose.redis.yml up -d
    docker-compose -f docker/docker-compose.qdrant.yml up -d

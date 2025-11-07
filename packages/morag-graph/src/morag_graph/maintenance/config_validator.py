@@ -20,14 +20,14 @@ class ValidationResult:
     errors: List[str]
     warnings: List[str]
     recommendations: List[str]
-    
+
     def __bool__(self) -> bool:
         return self.is_valid
 
 
 class MaintenanceConfigValidator:
     """Validates configuration for all maintenance jobs."""
-    
+
     # Configuration schemas with validation rules
     SCHEMAS = {
         'keyword_deduplication': {
@@ -74,7 +74,7 @@ class MaintenanceConfigValidator:
                 'description': 'Don\'t merge entities with confidence above this threshold'
             }
         },
-        
+
         'keyword_hierarchization': {
             'threshold_min_facts': {
                 'type': int,
@@ -119,7 +119,7 @@ class MaintenanceConfigValidator:
                 'description': 'Minimum co-occurrence share for keyword proposals'
             }
         },
-        
+
         'keyword_linking': {
             'cooccurrence_min_share': {
                 'type': float,
@@ -150,7 +150,7 @@ class MaintenanceConfigValidator:
                 'description': 'Batch size for link creation operations'
             }
         },
-        
+
         'relationship_cleanup': {
             'batch_size': {
                 'type': int,
@@ -174,7 +174,7 @@ class MaintenanceConfigValidator:
                 'description': 'Threshold for semantic similarity merging'
             }
         },
-        
+
         'relationship_merger': {
             'similarity_threshold': {
                 'type': float,
@@ -206,7 +206,7 @@ class MaintenanceConfigValidator:
             }
         }
     }
-    
+
     @classmethod
     def validate_job_config(cls, job_name: str, config: Dict[str, Any]) -> ValidationResult:
         """Validate configuration for a specific maintenance job."""
@@ -217,16 +217,16 @@ class MaintenanceConfigValidator:
                 warnings=[],
                 recommendations=[]
             )
-        
+
         schema = cls.SCHEMAS[job_name]
         errors = []
         warnings = []
         recommendations = []
-        
+
         # Validate each configuration parameter
         for param_name, param_schema in schema.items():
             value = config.get(param_name)
-            
+
             # Check if required parameter is missing
             if value is None:
                 if 'default' in param_schema:
@@ -238,7 +238,7 @@ class MaintenanceConfigValidator:
                 else:
                     errors.append(f"{param_name}: Required parameter is missing")
                     continue
-            
+
             # Validate parameter type
             expected_type = param_schema['type']
             if not isinstance(value, expected_type):
@@ -246,69 +246,69 @@ class MaintenanceConfigValidator:
                     f"{param_name}: Expected {expected_type.__name__}, got {type(value).__name__}"
                 )
                 continue
-            
+
             # Validate parameter range
             if 'min' in param_schema and value < param_schema['min']:
                 errors.append(
                     f"{param_name}: Value {value} is below minimum {param_schema['min']}"
                 )
-            
+
             if 'max' in param_schema and value > param_schema['max']:
                 errors.append(
                     f"{param_name}: Value {value} is above maximum {param_schema['max']}"
                 )
-            
+
             # Generate warnings for potentially problematic values
             cls._check_parameter_warnings(param_name, value, param_schema, warnings)
-        
+
         # Check for unknown parameters
         unknown_params = set(config.keys()) - set(schema.keys()) - {'dry_run', 'job_tag'}
         if unknown_params:
             warnings.extend([f"Unknown parameter: {param}" for param in unknown_params])
-        
+
         # Generate job-specific recommendations
         job_recommendations = cls._get_job_specific_recommendations(job_name, config)
         recommendations.extend(job_recommendations)
-        
+
         return ValidationResult(
             is_valid=len(errors) == 0,
             errors=errors,
             warnings=warnings,
             recommendations=recommendations
         )
-    
+
     @classmethod
     def _check_parameter_warnings(
-        cls, 
-        param_name: str, 
-        value: Any, 
-        schema: Dict[str, Any], 
+        cls,
+        param_name: str,
+        value: Any,
+        schema: Dict[str, Any],
         warnings: List[str]
     ):
         """Check for parameter values that might cause issues."""
         # Check for values at extremes
         if 'min' in schema and 'max' in schema:
             range_size = schema['max'] - schema['min']
-            
+
             # Warn if value is very close to minimum
             if value <= schema['min'] + range_size * 0.1:
                 warnings.append(
                     f"{param_name}: Value {value} is very close to minimum, "
                     f"consider increasing for better results"
                 )
-            
+
             # Warn if value is very close to maximum
             if value >= schema['max'] - range_size * 0.1:
                 warnings.append(
                     f"{param_name}: Value {value} is very close to maximum, "
                     f"consider decreasing to avoid issues"
                 )
-    
+
     @classmethod
     def _get_job_specific_recommendations(cls, job_name: str, config: Dict[str, Any]) -> List[str]:
         """Get job-specific configuration recommendations."""
         recommendations = []
-        
+
         if job_name == 'keyword_deduplication':
             similarity_threshold = config.get('similarity_threshold', 0.75)
             if similarity_threshold > 0.9:
@@ -316,67 +316,67 @@ class MaintenanceConfigValidator:
                     "High similarity threshold may miss valid merges. "
                     "Consider starting with 0.75-0.85 for initial runs."
                 )
-            
+
             max_cluster_size = config.get('max_cluster_size', 8)
             if max_cluster_size > 15:
                 recommendations.append(
                     "Large cluster sizes may create overly broad merges. "
                     "Consider keeping cluster size under 10 for quality."
                 )
-        
+
         elif job_name == 'keyword_hierarchization':
             min_facts = config.get('threshold_min_facts', 50)
             max_move_ratio = config.get('max_move_ratio', 0.8)
-            
+
             if min_facts < 20:
                 recommendations.append(
                     "Low fact threshold may create too many hierarchies. "
                     "Consider starting with 30-50 facts for stable results."
                 )
-            
+
             if max_move_ratio > 0.9:
                 recommendations.append(
                     "High move ratio may leave original keywords with too few facts. "
                     "Consider keeping move ratio under 0.8."
                 )
-        
+
         elif job_name == 'keyword_linking':
             min_share = config.get('cooccurrence_min_share', 0.18)
             max_links = config.get('max_links_per_parent', 6)
-            
+
             if min_share < 0.1:
                 recommendations.append(
                     "Low co-occurrence threshold may create weak links. "
                     "Consider using 0.15-0.25 for meaningful relationships."
                 )
-            
+
             if max_links > 10:
                 recommendations.append(
                     "Too many links per parent may create graph clutter. "
                     "Consider limiting to 5-8 links for focused relationships."
                 )
-        
+
         return recommendations
-    
+
     @classmethod
     def get_recommended_config(cls, job_name: str) -> Dict[str, Any]:
         """Get recommended configuration for a job."""
         if job_name not in cls.SCHEMAS:
             return {}
-        
+
         schema = cls.SCHEMAS[job_name]
         return {
             param_name: param_schema.get('default')
             for param_name, param_schema in schema.items()
             if 'default' in param_schema
         }
-    
+
     @classmethod
     def validate_all_configs(cls, configs: Dict[str, Dict[str, Any]]) -> Dict[str, ValidationResult]:
         """Validate configurations for multiple jobs."""
         results = {}
-        
+
         for job_name, config in configs.items():
             results[job_name] = cls.validate_job_config(job_name, config)
-        
+
         return results

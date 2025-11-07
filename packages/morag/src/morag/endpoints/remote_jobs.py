@@ -94,15 +94,15 @@ async def submit_job_result(
     """Submit processing result for a remote job."""
     try:
         job = service.submit_result(job_id, result)
-        
+
         if not job:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Job {job_id} not found"
             )
-        
 
-        
+
+
         # Continue ingestion pipeline if successful
         ingestion_continued = False
         if result.success and result.content:
@@ -123,7 +123,7 @@ async def submit_job_result(
                            job_id=job_id,
                            error=str(e))
                 ingestion_continued = False
-        
+
         return SubmitResultResponse(
             status=job.status,
             ingestion_continued=ingestion_continued

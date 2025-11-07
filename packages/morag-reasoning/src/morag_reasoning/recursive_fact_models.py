@@ -2,7 +2,6 @@
 
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field
-from datetime import datetime
 
 
 class SourceMetadata(BaseModel):
@@ -88,27 +87,27 @@ class RecursiveFactRetrievalResponse(BaseModel):
     query_id: str = Field(..., description="Unique identifier for this query")
     user_query: str = Field(..., description="Original user query")
     processing_time_ms: float = Field(..., description="Total processing time in milliseconds")
-    
+
     # Traversal information
     initial_entities: List[str] = Field(..., description="Initial entities identified from query")
     total_nodes_explored: int = Field(..., description="Total number of nodes explored")
     max_depth_reached: int = Field(..., description="Maximum depth reached during traversal")
     traversal_steps: List[TraversalStep] = Field(..., description="Detailed traversal steps")
-    
+
     # Fact information
     total_raw_facts: int = Field(..., description="Total raw facts extracted")
     total_scored_facts: int = Field(..., description="Total facts after scoring")
     final_facts: List[FinalFact] = Field(..., description="Final facts after decay and filtering")
-    
+
     # LLM usage
     gta_llm_calls: int = Field(..., description="Number of GraphTraversalAgent LLM calls")
     fca_llm_calls: int = Field(..., description="Number of FactCriticAgent LLM calls")
     final_llm_calls: int = Field(..., description="Number of final synthesis LLM calls")
-    
+
     # Final answer
     final_answer: Optional[str] = Field(None, description="Final synthesized answer from the stronger LLM (null if facts_only=true)")
     confidence_score: float = Field(..., ge=0.0, le=1.0, description="Overall confidence in the answer")
-    
+
     # Debug information
     debug_info: Optional[Dict[str, Any]] = Field(None, description="Optional debug information")
 

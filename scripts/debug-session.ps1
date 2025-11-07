@@ -2,30 +2,30 @@
 <#
 .SYNOPSIS
     MoRAG Debug Session Startup Script
-    
+
 .DESCRIPTION
     This script sets up a complete debugging environment for the MoRAG project.
     It handles dependency installation, service startup, environment configuration,
     and launches the application in debug mode with comprehensive logging.
-    
+
 .PARAMETER SkipDependencies
     Skip dependency installation if already installed
-    
+
 .PARAMETER SkipServices
     Skip starting Docker services (Redis, Qdrant)
-    
+
 .PARAMETER TestMode
     Run in test mode with mock services
-    
+
 .PARAMETER LogLevel
     Set logging level (DEBUG, INFO, WARNING, ERROR)
-    
+
 .EXAMPLE
     .\debug-session.ps1
-    
+
 .EXAMPLE
     .\debug-session.ps1 -SkipDependencies -LogLevel DEBUG
-    
+
 .EXAMPLE
     .\debug-session.ps1 -TestMode
 #>
@@ -65,12 +65,12 @@ function Write-Log {
         [ValidateSet("SUCCESS", "WARNING", "ERROR", "INFO", "DEBUG")]
         [string]$Level = "INFO"
     )
-    
+
     $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
     $color = $Colors[$Level]
-    
+
     Write-Host "[$timestamp] [$Level] $Message" -ForegroundColor $color
-    
+
     # Also log to file
     $logFile = "logs/debug-session.log"
     if (!(Test-Path "logs")) {
@@ -82,14 +82,14 @@ function Write-Log {
 # Error handling
 function Handle-Error {
     param([string]$ErrorMessage, [string]$Context = "")
-    
+
     Write-Log "ERROR in $Context`: $ErrorMessage" -Level "ERROR"
     Write-Log "Stack trace: $($_.ScriptStackTrace)" -Level "DEBUG"
-    
+
     # Cleanup on error
     Write-Log "Performing cleanup..." -Level "INFO"
     Stop-Services
-    
+
     exit 1
 }
 
@@ -101,7 +101,7 @@ trap {
 # Check prerequisites
 function Test-Prerequisites {
     Write-Log "Checking prerequisites..." -Level "INFO"
-    
+
     # Check Python
     try {
         $pythonVersion = python --version 2>&1
@@ -114,7 +114,7 @@ function Test-Prerequisites {
         Write-Log "Python is required but not found. Please install Python 3.9+" -Level "ERROR"
         exit 1
     }
-    
+
     # Check Docker
     if (!$SkipServices -and !$TestMode) {
         try {
@@ -129,20 +129,20 @@ function Test-Prerequisites {
             exit 1
         }
     }
-    
+
     # Check if we're in the right directory
     if (!(Test-Path "pyproject.toml")) {
         Write-Log "Not in MoRAG project directory. Please run from project root." -Level "ERROR"
         exit 1
     }
-    
+
     Write-Log "Prerequisites check completed" -Level "SUCCESS"
 }
 
 # Setup virtual environment
 function Setup-VirtualEnvironment {
     Write-Log "Setting up Python virtual environment..." -Level "INFO"
-    
+
     if (!(Test-Path "venv")) {
         Write-Log "Creating virtual environment..." -Level "INFO"
         python -m venv venv
@@ -150,7 +150,7 @@ function Setup-VirtualEnvironment {
             throw "Failed to create virtual environment"
         }
     }
-    
+
     # Activate virtual environment
     Write-Log "Activating virtual environment..." -Level "INFO"
     if ($IsWindows -or $env:OS -eq "Windows_NT") {
@@ -158,11 +158,11 @@ function Setup-VirtualEnvironment {
     } else {
         & "venv/bin/Activate.ps1"
     }
-    
+
     if ($LASTEXITCODE -ne 0) {
         throw "Failed to activate virtual environment"
     }
-    
+
     Write-Log "Virtual environment activated" -Level "SUCCESS"
 }
 
@@ -172,27 +172,27 @@ function Install-Dependencies {
         Write-Log "Skipping dependency installation" -Level "INFO"
         return
     }
-    
+
     Write-Log "Installing dependencies..." -Level "INFO"
-    
+
     # Upgrade pip first
     Write-Log "Upgrading pip..." -Level "INFO"
     python -m pip install --upgrade pip
-    
+
     # Install main dependencies
     Write-Log "Installing main dependencies..." -Level "INFO"
     pip install -e .
-    
+
     # Install development dependencies
     Write-Log "Installing development dependencies..." -Level "INFO"
     pip install -e ".[dev]"
-    
+
     # Install optional dependencies based on mode
     if (!$TestMode) {
         Write-Log "Installing optional dependencies..." -Level "INFO"
         pip install -e ".[audio,video,image,docling,morphik,milvus]"
     }
-    
+
     Write-Log "Dependencies installed successfully" -Level "SUCCESS"
 }
 
@@ -202,27 +202,27 @@ function Start-Services {
         Write-Log "Skipping service startup" -Level "INFO"
         return
     }
-    
+
     Write-Log "Starting required services..." -Level "INFO"
-    
+
     # Start Redis
     Write-Log "Starting Redis..." -Level "INFO"
     docker-compose -f docker/docker-compose.redis.yml up -d
     if ($LASTEXITCODE -ne 0) {
         throw "Failed to start Redis"
     }
-    
+
     # Start Qdrant
     Write-Log "Starting Qdrant..." -Level "INFO"
     docker-compose -f docker/docker-compose.qdrant.yml up -d
     if ($LASTEXITCODE -ne 0) {
         throw "Failed to start Qdrant"
     }
-    
+
     # Wait for services to be ready
     Write-Log "Waiting for services to be ready..." -Level "INFO"
     Start-Sleep -Seconds 10
-    
+
     # Check Redis
     $redisCheck = docker exec morag-redis redis-cli ping 2>&1
     if ($redisCheck -ne "PONG") {
@@ -230,7 +230,7 @@ function Start-Services {
     } else {
         Write-Log "Redis is ready" -Level "SUCCESS"
     }
-    
+
     # Check Qdrant
     try {
         $qdrantCheck = Invoke-RestMethod -Uri "http://localhost:6333/health" -Method GET -TimeoutSec 5
@@ -244,7 +244,7 @@ function Start-Services {
 # Stop services
 function Stop-Services {
     Write-Log "Stopping services..." -Level "INFO"
-    
+
     try {
         docker-compose -f docker/docker-compose.redis.yml down 2>&1 | Out-Null
         docker-compose -f docker/docker-compose.qdrant.yml down 2>&1 | Out-Null
@@ -258,7 +258,7 @@ function Stop-Services {
 # Setup environment
 function Setup-Environment {
     Write-Log "Setting up environment..." -Level "INFO"
-    
+
     # Create required directories
     $dirs = @("uploads", "temp", "logs")
     foreach ($dir in $dirs) {
@@ -267,18 +267,18 @@ function Setup-Environment {
             Write-Log "Created directory: $dir" -Level "DEBUG"
         }
     }
-    
+
     # Set environment variables
     $env:LOG_LEVEL = $LogLevel
     $env:LOG_FORMAT = "console"  # Better for debugging
     $env:PYTHONPATH = "$PWD/src"
-    
+
     if ($TestMode) {
         $env:REDIS_URL = "redis://localhost:6379/15"
         $env:QDRANT_COLLECTION_NAME = "test_morag_documents"
         Write-Log "Test mode environment configured" -Level "INFO"
     }
-    
+
     Write-Log "Environment setup completed" -Level "SUCCESS"
 }
 

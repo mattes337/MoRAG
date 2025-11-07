@@ -14,15 +14,14 @@ except ImportError:
 
 from ..models import Entity
 from .entity_normalizer import LLMEntityNormalizer
-from ..utils.retry_utils import retry_with_exponential_backoff
-from ..utils.quota_retry import never_fail_extraction, retry_with_quota_handling
+from ..utils.quota_retry import never_fail_extraction
 
 logger = structlog.get_logger(__name__)
 
 
 class EntityExtractor:
     """LangExtract-based entity extractor that replaces the PydanticAI implementation."""
-    
+
     def __init__(
         self,
         min_confidence: float = 0.5,  # Lower threshold for better recall
@@ -52,7 +51,7 @@ class EntityExtractor:
         """
         if not LANGEXTRACT_AVAILABLE:
             raise ImportError("LangExtract is not available. Please install it with: pip install langextract")
-        
+
         self.min_confidence = min_confidence
         self.chunk_size = chunk_size
         self.dynamic_types = dynamic_types
@@ -65,7 +64,7 @@ class EntityExtractor:
         self.extraction_passes = extraction_passes
         self.domain = domain
         self.logger = logger.bind(component="langextract_entity_extractor")
-        
+
         # Thread pool for async execution
         self._executor = ThreadPoolExecutor(max_workers=2)
 
@@ -79,12 +78,12 @@ class EntityExtractor:
             api_key=self.api_key,
             language=self.language or "auto"
         )
-    
+
     def _get_api_key(self) -> Optional[str]:
         """Get API key from environment variables."""
         import os
         return os.getenv("LANGEXTRACT_API_KEY") or os.getenv("GOOGLE_API_KEY")
-    
+
     def _get_domain_entity_types(self, domain: str) -> Dict[str, str]:
         """Get entity types for the specified domain."""
         # Return generic entity types to avoid domain-specific bias
@@ -96,7 +95,7 @@ class EntityExtractor:
             "object": "Physical item, tool, or artifact",
             "event": "Occurrence, happening, or activity"
         }
-    
+
     def _create_entity_prompt(self) -> str:
         """Create prompt for entity extraction with normalization."""
         base_prompt = """Extract and normalize entities from the text in order of appearance.
@@ -133,7 +132,7 @@ class EntityExtractor:
             base_prompt += f"\n\nProcess text in {self.language} language."
 
         return base_prompt
-    
+
     def _create_entity_examples(self) -> List[Any]:
         """Create few-shot examples for entity extraction."""
         # Use minimal generic examples to avoid domain-specific bias
@@ -177,7 +176,7 @@ class EntityExtractor:
                 ]
             )
         ]
-    
+
     async def extract(
         self,
         text: str,
@@ -194,10 +193,10 @@ class EntityExtractor:
         Returns:
             List of Entity objects
         """
-        
+
         if not text or not text.strip():
             return []
-        
+
         if not self.api_key:
             self.logger.warning("No API key found for LangExtract. Set LANGEXTRACT_API_KEY or GOOGLE_API_KEY.")
             return []
@@ -272,7 +271,7 @@ class EntityExtractor:
             )
             # Return basic entities as last resort
             return self._create_basic_entities_from_text(text, source_doc_id)
-    
+
     def _extract_sync(self, text: str, source_doc_id: Optional[str]) -> Any:
         """Synchronous extraction using LangExtract with robust error handling."""
         try:
@@ -419,10 +418,10 @@ class EntityExtractor:
     def _convert_to_entities(self, result: Any, source_doc_id: Optional[str]) -> List[Entity]:
         """Convert LangExtract results to MoRAG Entity objects."""
         entities = []
-        
+
         if not result or not hasattr(result, 'extractions'):
             return entities
-        
+
         for extraction in result.extractions:
             try:
                 # Map LangExtract extraction to MoRAG Entity
@@ -434,7 +433,7 @@ class EntityExtractor:
                     confidence=getattr(extraction, 'confidence', 1.0)
                 )
                 entities.append(entity)
-                
+
             except Exception as e:
                 self.logger.warning(
                     "Failed to convert extraction to entity",
@@ -442,7 +441,7 @@ class EntityExtractor:
                     error=str(e)
                 )
                 continue
-        
+
         return entities
 
     def _infer_domain_from_text(self, text: str) -> str:
@@ -637,13 +636,13 @@ class EntityExtractor:
         **kwargs
     ) -> List[Entity]:
         """Extract entities with additional context information.
-        
+
         Args:
             text: Text to extract entities from
             source_doc_id: ID of the source document
             additional_context: Additional context to help with extraction
             **kwargs: Additional arguments
-            
+
         Returns:
             List of Entity objects with context information
         """
@@ -652,13 +651,13 @@ class EntityExtractor:
             combined_text = f"{additional_context}\n\n{text}"
         else:
             combined_text = text
-        
+
         return await self.extract(combined_text, source_doc_id=source_doc_id, **kwargs)
-    
+
     def get_system_prompt(self) -> str:
         """Get the system prompt used by LangExtract."""
         return self._prompt
-    
+
     async def _normalize_entities(self, entities: List[Entity]) -> List[Entity]:
         """Legacy method for compatibility - LangExtract handles normalization internally."""
         # LangExtract handles normalization internally, so just return entities as-is
@@ -801,11 +800,11 @@ class EntityExtractor:
                 text_length=len(text)
             )
             return []
-    
+
     async def __aenter__(self):
         """Async context manager entry."""
         return self
-    
+
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """Async context manager exit."""
         if hasattr(self, '_executor'):

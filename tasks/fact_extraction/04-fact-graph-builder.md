@@ -12,7 +12,7 @@ Create a new graph builder that constructs knowledge graphs based on extracted f
 ```python
 class FactGraphBuilder:
     """Build knowledge graphs from extracted facts."""
-    
+
     def __init__(
         self,
         storage: BaseStorage,
@@ -21,27 +21,27 @@ class FactGraphBuilder:
         enable_fact_clustering: bool = True
     ):
         """Initialize fact-based graph builder."""
-        
+
     async def build_fact_graph(
-        self, 
-        facts: List[Fact], 
+        self,
+        facts: List[Fact],
         document_id: str,
         chunk_mappings: Dict[str, str]
     ) -> FactGraphResult:
         """Build knowledge graph from extracted facts."""
-        
+
     async def _store_facts(self, facts: List[Fact]) -> int:
         """Store facts in Neo4j with proper indexing."""
-        
+
     async def _create_fact_relationships(self, facts: List[Fact]) -> List[FactRelation]:
         """Create semantic relationships between facts."""
-        
+
     async def _link_facts_to_sources(self, facts: List[Fact], chunk_mappings: Dict[str, str]) -> None:
         """Create relationships from facts to source chunks and documents."""
-        
+
     async def _create_keyword_index(self, facts: List[Fact]) -> None:
         """Create keyword nodes and link them to facts."""
-        
+
     async def _cluster_related_facts(self, facts: List[Fact]) -> Dict[str, List[Fact]]:
         """Group related facts into clusters for better organization."""
 ```
@@ -53,32 +53,32 @@ class FactGraphBuilder:
 ```python
 class FactRelationshipDetector:
     """Detect semantic relationships between facts."""
-    
+
     def __init__(self, model_id: str = "gemini-2.0-flash"):
         self.model = self._initialize_model(model_id)
-        
+
     async def detect_relationships(self, facts: List[Fact]) -> List[FactRelation]:
         """Detect relationships between a set of facts."""
-        
+
     async def _analyze_fact_pair(self, fact1: Fact, fact2: Fact) -> Optional[FactRelation]:
         """Analyze a pair of facts for potential relationships."""
-        
+
     def _calculate_semantic_similarity(self, fact1: Fact, fact2: Fact) -> float:
         """Calculate semantic similarity between two facts."""
-        
+
     async def _classify_relationship_type(self, fact1: Fact, fact2: Fact) -> Optional[str]:
         """Use LLM to classify the type of relationship between facts."""
 
 class FactRelation(BaseModel):
     """Represents a relationship between two facts."""
-    
+
     id: str = Field(description="Unique relationship identifier")
     source_fact_id: str = Field(description="Source fact ID")
     target_fact_id: str = Field(description="Target fact ID")
     relationship_type: str = Field(description="Type of relationship")
     confidence: float = Field(ge=0.0, le=1.0, description="Confidence in relationship")
     reasoning: Optional[str] = Field(description="Explanation of the relationship")
-    
+
     # Relationship types
     SUPPORTS = "SUPPORTS"           # One fact supports another
     ELABORATES = "ELABORATES"       # One fact provides more detail
@@ -96,34 +96,34 @@ class FactRelation(BaseModel):
 ```python
 class FactOperations:
     """Neo4j operations for fact storage and retrieval."""
-    
+
     def __init__(self, driver):
         self.driver = driver
-        
+
     async def store_fact(self, fact: Fact) -> str:
         """Store a single fact in Neo4j."""
-        
+
     async def store_facts_batch(self, facts: List[Fact]) -> int:
         """Store multiple facts efficiently."""
-        
+
     async def create_fact_relationship(self, relation: FactRelation) -> None:
         """Create relationship between two facts."""
-        
+
     async def link_fact_to_chunk(self, fact_id: str, chunk_id: str) -> None:
         """Link fact to its source document chunk."""
-        
+
     async def create_keyword_links(self, fact_id: str, keywords: List[str]) -> None:
         """Create links from fact to keyword nodes."""
-        
+
     async def search_facts(
-        self, 
-        query: str, 
+        self,
+        query: str,
         fact_type: Optional[str] = None,
         domain: Optional[str] = None,
         limit: int = 10
     ) -> List[Fact]:
         """Search for facts based on content and metadata."""
-        
+
     async def get_related_facts(self, fact_id: str, max_depth: int = 2) -> List[Fact]:
         """Get facts related to a given fact through graph relationships."""
 ```

@@ -80,7 +80,7 @@ class YouTubeProcessor(BaseProcessor):
 
     def __init__(self):
         """Initialize YouTube processor."""
-        from .apify_service import ApifyYouTubeService, ApifyYouTubeServiceError
+        from .apify_service import ApifyYouTubeServiceError
         self.apify_service = None  # Initialize on demand
         self.ApifyYouTubeServiceError = ApifyYouTubeServiceError
         logger.info("YouTube processor initialized with Apify service")

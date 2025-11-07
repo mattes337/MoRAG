@@ -9,7 +9,7 @@ from morag_graph.extraction.fact_validator import FactValidator
 
 class TestFactModel:
     """Test the Fact model."""
-    
+
     def test_fact_creation(self):
         """Test basic fact creation."""
         fact = Fact(
@@ -22,7 +22,7 @@ class TestFactModel:
             extraction_confidence=0.9,
             fact_type=FactType.RESEARCH
         )
-        
+
         assert fact.subject == "Machine Learning"
         assert fact.object == "image classification accuracy"
         assert fact.approach == "convolutional neural networks"
@@ -30,7 +30,7 @@ class TestFactModel:
         assert fact.extraction_confidence == 0.9
         assert fact.fact_type == FactType.RESEARCH
         assert fact.id.startswith("fact_")
-    
+
     def test_fact_completeness(self):
         """Test fact completeness checking."""
         # Complete fact
@@ -45,7 +45,7 @@ class TestFactModel:
             fact_type=FactType.PROCESS
         )
         assert complete_fact.is_complete()
-        
+
         # Incomplete fact (no approach or solution)
         incomplete_fact = Fact(
             subject="Python",
@@ -56,7 +56,7 @@ class TestFactModel:
             fact_type=FactType.PROCESS
         )
         assert not incomplete_fact.is_complete()
-    
+
     def test_fact_neo4j_properties(self):
         """Test Neo4j properties conversion."""
         fact = Fact(
@@ -69,16 +69,16 @@ class TestFactModel:
             fact_type=FactType.DEFINITION,
             keywords=["test", "example"]
         )
-        
+
         props = fact.get_neo4j_properties()
-        
+
         assert props["subject"] == "Test Subject"
         assert props["object"] == "Test Object"
         assert props["approach"] == "Test Approach"
         assert props["confidence"] == 0.85
         assert props["fact_type"] == FactType.DEFINITION
         assert props["keywords"] == "test,example"
-    
+
     def test_fact_search_text(self):
         """Test search text generation."""
         fact = Fact(
@@ -93,7 +93,7 @@ class TestFactModel:
             extraction_confidence=0.9,
             fact_type=FactType.RESEARCH
         )
-        
+
         search_text = fact.get_search_text()
         assert "Machine Learning" in search_text
         assert "data analysis" in search_text
@@ -102,7 +102,7 @@ class TestFactModel:
         assert "requires large datasets" in search_text
         assert "AI" in search_text
         assert "ML" in search_text
-    
+
     def test_fact_display_text(self):
         """Test display text generation."""
         fact = Fact(
@@ -115,7 +115,7 @@ class TestFactModel:
             extraction_confidence=0.8,
             fact_type=FactType.PROCESS
         )
-        
+
         display_text = fact.get_display_text()
         assert "Subject: Python" in display_text
         assert "Object: web development" in display_text
@@ -125,11 +125,11 @@ class TestFactModel:
 
 class TestFactValidator:
     """Test the FactValidator."""
-    
+
     def setup_method(self):
         """Set up test fixtures."""
         self.validator = FactValidator(min_confidence=0.3)
-    
+
     def test_valid_fact(self):
         """Test validation of a valid fact."""
         fact = Fact(
@@ -144,11 +144,11 @@ class TestFactValidator:
             extraction_confidence=0.9,
             fact_type=FactType.RESEARCH
         )
-        
+
         is_valid, issues = self.validator.validate_fact(fact)
         assert is_valid
         assert len(issues) == 0
-    
+
     def test_invalid_fact_generic_subject(self):
         """Test validation fails for generic subject."""
         # Create a stricter validator for this test
@@ -174,7 +174,7 @@ class TestFactValidator:
         is_valid, issues = strict_validator.validate_fact(fact)
         assert not is_valid
         assert any("Generic subject" in issue or "primary entities" in issue for issue in issues)
-    
+
     def test_invalid_fact_low_confidence(self):
         """Test validation fails for low confidence."""
         fact = Fact(
@@ -189,11 +189,11 @@ class TestFactValidator:
             extraction_confidence=0.2,  # Below threshold of 0.3
             fact_type=FactType.RESEARCH
         )
-        
+
         is_valid, issues = self.validator.validate_fact(fact)
         assert not is_valid
         assert any("Confidence" in issue and "below threshold" in issue for issue in issues)
-    
+
     def test_invalid_fact_missing_actionable_content(self):
         """Test validation fails for missing actionable content."""
         fact = Fact(
@@ -213,7 +213,7 @@ class TestFactValidator:
         # "Something" is detected as a generic entity, so this should fail
         assert not is_valid
         assert any("Generic entity" in issue for issue in issues)
-    
+
     def test_batch_validation(self):
         """Test batch validation of multiple facts."""
         facts = [
@@ -242,7 +242,7 @@ class TestFactValidator:
                 fact_type=FactType.RESEARCH
             )
         ]
-        
+
         result = self.validator.validate_facts_batch(facts)
 
         assert result['total_facts'] == 2
@@ -250,7 +250,7 @@ class TestFactValidator:
         assert result['valid_facts'] >= 1
         assert result['invalid_facts'] <= 1
         assert result['validation_rate'] >= 0.5
-    
+
     def test_quality_score(self):
         """Test quality score calculation."""
         # High quality fact
@@ -267,10 +267,10 @@ class TestFactValidator:
             extraction_confidence=0.9,
             fact_type=FactType.RESEARCH
         )
-        
+
         score = self.validator.get_quality_score(good_fact)
         assert score > 0.9  # Should get bonus for completeness
-        
+
         # Low quality fact
         bad_fact = Fact(
             fact_text="It does something.",
@@ -284,14 +284,14 @@ class TestFactValidator:
             extraction_confidence=0.8,
             fact_type=FactType.RESEARCH
         )
-        
+
         score = self.validator.get_quality_score(bad_fact)
         assert score < 0.8  # Should be penalized
 
 
 class TestFactRelation:
     """Test the FactRelation model."""
-    
+
     def test_fact_relation_creation(self):
         """Test basic fact relation creation."""
         relation = FactRelation(
@@ -301,13 +301,13 @@ class TestFactRelation:
             confidence=0.8,
             context="Fact 1 provides evidence for Fact 2"
         )
-        
+
         assert relation.source_fact_id == "fact_1"
         assert relation.target_fact_id == "fact_2"
         assert relation.relation_type == FactRelationType.SUPPORTS
         assert relation.confidence == 0.8
         assert relation.id.startswith("fact_rel_")
-    
+
     def test_fact_relation_neo4j_properties(self):
         """Test Neo4j properties conversion."""
         relation = FactRelation(
@@ -317,9 +317,9 @@ class TestFactRelation:
             confidence=0.75,
             context="Additional details"
         )
-        
+
         props = relation.get_neo4j_properties()
-        
+
         assert props["relation_type"] == FactRelationType.ELABORATES
         assert props["confidence"] == 0.75
         assert props["context"] == "Additional details"
@@ -327,11 +327,11 @@ class TestFactRelation:
 
 class TestFactTypes:
     """Test fact type constants."""
-    
+
     def test_fact_types(self):
         """Test fact type constants."""
         all_types = FactType.all_types()
-        
+
         assert FactType.RESEARCH in all_types
         assert FactType.PROCESS in all_types
         assert FactType.DEFINITION in all_types
@@ -340,11 +340,11 @@ class TestFactTypes:
         assert FactType.TEMPORAL in all_types
         assert FactType.STATISTICAL in all_types
         assert FactType.METHODOLOGICAL in all_types
-    
+
     def test_fact_relation_types(self):
         """Test fact relation type constants."""
         all_types = FactRelationType.all_types()
-        
+
         assert FactRelationType.SUPPORTS in all_types
         assert FactRelationType.CONTRADICTS in all_types
         assert FactRelationType.ELABORATES in all_types

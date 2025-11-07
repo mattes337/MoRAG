@@ -168,7 +168,7 @@ GraphRAG introduces:
 class CommunityDetector:
     def __init__(self, algorithm="leiden"):
         self.algorithm = algorithm
-    
+
     async def detect_communities(self, graph: KnowledgeGraph) -> CommunityHierarchy:
         # 1. Apply Leiden algorithm recursively
         # 2. Create hierarchical community structure (C0-C3)

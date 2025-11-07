@@ -52,7 +52,7 @@ domain_specific:
     - PATHOGEN
     - GENE
     - PROTEIN
-    
+
   legal:
     - STATUTE
     - CASE_LAW
@@ -65,7 +65,7 @@ domain_specific:
     - LAWYER
     - PLAINTIFF
     - DEFENDANT
-    
+
   technical:
     - SOFTWARE
     - HARDWARE
@@ -78,7 +78,7 @@ domain_specific:
     - VERSION
     - CONFIGURATION
     - PARAMETER
-    
+
   business:
     - COMPANY
     - DEPARTMENT
@@ -91,7 +91,7 @@ domain_specific:
     - METRIC
     - KPI
     - BUDGET
-    
+
   academic:
     - RESEARCH_PAPER
     - AUTHOR
@@ -116,7 +116,7 @@ hierarchies:
     - ENGINEER
     - MANAGER
     - STUDENT
-    
+
   ORGANIZATION:
     - COMPANY
     - UNIVERSITY
@@ -124,7 +124,7 @@ hierarchies:
     - GOVERNMENT_AGENCY
     - NGO
     - RESEARCH_INSTITUTE
-    
+
   LOCATION:
     - COUNTRY
     - STATE
@@ -132,7 +132,7 @@ hierarchies:
     - ADDRESS
     - BUILDING
     - ROOM
-    
+
   DOCUMENT:
     - RESEARCH_PAPER
     - REPORT
@@ -173,21 +173,21 @@ agent_defaults:
     - QUANTITY
     - TECHNOLOGY
     - PROCESS
-    
+
   relation_extraction:
     - PERSON
     - ORGANIZATION
     - CONCEPT
     - TECHNOLOGY
     - PROCESS
-    
+
   content_analysis:
     - CONCEPT
     - TECHNOLOGY
     - PROCESS
     - DOCUMENT
     - ORGANIZATION
-    
+
   query_analysis:
     - PERSON
     - ORGANIZATION

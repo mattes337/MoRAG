@@ -16,7 +16,7 @@ from morag_services.embedding import GeminiEmbeddingService
 
 class FactVectorOperations:
     """Qdrant vector operations for fact storage and retrieval."""
-    
+
     def __init__(
         self,
         client: QdrantClient,
@@ -24,7 +24,7 @@ class FactVectorOperations:
         embedding_service: Optional[GeminiEmbeddingService] = None
     ):
         """Initialize fact vector operations.
-        
+
         Args:
             client: Qdrant client instance
             collection_name: Name of the collection for facts
@@ -34,13 +34,13 @@ class FactVectorOperations:
         self.collection_name = collection_name
         self.embedding_service = embedding_service
         self.logger = structlog.get_logger(__name__)
-        
+
         # Default embedding dimension (text-embedding-004)
         self.embedding_dimension = 768
-    
+
     async def ensure_collection_exists(self) -> bool:
         """Ensure the facts collection exists in Qdrant.
-        
+
         Returns:
             True if collection exists or was created successfully
         """
@@ -48,14 +48,14 @@ class FactVectorOperations:
             # Check if collection exists
             collections = await asyncio.to_thread(self.client.get_collections)
             existing_names = [col.name for col in collections.collections]
-            
+
             if self.collection_name in existing_names:
                 self.logger.debug(
                     "Facts collection already exists",
                     collection=self.collection_name
                 )
                 return True
-            
+
             # Create collection
             await asyncio.to_thread(
                 self.client.create_collection,
@@ -65,14 +65,14 @@ class FactVectorOperations:
                     distance=Distance.COSINE
                 )
             )
-            
+
             self.logger.info(
                 "Created facts collection",
                 collection=self.collection_name,
                 dimension=self.embedding_dimension
             )
             return True
-            
+
         except Exception as e:
             self.logger.error(
                 "Failed to ensure facts collection exists",
@@ -80,14 +80,14 @@ class FactVectorOperations:
                 error=str(e)
             )
             return False
-    
+
     async def store_fact_vector(self, fact: Fact, embedding: Optional[List[float]] = None) -> str:
         """Store a fact as a vector in Qdrant.
-        
+
         Args:
             fact: Fact to store
             embedding: Pre-computed embedding (optional)
-            
+
         Returns:
             Point ID of stored fact
         """
@@ -99,16 +99,16 @@ class FactVectorOperations:
                 task_type="retrieval_document"
             )
             embedding = embedding_result.embedding
-        
+
         if embedding is None:
             raise ValueError("No embedding provided and no embedding service available")
-        
+
         # Ensure collection exists
         await self.ensure_collection_exists()
-        
+
         # Create point ID
         point_id = str(uuid.uuid4())
-        
+
         # Prepare payload with fact metadata
         payload = {
             "fact_id": fact.id,
@@ -139,14 +139,14 @@ class FactVectorOperations:
             "citation": fact.get_citation(),
             "machine_readable_source": fact.get_machine_readable_source()
         }
-        
+
         # Create point
         point = PointStruct(
             id=point_id,
             vector=embedding,
             payload=payload
         )
-        
+
         try:
             # Store point
             await asyncio.to_thread(
@@ -154,16 +154,16 @@ class FactVectorOperations:
                 collection_name=self.collection_name,
                 points=[point]
             )
-            
+
             self.logger.debug(
                 "Fact vector stored successfully",
                 fact_id=fact.id,
                 point_id=point_id,
                 fact_text=fact.fact_text[:50] + "..." if len(fact.fact_text) > 50 else fact.fact_text
             )
-            
+
             return point_id
-            
+
         except Exception as e:
             self.logger.error(
                 "Failed to store fact vector",
@@ -171,20 +171,20 @@ class FactVectorOperations:
                 error=str(e)
             )
             raise
-    
+
     async def store_facts_batch(self, facts: List[Fact], embeddings: Optional[List[List[float]]] = None) -> List[str]:
         """Store multiple facts as vectors in batch.
-        
+
         Args:
             facts: List of facts to store
             embeddings: Pre-computed embeddings (optional)
-            
+
         Returns:
             List of point IDs
         """
         if not facts:
             return []
-        
+
         # Generate embeddings if not provided
         if embeddings is None and self.embedding_service:
             fact_texts = [fact.get_search_text() for fact in facts]
@@ -193,24 +193,24 @@ class FactVectorOperations:
                 task_type="retrieval_document"
             )
             embeddings = [result.embedding for result in embedding_results]
-        
+
         if embeddings is None:
             raise ValueError("No embeddings provided and no embedding service available")
-        
+
         if len(facts) != len(embeddings):
             raise ValueError("Number of facts must match number of embeddings")
-        
+
         # Ensure collection exists
         await self.ensure_collection_exists()
-        
+
         # Prepare points
         points = []
         point_ids = []
-        
+
         for fact, embedding in zip(facts, embeddings):
             point_id = str(uuid.uuid4())
             point_ids.append(point_id)
-            
+
             # Prepare payload
             payload = {
                 "fact_id": fact.id,
@@ -241,13 +241,13 @@ class FactVectorOperations:
                 "citation": fact.get_citation(),
                 "machine_readable_source": fact.get_machine_readable_source()
             }
-            
+
             points.append(PointStruct(
                 id=point_id,
                 vector=embedding,
                 payload=payload
             ))
-        
+
         try:
             # Store points in batches
             batch_size = 100
@@ -258,15 +258,15 @@ class FactVectorOperations:
                     collection_name=self.collection_name,
                     points=batch
                 )
-            
+
             self.logger.info(
                 "Fact vectors stored successfully",
                 num_facts=len(facts),
                 collection=self.collection_name
             )
-            
+
             return point_ids
-            
+
         except Exception as e:
             self.logger.error(
                 "Failed to store fact vectors batch",
@@ -274,7 +274,7 @@ class FactVectorOperations:
                 error=str(e)
             )
             raise
-    
+
     async def search_facts(
         self,
         query_embedding: List[float],
@@ -283,13 +283,13 @@ class FactVectorOperations:
         filters: Optional[Dict[str, Any]] = None
     ) -> List[Dict[str, Any]]:
         """Search for facts using vector similarity.
-        
+
         Args:
             query_embedding: Query vector
             limit: Maximum number of results
             score_threshold: Minimum similarity score
             filters: Optional filters for metadata
-            
+
         Returns:
             List of search results with fact data and scores
         """
@@ -303,7 +303,7 @@ class FactVectorOperations:
                 score_threshold=score_threshold,
                 query_filter=filters
             )
-            
+
             # Convert results to fact data
             results = []
             for scored_point in search_result:
@@ -331,15 +331,15 @@ class FactVectorOperations:
                     }
                 }
                 results.append(result)
-            
+
             self.logger.debug(
                 "Fact vector search completed",
                 results_count=len(results),
                 score_threshold=score_threshold
             )
-            
+
             return results
-            
+
         except Exception as e:
             self.logger.error(
                 "Fact vector search failed",

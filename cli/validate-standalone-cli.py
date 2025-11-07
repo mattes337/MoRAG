@@ -53,7 +53,7 @@ def print_result(key: str, value: str, indent: int = 0):
 def check_environment() -> bool:
     """Check environment configuration."""
     print_section("Environment Configuration Check")
-    
+
     # Check for .env file
     env_file = Path(".env")
     if env_file.exists():
@@ -61,11 +61,11 @@ def check_environment() -> bool:
     else:
         print_result("Environment File", "[FAIL] .env not found")
         return False
-    
+
     # Check for GEMINI_API_KEY
     gemini_key = os.getenv('GEMINI_API_KEY')
     google_key = os.getenv('GOOGLE_API_KEY')
-    
+
     if gemini_key:
         print_result("GEMINI_API_KEY", "[OK] Set")
         return True
@@ -83,10 +83,10 @@ def check_environment() -> bool:
 def find_test_files() -> Dict[str, Path]:
     """Find available test files."""
     print_section("Test Files Discovery")
-    
+
     uploads_dir = Path("uploads")
     test_files = {}
-    
+
     # Look for specific file types
     file_patterns = {
         "audio": ["*.mp3", "*.wav", "*.m4a"],
@@ -94,7 +94,7 @@ def find_test_files() -> Dict[str, Path]:
         "image": ["*.jpg", "*.jpeg", "*.png"],
         "video": ["*.mp4", "*.avi", "*.mov"]
     }
-    
+
     for file_type, patterns in file_patterns.items():
         for pattern in patterns:
             files = list(uploads_dir.glob(pattern))
@@ -104,20 +104,20 @@ def find_test_files() -> Dict[str, Path]:
                 break
         else:
             print_result(f"{file_type.title()} File", "[FAIL] Not found")
-    
+
     return test_files
 
 
 def run_cli_test(script_name: str, file_path: Path, mode: str = "processing") -> bool:
     """Run a CLI test script and check if it works."""
     print(f"\n[PROCESSING] Testing {script_name} in {mode} mode...")
-    
+
     try:
         cmd = [sys.executable, f"tests/cli/{script_name}", str(file_path)]
-        
+
         if mode == "ingestion":
             cmd.append("--ingest")
-        
+
         # Run the command with timeout
         result = subprocess.run(
             cmd,
@@ -126,7 +126,7 @@ def run_cli_test(script_name: str, file_path: Path, mode: str = "processing") ->
             timeout=60,  # 1 minute timeout
             cwd=project_root
         )
-        
+
         if result.returncode == 0:
             print(f"  [OK] {script_name} {mode} mode: SUCCESS")
             return True
@@ -134,7 +134,7 @@ def run_cli_test(script_name: str, file_path: Path, mode: str = "processing") ->
             print(f"  [FAIL] {script_name} {mode} mode: FAILED")
             print(f"  Error: {result.stderr[:200]}...")
             return False
-            
+
     except subprocess.TimeoutExpired:
         print(f"  ⏰ {script_name} {mode} mode: TIMEOUT")
         return False
@@ -146,7 +146,7 @@ def run_cli_test(script_name: str, file_path: Path, mode: str = "processing") ->
 def validate_standalone_functionality(test_files: Dict[str, Path]) -> Dict[str, Dict[str, bool]]:
     """Validate that CLI scripts work standalone."""
     print_section("Standalone CLI Validation")
-    
+
     # Test mapping: script_name -> file_type
     tests = {
         "test-audio.py": "audio",
@@ -154,52 +154,52 @@ def validate_standalone_functionality(test_files: Dict[str, Path]) -> Dict[str, 
         "test-image.py": "image",
         "test-video.py": "video"
     }
-    
+
     results = {}
-    
+
     for script_name, file_type in tests.items():
         if file_type not in test_files:
             print(f"⏭️  Skipping {script_name} - no {file_type} file available")
             continue
-        
+
         file_path = test_files[file_type]
         script_results = {}
-        
+
         # Test processing mode
         script_results["processing"] = run_cli_test(script_name, file_path, "processing")
-        
+
         # Test ingestion mode (the new standalone functionality)
         script_results["ingestion"] = run_cli_test(script_name, file_path, "ingestion")
-        
+
         results[script_name] = script_results
-    
+
     return results
 
 
 def main():
     """Main validation function."""
     print_header("MoRAG Standalone CLI Validation")
-    
+
     # Check environment
     if not check_environment():
         print("\n[FAIL] Environment check failed. Please configure your .env file.")
         return False
-    
+
     # Find test files
     test_files = find_test_files()
     if not test_files:
         print("\n[FAIL] No test files found. Please add some files to the uploads/ directory.")
         return False
-    
+
     # Validate standalone functionality
     results = validate_standalone_functionality(test_files)
-    
+
     # Summary
     print_section("Validation Summary")
-    
+
     total_tests = 0
     passed_tests = 0
-    
+
     for script_name, script_results in results.items():
         print(f"\n📄 {script_name}:")
         for mode, success in script_results.items():
@@ -209,9 +209,9 @@ def main():
                 print(f"  [OK] {mode} mode: PASS")
             else:
                 print(f"  [FAIL] {mode} mode: FAIL")
-    
+
     print(f"\n📊 Overall Results: {passed_tests}/{total_tests} tests passed")
-    
+
     if passed_tests == total_tests:
         print("\n[SUCCESS] All CLI scripts work standalone successfully!")
         print("[OK] GEMINI_API_KEY configuration is working")

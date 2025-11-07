@@ -299,7 +299,7 @@ python -m pytest tests/integration/test_architecture_compliance.py -v
    ```python
    # packages/morag-newtype/src/morag_newtype/processor.py
    from morag_core.interfaces.processor import BaseProcessor
-   
+
    class NewTypeProcessor(BaseProcessor):
        async def process(self, input_data):
            # Implementation
@@ -310,7 +310,7 @@ python -m pytest tests/integration/test_architecture_compliance.py -v
    ```python
    # packages/morag-newtype/src/morag_newtype/__init__.py
    from .processor import NewTypeProcessor
-   
+
    __all__ = ['NewTypeProcessor']
    ```
 
@@ -319,7 +319,7 @@ python -m pytest tests/integration/test_architecture_compliance.py -v
    # packages/morag-newtype/tests/test_processor.py
    import pytest
    from morag_newtype import NewTypeProcessor
-   
+
    def test_processor_creation():
        processor = NewTypeProcessor()
        assert processor is not None

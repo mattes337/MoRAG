@@ -133,13 +133,13 @@ async def create_qdrant_collection(collection_name: str, vector_size: int = 768)
                 collection_name=collection_name,
                 verify_ssl=verify_ssl
             )
-        
+
         await storage.connect()
         await storage.create_collection(collection_name, vector_size, force_recreate=False)
         await storage.disconnect()
-        
+
         return True
-        
+
     except Exception as e:
         print(f"[FAIL] Error creating Qdrant collection: {e}")
         return False
@@ -183,9 +183,9 @@ async def list_existing_databases() -> None:
 
     except Exception as e:
         print(f"[FAIL] Error listing Neo4j databases: {e}")
-    
+
     print_section("Existing Qdrant Collections")
-    
+
     try:
         from qdrant_client import QdrantClient
 
@@ -221,13 +221,13 @@ async def list_existing_databases() -> None:
                 api_key=qdrant_api_key,
                 verify=verify_ssl
             )
-        
+
         collections = client.get_collections()
         for col in collections.collections:
             print_result("Collection", col.name)
-            
+
         client.close()
-        
+
     except Exception as e:
         print(f"[FAIL] Error listing Qdrant collections: {e}")
 
@@ -240,13 +240,13 @@ async def main():
 Examples:
   Create both database and collection:
     python create-databases.py --neo4j-database smartcard --qdrant-collection smartcard_docs
-    
+
   Create only Neo4j database:
     python create-databases.py --neo4j-database test_db
-    
+
   Create only Qdrant collection:
     python create-databases.py --qdrant-collection test_collection
-    
+
   List existing databases and collections:
     python create-databases.py --list-existing
 
@@ -259,26 +259,26 @@ Note:
   To create custom databases, you need Neo4j Enterprise Edition.
         """
     )
-    
+
     parser.add_argument('--neo4j-database', help='Neo4j database name to create')
     parser.add_argument('--qdrant-collection', help='Qdrant collection name to create')
     parser.add_argument('--vector-size', type=int, default=768, help='Vector size for Qdrant collection (default: 768)')
     parser.add_argument('--list-existing', action='store_true', help='List existing databases and collections')
-    
+
     args = parser.parse_args()
-    
+
     if not any([args.neo4j_database, args.qdrant_collection, args.list_existing]):
         parser.print_help()
         return 1
-    
+
     print_header("MoRAG Database and Collection Creation Utility")
-    
+
     if args.list_existing:
         await list_existing_databases()
         return 0
-    
+
     success = True
-    
+
     if args.neo4j_database:
         print_section(f"Creating Neo4j Database: {args.neo4j_database}")
         if await create_neo4j_database(args.neo4j_database):
@@ -286,7 +286,7 @@ Note:
         else:
             print(f"[FAIL] Failed to create Neo4j database '{args.neo4j_database}'")
             success = False
-    
+
     if args.qdrant_collection:
         print_section(f"Creating Qdrant Collection: {args.qdrant_collection}")
         if await create_qdrant_collection(args.qdrant_collection, args.vector_size):
@@ -294,7 +294,7 @@ Note:
         else:
             print(f"[FAIL] Failed to create Qdrant collection '{args.qdrant_collection}'")
             success = False
-    
+
     if success:
         print("\n[SUCCESS] All databases and collections created successfully!")
         return 0

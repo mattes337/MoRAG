@@ -16,9 +16,9 @@ def run_command(cmd: List[str], cwd: Path = None) -> Dict[str, Any]:
     """Run a command and return the result."""
     try:
         result = subprocess.run(
-            cmd, 
-            capture_output=True, 
-            text=True, 
+            cmd,
+            capture_output=True,
+            text=True,
             cwd=cwd or Path.cwd()
         )
         return {
@@ -39,18 +39,18 @@ def run_command(cmd: List[str], cwd: Path = None) -> Dict[str, Any]:
 def check_python_syntax(project_root: Path) -> Dict[str, Any]:
     """Check Python syntax using py_compile."""
     print("🔍 Checking Python syntax...")
-    
+
     python_files = []
     for root, dirs, files in project_root.rglob('*.py'):
         if not any(exclude in str(root) for exclude in ['.git', '__pycache__', '.venv', 'venv']):
             python_files.append(root)
-    
+
     errors = []
     for py_file in python_files:
         result = run_command([sys.executable, '-m', 'py_compile', str(py_file)])
         if not result['success']:
             errors.append(f"Syntax error in {py_file}: {result['stderr']}")
-    
+
     return {
         'name': 'Python Syntax Check',
         'success': len(errors) == 0,
@@ -62,7 +62,7 @@ def check_python_syntax(project_root: Path) -> Dict[str, Any]:
 def run_import_check(project_root: Path) -> Dict[str, Any]:
     """Run our custom import checker."""
     print("📦 Checking imports...")
-    
+
     script_path = project_root / 'scripts' / 'check_imports.py'
     if not script_path.exists():
         return {
@@ -71,20 +71,20 @@ def run_import_check(project_root: Path) -> Dict[str, Any]:
             'errors': ['Import checker script not found'],
             'warnings': []
         }
-    
+
     result = run_command([
-        sys.executable, str(script_path), 
+        sys.executable, str(script_path),
         'packages', '--exit-on-error'
     ], cwd=project_root)
-    
+
     errors = []
     warnings = []
-    
+
     if result['stdout']:
         lines = result['stdout'].split('\n')
         in_errors = False
         in_warnings = False
-        
+
         for line in lines:
             line = line.strip()
             if line == 'ERRORS:':
@@ -100,7 +100,7 @@ def run_import_check(project_root: Path) -> Dict[str, Any]:
                 errors.append(line)
             elif line and in_warnings:
                 warnings.append(line)
-    
+
     return {
         'name': 'Import Check',
         'success': result['success'],
@@ -112,7 +112,7 @@ def run_import_check(project_root: Path) -> Dict[str, Any]:
 def run_static_analysis(project_root: Path) -> Dict[str, Any]:
     """Run comprehensive static analysis."""
     print("🔬 Running static analysis...")
-    
+
     script_path = project_root / 'scripts' / 'static_analysis.py'
     if not script_path.exists():
         return {
@@ -121,12 +121,12 @@ def run_static_analysis(project_root: Path) -> Dict[str, Any]:
             'errors': ['Static analysis script not found'],
             'warnings': []
         }
-    
+
     result = run_command([
-        sys.executable, str(script_path), 
+        sys.executable, str(script_path),
         'packages', '--json', '--exit-on-error'
     ], cwd=project_root)
-    
+
     if result['success'] and result['stdout']:
         try:
             analysis_results = json.loads(result['stdout'])
@@ -162,20 +162,20 @@ def run_static_analysis(project_root: Path) -> Dict[str, Any]:
 def run_tests(project_root: Path) -> Dict[str, Any]:
     """Run tests if available."""
     print("🧪 Running tests...")
-    
+
     # Check if pytest is available and there are tests
     test_dirs = [
         project_root / 'tests',
         project_root / 'test',
         project_root / 'packages' / 'morag-stages' / 'tests'
     ]
-    
+
     test_dir = None
     for td in test_dirs:
         if td.exists() and any(td.glob('test_*.py')):
             test_dir = td
             break
-    
+
     if not test_dir:
         return {
             'name': 'Tests',
@@ -184,10 +184,10 @@ def run_tests(project_root: Path) -> Dict[str, Any]:
             'warnings': ['No tests found'],
             'skipped': True
         }
-    
+
     # Try to run pytest
     result = run_command([sys.executable, '-m', 'pytest', str(test_dir), '-v'], cwd=project_root)
-    
+
     return {
         'name': 'Tests',
         'success': result['success'],
@@ -201,28 +201,28 @@ def run_build_checks(project_root: Path, skip_tests: bool = False) -> Dict[str, 
     """Run all build checks."""
     print("🚀 Starting build checks...")
     print("=" * 50)
-    
+
     checks = [
         check_python_syntax,
         run_import_check,
         run_static_analysis,
     ]
-    
+
     if not skip_tests:
         checks.append(run_tests)
-    
+
     results = []
     overall_success = True
-    
+
     for check_func in checks:
         try:
             result = check_func(project_root)
             results.append(result)
-            
+
             # Print immediate feedback
             status = "✅" if result['success'] else "❌"
             print(f"{status} {result['name']}")
-            
+
             if not result['success']:
                 overall_success = False
                 if result.get('errors'):
@@ -230,10 +230,10 @@ def run_build_checks(project_root: Path, skip_tests: bool = False) -> Dict[str, 
                         print(f"   Error: {error}")
                     if len(result['errors']) > 3:
                         print(f"   ... and {len(result['errors']) - 3} more errors")
-            
+
             if result.get('warnings'):
                 print(f"   {len(result['warnings'])} warnings")
-        
+
         except Exception as e:
             print(f"❌ {check_func.__name__} failed: {e}")
             overall_success = False
@@ -243,9 +243,9 @@ def run_build_checks(project_root: Path, skip_tests: bool = False) -> Dict[str, 
                 'errors': [str(e)],
                 'warnings': []
             })
-    
+
     print("=" * 50)
-    
+
     return {
         'overall_success': overall_success,
         'checks': results,
@@ -268,11 +268,11 @@ def main():
                        help='Output results in JSON format')
     parser.add_argument('--project-root', type=Path, default=Path.cwd(),
                        help='Project root directory')
-    
+
     args = parser.parse_args()
-    
+
     results = run_build_checks(args.project_root, args.skip_tests)
-    
+
     if args.json:
         print(json.dumps(results, indent=2, default=str))
     else:
@@ -282,7 +282,7 @@ def main():
         print(f"  Failed: {results['summary']['failed']}")
         print(f"  Total errors: {results['summary']['total_errors']}")
         print(f"  Total warnings: {results['summary']['total_warnings']}")
-        
+
         if results['overall_success']:
             print("\n🎉 All checks passed!")
         else:
@@ -293,7 +293,7 @@ def main():
                     print(f"  - {check['name']}")
                     for error in check.get('errors', []):
                         print(f"    {error}")
-    
+
     sys.exit(0 if results['overall_success'] else 1)
 
 

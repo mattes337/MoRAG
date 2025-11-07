@@ -17,7 +17,7 @@ class TestQdrantIntegration:
             mock_response.status_code = 200
             mock_response.json.return_value = {"status": "ok"}
             mock_get.return_value = mock_response
-            
+
             response = requests.get("http://localhost:6333/health", timeout=5)
             assert response.status_code == 200
 
@@ -25,7 +25,7 @@ class TestQdrantIntegration:
         """Test Qdrant container health check failure handling."""
         with patch('requests.get') as mock_get:
             mock_get.side_effect = requests.exceptions.RequestException("Connection failed")
-            
+
             with pytest.raises(requests.exceptions.RequestException):
                 requests.get("http://localhost:6333/health", timeout=5)
 
@@ -40,7 +40,7 @@ class TestQdrantIntegration:
         data = response.json()
         assert "services" in data
         assert "qdrant" in data["services"]
-        
+
         # Qdrant status should be one of the expected values
         qdrant_status = data["services"]["qdrant"]
         assert qdrant_status in ["healthy", "unhealthy", "not_connected"]
@@ -104,9 +104,9 @@ class TestQdrantIntegration:
     async def test_qdrant_service_mock_operations(self):
         """Test Qdrant service operations with mocked client."""
         from morag_services.storage import QdrantService
-        
+
         service = QdrantService()
-        
+
         # Mock the client
         mock_client = MagicMock()
         mock_client.get_collections.return_value = MagicMock(collections=[])
@@ -128,7 +128,7 @@ class TestQdrantIntegration:
         )
         mock_client.upsert = MagicMock()
         mock_client.close = MagicMock()
-        
+
         service.client = mock_client
 
         with patch('asyncio.to_thread', new_callable=AsyncMock) as mock_to_thread:
@@ -138,10 +138,10 @@ class TestQdrantIntegration:
                 None,  # create_collection
                 mock_client.get_collection.return_value  # get_collection
             ]
-            
+
             await service.create_collection(vector_size=768)
             info = await service.get_collection_info()
-            
+
             assert info["config"]["vector_size"] == 768
             assert info["status"] == "green"
 
@@ -149,14 +149,14 @@ class TestQdrantIntegration:
         """Test health endpoint Qdrant integration."""
         app = create_app()
         client = TestClient(app)
-        
+
         # Mock the qdrant_service to avoid actual connection
         with patch('morag.api.routes.health.qdrant_service') as mock_service:
             mock_service.client = None  # Simulate not connected
-            
+
             response = client.get("/health/ready")
             assert response.status_code == 200
-            
+
             data = response.json()
             assert data["services"]["qdrant"] == "not_connected"
 
@@ -164,17 +164,17 @@ class TestQdrantIntegration:
         """Test health endpoint when Qdrant is healthy."""
         app = create_app()
         client = TestClient(app)
-        
+
         with patch('morag.api.routes.health.qdrant_service') as mock_service:
             mock_service.client = MagicMock()  # Simulate connected
             mock_service.get_collection_info = AsyncMock(return_value={
                 "name": "test_collection",
                 "status": "green"
             })
-            
+
             response = client.get("/health/ready")
             assert response.status_code == 200
-            
+
             data = response.json()
             assert data["services"]["qdrant"] == "healthy"
 
@@ -182,14 +182,14 @@ class TestQdrantIntegration:
         """Test health endpoint when Qdrant is unhealthy."""
         app = create_app()
         client = TestClient(app)
-        
+
         with patch('morag.api.routes.health.qdrant_service') as mock_service:
             mock_service.client = MagicMock()  # Simulate connected
             mock_service.get_collection_info = AsyncMock(side_effect=Exception("Connection error"))
-            
+
             response = client.get("/health/ready")
             assert response.status_code == 200
-            
+
             data = response.json()
             assert data["services"]["qdrant"] == "unhealthy"
 
@@ -199,14 +199,14 @@ class TestQdrantConfiguration:
     def test_docker_compose_file_exists(self):
         """Test that Docker Compose file exists."""
         from pathlib import Path
-        
+
         compose_file = Path("docker/docker-compose.qdrant.yml")
         assert compose_file.exists(), "Qdrant Docker Compose file not found"
-        
+
         # Test file content
         with open(compose_file, 'r') as f:
             content = f.read()
-        
+
         assert "qdrant/qdrant" in content
         assert "6333:6333" in content
         assert "6334:6334" in content
@@ -214,13 +214,13 @@ class TestQdrantConfiguration:
     def test_qdrant_settings_configuration(self):
         """Test Qdrant settings configuration."""
         from morag_core.config import settings
-        
+
         # Test that Qdrant settings are properly configured
         assert hasattr(settings, 'qdrant_host')
         assert hasattr(settings, 'qdrant_port')
         assert hasattr(settings, 'qdrant_collection_name')
         assert hasattr(settings, 'qdrant_api_key')
-        
+
         # Test default values
         assert settings.qdrant_host == "localhost"
         assert settings.qdrant_port == 6333
@@ -229,32 +229,32 @@ class TestQdrantConfiguration:
     def test_service_singleton_pattern(self):
         """Test that qdrant_service follows singleton pattern."""
         from morag_services.storage import qdrant_service
-        
+
         # Import again to test singleton
         from morag_services.storage import qdrant_service as qdrant_service2
-        
+
         assert qdrant_service is qdrant_service2
 
     @pytest.mark.asyncio
     async def test_service_lifecycle(self):
         """Test service connection lifecycle."""
         from morag_services.storage import QdrantService
-        
+
         service = QdrantService()
-        
+
         # Test initial state
         assert service.client is None
-        
+
         # Mock connection
         with patch('qdrant_client.QdrantClient') as mock_client_class:
             mock_client = MagicMock()
             mock_client.get_collections.return_value = MagicMock(collections=[])
             mock_client.close = MagicMock()
             mock_client_class.return_value = mock_client
-            
+
             with patch('asyncio.to_thread', new_callable=AsyncMock):
                 await service.connect()
                 assert service.client is not None
-                
+
                 await service.disconnect()
                 assert service.client is None

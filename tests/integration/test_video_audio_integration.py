@@ -18,12 +18,12 @@ from morag_core.interfaces.converter import ConversionOptions
 
 class TestVideoAudioIntegration:
     """Test the integrated video-audio processing pipeline."""
-    
+
     @pytest.fixture
     def mock_video_file(self):
         """Create a mock video file path."""
         return Path("/tmp/test_video.mp4")
-    
+
     @pytest.fixture
     def mock_audio_result(self):
         """Create a mock enhanced audio processing result."""
@@ -54,19 +54,19 @@ class TestVideoAudioIntegration:
                 language="en"
             )
         ]
-        
+
         # Mock speaker diarization
         speakers = [
             SpeakerInfo("SPEAKER_00", 6.0, 2, 6.0, [0.95, 0.88], 0.0, 9.0),
             SpeakerInfo("SPEAKER_01", 2.5, 1, 2.5, [0.92], 3.5, 6.0)
         ]
-        
+
         speaker_segments = [
             SpeakerSegment("SPEAKER_00", 0.0, 3.0, 3.0, 0.95),
             SpeakerSegment("SPEAKER_01", 3.5, 6.0, 2.5, 0.92),
             SpeakerSegment("SPEAKER_00", 6.5, 9.0, 2.5, 0.88)
         ]
-        
+
         diarization_result = DiarizationResult(
             speakers=speakers,
             segments=speaker_segments,
@@ -77,7 +77,7 @@ class TestVideoAudioIntegration:
             model_used="pyannote/speaker-diarization-3.1",
             confidence_threshold=0.7
         )
-        
+
         # Mock topic segmentation
         topics = [
             TopicSegment(
@@ -105,7 +105,7 @@ class TestVideoAudioIntegration:
                 speaker_distribution={"SPEAKER_00": 100.0}
             )
         ]
-        
+
         topic_result = TopicSegmentationResult(
             topics=topics,
             total_topics=2,
@@ -114,7 +114,7 @@ class TestVideoAudioIntegration:
             similarity_threshold=0.7,
             segmentation_method="semantic_embedding"
         )
-        
+
         return AudioProcessingResult(
             text="Hello, welcome to our discussion. Thank you for having me. Let's talk about the main topic.",
             language="en",
@@ -127,7 +127,7 @@ class TestVideoAudioIntegration:
             speaker_diarization=diarization_result,
             topic_segmentation=topic_result
         )
-    
+
     @pytest.fixture
     def mock_video_metadata(self):
         """Create mock video metadata."""
@@ -144,20 +144,20 @@ class TestVideoAudioIntegration:
             audio_codec="aac",
             creation_time=None
         )
-    
+
     @pytest.mark.asyncio
     async def test_video_processor_enhanced_audio_integration(
-        self, 
-        mock_video_file, 
-        mock_video_metadata, 
+        self,
+        mock_video_file,
+        mock_video_metadata,
         mock_audio_result
     ):
         """Test that VideoProcessor correctly integrates enhanced audio processing."""
-        
+
         with patch('morag.processors.video.ffmpeg_probe') as mock_probe, \
              patch('morag.processors.video.ffmpeg_run') as mock_ffmpeg, \
              patch('morag.processors.video.asyncio.to_thread') as mock_thread:
-            
+
             # Mock ffmpeg probe response
             mock_probe.return_value = {
                 'streams': [
@@ -171,7 +171,7 @@ class TestVideoAudioIntegration:
                     'format_name': 'mp4'
                 }
             }
-            
+
             # Mock ffmpeg execution - handle both single function and function with args
             def mock_thread_side_effect(func, *args, **kwargs):
                 if args or kwargs:
@@ -179,15 +179,15 @@ class TestVideoAudioIntegration:
                 else:
                     return func()
             mock_thread.side_effect = mock_thread_side_effect
-            
+
             # Mock audio processor
             mock_audio_processor = Mock()
             mock_audio_processor.process_audio_file = AsyncMock(return_value=mock_audio_result)
-            
+
             # Create video processor and inject mock audio processor
             processor = VideoProcessor()
             processor._audio_processor = mock_audio_processor
-            
+
             # Create config with enhanced audio enabled
             config = VideoConfig(
                 extract_audio=True,
@@ -196,19 +196,19 @@ class TestVideoAudioIntegration:
                 enable_topic_segmentation=True,
                 audio_model_size="base"
             )
-            
+
             # Mock file existence
             with patch.object(Path, 'exists', return_value=True), \
                  patch.object(Path, 'stat') as mock_stat:
-                
+
                 mock_stat.return_value.st_size = 1024
-                
+
                 # Process video
                 result = await processor.process_video(mock_video_file, config)
-                
+
                 # Verify enhanced audio processing was called
                 mock_audio_processor.process_audio_file.assert_called_once()
-                
+
                 # Verify result contains enhanced audio processing
                 assert result.audio_processing_result is not None
                 assert result.audio_processing_result == mock_audio_result
@@ -216,16 +216,16 @@ class TestVideoAudioIntegration:
                 assert result.audio_processing_result.topic_segmentation is not None
                 assert result.audio_processing_result.speaker_diarization.total_speakers == 2
                 assert result.audio_processing_result.topic_segmentation.total_topics == 2
-    
+
     @pytest.mark.asyncio
     async def test_video_task_enhanced_integration(
-        self, 
-        mock_video_file, 
-        mock_video_metadata, 
+        self,
+        mock_video_file,
+        mock_video_metadata,
         mock_audio_result
     ):
         """Test that video task correctly handles enhanced audio processing results."""
-        
+
         # Mock video processing result with enhanced audio
         mock_video_result = VideoProcessingResult(
             audio_path=Path("/tmp/extracted_audio.wav"),
@@ -236,15 +236,15 @@ class TestVideoAudioIntegration:
             temp_files=[],
             audio_processing_result=mock_audio_result
         )
-        
+
         with patch('morag.tasks.video_tasks.video_processor') as mock_processor:
             mock_processor.process_video = AsyncMock(return_value=mock_video_result)
             mock_processor.cleanup_temp_files = Mock()
-            
+
             # Create mock task
             mock_task = Mock()
             mock_task.update_status = Mock()
-            
+
             # Process video file
             result = await _process_video_file_impl(
                 mock_task,
@@ -253,26 +253,26 @@ class TestVideoAudioIntegration:
                 config={"enable_enhanced_audio": True},
                 process_audio=True
             )
-            
+
             # Verify enhanced audio results are included
             assert "audio_processing_result" in result
             assert result["audio_processing_result"] is not None
-            
+
             audio_result = result["audio_processing_result"]
             assert audio_result["text"] == mock_audio_result.text
             assert audio_result["language"] == mock_audio_result.language
             assert audio_result["speaker_diarization"]["total_speakers"] == 2
             assert audio_result["topic_segmentation"]["total_topics"] == 2
-    
+
     @pytest.mark.asyncio
     async def test_video_converter_enhanced_markdown(
-        self, 
-        mock_video_file, 
-        mock_video_metadata, 
+        self,
+        mock_video_file,
+        mock_video_metadata,
         mock_audio_result
     ):
         """Test that video converter creates enhanced markdown with topic headers and speaker dialogue."""
-        
+
         # Mock video processing result with enhanced audio
         mock_video_result = VideoProcessingResult(
             audio_path=Path("/tmp/extracted_audio.wav"),
@@ -283,13 +283,13 @@ class TestVideoAudioIntegration:
             temp_files=[],
             audio_processing_result=mock_audio_result
         )
-        
+
         with patch('morag.converters.video.video_processor') as mock_processor:
             mock_processor.process_video = AsyncMock(return_value=mock_video_result)
-            
+
             # Create converter
             converter = VideoConverter()
-            
+
             # Create conversion options
             options = ConversionOptions(
                 include_metadata=True,
@@ -300,16 +300,16 @@ class TestVideoAudioIntegration:
                     'enable_topic_segmentation': True
                 }
             )
-            
+
             # Mock file existence for converter
             with patch.object(Path, 'exists', return_value=True):
                 # Convert video
                 result = await converter.convert(mock_video_file, options)
-            
+
             # Verify conversion was successful
             assert result.success
             assert result.content
-            
+
             # Verify enhanced audio content is included
             content = result.content
             assert "# Introduction [00:00 - 00:06]" in content

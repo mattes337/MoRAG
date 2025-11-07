@@ -18,13 +18,13 @@ logger = structlog.get_logger(__name__)
 
 def ensure_directory(directory: Union[str, Path]) -> Path:
     """Ensure directory exists, create if it doesn't.
-    
+
     Args:
         directory: Directory path
-        
+
     Returns:
         Path object for directory
-        
+
     Raises:
         StorageError: If directory cannot be created
     """
@@ -38,27 +38,27 @@ def ensure_directory(directory: Union[str, Path]) -> Path:
 
 def get_file_info(file_path: Union[str, Path]) -> Dict[str, Union[str, int]]:
     """Get file information.
-    
+
     Args:
         file_path: Path to file
-        
+
     Returns:
         Dictionary with file information
-        
+
     Raises:
         ValidationError: If file does not exist
     """
     file_path = Path(file_path)
-    
+
     if not file_path.exists():
         raise ValidationError(f"File not found: {file_path}")
-    
+
     # Get file stats
     stats = file_path.stat()
-    
+
     # Get MIME type
     mime_type, _ = mimetypes.guess_type(file_path)
-    
+
     return {
         "file_name": file_path.name,
         "file_path": str(file_path),
@@ -98,15 +98,15 @@ def generate_temp_path(prefix: str = "", suffix: str = "", directory: Optional[U
 
 def safe_delete(file_path: Union[str, Path]) -> bool:
     """Safely delete file or directory.
-    
+
     Args:
         file_path: Path to file or directory
-        
+
     Returns:
         True if deletion was successful, False otherwise
     """
     file_path = Path(file_path)
-    
+
     try:
         if file_path.is_file():
             file_path.unlink()
@@ -120,16 +120,16 @@ def safe_delete(file_path: Union[str, Path]) -> bool:
 
 def detect_format(file_path: Union[str, Path]) -> str:
     """Detect format from file extension.
-    
+
     Args:
         file_path: Path to file
-        
+
     Returns:
         Format type string
     """
     file_path = Path(file_path)
     extension = file_path.suffix.lower().lstrip('.')
-    
+
     # Map common extensions to format types
     format_map = {
         # Documents
@@ -141,7 +141,7 @@ def detect_format(file_path: Union[str, Path]) -> str:
         'xml': 'xml',
         'json': 'json',
         'csv': 'csv',
-        
+
         # Office
         'doc': 'word',
         'docx': 'word',
@@ -149,21 +149,21 @@ def detect_format(file_path: Union[str, Path]) -> str:
         'xlsx': 'excel',
         'ppt': 'powerpoint',
         'pptx': 'powerpoint',
-        
+
         # Audio
         'mp3': 'audio',
         'wav': 'audio',
         'ogg': 'audio',
         'flac': 'audio',
         'm4a': 'audio',
-        
+
         # Video
         'mp4': 'video',
         'avi': 'video',
         'mov': 'video',
         'mkv': 'video',
         'webm': 'video',
-        
+
         # Images
         'jpg': 'image',
         'jpeg': 'image',
@@ -172,7 +172,7 @@ def detect_format(file_path: Union[str, Path]) -> str:
         'bmp': 'image',
         'webp': 'image',
     }
-    
+
     return format_map.get(extension, 'unknown')
 
 

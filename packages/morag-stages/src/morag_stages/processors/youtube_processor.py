@@ -19,12 +19,12 @@ except ImportError:
 
 class YouTubeStageProcessor(StageProcessor):
     """Stage processor for YouTube content using morag_youtube package."""
-    
+
     def __init__(self):
         """Initialize YouTube stage processor."""
         self._youtube_processor = None
         self._youtube_service = None
-    
+
     def _get_youtube_processor(self):
         """Get or create YouTube processor instance."""
         if self._youtube_processor is None:
@@ -34,7 +34,7 @@ class YouTubeStageProcessor(StageProcessor):
             except ImportError as e:
                 raise ProcessingError(f"YouTube processor not available: {e}")
         return self._youtube_processor
-    
+
     def _get_youtube_service(self):
         """Get or create YouTube service instance."""
         if self._youtube_service is None:
@@ -44,15 +44,15 @@ class YouTubeStageProcessor(StageProcessor):
             except ImportError as e:
                 raise ProcessingError(f"YouTube service not available: {e}")
         return self._youtube_service
-    
+
     def supports_content_type(self, content_type: str) -> bool:
         """Check if this processor supports the given content type."""
         return content_type.upper() == "YOUTUBE"
-    
+
     async def process(
-        self, 
-        input_file: Path, 
-        output_file: Path, 
+        self,
+        input_file: Path,
+        output_file: Path,
         config: Dict[str, Any]
     ) -> ProcessorResult:
         """Process YouTube URL to markdown."""
@@ -94,13 +94,13 @@ class YouTubeStageProcessor(StageProcessor):
             elif ('www.' in url or '.com' in url or '.org' in url or '.net' in url) and not url.startswith(('http://', 'https://')):
                 # Default to https for security
                 url = 'https://' + url
-        
+
         logger.info("Processing YouTube URL", url=url)
-        
+
         try:
             # Use YouTube processor from morag_youtube package
             processor = self._get_youtube_processor()
-            
+
             # Convert config to YouTubeConfig
             from morag_youtube import YouTubeConfig
             youtube_config = YouTubeConfig(
@@ -112,7 +112,7 @@ class YouTubeStageProcessor(StageProcessor):
                 transcript=config.get('transcript'),
                 transcript_segments=config.get('transcript_segments')
             )
-            
+
             # Process the URL
             result = await processor.process_url(url, youtube_config)
 
@@ -147,7 +147,7 @@ class YouTubeStageProcessor(StageProcessor):
                 "playlist_index": result.metadata.playlist_index if result.metadata else None,
                 "created_at": datetime.now().isoformat()
             }
-            
+
             # Create content with transcript
             content_lines = []
             if result.transcript:
@@ -157,10 +157,10 @@ class YouTubeStageProcessor(StageProcessor):
 
             content = '\n'.join(content_lines)
             markdown_content = self.create_markdown_with_metadata(content, metadata)
-            
+
             # Write to file
             output_file.write_text(markdown_content, encoding='utf-8')
-            
+
             # Generate final filename based on video title if available
             final_output_file = output_file
             if result.metadata.get('title'):
@@ -169,7 +169,7 @@ class YouTubeStageProcessor(StageProcessor):
                 final_output_file = output_file.parent / f"{safe_title}.md"
                 if final_output_file != output_file:
                     output_file.rename(final_output_file)
-            
+
             return ProcessorResult(
                 content=content,
                 metadata=metadata,
@@ -180,24 +180,24 @@ class YouTubeStageProcessor(StageProcessor):
                 },
                 final_output_file=final_output_file
             )
-            
+
         except Exception as e:
             logger.error("YouTube processing failed", url=url, error=str(e))
-            
+
             # Fallback to YouTube service if available
             try:
                 service = self._get_youtube_service()
                 video_id = service.transcript_service.extract_video_id(url)
-                
+
                 # Try to get transcript using fallback
                 transcript_result = await service.transcript_service.get_transcript(video_id)
-                
+
                 if transcript_result and transcript_result.segments:
                     transcript_text = '\n'.join([
                         f"[{segment.start:.1f}s] {segment.text}"
                         for segment in transcript_result.segments
                     ])
-                    
+
                     metadata = {
                         "title": f"YouTube Video {video_id}",
                         "source": url,
@@ -207,11 +207,11 @@ class YouTubeStageProcessor(StageProcessor):
                         "created_at": datetime.now().isoformat(),
                         "fallback_processing": True
                     }
-                    
+
                     content = f"\n# Transcript\n\n{transcript_text}"
                     markdown_content = self.create_markdown_with_metadata(content, metadata)
                     output_file.write_text(markdown_content, encoding='utf-8')
-                    
+
                     return ProcessorResult(
                         content=content,
                         metadata=metadata,
@@ -222,7 +222,7 @@ class YouTubeStageProcessor(StageProcessor):
                         },
                         final_output_file=output_file
                     )
-                
+
             except Exception as fallback_error:
                 logger.error("YouTube fallback processing also failed",
                            url=url, error=str(fallback_error))

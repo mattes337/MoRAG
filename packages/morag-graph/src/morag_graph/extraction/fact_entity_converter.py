@@ -2,7 +2,7 @@
 
 import hashlib
 import re
-from typing import List, Dict, Any, Tuple, Optional
+from typing import List, Dict, Tuple, Optional
 import structlog
 
 from ..models.fact import Fact
@@ -12,16 +12,16 @@ from ..models.relation import Relation
 
 class FactEntityConverter:
     """Convert facts to entities and relationships for graph storage."""
-    
+
     def __init__(self, domain: str = "general"):
         """Initialize the converter.
-        
+
         Args:
             domain: Domain context for entity type inference
         """
         self.domain = domain
         self.logger = structlog.get_logger(__name__)
-        
+
         # Generic entity names to skip
         self.generic_names = {
             'it', 'this', 'that', 'they', 'them', 'these', 'those',
@@ -33,38 +33,38 @@ class FactEntityConverter:
             'result', 'outcome', 'effect', 'consequence',
             'study', 'research', 'analysis', 'investigation'
         }
-    
+
     def convert_facts_to_entities(self, facts: List[Fact]) -> Tuple[List[Entity], List[Relation]]:
         """Convert facts to entities and relationships.
-        
+
         Args:
             facts: List of facts to convert
-            
+
         Returns:
             Tuple of (entities, relationships)
         """
         entities = []
         relationships = []
         entity_cache = {}  # Cache to avoid duplicate entities
-        
+
         self.logger.info(f"Converting {len(facts)} facts to entities and relationships")
-        
+
         for fact in facts:
             # Create entities from fact components
             fact_entities, fact_relations = self._convert_single_fact(fact, entity_cache)
             entities.extend(fact_entities)
             relationships.extend(fact_relations)
-        
+
         # Remove duplicates while preserving order
         unique_entities = self._deduplicate_entities(entities)
         unique_relationships = self._deduplicate_relationships(relationships)
-        
+
         self.logger.info(
             f"Converted facts to {len(unique_entities)} entities and {len(unique_relationships)} relationships"
         )
-        
+
         return unique_entities, unique_relationships
-    
+
     def _convert_single_fact(self, fact: Fact, entity_cache: Dict[str, Entity]) -> Tuple[List[Entity], List[Relation]]:
         """Convert a single fact to entities and relationships using hybrid approach.
 
@@ -139,7 +139,7 @@ class FactEntityConverter:
                     ))
 
         return entities, relationships
-    
+
     def _create_entity_from_text(
         self,
         text: str,
@@ -214,7 +214,7 @@ class FactEntityConverter:
         entity_cache[cache_key] = entity
 
         return entity
-    
+
     def _clean_entity_text(self, text: str) -> str:
         """Clean and normalize entity text.
 
@@ -246,45 +246,45 @@ class FactEntityConverter:
             cleaned = cleaned[0].upper() + cleaned[1:]
 
         return cleaned
-    
+
     def _is_generic_entity_name(self, name: str) -> bool:
         """Check if entity name is too generic.
-        
+
         Args:
             name: Entity name to check
-            
+
         Returns:
             True if name is generic
         """
         name_lower = name.lower().strip()
-        
+
         # Check against generic names
         if name_lower in self.generic_names:
             return True
-        
+
         # Check if it's too short
         if len(name_lower) < 2:
             return True
-        
+
         # Check if it's just punctuation or numbers
         if re.match(r'^[^\w\s]*$', name_lower) or re.match(r'^\d+$', name_lower):
             return True
-        
+
         return False
-    
+
     def _infer_entity_type(self, text: str, base_type: str, domain: str) -> str:
         """Infer more specific entity type based on content and domain.
-        
+
         Args:
             text: Entity text
             base_type: Base type (SUBJECT, OBJECT, KEYWORD)
             domain: Domain context
-            
+
         Returns:
             Specific entity type
         """
         text_lower = text.lower()
-        
+
         # Domain-specific type inference
         if domain == "medical" or domain == "health":
             if any(term in text_lower for term in ['vitamin', 'mineral', 'supplement', 'herb', 'extract']):
@@ -297,7 +297,7 @@ class FactEntityConverter:
                 return "TREATMENT"
             elif any(term in text_lower for term in ['symptom', 'condition', 'disease', 'disorder']):
                 return "MEDICAL_CONDITION"
-        
+
         # General type inference
         if base_type == "KEYWORD":
             return "KEYWORD"
@@ -307,9 +307,9 @@ class FactEntityConverter:
             return "OUTCOME"
         elif any(term in text_lower for term in ['study', 'research', 'analysis', 'investigation']):
             return "RESEARCH"
-        
+
         return base_type
-    
+
     def _generate_entity_id(self, name: str, entity_type: str) -> str:
         """Generate a unique entity ID.
 
@@ -324,7 +324,7 @@ class FactEntityConverter:
         content_for_hash = f"{name.lower()}_{entity_type.lower()}"
         content_hash = hashlib.md5(content_for_hash.encode()).hexdigest()[:12]
         return f"ent_{content_hash}"
-    
+
     def _create_fact_relationship(
         self,
         entity_id: str,
@@ -359,7 +359,7 @@ class FactEntityConverter:
                 "relationship_category": "fact_entity"
             }
         )
-    
+
     def _create_entity_relationship(
         self,
         source_id: str,
@@ -394,41 +394,41 @@ class FactEntityConverter:
                 "relationship_category": "entity_entity"
             }
         )
-    
+
     def _deduplicate_entities(self, entities: List[Entity]) -> List[Entity]:
         """Remove duplicate entities while preserving order.
-        
+
         Args:
             entities: List of entities
-            
+
         Returns:
             Deduplicated list of entities
         """
         seen_ids = set()
         unique_entities = []
-        
+
         for entity in entities:
             if entity.id not in seen_ids:
                 seen_ids.add(entity.id)
                 unique_entities.append(entity)
-        
+
         return unique_entities
-    
+
     def _deduplicate_relationships(self, relationships: List[Relation]) -> List[Relation]:
         """Remove duplicate relationships while preserving order.
-        
+
         Args:
             relationships: List of relationships
-            
+
         Returns:
             Deduplicated list of relationships
         """
         seen_ids = set()
         unique_relationships = []
-        
+
         for relationship in relationships:
             if relationship.id not in seen_ids:
                 seen_ids.add(relationship.id)
                 unique_relationships.append(relationship)
-        
+
         return unique_relationships

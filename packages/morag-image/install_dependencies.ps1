@@ -15,7 +15,7 @@ if (-not (Get-Command choco -ErrorAction SilentlyContinue)) {
     Set-ExecutionPolicy Bypass -Scope Process -Force
     [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
     Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
-    
+
     # Refresh environment variables
     $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
 }
@@ -24,14 +24,14 @@ if (-not (Get-Command choco -ErrorAction SilentlyContinue)) {
 Write-Host "Installing Tesseract OCR..." -ForegroundColor Cyan
 try {
     choco install tesseract -y
-    
+
     # Add Tesseract to PATH if not already there
     $tesseractPath = "C:\Program Files\Tesseract-OCR"
     if (-not ($env:Path -like "*$tesseractPath*")) {
         [Environment]::SetEnvironmentVariable("Path", $env:Path + ";$tesseractPath", "Machine")
         $env:Path = $env:Path + ";$tesseractPath"
     }
-    
+
     Write-Host "Tesseract OCR installed successfully." -ForegroundColor Green
 } catch {
     Write-Host "Failed to install Tesseract OCR: $_" -ForegroundColor Red

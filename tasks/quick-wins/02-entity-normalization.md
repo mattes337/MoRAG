@@ -2,8 +2,8 @@
 
 ## Overview
 
-**Priority**: 🔥 **Immediate** (1-2 weeks, High Impact, High ROI)  
-**Source**: LightRAG systematic deduplication insights  
+**Priority**: 🔥 **Immediate** (1-2 weeks, High Impact, High ROI)
+**Source**: LightRAG systematic deduplication insights
 **Expected Impact**: 15-20% reduction in duplicate entities, cleaner knowledge graphs
 
 ## Problem Statement
@@ -263,7 +263,7 @@ class EntityDeduplicator:
         WHERE e.collection_name = $collection_name
         RETURN DISTINCT e.name as entity_name
         """
-        
+
         result = await self.neo4j.execute_query(query, {'collection_name': collection_name})
         return [record['entity_name'] for record in result]
 
@@ -271,49 +271,49 @@ class EntityDeduplicator:
         """Merge entities in the graph."""
         entities_to_merge = candidate.entities
         canonical_form = candidate.canonical_form
-        
+
         # Find the canonical entity or create it
         canonical_entity = None
         for entity in entities_to_merge:
             if entity == canonical_form:
                 canonical_entity = entity
                 break
-                
+
         if not canonical_entity:
             canonical_entity = canonical_form
-            
+
         # Merge all relationships to canonical entity
         merge_query = """
         MATCH (old:Entity)
-        WHERE old.name IN $entities_to_merge 
+        WHERE old.name IN $entities_to_merge
           AND old.collection_name = $collection_name
           AND old.name <> $canonical_form
-        
+
         MATCH (canonical:Entity {name: $canonical_form, collection_name: $collection_name})
-        
+
         // Transfer all relationships
         OPTIONAL MATCH (old)-[r1]->(other)
         WHERE NOT (canonical)-[:SAME_TYPE]->(other)
         CREATE (canonical)-[r2:SAME_TYPE]->(other)
         SET r2 = properties(r1)
-        
+
         OPTIONAL MATCH (other)-[r3]->(old)
         WHERE NOT (other)-[:SAME_TYPE]->(canonical)
         CREATE (other)-[r4:SAME_TYPE]->(canonical)
         SET r4 = properties(r3)
-        
+
         // Delete old entities and relationships
         DETACH DELETE old
-        
+
         RETURN count(old) as merged_count
         """
-        
+
         result = await self.neo4j.execute_query(merge_query, {
             'entities_to_merge': entities_to_merge,
             'canonical_form': canonical_form,
             'collection_name': collection_name
         })
-        
+
         return {
             'merged_entities': entities_to_merge,
             'canonical_form': canonical_form,
@@ -418,7 +418,7 @@ class TestEntityNormalization:
             ("ai", "artificial intelligence"),
             ("ml", "machine learning")
         ]
-        
+
         for input_entity, expected in test_cases:
             result = self.normalizer.normalize_entity(input_entity)
             assert result.normalized == expected
@@ -429,7 +429,7 @@ class TestEntityNormalization:
             ("Dr. Jane Doe", "Jane Doe"),
             ("john smith", "John Smith")
         ]
-        
+
         for input_name, expected in test_cases:
             result = self.normalizer.normalize_entity(input_name)
             assert result.normalized == expected
@@ -440,7 +440,7 @@ class TestEntityNormalization:
             ("Microsoft Corporation", "Microsoft Corp"),
             ("Apple Computer Company", "Apple Computer Co")
         ]
-        
+
         for input_org, expected in test_cases:
             result = self.normalizer.normalize_entity(input_org)
             assert result.normalized == expected
@@ -471,19 +471,19 @@ Add normalization settings:
 entity_normalization:
   enabled: true
   confidence_threshold: 0.8
-  
+
   rules:
     acronym_expansion: true
     person_name_standardization: true
     organization_cleanup: true
     general_lowercasing: true
-    
+
   merge_thresholds:
     acronym: 0.9
     person: 0.8
     organization: 0.85
     general: 0.95
-    
+
   custom_acronyms:
     # Add domain-specific acronyms
     "gpt": "generative pre-trained transformer"

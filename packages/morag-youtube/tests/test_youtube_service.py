@@ -71,14 +71,14 @@ async def test_process_video(mock_process_url, youtube_service, sample_download_
     """Test processing a single video."""
     # Configure the mock
     mock_process_url.return_value = sample_download_result
-    
+
     # Call the method
     url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
     result = await youtube_service.process_video(url)
-    
+
     # Verify the result
     assert result == sample_download_result
-    
+
     # Verify the mock was called correctly
     mock_process_url.assert_called_once_with(url, None)
 
@@ -88,19 +88,19 @@ async def test_process_videos(mock_process_url, youtube_service, sample_download
     """Test processing multiple videos concurrently."""
     # Configure the mock
     mock_process_url.return_value = sample_download_result
-    
+
     # Call the method
     urls = [
         "https://www.youtube.com/watch?v=video1",
         "https://www.youtube.com/watch?v=video2",
     ]
     results = await youtube_service.process_videos(urls)
-    
+
     # Verify the results
     assert len(results) == 2
     assert results[0] == sample_download_result
     assert results[1] == sample_download_result
-    
+
     # Verify the mock was called correctly
     assert mock_process_url.call_count == 2
     mock_process_url.assert_any_call(urls[0], None)
@@ -112,16 +112,16 @@ async def test_process_playlist(mock_process_playlist, youtube_service, sample_d
     """Test processing a playlist."""
     # Configure the mock
     mock_process_playlist.return_value = [sample_download_result, sample_download_result]
-    
+
     # Call the method
     url = "https://www.youtube.com/playlist?list=PLsomething"
     results = await youtube_service.process_playlist(url)
-    
+
     # Verify the results
     assert len(results) == 2
     assert results[0] == sample_download_result
     assert results[1] == sample_download_result
-    
+
     # Verify the mock was called correctly
     mock_process_playlist.assert_called_once_with(url, None)
 
@@ -131,17 +131,17 @@ async def test_extract_metadata(mock_process_url, youtube_service, sample_downlo
     """Test extracting metadata without downloading."""
     # Configure the mock
     mock_process_url.return_value = sample_download_result
-    
+
     # Call the method
     url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
     metadata = await youtube_service.extract_metadata(url)
-    
+
     # Verify the result
     assert metadata['id'] == SAMPLE_METADATA['id']
     assert metadata['title'] == SAMPLE_METADATA['title']
     assert metadata['uploader'] == SAMPLE_METADATA['uploader']
     assert metadata['duration'] == SAMPLE_METADATA['duration']
-    
+
     # Verify the mock was called correctly
     mock_process_url.assert_called_once()
     # Verify that extract_metadata_only was set to True in the config
@@ -154,18 +154,18 @@ async def test_download_video_with_options(mock_process_url, youtube_service, sa
     """Test downloading a video with custom options."""
     # Configure the mock
     mock_process_url.return_value = sample_download_result
-    
+
     # Create test files to simulate download
     video_file = temp_dir / "video.mp4"
     audio_file = temp_dir / "audio.mp3"
     subtitle_file = temp_dir / "subs.vtt"
     thumbnail_file = temp_dir / "thumb.jpg"
-    
+
     video_file.touch()
     audio_file.touch()
     subtitle_file.touch()
     thumbnail_file.touch()
-    
+
     # Create a modified result with our test files
     test_result = YouTubeDownloadResult(
         video_path=video_file,
@@ -179,12 +179,12 @@ async def test_download_video_with_options(mock_process_url, youtube_service, sa
         success=True
     )
     mock_process_url.return_value = test_result
-    
+
     # Call the method
     url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
     output_dir = temp_dir / "output"
     output_dir.mkdir()
-    
+
     result = await youtube_service.download_video(
         url,
         output_dir=output_dir,
@@ -192,7 +192,7 @@ async def test_download_video_with_options(mock_process_url, youtube_service, sa
         extract_audio=True,
         download_subtitles=True
     )
-    
+
     # Verify the mock was called correctly
     mock_process_url.assert_called_once()
     config = mock_process_url.call_args[0][1]
@@ -207,7 +207,7 @@ async def test_download_audio(mock_process_url, youtube_service, sample_download
     # Create test audio file
     audio_file = temp_dir / "audio.mp3"
     audio_file.touch()
-    
+
     # Create a modified result with our test file
     test_result = YouTubeDownloadResult(
         video_path=None,
@@ -221,14 +221,14 @@ async def test_download_audio(mock_process_url, youtube_service, sample_download
         success=True
     )
     mock_process_url.return_value = test_result
-    
+
     # Call the method
     url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
     output_dir = temp_dir / "output"
     output_dir.mkdir()
-    
+
     audio_path = await youtube_service.download_audio(url, output_dir=output_dir)
-    
+
     # Verify the mock was called correctly
     mock_process_url.assert_called_once()
     config = mock_process_url.call_args[0][1]
@@ -245,7 +245,7 @@ async def test_download_subtitles(mock_process_url, youtube_service, sample_down
     subtitle_file2 = temp_dir / "subs.fr.vtt"
     subtitle_file1.touch()
     subtitle_file2.touch()
-    
+
     # Create a modified result with our test files
     test_result = YouTubeDownloadResult(
         video_path=None,
@@ -259,15 +259,15 @@ async def test_download_subtitles(mock_process_url, youtube_service, sample_down
         success=True
     )
     mock_process_url.return_value = test_result
-    
+
     # Call the method
     url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
     languages = ["en", "fr"]
     output_dir = temp_dir / "output"
     output_dir.mkdir()
-    
+
     subtitle_paths = await youtube_service.download_subtitles(url, languages=languages, output_dir=output_dir)
-    
+
     # Verify the mock was called correctly
     mock_process_url.assert_called_once()
     config = mock_process_url.call_args[0][1]
@@ -283,7 +283,7 @@ async def test_download_thumbnail(mock_process_url, youtube_service, sample_down
     # Create test thumbnail file
     thumbnail_file = temp_dir / "thumb.jpg"
     thumbnail_file.touch()
-    
+
     # Create a modified result with our test file
     test_result = YouTubeDownloadResult(
         video_path=None,
@@ -297,14 +297,14 @@ async def test_download_thumbnail(mock_process_url, youtube_service, sample_down
         success=True
     )
     mock_process_url.return_value = test_result
-    
+
     # Call the method
     url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
     output_dir = temp_dir / "output"
     output_dir.mkdir()
-    
+
     thumbnail_path = await youtube_service.download_thumbnail(url, output_dir=output_dir)
-    
+
     # Verify the mock was called correctly
     mock_process_url.assert_called_once()
     config = mock_process_url.call_args[0][1]
@@ -319,7 +319,7 @@ async def test_cleanup_single_result(youtube_service, sample_download_result):
     with patch.object(youtube_service.processor, 'cleanup') as mock_cleanup:
         # Call the method
         youtube_service.cleanup(sample_download_result)
-        
+
         # Verify the mock was called correctly
         mock_cleanup.assert_called_once_with(sample_download_result)
 
@@ -331,7 +331,7 @@ async def test_cleanup_multiple_results(youtube_service, sample_download_result)
         # Call the method with a list of results
         results = [sample_download_result, sample_download_result]
         youtube_service.cleanup(results)
-        
+
         # Verify the mock was called correctly
         assert mock_cleanup.call_count == 2
         mock_cleanup.assert_any_call(sample_download_result)

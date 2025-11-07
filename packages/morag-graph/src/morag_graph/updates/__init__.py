@@ -5,6 +5,6 @@ from .cleanup_manager import DocumentCleanupManager, CleanupResult
 
 __all__ = [
     "DocumentChecksumManager",
-    "DocumentCleanupManager", 
+    "DocumentCleanupManager",
     "CleanupResult"
 ]

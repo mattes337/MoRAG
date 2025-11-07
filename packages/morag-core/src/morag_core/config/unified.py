@@ -12,29 +12,29 @@ T = TypeVar('T', bound=BaseModel)
 
 class ConfigMixin:
     """Mixin class that provides unified configuration loading with fallbacks."""
-    
+
     @classmethod
     def from_env_and_overrides(
-        cls: Type[T], 
+        cls: Type[T],
         overrides: Optional[Dict[str, Any]] = None,
         prefix: Optional[str] = None
     ) -> T:
         """Create configuration from environment variables with optional overrides.
-        
+
         Args:
             overrides: Dictionary of override values (from CLI/REST)
             prefix: Environment variable prefix (auto-detected if None)
-            
+
         Returns:
             Configuration instance with environment variables and overrides applied
         """
         if prefix is None:
             prefix = getattr(cls, '_env_prefix', 'MORAG_')
-        
+
         # Get field information from the model
         field_info = cls.model_fields if hasattr(cls, 'model_fields') else {}
         type_hints = get_type_hints(cls)
-        
+
         # Load from environment variables
         env_config = {}
         for field_name, field in field_info.items():
@@ -56,13 +56,13 @@ class ConfigMixin:
                     env_config[field_name] = converted_value
                 except (ValueError, TypeError) as e:
                     logger.warning(f"Invalid value for {env_var}: {env_value}", error=str(e))
-        
+
         # Apply overrides
         if overrides:
             env_config.update(overrides)
-        
+
         return cls(**env_config)
-    
+
     @staticmethod
     def _convert_env_value(value: str, target_type: Type) -> Any:
         """Convert environment variable string to target type."""
@@ -81,24 +81,24 @@ class ConfigMixin:
 
 class LLMConfig(BaseModel, ConfigMixin):
     """Unified LLM configuration with environment variable support."""
-    
+
     _env_prefix = "MORAG_LLM_"
-    
+
     # Provider and model with fallbacks
     provider: str = Field(default="gemini", description="LLM provider")
     model: str = Field(default="gemini-1.5-flash", description="LLM model")
     api_key: Optional[str] = Field(default=None, description="API key")
-    
+
     # Generation parameters
     temperature: float = Field(default=0.1, ge=0.0, le=2.0, description="LLM temperature")
     max_tokens: int = Field(default=4000, ge=1, description="Maximum tokens")
     timeout: int = Field(default=30, ge=1, description="Request timeout in seconds")
-    
+
     # Retry configuration
     max_retries: int = Field(default=5, ge=0, description="Maximum retry attempts")
     base_delay: float = Field(default=2.0, ge=0.0, description="Base retry delay")
     max_delay: float = Field(default=120.0, ge=0.0, description="Maximum retry delay")
-    
+
     @classmethod
     def from_env_and_overrides(
         cls,
@@ -211,12 +211,12 @@ class MarkdownOptimizerConfig(BaseModel, ConfigMixin):
             env_config.update(overrides)
 
         return cls(**env_config)
-    
+
     def get_llm_config(self, base_llm_config: Optional[LLMConfig] = None) -> LLMConfig:
         """Get LLM configuration with stage-specific overrides."""
         if base_llm_config is None:
             base_llm_config = LLMConfig.from_env_and_overrides()
-        
+
         # Create overrides dict with non-None values
         overrides = {}
         if self.model is not None:
@@ -229,11 +229,11 @@ class MarkdownOptimizerConfig(BaseModel, ConfigMixin):
             overrides['max_tokens'] = self.max_tokens
         if self.max_retries is not None:
             overrides['max_retries'] = self.max_retries
-        
+
         # Apply overrides to base config
         config_dict = base_llm_config.model_dump()
         config_dict.update(overrides)
-        
+
         return LLMConfig(**config_dict)
 
 
@@ -255,18 +255,18 @@ class FactGeneratorConfig(BaseModel, ConfigMixin):
 
     temperature: Optional[float] = Field(default=None, description="LLM temperature override")
     max_tokens: Optional[int] = Field(default=None, description="Max tokens override")
-    
+
     # Extraction settings
     extract_entities: bool = Field(default=True, description="Extract entities")
     extract_relations: bool = Field(default=True, description="Extract relations")
     extract_keywords: bool = Field(default=True, description="Extract keywords")
     domain: str = Field(default="general", description="Domain for extraction")
-    
+
     # Quality settings
     # min_confidence already defined above - removed duplicate
     max_entities_per_chunk: int = Field(default=20, ge=1, description="Maximum entities per chunk")
     max_relations_per_chunk: int = Field(default=15, ge=1, description="Maximum relations per chunk")
-    
+
     @classmethod
     def from_env_and_overrides(
         cls,

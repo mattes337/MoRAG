@@ -1,6 +1,5 @@
 """Tests for PDF text encoding fixes."""
 
-import pytest
 from morag_core.utils import clean_pdf_text_encoding, normalize_text_encoding
 
 
@@ -37,7 +36,7 @@ class TestPDFEncodingFix:
             ("naïve", "naïve"),  # Should handle diacritics
             ("résumé", "résumé"),  # Should preserve accents
         ]
-        
+
         for input_text, expected in test_cases:
             result = clean_pdf_text_encoding(input_text)
             assert result == expected, f"Failed for input: {input_text}"
@@ -51,7 +50,7 @@ class TestPDFEncodingFix:
             ("\ufb03", "ffi"),     # ffi ligature
             ("\ufb04", "ffl"),     # ffl ligature
         ]
-        
+
         for input_text, expected in test_cases:
             result = clean_pdf_text_encoding(input_text)
             assert result == expected, f"Failed for input: {input_text}"
@@ -64,7 +63,7 @@ class TestPDFEncodingFix:
             ("em\u2014dash", "em-dash"),       # Em dash
             ("en\u2013dash", "en-dash"),       # En dash
         ]
-        
+
         for input_text, expected in test_cases:
             result = clean_pdf_text_encoding(input_text)
             assert result == expected, f"Failed for input: {input_text}"
@@ -79,7 +78,7 @@ class TestPDFEncodingFix:
             ("\u00e2\u0080\u00a6", "..."), # â€¦ -> ...
             ("\u00e2\u0080\u0094", "-"),   # â€" -> -
         ]
-        
+
         for input_text, expected in test_cases:
             result = clean_pdf_text_encoding(input_text)
             assert result == expected, f"Failed for input: {input_text}"
@@ -106,7 +105,7 @@ class TestPDFEncodingFix:
             ("word\ufeffword", "wordword"),  # Byte order mark
             ("word\u00adword", "wordword"),  # Soft hyphen
         ]
-        
+
         for input_text, expected in test_cases:
             result = clean_pdf_text_encoding(input_text)
             assert result == expected, f"Failed for input: {input_text}"
@@ -117,7 +116,7 @@ class TestPDFEncodingFix:
         utf8_bytes = "Hello world".encode('utf-8')
         result = normalize_text_encoding(utf8_bytes)
         assert result == "Hello world"
-        
+
         # Test Latin-1 bytes
         latin1_bytes = "café".encode('latin-1')
         result = normalize_text_encoding(latin1_bytes)
@@ -150,14 +149,14 @@ class TestPDFEncodingFix:
         It contains \u201csmart quotes\u201d and em\u2014dashes.
         There are also \ufb01le names and \ufb02ow charts.
         Some text has   multiple   spaces.
-        
-        
-        
+
+
+
         And excessive newlines.
         """
-        
+
         result = clean_pdf_text_encoding(input_text)
-        
+
         # Check that issues are fixed
         assert "\u00ad" not in result
         assert "document" in result
@@ -175,15 +174,15 @@ class TestPDFEncodingFix:
     def test_clean_pdf_text_encoding_preserves_structure(self):
         """Test that cleaning preserves important text structure."""
         input_text = """# Title
-        
+
         This is a paragraph with some text.
-        
+
         ## Subtitle
-        
+
         Another paragraph here."""
-        
+
         result = clean_pdf_text_encoding(input_text)
-        
+
         # Should preserve markdown structure
         assert "# Title" in result
         assert "## Subtitle" in result

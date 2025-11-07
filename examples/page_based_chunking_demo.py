@@ -84,10 +84,10 @@ async def create_sample_document_chunks():
 async def demonstrate_page_based_chunking():
     """Demonstrate page-based chunking vs traditional chunking."""
     print("=== Page-Based Chunking Demo ===\n")
-    
+
     # Create sample document chunks
     sample_chunks = await create_sample_document_chunks()
-    
+
     # Create a sample parse result
     parse_result = DocumentParseResult(
         chunks=sample_chunks,
@@ -100,18 +100,18 @@ async def demonstrate_page_based_chunking():
         total_pages=3,
         word_count=150
     )
-    
+
     print("Original chunks (sentence/element level):")
     print(f"Total chunks: {len(parse_result.chunks)}")
     for i, chunk in enumerate(parse_result.chunks):
         print(f"  {i+1}. Page {chunk.page_number} ({chunk.chunk_type}): {chunk.text[:60]}...")
-    
+
     print("\n" + "="*60 + "\n")
-    
+
     # Apply page-based chunking
     processor = DocumentProcessor()
     page_based_result = await processor._apply_page_based_chunking(parse_result)
-    
+
     print("After page-based chunking:")
     print(f"Total chunks: {len(page_based_result.chunks)}")
     for i, chunk in enumerate(page_based_result.chunks):
@@ -120,40 +120,40 @@ async def demonstrate_page_based_chunking():
         print(f"     Type: {chunk.chunk_type}")
         print(f"     Original chunks combined: {chunk.metadata.get('original_chunks_count', 'N/A')}")
         print(f"     Content preview: {chunk.text[:100]}...")
-    
+
     print("\n" + "="*60 + "\n")
-    
+
     # Show the difference in vector points
     print("Vector Database Impact:")
     print(f"  Before: {len(parse_result.chunks)} vector points")
     print(f"  After:  {len(page_based_result.chunks)} vector points")
     reduction = (len(parse_result.chunks) - len(page_based_result.chunks)) / len(parse_result.chunks) * 100
     print(f"  Reduction: {reduction:.1f}%")
-    
+
     return page_based_result
 
 
 async def demonstrate_chunking_strategies():
     """Demonstrate different chunking strategies."""
     print("\n=== Chunking Strategy Comparison ===\n")
-    
+
     sample_text = """
-    Machine learning is a powerful technology that has revolutionized many industries. 
+    Machine learning is a powerful technology that has revolutionized many industries.
     It enables computers to learn patterns from data without explicit programming.
-    
-    There are several types of machine learning algorithms. Supervised learning uses 
-    labeled data to train models. Unsupervised learning finds hidden patterns in 
+
+    There are several types of machine learning algorithms. Supervised learning uses
+    labeled data to train models. Unsupervised learning finds hidden patterns in
     unlabeled data. Reinforcement learning learns through trial and error.
-    
-    Applications of machine learning are vast and growing. They include image 
-    recognition, natural language processing, recommendation systems, and autonomous 
+
+    Applications of machine learning are vast and growing. They include image
+    recognition, natural language processing, recommendation systems, and autonomous
     vehicles. The future of AI depends heavily on advances in machine learning.
     """
-    
+
     chunker = SemanticChunker()
-    
+
     strategies = ["page", "semantic", "sentence", "paragraph", "simple"]
-    
+
     for strategy in strategies:
         print(f"\n{strategy.upper()} Chunking:")
         try:
@@ -169,13 +169,13 @@ async def main():
     """Main demo function."""
     print("MoRAG Page-Based Chunking Demonstration")
     print("=" * 50)
-    
+
     # Demonstrate page-based chunking
     await demonstrate_page_based_chunking()
-    
+
     # Demonstrate different chunking strategies
     await demonstrate_chunking_strategies()
-    
+
     print("\n" + "="*60)
     print("Demo completed!")
     print("\nKey Benefits of Page-Based Chunking:")

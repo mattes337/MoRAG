@@ -9,7 +9,7 @@ from ..models.fact import Fact, FactType
 
 class FactValidator:
     """Validate quality and completeness of extracted facts."""
-    
+
     def __init__(self,
                  min_confidence: float = 0.3,
                  allow_vague_language: bool = True,
@@ -31,21 +31,21 @@ class FactValidator:
         self.min_fact_length = min_fact_length
         self.strict_validation = strict_validation
         self.logger = structlog.get_logger(__name__)
-        
+
         # Generic words that indicate low specificity
         self.generic_subjects = {
-            'it', 'this', 'that', 'they', 'these', 'those', 'something', 
+            'it', 'this', 'that', 'they', 'these', 'those', 'something',
             'anything', 'everything', 'nothing', 'someone', 'anyone',
             'everyone', 'thing', 'stuff', 'item', 'element', 'aspect'
         }
-        
+
         # Words that indicate meta-commentary rather than facts
         self.meta_indicators = {
             'document', 'text', 'paper', 'article', 'chapter', 'section',
             'paragraph', 'sentence', 'author', 'writer', 'researcher',
             'study shows', 'research indicates', 'paper discusses'
         }
-    
+
     def validate_fact(self, fact: Fact) -> Tuple[bool, List[str]]:
         """Validate a fact and return validation result with issues.
 
@@ -113,7 +113,7 @@ class FactValidator:
             )
 
         return is_valid, issues
-    
+
     def _check_completeness(self, fact: Fact) -> List[str]:
         """Check if fact has required components.
 
@@ -137,7 +137,7 @@ class FactValidator:
             issues.append("No primary entities identified in structured metadata")
 
         return issues
-    
+
     def _check_specificity(self, fact: Fact) -> List[str]:
         """Check if fact is specific enough to be useful.
 
@@ -155,25 +155,25 @@ class FactValidator:
             entity_words = set(entity_lower.split())
             if entity_words.intersection(self.generic_subjects):
                 issues.append(f"Generic entity: '{entity}'")
-        
+
         # Check for overly vague language
         vague_patterns = [
             r'\b(some|many|several|various|different|certain)\b',
             r'\b(generally|usually|often|sometimes|typically)\b',
             r'\b(might|could|may|possibly|potentially)\b'
         ]
-        
+
         fact_text = fact.fact_text
-        
+
         for pattern in vague_patterns:
             if re.search(pattern, fact_text.lower()):
                 issues.append(f"Contains vague language: {pattern}")
                 break  # Only report one vague language issue
-        
+
         # Check for sufficient detail
         if len(fact_text) < 20:
             issues.append("Fact too brief - lacks sufficient detail")
-        
+
         return issues
 
     def _check_specificity_enhanced(self, fact: Fact) -> Tuple[List[str], bool]:
@@ -218,15 +218,15 @@ class FactValidator:
 
     def _check_actionability(self, fact: Fact) -> List[str]:
         """Check if fact provides actionable information.
-        
+
         Args:
             fact: Fact to check
-            
+
         Returns:
             List of actionability issues
         """
         issues = []
-        
+
         # Check for actionable verbs or concrete information
         actionable_indicators = [
             # Process verbs
@@ -265,7 +265,7 @@ class FactValidator:
             'abends', 'vor', 'nach', 'mahlzeiten', 'verbessert', 'unterstützt',
             'hilft', 'reduziert', 'erhöht', 'stärkt', 'beruhigt', 'lindert'
         ]
-        
+
         # Use fact_text for checking
         fact_text_lower = fact.fact_text.lower()
 
@@ -281,57 +281,57 @@ class FactValidator:
                 issues.append("Fact too brief and lacks actionable content")
 
         return issues
-    
+
     def _check_meta_commentary(self, fact: Fact) -> List[str]:
         """Check for meta-commentary about the document itself.
-        
+
         Args:
             fact: Fact to check
-            
+
         Returns:
             List of meta-commentary issues
         """
         issues = []
-        
+
         fact_text_lower = fact.fact_text.lower()
-        
+
         for meta_indicator in self.meta_indicators:
             if meta_indicator in fact_text_lower:
                 issues.append(f"Contains meta-commentary: '{meta_indicator}'")
                 break  # Only report one meta-commentary issue
-        
+
         return issues
-    
+
     def _check_fact_type(self, fact: Fact) -> List[str]:
         """Check if fact type is valid.
-        
+
         Args:
             fact: Fact to check
-            
+
         Returns:
             List of fact type issues
         """
         issues = []
-        
+
         valid_types = FactType.all_types()
         if fact.fact_type not in valid_types:
             issues.append(f"Invalid fact type: '{fact.fact_type}'. Valid types: {valid_types}")
-        
+
         return issues
-    
+
     def validate_facts_batch(self, facts: List[Fact]) -> Dict[str, Any]:
         """Validate a batch of facts and return summary statistics.
-        
+
         Args:
             facts: List of facts to validate
-            
+
         Returns:
             Dictionary with validation statistics
         """
         valid_facts = []
         invalid_facts = []
         all_issues = []
-        
+
         for fact in facts:
             is_valid, issues = self.validate_fact(fact)
             if is_valid:
@@ -339,13 +339,13 @@ class FactValidator:
             else:
                 invalid_facts.append((fact, issues))
                 all_issues.extend(issues)
-        
+
         # Count issue types
         issue_counts = {}
         for issue in all_issues:
             issue_type = issue.split(':')[0] if ':' in issue else issue
             issue_counts[issue_type] = issue_counts.get(issue_type, 0) + 1
-        
+
         return {
             'total_facts': len(facts),
             'valid_facts': len(valid_facts),
@@ -356,23 +356,23 @@ class FactValidator:
             'issue_counts': issue_counts,
             'most_common_issues': sorted(issue_counts.items(), key=lambda x: x[1], reverse=True)[:5]
         }
-    
+
     def get_quality_score(self, fact: Fact) -> float:
         """Calculate a quality score for a fact.
-        
+
         Args:
             fact: Fact to score
-            
+
         Returns:
             Quality score between 0.0 and 1.0
         """
         is_valid, issues = self.validate_fact(fact)
-        
+
         if not is_valid:
             # Penalize based on number and severity of issues
             penalty = min(0.8, len(issues) * 0.2)
             return max(0.0, fact.extraction_confidence - penalty)
-        
+
         # Bonus for completeness based on new model structure
         completeness_bonus = 0.0
         if fact.structured_metadata.primary_entities:
@@ -383,5 +383,5 @@ class FactValidator:
             completeness_bonus += 0.05
         if fact.keywords:
             completeness_bonus += 0.05
-        
+
         return min(1.0, fact.extraction_confidence + completeness_bonus)

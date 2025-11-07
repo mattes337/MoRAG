@@ -15,21 +15,21 @@ def test_external_service_error_re_raising():
     """Test that ExternalServiceError is properly re-raised in Celery tasks."""
     print("\n🔧 Testing ExternalServiceError Re-raising in Celery Tasks")
     print("=" * 60)
-    
+
     try:
         from morag.ingest_tasks import ingest_file_task
         from morag_core.exceptions import ExternalServiceError
-        
+
         # Create a mock Celery task instance
         mock_task = MagicMock()
         mock_task.request.id = "test-task-123"
         mock_task.update_state = MagicMock()
-        
+
         # Test the error handling logic directly
         def simulate_task_error_handling(original_exception):
             """Simulate the error handling logic from ingest_tasks.py."""
             e = original_exception
-            
+
             # This is the exact logic from the fixed ingest_tasks.py
             if hasattr(e, 'service') and hasattr(type(e), '__init__'):
                 # For ExternalServiceError and similar exceptions that need service parameter
@@ -45,11 +45,11 @@ def test_external_service_error_re_raising():
                 except:
                     # Fallback to generic exception if reconstruction fails
                     raise Exception(str(e))
-        
+
         # Test 1: ExternalServiceError with service parameter
         print("🔍 Testing ExternalServiceError re-raising...")
         original_error = ExternalServiceError("Rate limit exceeded", "gemini")
-        
+
         try:
             simulate_task_error_handling(original_error)
             print("❌ Should have raised an exception")
@@ -63,16 +63,16 @@ def test_external_service_error_re_raising():
         except Exception as e:
             print(f"✅ ExternalServiceError fallback to generic Exception: {type(e).__name__}")
             # This is acceptable as a fallback
-        
+
         # Test 2: Verify the original error scenario is fixed
         print("🔍 Testing original error scenario (rate limit with embedding)...")
-        
+
         # Simulate the exact error from the logs
         rate_limit_error = ExternalServiceError(
             "Embedding generation failed: Rate limit exceeded after 3 retries: 429 RESOURCE_EXHAUSTED",
             "gemini"
         )
-        
+
         try:
             simulate_task_error_handling(rate_limit_error)
             print("❌ Should have raised an exception")
@@ -86,10 +86,10 @@ def test_external_service_error_re_raising():
         except Exception as e:
             print(f"✅ Rate limit error fallback to generic Exception: {type(e).__name__}")
             # This is acceptable as a fallback
-        
+
         # Test 3: Test with other exception types to ensure they still work
         print("🔍 Testing other exception types...")
-        
+
         try:
             simulate_task_error_handling(ValueError("Invalid input"))
             print("❌ Should have raised an exception")
@@ -98,10 +98,10 @@ def test_external_service_error_re_raising():
             print("✅ ValueError properly re-raised")
         except Exception as e:
             print(f"✅ ValueError fallback to generic Exception: {type(e).__name__}")
-        
+
         print("✅ All exception re-raising tests passed!")
         return True
-        
+
     except ImportError as e:
         print(f"❌ Failed to import required modules: {e}")
         return False
@@ -260,26 +260,26 @@ def main():
     print("=" * 60)
     print("Testing ExternalServiceError re-raising fixes in Celery tasks...")
     print()
-    
+
     tests = [
         test_external_service_error_re_raising,
         test_celery_task_error_context,
         test_indefinite_retry_configuration,
         test_retry_delay_calculation,
     ]
-    
+
     passed = 0
     total = len(tests)
-    
+
     for test in tests:
         try:
             if test():
                 passed += 1
         except Exception as e:
             print(f"❌ Test {test.__name__} failed with exception: {e}")
-    
+
     print(f"\n📊 Test Results: {passed}/{total} tests passed")
-    
+
     if passed == total:
         print("🎉 All Celery exception handling fixes working correctly!")
         return True

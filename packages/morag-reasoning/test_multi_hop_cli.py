@@ -6,10 +6,10 @@ of the MoRAG system, including path selection and iterative context refinement.
 
 Usage:
     python test_multi_hop_cli.py "How are Apple's AI research efforts related to their partnership with universities?"
-    
+
 Or with specific parameters:
     python test_multi_hop_cli.py "query" --strategy bidirectional --max-paths 20 --verbose
-    
+
 Options:
     --strategy       Reasoning strategy (forward_chaining, backward_chaining, bidirectional)
     --max-paths      Maximum number of paths to discover (default: 50)
@@ -46,7 +46,7 @@ logging.basicConfig(
 
 try:
     from morag_reasoning import (
-        LLMClient, LLMConfig, PathSelectionAgent, ReasoningPathFinder, 
+        LLMClient, LLMConfig, PathSelectionAgent, ReasoningPathFinder,
         IterativeRetriever, RetrievalContext
     )
     from morag_reasoning.llm import LLMClient
@@ -61,20 +61,20 @@ def check_dependencies() -> bool:
     """Check if required dependencies are installed."""
     required_packages = {
         "google-generativeai": "google.generativeai",
-        "httpx": "httpx", 
+        "httpx": "httpx",
         "pydantic": "pydantic",
         "python-dotenv": "dotenv",
         "aiofiles": "aiofiles"
     }
-    
+
     missing_packages = []
-    
+
     for package_name, import_name in required_packages.items():
         try:
             __import__(import_name)
         except ImportError:
             missing_packages.append(package_name)
-    
+
     if missing_packages:
         print("❌ Missing required packages:")
         for package in missing_packages:
@@ -82,7 +82,7 @@ def check_dependencies() -> bool:
         print("\n💡 Install missing packages with:")
         print(f"   pip install {' '.join(missing_packages)}")
         return False
-    
+
     return True
 
 
@@ -91,15 +91,15 @@ def setup_environment(api_key: Optional[str] = None) -> bool:
     # Check API key
     if not api_key:
         api_key = os.getenv("GEMINI_API_KEY")
-    
+
     if not api_key:
         print("❌ Gemini API key is required for multi-hop reasoning.")
         print("   Set it via --api-key argument or GEMINI_API_KEY environment variable.")
         return False
-    
+
     # Set environment variable
     os.environ["GEMINI_API_KEY"] = api_key
-    
+
     return True
 
 
@@ -149,7 +149,7 @@ class MockGraphEngine:
                 {"subject": "Stanford University", "predicate": "collaborates_on", "object": "AI research"},
                 {"subject": "AI research", "predicate": "influences", "object": "product development"}
             ]
-    
+
     def _get_entity_type(self, entity_name: str) -> str:
         """Get the correct entity type for an entity name."""
         entity_data = self.entities.get(entity_name, {})
@@ -158,7 +158,7 @@ class MockGraphEngine:
     async def get_entity_details(self, entity_name: str) -> Optional[Dict[str, Any]]:
         """Get entity details."""
         return self.entities.get(entity_name)
-    
+
     async def find_neighbors(self, entity_name: str, max_distance: int = 2) -> List[Dict[str, Any]]:
         """Find neighboring entities."""
         neighbors = []
@@ -180,7 +180,7 @@ class MockGraphEngine:
                         "relation": f"inverse_{relation['predicate']}"
                     })
         return neighbors[:5]  # Limit results
-    
+
     async def find_shortest_path(self, start: str, end: str):
         """Find shortest path between entities."""
         # Simple mock implementation
@@ -206,25 +206,25 @@ class MockGraphEngine:
                 relations=[connection_rel]
             )
         return None
-    
+
     async def traverse(self, start_entity: str, algorithm: str = "bfs", max_depth: int = 3):
         """Traverse the graph from a starting entity."""
         from morag_graph.operations import GraphPath
-        
+
         paths = []
         visited = set()
-        
+
         # Simple BFS traversal simulation
         queue = [(start_entity, [start_entity], [])]
-        
+
         while queue and len(paths) < 10:  # Limit paths
             current, path, relations = queue.pop(0)
-            
+
             if current in visited or len(path) > max_depth:
                 continue
-                
+
             visited.add(current)
-            
+
             # Add current path if it has more than one entity
             if len(path) > 1:
                 # Create Entity and Relation objects for GraphPath
@@ -255,7 +255,7 @@ class MockGraphEngine:
                     relations=path_relations
                 )
                 paths.append(graph_path)
-            
+
             # Find neighbors and add to queue
             neighbors = await self.find_neighbors(current, 1)
             for neighbor in neighbors:
@@ -323,7 +323,7 @@ async def test_multi_hop_reasoning(
     verbose: bool = False
 ) -> Dict[str, Any]:
     """Test multi-hop reasoning with the given query."""
-    
+
     if verbose:
         print(f"🧠 Testing multi-hop reasoning")
         print(f"📝 Query: {query}")
@@ -332,7 +332,7 @@ async def test_multi_hop_reasoning(
         print(f"📊 Max paths: {max_paths}")
         print(f"🔁 Max iterations: {max_iterations}")
         print("=" * 60)
-    
+
     # Configure LLM
     llm_config = LLMConfig(
         provider="gemini",
@@ -341,7 +341,7 @@ async def test_multi_hop_reasoning(
         temperature=0.1,
         max_tokens=1000
     )
-    
+
     # Initialize components with query context
     llm_client = LLMClient(llm_config)
     graph_engine = MockGraphEngine(query)
@@ -353,7 +353,7 @@ async def test_multi_hop_reasoning(
         llm_client, graph_engine, vector_retriever,
         max_iterations=max_iterations
     )
-    
+
     results = {
         "query": query,
         "model": model,
@@ -363,14 +363,14 @@ async def test_multi_hop_reasoning(
         "performance": {},
         "success": False
     }
-    
+
     try:
         # Step 1: Find reasoning paths
         if verbose:
             print("🔍 Step 1: Finding reasoning paths...")
-        
+
         start_time = time.time()
-        
+
         # Extract potential start entities from query (simple keyword matching)
         start_entities = []
 
@@ -388,21 +388,21 @@ async def test_multi_hop_reasoning(
                     start_entities.append(entity)
             if not start_entities:
                 start_entities = ["Apple Inc.", "AI research"]
-        
+
         reasoning_paths = await path_finder.find_reasoning_paths(
             query=query,
             start_entities=start_entities,
             strategy=strategy,
             max_paths=max_paths
         )
-        
+
         path_finding_time = time.time() - start_time
-        
+
         if verbose:
             print(f"✅ Found {len(reasoning_paths)} reasoning paths in {path_finding_time:.2f}s")
             for i, path_score in enumerate(reasoning_paths[:3]):  # Show top 3
                 print(f"   Path {i+1}: Score {path_score.relevance_score:.2f} - {path_score.reasoning}")
-        
+
         results["reasoning_paths"] = [
             {
                 "entities": [e.name if hasattr(e, 'name') else str(e) for e in path_score.path.entities],
@@ -413,34 +413,34 @@ async def test_multi_hop_reasoning(
             }
             for path_score in reasoning_paths
         ]
-        
+
         # Step 2: Create initial context and refine iteratively
         if verbose:
             print("\n🔄 Step 2: Iterative context refinement...")
-        
+
         start_time = time.time()
-        
+
         # Create initial context from top paths
         initial_context = RetrievalContext(
             entities={entity: {"type": "UNKNOWN"} for path in reasoning_paths[:3] for entity in path.path.entities},
             paths=[path_score.path for path_score in reasoning_paths[:5]]
         )
-        
+
         refined_context = await iterative_retriever.refine_context(query, initial_context)
-        
+
         refinement_time = time.time() - start_time
-        
+
         if verbose:
             print(f"✅ Context refinement completed in {refinement_time:.2f}s")
             print(f"   Iterations used: {refined_context.metadata.get('iterations_used', 0)}")
             print(f"   Final entities: {len(refined_context.entities)}")
             print(f"   Final documents: {len(refined_context.documents)}")
-            
+
             final_analysis = refined_context.metadata.get('final_analysis')
             if final_analysis:
                 print(f"   Final confidence: {final_analysis.confidence:.2f}")
                 print(f"   Context sufficient: {final_analysis.is_sufficient}")
-        
+
         final_analysis = refined_context.metadata.get('final_analysis')
         results["refined_context"] = {
             "entity_count": len(refined_context.entities),
@@ -452,7 +452,7 @@ async def test_multi_hop_reasoning(
                 "confidence": final_analysis.confidence if final_analysis else 0.0
             } if final_analysis else None
         }
-        
+
         results["performance"] = {
             "path_finding_time": path_finding_time,
             "refinement_time": refinement_time,
@@ -472,19 +472,19 @@ async def test_multi_hop_reasoning(
             print(f"   Has context: {has_context} ({len(refined_context.entities)} entities, {len(refined_context.documents)} docs)")
             print(f"   Reasonable confidence: {reasonable_confidence} ({final_analysis.confidence:.2f} if final_analysis else 0.0)")
             print(f"   Overall success: {results['success']}")
-        
+
         if verbose:
             print("\n" + "=" * 60)
             print("✅ Multi-hop reasoning test completed successfully!")
             print(f"📊 Total time: {results['performance']['total_time']:.2f}s")
-        
+
     except Exception as e:
         print(f"❌ Error during multi-hop reasoning: {e}")
         if verbose:
             import traceback
             traceback.print_exc()
         results["error"] = str(e)
-    
+
     return results
 
 
@@ -493,12 +493,12 @@ def save_results(results: Dict[str, Any], output_file: Path, verbose: bool = Fal
     try:
         with open(output_file, 'w', encoding='utf-8') as f:
             json.dump(results, f, indent=2, ensure_ascii=False)
-        
+
         if verbose:
             print(f"💾 Results saved to: {output_file}")
-        
+
         return True
-    
+
     except Exception as e:
         print(f"❌ Error saving results to {output_file}: {e}")
         return False
@@ -515,19 +515,19 @@ async def main():
   python test_multi_hop_cli.py "How does AI research influence product development?" --verbose --output results.json
 """
     )
-    
+
     parser.add_argument(
         "query",
         type=str,
         help="Multi-hop reasoning query to test"
     )
-    
+
     parser.add_argument(
         "--api-key",
         type=str,
         help="Gemini API key (can also be set via GEMINI_API_KEY environment variable)"
     )
-    
+
     parser.add_argument(
         "--strategy",
         type=str,
@@ -535,42 +535,42 @@ async def main():
         default="forward_chaining",
         help="Reasoning strategy to use (default: forward_chaining)"
     )
-    
+
     parser.add_argument(
         "--max-paths",
         type=int,
         default=50,
         help="Maximum number of paths to discover (default: 50)"
     )
-    
+
     parser.add_argument(
         "--max-iterations",
         type=int,
         default=5,
         help="Maximum context refinement iterations (default: 5)"
     )
-    
+
     parser.add_argument(
         "--model",
         type=str,
         default="gemini-1.5-flash",
         help="LLM model to use (default: gemini-1.5-flash)"
     )
-    
+
     parser.add_argument(
         "--verbose",
         action="store_true",
         help="Show detailed reasoning output"
     )
-    
+
     parser.add_argument(
         "--output",
         type=str,
         help="Save results to JSON file"
     )
-    
+
     args = parser.parse_args()
-    
+
     print("🧠 MoRAG Multi-Hop Reasoning Test")
     print("=" * 60)
 
@@ -589,7 +589,7 @@ async def main():
     # Setup environment
     if not setup_environment(args.api_key):
         return 1
-    
+
     try:
         # Run multi-hop reasoning test
         results = await test_multi_hop_reasoning(
@@ -601,11 +601,11 @@ async def main():
             max_iterations=args.max_iterations,
             verbose=args.verbose
         )
-        
+
         if not results.get("success", False):
             print("❌ Multi-hop reasoning test failed")
             return 1
-        
+
         # Save results if requested
         if args.output:
             output_file = Path(args.output)
@@ -613,10 +613,10 @@ async def main():
                 print(f"📁 Results saved to: {output_file}")
             else:
                 return 1
-        
+
         print("✅ Multi-hop reasoning test completed successfully!")
         return 0
-        
+
     except KeyboardInterrupt:
         print("\n⏹️  Test interrupted by user")
         return 1

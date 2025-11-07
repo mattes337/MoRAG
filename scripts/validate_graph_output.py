@@ -19,16 +19,16 @@ def validate_entity(entity: Dict[str, Any], index: int) -> List[str]:
     """Validate a single entity object."""
     errors = []
     required_fields = ['id', 'name', 'type', 'confidence', 'source_doc_id']
-    
+
     for field in required_fields:
         if field not in entity:
             errors.append(f"Entity {index}: Missing required field '{field}'")
-    
+
     if 'confidence' in entity:
         confidence = entity['confidence']
         if not isinstance(confidence, (int, float)) or not (0.0 <= confidence <= 1.0):
             errors.append(f"Entity {index}: Invalid confidence value {confidence} (must be 0.0-1.0)")
-    
+
     return errors
 
 
@@ -36,38 +36,38 @@ def validate_relation(relation: Dict[str, Any], index: int) -> List[str]:
     """Validate a single relation object."""
     errors = []
     required_fields = ['id', 'source_entity_id', 'target_entity_id', 'relation_type', 'confidence', 'source_doc_id']
-    
+
     for field in required_fields:
         if field not in relation:
             errors.append(f"Relation {index}: Missing required field '{field}'")
-    
+
     if 'confidence' in relation:
         confidence = relation['confidence']
         if not isinstance(confidence, (int, float)) or not (0.0 <= confidence <= 1.0):
             errors.append(f"Relation {index}: Invalid confidence value {confidence} (must be 0.0-1.0)")
-    
+
     return errors
 
 
 def validate_graph_output(data: Dict[str, Any]) -> List[str]:
     """Validate the complete graph output structure."""
     errors = []
-    
+
     # Check top-level structure
     required_top_level = ['input_file', 'content_length', 'extraction_results', 'analysis']
     for field in required_top_level:
         if field not in data:
             errors.append(f"Missing top-level field '{field}'")
-    
+
     # Check extraction_results structure
     if 'extraction_results' in data:
         extraction_results = data['extraction_results']
         required_extraction = ['entities', 'relations', 'metadata']
-        
+
         for field in required_extraction:
             if field not in extraction_results:
                 errors.append(f"Missing extraction_results field '{field}'")
-        
+
         # Validate entities
         if 'entities' in extraction_results:
             entities = extraction_results['entities']
@@ -76,7 +76,7 @@ def validate_graph_output(data: Dict[str, Any]) -> List[str]:
             else:
                 for i, entity in enumerate(entities):
                     errors.extend(validate_entity(entity, i))
-        
+
         # Validate relations
         if 'relations' in extraction_results:
             relations = extraction_results['relations']
@@ -85,27 +85,27 @@ def validate_graph_output(data: Dict[str, Any]) -> List[str]:
             else:
                 for i, relation in enumerate(relations):
                     errors.extend(validate_relation(relation, i))
-    
+
     # Check analysis structure
     if 'analysis' in data:
         analysis = data['analysis']
         required_analysis = ['entity_count', 'relation_count', 'entity_types', 'relation_types']
-        
+
         for field in required_analysis:
             if field not in analysis:
                 errors.append(f"Missing analysis field '{field}'")
-        
+
         # Validate counts match actual data
         if 'extraction_results' in data and 'entities' in data['extraction_results']:
             actual_entity_count = len(data['extraction_results']['entities'])
             if analysis.get('entity_count') != actual_entity_count:
                 errors.append(f"Entity count mismatch: analysis says {analysis.get('entity_count')}, actual is {actual_entity_count}")
-        
+
         if 'extraction_results' in data and 'relations' in data['extraction_results']:
             actual_relation_count = len(data['extraction_results']['relations'])
             if analysis.get('relation_count') != actual_relation_count:
                 errors.append(f"Relation count mismatch: analysis says {analysis.get('relation_count')}, actual is {actual_relation_count}")
-    
+
     return errors
 
 
@@ -114,13 +114,13 @@ def main():
     if len(sys.argv) != 2:
         print("Usage: python scripts/validate_graph_output.py output.json")
         sys.exit(1)
-    
+
     output_file = Path(sys.argv[1])
-    
+
     if not output_file.exists():
         print(f"[ERROR] File not found: {output_file}")
         sys.exit(1)
-    
+
     try:
         with open(output_file, 'r', encoding='utf-8') as f:
             data = json.load(f)
@@ -130,10 +130,10 @@ def main():
     except Exception as e:
         print(f"[ERROR] Error reading file {output_file}: {e}")
         sys.exit(1)
-    
+
     # Validate the structure
     errors = validate_graph_output(data)
-    
+
     if errors:
         print(f"[ERROR] Validation failed for {output_file}:")
         for error in errors:
@@ -149,7 +149,7 @@ def main():
         print(f"   - Relations: {analysis.get('relation_count', 0)}")
         print(f"   - Entity types: {list(analysis.get('entity_types', {}).keys())}")
         print(f"   - Relation types: {list(analysis.get('relation_types', {}).keys())}")
-        
+
         if 'confidence_stats' in analysis:
             conf_stats = analysis['confidence_stats']
             if 'entity_confidence' in conf_stats:

@@ -27,7 +27,7 @@ words_to_remove = [
 **Impact**: Entity names like "University of California" become "University California", causing matching failures.
 
 ### 2. Entity Type Assignment Problems
-**Files**: 
+**Files**:
 - `packages/morag-graph/src/morag_graph/models/entity.py`
 - `packages/morag-graph/src/morag_graph/storage/neo4j_operations/entity_operations.py`
 

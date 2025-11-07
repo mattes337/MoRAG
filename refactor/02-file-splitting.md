@@ -1,6 +1,6 @@
 # MoRAG Refactoring Task 2: File Splitting Strategy
 
-## Priority: HIGH  
+## Priority: HIGH
 ## Estimated Time: 8-12 hours
 ## Impact: Major maintainability improvement
 
@@ -10,7 +10,7 @@ This task addresses the 9 files exceeding 1000 lines by splitting them into focu
 ## Critical Files Requiring Immediate Splitting
 
 ### 1. `ingestion_coordinator.py` (2958 lines) - CRITICAL
-**Current Issues**: 
+**Current Issues**:
 - Massive coordinator class handling database detection, embedding, metadata, initialization, and writing
 - Multiple responsibilities violating SRP
 - Difficult to test and maintain
@@ -24,14 +24,14 @@ ingestion_coordinator.py (2958) → Split into 4 files:
    - Interface definitions
    - High-level orchestration
 
-2. database_handler.py (800 lines)  
+2. database_handler.py (800 lines)
    - Database detection and configuration
    - Collection/database initialization
    - Connection management
 
 3. result_processor.py (700 lines)
    - Embedding generation
-   - Metadata processing  
+   - Metadata processing
    - Result file creation
 
 4. data_writer.py (600 lines)
@@ -47,12 +47,12 @@ packages/morag/src/morag/ingestion/
 ├── __init__.py
 ├── coordinator.py          # Main orchestrator (400 lines)
 ├── database_handler.py     # DB operations (800 lines)
-├── result_processor.py     # Result processing (700 lines) 
+├── result_processor.py     # Result processing (700 lines)
 └── data_writer.py         # Data writing (600 lines)
 
 # 2. Extract classes
 class IngestionCoordinator:      # coordinator.py
-class DatabaseHandler:           # database_handler.py  
+class DatabaseHandler:           # database_handler.py
 class ResultProcessor:           # result_processor.py
 class DataWriter:                # data_writer.py
 ```
@@ -103,7 +103,7 @@ markitdown_base.py (1149) → Split into 2 files:
    - Format handlers
 ```
 
-### 4. `services.py` (1144 lines) - HIGH 
+### 4. `services.py` (1144 lines) - HIGH
 **Current Issues**:
 - Multiple service types in single file
 - Mixed embedding, storage, and processing services
@@ -118,7 +118,7 @@ services.py (1144) → Split into 3 files:
    - Embedding utilities
 
 2. storage_services.py (400 lines)
-   - QdrantVectorStorage 
+   - QdrantVectorStorage
    - Storage operations
    - Connection management
 
@@ -154,8 +154,8 @@ webdav-processor.py → Split into:
 3. webdav_client.py (300 lines) - WebDAV operations
 ```
 
-### 7. `fact_graph_builder.py` (1042 lines) 
-```  
+### 7. `fact_graph_builder.py` (1042 lines)
+```
 fact_graph_builder.py → Split into:
 1. graph_builder_interface.py (200 lines) - Interface
 2. fact_graph_operations.py (600 lines) - Core operations
@@ -174,7 +174,7 @@ stages.py → Split into:
 ```
 qdrant_storage.py → Split into:
 1. qdrant_client.py (300 lines) - Connection and client
-2. qdrant_operations.py (500 lines) - CRUD operations  
+2. qdrant_operations.py (500 lines) - CRUD operations
 3. qdrant_utilities.py (200 lines) - Helper functions
 ```
 
@@ -222,7 +222,7 @@ class IngestionCoordinator:
     def __init__(
         self,
         database_handler: DatabaseHandler,
-        result_processor: ResultProcessor, 
+        result_processor: ResultProcessor,
         data_writer: DataWriter
     ):
         self._db_handler = database_handler
@@ -240,7 +240,7 @@ tests/unit/test_<module_name>.py
 
 # Example:
 tests/unit/ingestion/test_coordinator.py
-tests/unit/ingestion/test_database_handler.py  
+tests/unit/ingestion/test_database_handler.py
 tests/unit/ingestion/test_result_processor.py
 tests/unit/ingestion/test_data_writer.py
 ```
@@ -257,7 +257,7 @@ tests/integration/test_markdown_conversion_pipeline.py
 ### Phase 1: Critical Files (6 hours)
 **Order of execution**:
 1. `ingestion_coordinator.py` → 4 files (2 hours)
-2. `markitdown_base.py` → 2 files (1 hour)  
+2. `markitdown_base.py` → 2 files (1 hour)
 3. `services.py` → 3 files (1.5 hours)
 4. Unit tests for split files (1.5 hours)
 
@@ -274,7 +274,7 @@ tests/integration/test_markdown_conversion_pipeline.py
 
 ### File Size Targets
 - [ ] No files >1000 lines
-- [ ] Target: All files ≤500 lines  
+- [ ] Target: All files ≤500 lines
 - [ ] Average file size: 200-400 lines
 
 ### Code Quality
@@ -340,7 +340,7 @@ pytest tests/ -x -v
 ## Dependencies for Next Tasks
 This task creates the foundation for:
 - **03-deduplication.md**: Smaller files easier to deduplicate
-- **04-dependency-cleanup.md**: Clear module boundaries for dependency analysis  
+- **04-dependency-cleanup.md**: Clear module boundaries for dependency analysis
 - **05-testing-strategy.md**: Focused test creation for split components
 
 ## Documentation Updates Required

@@ -90,27 +90,27 @@ async def test_neo4j_connection(args) -> Optional[Neo4jStorage]:
     """Test Neo4j database connection."""
     if not args.neo4j:
         return None
-        
+
     print_section("Testing Neo4j Connection")
-    
+
     try:
         storage = get_default_neo4j_storage()
         if not storage:
             print("[FAIL] Failed to create Neo4j storage from environment")
             return None
-            
+
         await storage.connect()
-        
+
         # Test basic query
         result = await storage._execute_query("RETURN 1 as test")
         if result and result[0].get("test") == 1:
             print("[OK] Neo4j connection successful")
-            
+
             # Get database stats
             stats_query = """
-            MATCH (n) 
-            RETURN labels(n) as labels, count(n) as count 
-            ORDER BY count DESC 
+            MATCH (n)
+            RETURN labels(n) as labels, count(n) as count
+            ORDER BY count DESC
             LIMIT 10
             """
             stats = await storage._execute_query(stats_query)
@@ -119,12 +119,12 @@ async def test_neo4j_connection(args) -> Optional[Neo4jStorage]:
                 labels = stat.get("labels", ["Unknown"])
                 count = stat.get("count", 0)
                 print(f"   {':'.join(labels)}: {count} nodes")
-                
+
             return storage
         else:
             print("[FAIL] Neo4j connection test failed")
             return None
-            
+
     except Exception as e:
         print(f"[FAIL] Neo4j connection error: {e}")
         return None
@@ -134,38 +134,38 @@ async def test_qdrant_connection(args) -> Optional[QdrantStorage]:
     """Test Qdrant database connection."""
     if not args.qdrant:
         return None
-        
+
     print_section("Testing Qdrant Connection")
-    
+
     try:
         storage = get_default_qdrant_storage()
         if not storage:
             print("[FAIL] Failed to create Qdrant storage from environment")
             return None
-            
+
         await storage.connect()
-        
+
         # Get collection info
         info = await storage.get_collection_info()
         print("[OK] Qdrant connection successful")
         print(f"📊 Collection '{info['collection_name']}' contains {info['total_points']} points")
         print(f"   Vector size: {info['vector_size']}")
         print(f"   Host: {info['host']}:{info['port']}")
-        
+
         return storage
-        
+
     except Exception as e:
         print(f"[FAIL] Qdrant connection error: {e}")
         return None
 
 
-async def test_simple_query(query: str, neo4j_storage: Optional[Neo4jStorage], 
+async def test_simple_query(query: str, neo4j_storage: Optional[Neo4jStorage],
                           qdrant_storage: Optional[QdrantStorage], args):
     """Test simple query against available databases."""
     print_section(f"Simple Query: '{query}'")
-    
+
     results = {}
-    
+
     # Test Neo4j entity search
     if neo4j_storage and args.neo4j:
         try:
@@ -183,7 +183,7 @@ async def test_simple_query(query: str, neo4j_storage: Optional[Neo4jStorage],
             print(f"   Found {len(entities)} entities")
         except Exception as e:
             print(f"   [FAIL] Neo4j entity search failed: {e}")
-    
+
     # Test Qdrant vector search
     if qdrant_storage and args.qdrant:
         try:
@@ -201,7 +201,7 @@ async def test_simple_query(query: str, neo4j_storage: Optional[Neo4jStorage],
             print(f"   Found {len(entities)} entities")
         except Exception as e:
             print(f"   [FAIL] Qdrant entity search failed: {e}")
-    
+
     if results:
         print("\n[INFO] Results:")
         print_result(results)
@@ -214,9 +214,9 @@ async def test_entity_query(entity_name: str, neo4j_storage: Optional[Neo4jStora
     if not neo4j_storage:
         print("[WARN]  Entity queries require Neo4j connection")
         return
-        
+
     print_section(f"Entity Query: '{entity_name}'")
-    
+
     try:
         # Search for entity by name
         entities = await neo4j_storage.search_entities(entity_name, limit=5)
@@ -249,21 +249,21 @@ async def test_entity_query(entity_name: str, neo4j_storage: Optional[Neo4jStora
                 print(f"   {neighbor.name} ({neighbor.type})")
         except Exception as e:
             print(f"   [WARN]  Could not get neighbors: {e}")
-            
+
     except Exception as e:
         print(f"[FAIL] Entity query failed: {e}")
 
 
-async def test_multi_hop_reasoning(query: str, start_entities: List[str], 
+async def test_multi_hop_reasoning(query: str, start_entities: List[str],
                                  neo4j_storage: Optional[Neo4jStorage], args):
     """Test multi-hop reasoning capabilities."""
     if not neo4j_storage:
         print("[WARN]  Multi-hop reasoning requires Neo4j connection")
         return
-        
+
     print_section(f"Multi-Hop Reasoning: '{query}'")
     print(f"🎯 Start entities: {start_entities}")
-    
+
     try:
         # Initialize LLM client
         llm_client = LLMClient(
@@ -271,11 +271,11 @@ async def test_multi_hop_reasoning(query: str, start_entities: List[str],
             api_key=os.getenv("GEMINI_API_KEY"),
             model=os.getenv("MORAG_GEMINI_MODEL", "gemini-2.5-flash")
         )
-        
+
         # Create reasoning components
         path_selector = PathSelectionAgent(llm_client)
         path_finder = ReasoningPathFinder(neo4j_storage, path_selector)
-        
+
         # Configure reasoning parameters
         reasoning_config = {
             "query": query,
@@ -284,18 +284,18 @@ async def test_multi_hop_reasoning(query: str, start_entities: List[str],
             "max_depth": args.max_depth,
             "max_paths": args.max_paths
         }
-        
+
         print(f"[PROCESSING] Finding reasoning paths (strategy: {args.reasoning_strategy})...")
         start_time = time.time()
-        
+
         reasoning_paths = await path_finder.find_reasoning_paths(
             query, start_entities, strategy=args.reasoning_strategy
         )
-        
+
         end_time = time.time()
         print(f"⏱️  Reasoning completed in {(end_time - start_time)*1000:.2f}ms")
         print(f"🛤️  Found {len(reasoning_paths)} reasoning paths")
-        
+
         # Show first few paths
         for i, path in enumerate(reasoning_paths[:3]):
             print(f"\n   Path {i+1}:")
@@ -303,7 +303,7 @@ async def test_multi_hop_reasoning(query: str, start_entities: List[str],
                 print(f"     Entities: {' -> '.join(path.entities[:5])}")
             if hasattr(path, 'confidence'):
                 print(f"     Confidence: {path.confidence:.3f}")
-                
+
     except Exception as e:
         print(f"[FAIL] Multi-hop reasoning failed: {e}")
 
@@ -558,13 +558,13 @@ async def main():
     parser.add_argument("--neo4j", action="store_true", help="Test Neo4j queries")
     parser.add_argument("--qdrant", action="store_true", help="Test Qdrant queries")
     parser.add_argument("--all-dbs", action="store_true", help="Test all available databases")
-    
+
     # Query parameters
     parser.add_argument("query", help="Query text to test")
     parser.add_argument("--max-results", type=int, default=10, help="Maximum results (default: 10)")
-    parser.add_argument("--query-type", choices=["simple", "entity_focused", "relation_focused", "multi_hop", "analytical"], 
+    parser.add_argument("--query-type", choices=["simple", "entity_focused", "relation_focused", "multi_hop", "analytical"],
                        default="simple", help="Query type (default: simple)")
-    
+
     # Multi-hop reasoning
     parser.add_argument("--enable-multi-hop", action="store_true", help="Enable multi-hop reasoning")
     parser.add_argument("--start-entities", nargs="+", help="Starting entities for multi-hop reasoning")
@@ -572,7 +572,7 @@ async def main():
                        default="forward_chaining", help="Reasoning strategy (default: forward_chaining)")
     parser.add_argument("--max-depth", type=int, default=3, help="Maximum reasoning depth (default: 3)")
     parser.add_argument("--max-paths", type=int, default=10, help="Maximum reasoning paths (default: 10)")
-    
+
     # Graph traversal
     parser.add_argument("--test-traversal", action="store_true", help="Test graph traversal")
     parser.add_argument("--start-entity", help="Start entity for traversal")
@@ -599,7 +599,7 @@ async def main():
     parser.add_argument("--json", action="store_true", help="Output results as JSON")
     parser.add_argument("--verbose", action="store_true", help="Verbose output")
     parser.add_argument("--quiet", action="store_true", help="Minimal output")
-    
+
     # Handle case where no query is provided
     if len(sys.argv) == 1:
         print_header("MoRAG Query Testing CLI")
@@ -617,23 +617,23 @@ async def main():
         print("[FAIL] Please specify --neo4j, --qdrant, or --all-dbs")
         print("\nFor examples, run: python test-query.py")
         return 1
-    
+
     if not COMPONENTS_AVAILABLE:
         print("[FAIL] MoRAG components not available. Please install required packages.")
         return 1
-    
+
     print_header("MoRAG Query Testing CLI")
     print(f"Query: '{args.query}'")
     print(f"Databases: Neo4j={args.neo4j}, Qdrant={args.qdrant}")
-    
+
     # Test database connections
     neo4j_storage = await test_neo4j_connection(args)
     qdrant_storage = await test_qdrant_connection(args)
-    
+
     if not neo4j_storage and not qdrant_storage:
         print("[FAIL] No database connections available")
         return 1
-    
+
     # Set test flags for --test-all
     if args.test_all:
         args.test_analytics = True
@@ -693,7 +693,7 @@ async def main():
             import traceback
             traceback.print_exc()
         return 1
-    
+
     finally:
         # Clean up connections
         if neo4j_storage:

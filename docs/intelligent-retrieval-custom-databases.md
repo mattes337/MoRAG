@@ -127,7 +127,7 @@ The `/api/v2/intelligent-query` endpoint supports three ways to specify database
 When multiple database configuration methods are provided, they are processed in this priority order:
 
 1. **Custom server configurations** (`neo4j_server`, `qdrant_server`) - highest priority
-2. **Named configurations** (`neo4j_database`, `qdrant_collection`) - medium priority  
+2. **Named configurations** (`neo4j_database`, `qdrant_collection`) - medium priority
 3. **Server defaults** - lowest priority (fallback)
 
 ## Error Handling

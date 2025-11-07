@@ -116,7 +116,7 @@ Tests webhook functionality and integration.
    ```bash
    # Ensure MoRAG is properly installed
    pip install -e ".[dev,audio,video,image,docling]"
-   
+
    # Start required services
    docker-compose -f docker/docker-compose.redis.yml up -d
    docker-compose -f docker/docker-compose.qdrant.yml up -d

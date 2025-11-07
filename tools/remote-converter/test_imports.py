@@ -6,7 +6,7 @@ from pathlib import Path
 
 def test_imports():
     """Test importing MoRAG packages step by step."""
-    
+
     # Add MoRAG packages to path
     project_root = Path(__file__).parent.parent.parent
     sys.path.insert(0, str(project_root / "packages" / "morag-core" / "src"))
@@ -16,9 +16,9 @@ def test_imports():
     sys.path.insert(0, str(project_root / "packages" / "morag-image" / "src"))
     sys.path.insert(0, str(project_root / "packages" / "morag-web" / "src"))
     sys.path.insert(0, str(project_root / "packages" / "morag-youtube" / "src"))
-    
+
     print("Testing imports...")
-    
+
     # Test core imports
     try:
         from morag_core.interfaces.processor import ProcessingResult
@@ -26,7 +26,7 @@ def test_imports():
     except Exception as e:
         print(f"❌ ProcessingResult import failed: {e}")
         return False
-    
+
     # Test audio imports
     try:
         from morag_audio import AudioProcessor
@@ -35,7 +35,7 @@ def test_imports():
     except Exception as e:
         print(f"❌ Audio imports failed: {e}")
         return False
-    
+
     # Test video imports
     try:
         from morag_video import VideoProcessor
@@ -44,7 +44,7 @@ def test_imports():
     except Exception as e:
         print(f"❌ Video imports failed: {e}")
         return False
-    
+
     # Test document imports
     try:
         from morag_document import DocumentProcessor
@@ -52,7 +52,7 @@ def test_imports():
     except Exception as e:
         print(f"❌ Document imports failed: {e}")
         return False
-    
+
     # Test image imports
     try:
         from morag_image import ImageProcessor
@@ -61,7 +61,7 @@ def test_imports():
     except Exception as e:
         print(f"❌ Image imports failed: {e}")
         return False
-    
+
     # Test web imports
     try:
         from morag_web import WebProcessor
@@ -70,7 +70,7 @@ def test_imports():
     except Exception as e:
         print(f"❌ Web imports failed: {e}")
         return False
-    
+
     # Test youtube imports
     try:
         from morag_youtube import YouTubeProcessor
@@ -79,7 +79,7 @@ def test_imports():
     except Exception as e:
         print(f"❌ YouTube imports failed: {e}")
         return False
-    
+
     print("✅ All imports successful!")
     return True
 

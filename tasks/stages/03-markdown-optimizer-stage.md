@@ -29,48 +29,48 @@ class MarkdownOptimizerStage(Stage):
         super().__init__(StageType.MARKDOWN_OPTIMIZER)
         self.llm_service = llm_service
         self.prompt_templates = PromptTemplateManager()
-    
-    async def execute(self, 
-                     input_files: List[Path], 
+
+    async def execute(self,
+                     input_files: List[Path],
                      context: StageContext) -> StageResult:
         """Optimize markdown content using LLM."""
         start_time = time.time()
-        
+
         try:
             if len(input_files) != 1:
                 raise ValueError("Stage 2 requires exactly one markdown input file")
-            
+
             input_file = input_files[0]
-            
+
             # Parse input markdown
             content, metadata = self._parse_markdown_file(input_file)
-            
+
             # Determine optimization strategy
             config = context.config.get('stage2', {})
             optimization_type = self._determine_optimization_type(metadata, config)
-            
+
             # Optimize content
             optimized_content = await self._optimize_content(
                 content, metadata, optimization_type, config
             )
-            
+
             # Validate optimization quality
             quality_metrics = self._assess_optimization_quality(
                 content, optimized_content, metadata
             )
-            
+
             # Generate optimized markdown output
             output_file = self._generate_optimized_markdown(
                 optimized_content, metadata, input_file, context, quality_metrics
             )
-            
+
             # Create optimization report
             report_file = self._create_optimization_report(
                 quality_metrics, input_file, context
             )
-            
+
             execution_time = time.time() - start_time
-            
+
             return StageResult(
                 stage_type=self.stage_type,
                 status=StageStatus.COMPLETED,
@@ -84,7 +84,7 @@ class MarkdownOptimizerStage(Stage):
                 },
                 execution_time=execution_time
             )
-            
+
         except Exception as e:
             return StageResult(
                 stage_type=self.stage_type,
@@ -94,25 +94,25 @@ class MarkdownOptimizerStage(Stage):
                 error_message=str(e),
                 execution_time=time.time() - start_time
             )
-    
+
     def validate_inputs(self, input_files: List[Path]) -> bool:
         """Validate input files for Stage 2."""
         if len(input_files) != 1:
             return False
-        
+
         input_file = input_files[0]
-        
+
         # Check if file exists and is markdown
         return input_file.exists() and input_file.suffix == '.md'
-    
+
     def get_dependencies(self) -> List[StageType]:
         """markdown-optimizer depends on markdown-conversion."""
         return [StageType.MARKDOWN_CONVERSION]
-    
+
     def _parse_markdown_file(self, input_file: Path) -> tuple[str, Dict[str, Any]]:
         """Parse markdown file and extract metadata."""
         content = input_file.read_text(encoding='utf-8')
-        
+
         # Extract YAML frontmatter
         if content.startswith('---'):
             parts = content.split('---', 2)
@@ -123,19 +123,19 @@ class MarkdownOptimizerStage(Stage):
                 metadata = {}
         else:
             metadata = {}
-        
+
         return content, metadata
-    
-    def _determine_optimization_type(self, 
-                                   metadata: Dict[str, Any], 
+
+    def _determine_optimization_type(self,
+                                   metadata: Dict[str, Any],
                                    config: Dict[str, Any]) -> str:
         """Determine the type of optimization needed."""
         content_type = metadata.get('content_type', 'unknown')
-        
+
         # Override from config
         if 'optimization_type' in config:
             return config['optimization_type']
-        
+
         # Auto-detect based on content type
         if content_type in ['video', 'audio']:
             return 'transcription'
@@ -145,7 +145,7 @@ class MarkdownOptimizerStage(Stage):
             return 'web_content'
         else:
             return 'general'
-    
+
     async def _optimize_content(self,
                                content: str,
                                metadata: Dict[str, Any],
@@ -179,13 +179,13 @@ class MarkdownOptimizerStage(Stage):
         )
 
         return response.strip()
-    
-    def _assess_optimization_quality(self, 
-                                   original: str, 
-                                   optimized: str, 
+
+    def _assess_optimization_quality(self,
+                                   original: str,
+                                   optimized: str,
                                    metadata: Dict[str, Any]) -> Dict[str, Any]:
         """Assess the quality of optimization."""
-        
+
         metrics = {
             'original_word_count': len(original.split()),
             'optimized_word_count': len(optimized.split()),
@@ -194,26 +194,26 @@ class MarkdownOptimizerStage(Stage):
             'structure_preservation': self._check_structure_preservation(original, optimized),
             'readability_improvement': self._assess_readability_improvement(original, optimized)
         }
-        
+
         # Calculate overall improvement score
         metrics['improvement_score'] = self._calculate_improvement_score(metrics)
-        
+
         return metrics
-    
+
     def _check_timestamp_preservation(self, original: str, optimized: str) -> float:
         """Check how well timestamps were preserved."""
         # Find timestamps in both versions
         timestamp_pattern = r'\[(\d{2}:\d{2}(?::\d{2})?(?:\s*-\s*\d{2}:\d{2}(?::\d{2})?)?)\]'
-        
+
         original_timestamps = set(re.findall(timestamp_pattern, original))
         optimized_timestamps = set(re.findall(timestamp_pattern, optimized))
-        
+
         if not original_timestamps:
             return 1.0  # No timestamps to preserve
-        
+
         preserved = len(original_timestamps.intersection(optimized_timestamps))
         return preserved / len(original_timestamps)
-    
+
     def _check_structure_preservation(self, original: str, optimized: str) -> float:
         """Check how well document structure was preserved."""
         # Count headers, lists, etc.
@@ -224,22 +224,22 @@ class MarkdownOptimizerStage(Stage):
                 'numbered_lists': len(re.findall(r'^\s*\d+\.\s', text, re.MULTILINE)),
                 'code_blocks': len(re.findall(r'```', text)) // 2
             }
-        
+
         original_structure = count_structure_elements(original)
         optimized_structure = count_structure_elements(optimized)
-        
+
         # Calculate preservation ratio
         total_original = sum(original_structure.values())
         if total_original == 0:
             return 1.0
-        
+
         preserved = sum(
             min(original_structure[key], optimized_structure[key])
             for key in original_structure
         )
-        
+
         return preserved / total_original
-    
+
     def _assess_readability_improvement(self, original: str, optimized: str) -> float:
         """Assess readability improvement (simplified metric)."""
         # Simple metrics: sentence length, word complexity
@@ -249,10 +249,10 @@ class MarkdownOptimizerStage(Stage):
             if not sentences:
                 return 0
             return sum(len(s.split()) for s in sentences) / len(sentences)
-        
+
         original_avg = avg_sentence_length(original)
         optimized_avg = avg_sentence_length(optimized)
-        
+
         # Prefer moderate sentence lengths (10-20 words)
         def score_sentence_length(avg_len: float) -> float:
             if 10 <= avg_len <= 20:
@@ -261,12 +261,12 @@ class MarkdownOptimizerStage(Stage):
                 return avg_len / 10
             else:
                 return 20 / avg_len
-        
+
         original_score = score_sentence_length(original_avg)
         optimized_score = score_sentence_length(optimized_avg)
-        
+
         return optimized_score - original_score
-    
+
     def _calculate_improvement_score(self, metrics: Dict[str, Any]) -> float:
         """Calculate overall improvement score."""
         weights = {
@@ -274,12 +274,12 @@ class MarkdownOptimizerStage(Stage):
             'structure_preservation': 0.3,
             'readability_improvement': 0.4
         }
-        
+
         score = 0.0
         for metric, weight in weights.items():
             if metric in metrics:
                 score += metrics[metric] * weight
-        
+
         return max(0.0, min(1.0, score))  # Clamp to [0, 1]
 ```
 
@@ -307,7 +307,7 @@ class PromptTemplateManager:
         system_template = self.system_templates.get(optimization_type, self.system_templates['general'])
         user_template = self.user_templates.get(optimization_type, self.user_templates['general'])
         return system_template, user_template
-    
+
     def _get_transcription_system_template(self) -> str:
         return """You are an expert editor specializing in improving transcribed content. Your task is to optimize transcribed text while preserving its original meaning and structure.
 
@@ -336,7 +336,7 @@ OPTIMIZATION SETTINGS:
 - Preserve Timestamps: {preserve_timestamps}
 - Fix Transcription Errors: {fix_transcription_errors}
 - Improve Readability: {improve_readability}"""
-    
+
     def _get_document_system_template(self) -> str:
         return """You are an expert editor specializing in document optimization. Your task is to improve document content while preserving its structure and meaning.
 
@@ -363,7 +363,7 @@ METADATA:
 OPTIMIZATION SETTINGS:
 - Preserve Structure: {preserve_structure}
 - Improve Readability: {improve_readability}"""
-    
+
     def _get_web_content_template(self) -> str:
         return """You are an expert editor specializing in web content optimization. Your task is to improve the following web content while preserving its key information.
 
@@ -383,7 +383,7 @@ METADATA:
 - Content Type: {metadata.get('content_type', 'unknown')}
 
 Please provide the optimized version of the web content."""
-    
+
     def _get_general_template(self) -> str:
         return """You are an expert editor. Your task is to improve the following content while preserving its original meaning and important structural elements.
 

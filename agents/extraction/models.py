@@ -72,7 +72,7 @@ class RelationTypeExamples:
 
 class ExtractedFact(BaseModel):
     """A fact extracted from text."""
-    
+
     fact_text: str = Field(..., description="Complete, self-contained fact statement")
     fact_type: str = Field(..., description="Type of fact (statistical, causal, technical, definition, procedural)")
     confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence score")
@@ -109,7 +109,7 @@ class ExtractedRelation(BaseModel):
 
 class ExtractedKeyword(BaseModel):
     """A keyword extracted from text."""
-    
+
     keyword: str = Field(..., description="The keyword or phrase")
     category: str = Field(..., description="Category of keyword")
     importance: float = Field(..., ge=0.0, le=1.0, description="Importance score")
@@ -119,7 +119,7 @@ class ExtractedKeyword(BaseModel):
 
 class FactExtractionResult(BaseModel):
     """Result from fact extraction."""
-    
+
     facts: List[ExtractedFact] = Field(..., description="Extracted facts")
     total_facts: int = Field(..., description="Total number of facts extracted")
     confidence: ConfidenceLevel = Field(..., description="Overall confidence")
@@ -130,7 +130,7 @@ class FactExtractionResult(BaseModel):
 
 class EntityExtractionResult(BaseModel):
     """Result from entity extraction."""
-    
+
     entities: List[ExtractedEntity] = Field(..., description="Extracted entities")
     total_entities: int = Field(..., description="Total number of entities")
     confidence: ConfidenceLevel = Field(..., description="Overall confidence")
@@ -139,7 +139,7 @@ class EntityExtractionResult(BaseModel):
 
 class RelationExtractionResult(BaseModel):
     """Result from relation extraction."""
-    
+
     relations: List[ExtractedRelation] = Field(..., description="Extracted relations")
     total_relations: int = Field(..., description="Total number of relations")
     confidence: ConfidenceLevel = Field(..., description="Overall confidence")
@@ -148,7 +148,7 @@ class RelationExtractionResult(BaseModel):
 
 class KeywordExtractionResult(BaseModel):
     """Result from keyword extraction."""
-    
+
     keywords: List[ExtractedKeyword] = Field(..., description="Extracted keywords")
     total_keywords: int = Field(..., description="Total number of keywords")
     confidence: ConfidenceLevel = Field(..., description="Overall confidence")

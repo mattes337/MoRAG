@@ -243,7 +243,7 @@ docker run --rm -v morag_redis_data:/data -v $(pwd):/backup alpine tar xzf /back
    ```bash
    # Check port usage
    netstat -tulpn | grep :8000
-   
+
    # Change ports in docker-compose.yml
    ports:
      - "8001:8000"  # Use different host port
@@ -253,7 +253,7 @@ docker run --rm -v morag_redis_data:/data -v $(pwd):/backup alpine tar xzf /back
    ```bash
    # Increase Docker memory limit
    # Docker Desktop: Settings > Resources > Memory
-   
+
    # Check container memory usage
    docker stats
    ```

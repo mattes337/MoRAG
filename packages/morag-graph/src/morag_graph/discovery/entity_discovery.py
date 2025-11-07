@@ -68,14 +68,14 @@ class QueryAnalysis:
 
 class QueryEntityDiscovery:
     """Intelligent entity discovery based on query analysis."""
-    
+
     def __init__(
         self,
         entity_extractor: QueryEntityExtractor,
         config: Optional[Dict[str, Any]] = None
     ):
         """Initialize the entity discovery system.
-        
+
         Args:
             entity_extractor: Query entity extractor
             config: Optional configuration dictionary
@@ -83,33 +83,33 @@ class QueryEntityDiscovery:
         self.entity_extractor = entity_extractor
         self.config = config or {}
         self.settings = get_settings()
-        
+
         # Discovery parameters
         self.max_entities_to_discover = self.config.get('max_entities_to_discover', 50)
         self.min_relevance_threshold = self.config.get('min_relevance_threshold', 0.3)
         self.semantic_similarity_threshold = self.config.get('semantic_similarity_threshold', 0.7)
-        
+
         # LLM configuration
         self.llm_enabled = self.config.get('llm_enabled', True) and GEMINI_AVAILABLE
         self.model_name = self.config.get('model_name', 'gemini-1.5-flash')
-        
+
         # Semantic similarity configuration
         self.semantic_enabled = (
-            self.config.get('semantic_enabled', True) and 
+            self.config.get('semantic_enabled', True) and
             SENTENCE_TRANSFORMERS_AVAILABLE
         )
         self.embedding_model_name = self.config.get(
-            'embedding_model_name', 
+            'embedding_model_name',
             'all-MiniLM-L6-v2'
         )
-        
+
         # Performance settings
         self.batch_size = self.config.get('batch_size', 20)
 
         # Initialize components
         self._llm_client = None
         self._embedding_model = None
-        
+
         logger.info(
             "Entity discovery initialized",
             llm_enabled=self.llm_enabled,
@@ -117,7 +117,7 @@ class QueryEntityDiscovery:
             max_entities_to_discover=self.max_entities_to_discover,
             min_relevance_threshold=self.min_relevance_threshold
         )
-    
+
     async def initialize(self) -> None:
         """Initialize LLM and embedding models."""
         # Initialize LLM
@@ -129,7 +129,7 @@ class QueryEntityDiscovery:
             except Exception as e:
                 logger.warning(f"Failed to initialize LLM client: {e}")
                 self.llm_enabled = False
-        
+
         # Initialize embedding model
         if self.semantic_enabled and not self._embedding_model:
             try:
@@ -138,7 +138,7 @@ class QueryEntityDiscovery:
             except Exception as e:
                 logger.warning(f"Failed to initialize embedding model: {e}")
                 self.semantic_enabled = False
-    
+
     async def discover_entities(
         self,
         query: str,
@@ -146,20 +146,20 @@ class QueryEntityDiscovery:
         max_entities: Optional[int] = None
     ) -> List[EntityRelevanceScore]:
         """Discover entities relevant to the query.
-        
+
         Args:
             query: User query
             available_entities: Optional list of available entities to search
             max_entities: Optional override for maximum entities to return
-            
+
         Returns:
             List of entities ranked by relevance
         """
         if not query or not query.strip():
             return []
-        
+
         max_entities = max_entities or self.max_entities_to_discover
-        
+
         try:
             logger.debug(
                 "Starting entity discovery",
@@ -167,16 +167,16 @@ class QueryEntityDiscovery:
                 available_entities_count=len(available_entities) if available_entities else 0,
                 max_entities=max_entities
             )
-            
+
             # Initialize models if needed
             await self.initialize()
-            
+
             # Analyze query
             query_analysis = await self._analyze_query(query)
-            
+
             # Extract entities from query
             extracted_entities = await self.entity_extractor.extract_and_link_entities(query)
-            
+
             # Discover additional relevant entities
             if available_entities:
                 discovered_entities = await self._discover_from_available(
@@ -186,22 +186,22 @@ class QueryEntityDiscovery:
                 discovered_entities = await self._discover_from_graph(
                     query_analysis, extracted_entities
                 )
-            
+
             # Combine and rank entities
             all_entities = self._combine_entity_sources(
                 extracted_entities, discovered_entities
             )
-            
+
             # Filter by relevance threshold
             relevant_entities = [
-                e for e in all_entities 
+                e for e in all_entities
                 if e.relevance_score >= self.min_relevance_threshold
             ]
-            
+
             # Sort by relevance and limit results
             relevant_entities.sort(key=lambda x: x.relevance_score, reverse=True)
             final_entities = relevant_entities[:max_entities]
-            
+
             logger.info(
                 "Entity discovery completed",
                 query=query,
@@ -210,13 +210,13 @@ class QueryEntityDiscovery:
                 relevant_entities=len(relevant_entities),
                 final_entities=len(final_entities)
             )
-            
+
             return final_entities
-            
+
         except Exception as e:
             logger.error(f"Entity discovery failed: {e}")
             return []
-    
+
     async def _analyze_query(self, query: str) -> QueryAnalysis:
         """Analyze query to understand intent and extract keywords using enhanced LLM analysis."""
         try:
@@ -242,7 +242,7 @@ class QueryEntityDiscovery:
                 temporal_context=self._extract_temporal_context(query),
                 metadata={'analysis_method': 'basic'}
             )
-            
+
         except Exception as e:
             logger.warning(f"Query analysis failed: {e}")
             return QueryAnalysis(
@@ -325,7 +325,7 @@ Be thorough and accurate in your analysis."""
         """Extract keywords from query."""
         # Simple keyword extraction (could be enhanced with NLP)
         import re
-        
+
         # Remove common stop words
         stop_words = {
             'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
@@ -333,73 +333,73 @@ Be thorough and accurate in your analysis."""
             'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
             'should', 'may', 'might', 'can', 'what', 'when', 'where', 'why', 'how'
         }
-        
+
         # Extract words
         words = re.findall(r'\b\w+\b', query.lower())
         keywords = [w for w in words if w not in stop_words and len(w) > 2]
-        
+
         return keywords
-    
+
     def _detect_intent(self, query: str, keywords: List[str]) -> QueryIntent:
         """Detect query intent based on patterns."""
         query_lower = query.lower()
-        
+
         # Factual questions
         if any(word in query_lower for word in ['what', 'who', 'when', 'where', 'define']):
             return QueryIntent.FACTUAL
-        
+
         # Comparative questions
         if any(word in query_lower for word in ['compare', 'difference', 'versus', 'vs', 'better']):
             return QueryIntent.COMPARATIVE
-        
+
         # Analytical questions
         if any(word in query_lower for word in ['analyze', 'explain', 'why', 'how', 'relationship']):
             return QueryIntent.ANALYTICAL
-        
+
         # Exploratory questions
         if any(word in query_lower for word in ['explore', 'discover', 'find', 'search', 'related']):
             return QueryIntent.EXPLORATORY
-        
+
         # Default to factual
         return QueryIntent.FACTUAL
-    
+
     def _calculate_complexity(self, query: str, keywords: List[str]) -> float:
         """Calculate query complexity score."""
         complexity = 0.0
-        
+
         # Length factor
         complexity += min(len(query) / 100.0, 0.3)
-        
+
         # Keyword count factor
         complexity += min(len(keywords) / 10.0, 0.3)
-        
+
         # Question words factor
         question_words = ['what', 'who', 'when', 'where', 'why', 'how']
         question_count = sum(1 for word in question_words if word in query.lower())
         complexity += min(question_count / 3.0, 0.2)
-        
+
         # Conjunction factor (multiple clauses)
         conjunctions = ['and', 'or', 'but', 'however', 'moreover', 'furthermore']
         conjunction_count = sum(1 for word in conjunctions if word in query.lower())
         complexity += min(conjunction_count / 2.0, 0.2)
-        
+
         return min(complexity, 1.0)
-    
+
     def _extract_mentioned_entities(self, query: str) -> List[str]:
         """Extract entities mentioned in the query (simple approach)."""
         import re
-        
+
         # Look for capitalized words (potential proper nouns)
         capitalized_words = re.findall(r'\b[A-Z][a-z]+\b', query)
-        
+
         # Look for quoted strings
         quoted_strings = re.findall(r'"([^"]*)"', query)
-        
+
         # Combine and deduplicate
         entities = list(set(capitalized_words + quoted_strings))
-        
+
         return entities
-    
+
     async def _discover_from_available(
         self,
         query_analysis: QueryAnalysis,
@@ -407,15 +407,15 @@ Be thorough and accurate in your analysis."""
     ) -> List[EntityRelevanceScore]:
         """Discover relevant entities from available entity list."""
         discovered = []
-        
+
         # Process entities in batches
         for i in range(0, len(available_entities), self.batch_size):
             batch = available_entities[i:i + self.batch_size]
             batch_scores = await self._score_entity_batch(query_analysis, batch)
             discovered.extend(batch_scores)
-        
+
         return discovered
-    
+
     async def _discover_from_graph(
         self,
         query_analysis: QueryAnalysis,
@@ -426,7 +426,7 @@ Be thorough and accurate in your analysis."""
         # For now, return empty list as this requires graph storage integration
         logger.debug("Graph-based entity discovery not yet implemented")
         return []
-    
+
     async def _score_entity_batch(
         self,
         query_analysis: QueryAnalysis,
@@ -453,7 +453,7 @@ Be thorough and accurate in your analysis."""
                         metadata={'scoring_method': 'heuristic'}
                     )
                     scored_entities.append(scored_entity)
-        
+
         return scored_entities
 
     async def _score_entities_semantic(
@@ -543,7 +543,7 @@ Be thorough and accurate in your analysis."""
         union = words1.union(words2)
 
         return len(intersection) / len(union) if union else 0.0
-    
+
     def _calculate_entity_relevance(
         self,
         query_analysis: QueryAnalysis,
@@ -551,32 +551,32 @@ Be thorough and accurate in your analysis."""
     ) -> float:
         """Calculate relevance score for an entity."""
         relevance = 0.0
-        
+
         # Exact name match in query
         if entity.name.lower() in query_analysis.query.lower():
             relevance += 0.8
-        
+
         # Keyword overlap
         entity_words = set(entity.name.lower().split())
         query_keywords = set(query_analysis.keywords)
-        
+
         if entity_words & query_keywords:
             overlap_ratio = len(entity_words & query_keywords) / len(entity_words)
             relevance += overlap_ratio * 0.6
-        
+
         # Type relevance (could be enhanced with type-specific scoring)
         if entity.type and any(keyword in entity.type.lower() for keyword in query_analysis.keywords):
             relevance += 0.3
-        
+
         # Description relevance
         if entity.description:
             description_words = set(entity.description.lower().split())
             if description_words & query_keywords:
                 overlap_ratio = len(description_words & query_keywords) / len(description_words)
                 relevance += overlap_ratio * 0.4
-        
+
         return min(relevance, 1.0)
-    
+
     def _combine_entity_sources(
         self,
         extracted_entities: Any,
@@ -585,7 +585,7 @@ Be thorough and accurate in your analysis."""
         """Combine entities from different sources."""
         combined = []
         seen_entity_ids = set()
-        
+
         # Add extracted entities (if available)
         if extracted_entities and hasattr(extracted_entities, 'entities'):
             for entity_link in extracted_entities.entities:
@@ -593,13 +593,13 @@ Be thorough and accurate in your analysis."""
                     # Create EntityRelevanceScore from extracted entity
                     # This is a simplified approach - in practice, you'd need to fetch the full Entity object
                     seen_entity_ids.add(entity_link.linked_entity_id)
-        
+
         # Add discovered entities
         for scored_entity in discovered_entities:
             if scored_entity.entity.id not in seen_entity_ids:
                 combined.append(scored_entity)
                 seen_entity_ids.add(scored_entity.entity.id)
-        
+
         return combined
 
     def _detect_domain(self, query: str, keywords: List[str]) -> Optional[str]:

@@ -1,7 +1,6 @@
 """Unit tests for YouTube tasks."""
 
 import pytest
-from unittest.mock import patch, MagicMock, AsyncMock
 from pathlib import Path
 
 # Import the task functions directly to avoid Celery decorator issues
@@ -9,7 +8,6 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from morag_youtube import YouTubeConfig, YouTubeDownloadResult
-from morag_core.exceptions import ProcessingError
 
 
 class TestYouTubeVideoTask:
@@ -169,15 +167,15 @@ class TestYouTubePlaylistTask:
 
     @pytest.mark.asyncio
     async def test_process_youtube_playlist_success(
-        self, 
-        mock_celery_task, 
+        self,
+        mock_celery_task,
         mock_youtube_metadata,
         mock_gemini_service,
         mock_qdrant_service,
         tmp_path
     ):
         """Test successful YouTube playlist processing."""
-        
+
         # Create mock results for playlist videos
         mock_results = [
             YouTubeDownloadResult(
@@ -192,7 +190,7 @@ class TestYouTubePlaylistTask:
             )
             for i in range(3)
         ]
-        
+
         # Simulate playlist processing
         result = {
             "total_videos": 3,

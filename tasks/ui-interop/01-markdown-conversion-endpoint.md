@@ -74,5 +74,3 @@ Implement a lightweight REST endpoint that converts input files to intermediate 
 - Docling for PDF processing
 - Audio/video transcription services
 - FastAPI/Flask framework
-
-

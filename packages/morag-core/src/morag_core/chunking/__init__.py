@@ -6,7 +6,7 @@ from .factory import ChunkerFactory, create_chunker
 
 __all__ = [
     "ChunkingConfig",
-    "ChunkingStrategy", 
+    "ChunkingStrategy",
     "SemanticChunker",
     "ChunkerFactory",
     "create_chunker",

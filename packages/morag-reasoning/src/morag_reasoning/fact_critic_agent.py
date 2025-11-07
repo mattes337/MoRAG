@@ -1,10 +1,8 @@
 """FactCriticAgent for evaluating relevance of raw facts and assigning scores."""
 
-import json
 import structlog
 from typing import Optional
 from pydantic_ai import Agent
-from pydantic import BaseModel, Field
 
 from morag_reasoning.llm import LLMClient
 from morag_reasoning.recursive_fact_models import RawFact, ScoredFact, FCAResponse
@@ -12,23 +10,23 @@ from morag_reasoning.recursive_fact_models import RawFact, ScoredFact, FCARespon
 
 class FactCriticAgent:
     """Agent responsible for evaluating the relevance of raw facts and assigning scores."""
-    
+
     def __init__(self, llm_client: LLMClient):
         """Initialize the FactCriticAgent.
-        
+
         Args:
             llm_client: LLM client for AI operations
         """
         self.llm_client = llm_client
         self.logger = structlog.get_logger(__name__)
-        
+
         # Create PydanticAI agent for fact criticism
         self.agent = Agent(
             model=llm_client.get_model(),
             result_type=FCAResponse,
             system_prompt=self._get_system_prompt()
         )
-    
+
     def _get_system_prompt(self) -> str:
         """Get the system prompt for the FactCriticAgent."""
         return """You are a FactCriticAgent (FCA) responsible for evaluating the relevance and quality of extracted facts.
@@ -69,11 +67,11 @@ Be objective and consistent in your scoring. Focus on how well the fact helps an
         language: Optional[str] = None
     ) -> ScoredFact:
         """Evaluate a raw fact and assign a relevance score.
-        
+
         Args:
             user_query: Original user query
             raw_fact: Raw fact to evaluate
-            
+
         Returns:
             ScoredFact with relevance score and source description
         """
@@ -82,7 +80,7 @@ Be objective and consistent in your scoring. Focus on how well the fact helps an
             query=user_query,
             fact=raw_fact.fact_text[:100]
         )
-        
+
         try:
             # Create evaluation prompt
             prompt = self._create_evaluation_prompt(user_query, raw_fact, language)
@@ -135,7 +133,7 @@ Be objective and consistent in your scoring. Focus on how well the fact helps an
                 score=0.1,  # Low score for error cases
                 source_description=f"Document: {raw_fact.source_metadata.document_name or 'Unknown'}, Chunk: {raw_fact.source_metadata.chunk_index or 0}"
             )
-    
+
     def _create_evaluation_prompt(self, user_query: str, raw_fact: RawFact, language: Optional[str] = None) -> str:
         """Create the prompt for fact evaluation."""
 
@@ -171,7 +169,7 @@ Be objective and consistent in your scoring. Focus on how well the fact helps an
         else:
             # If no document metadata, this fact should be filtered out
             source_context = "No document source available"
-        
+
         prompt = f"""FACT EVALUATION TASK
 
 User Query: "{user_query}"
@@ -218,7 +216,7 @@ Return the fact with an assigned score and source description."""
             prompt += f"\n\nIMPORTANT: Provide source description in {language_name} ({language})."
 
         return prompt
-    
+
     async def batch_evaluate_facts(
         self,
         user_query: str,
@@ -227,31 +225,31 @@ Return the fact with an assigned score and source description."""
         language: Optional[str] = None
     ) -> list[ScoredFact]:
         """Evaluate multiple facts in batches for efficiency.
-        
+
         Args:
             user_query: Original user query
             raw_facts: List of raw facts to evaluate
             batch_size: Number of facts to process in each batch
-            
+
         Returns:
             List of scored facts
         """
         if not raw_facts:
             return []
-        
+
         self.logger.info(
             "Starting batch fact evaluation",
             total_facts=len(raw_facts),
             batch_size=batch_size
         )
-        
+
         scored_facts = []
-        
+
         # Process facts in batches
         for i in range(0, len(raw_facts), batch_size):
             batch = raw_facts[i:i + batch_size]
             self.logger.debug(f"Processing batch {i//batch_size + 1}")
-            
+
             # Evaluate each fact in the batch
             batch_results = []
             for fact in batch:
@@ -275,47 +273,47 @@ Return the fact with an assigned score and source description."""
                         score=0.1,
                         source_description=f"Document: {fact.source_metadata.document_name or 'Unknown'}, Chunk: {fact.source_metadata.chunk_index or 0}"
                     ))
-            
+
             scored_facts.extend(batch_results)
-        
+
         self.logger.info(
             "Batch fact evaluation completed",
             total_evaluated=len(scored_facts)
         )
-        
+
         return scored_facts
-    
+
     def apply_relevance_decay(
         self,
         scored_facts: list[ScoredFact],
         decay_rate: float = 0.2
     ) -> list["FinalFact"]:
         """Apply depth-based relevance decay to scored facts.
-        
+
         Args:
             scored_facts: List of scored facts
             decay_rate: Rate of decay per depth level
-            
+
         Returns:
             List of facts with final decayed scores
         """
         if not scored_facts:
             return []
-        
+
         self.logger.info(
             "Applying relevance decay",
             total_facts=len(scored_facts),
             decay_rate=decay_rate
         )
-        
+
         from morag_reasoning.recursive_fact_models import FinalFact
-        
+
         final_facts = []
         for fact in scored_facts:
             # Calculate decay factor: score_at_depth = initial_score * (1 - decay_rate * depth)
             decay_factor = max(0.0, 1.0 - decay_rate * fact.extracted_from_depth)
             final_decayed_score = max(0.0, fact.score * decay_factor)
-            
+
             final_fact = FinalFact(
                 fact_text=fact.fact_text,
                 source_node_id=fact.source_node_id,
@@ -328,10 +326,10 @@ Return the fact with an assigned score and source description."""
                 final_decayed_score=final_decayed_score
             )
             final_facts.append(final_fact)
-        
+
         # Sort by final decayed score, highest first
         final_facts.sort(key=lambda x: x.final_decayed_score, reverse=True)
-        
+
         self.logger.info(
             "Relevance decay applied",
             facts_processed=len(final_facts)

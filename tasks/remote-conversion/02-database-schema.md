@@ -571,16 +571,16 @@ logger = structlog.get_logger(__name__)
 
 class MigrationManager:
     """Database migration management."""
-    
+
     def __init__(self, migrations_dir: str = None):
         if migrations_dir is None:
             # Default to migrations directory in package
             package_dir = Path(__file__).parent.parent.parent
             migrations_dir = package_dir / "migrations"
-        
+
         self.migrations_dir = Path(migrations_dir)
         self.migrations_dir.mkdir(exist_ok=True)
-    
+
     def get_applied_migrations(self, session: Session) -> List[str]:
         """Get list of applied migration versions."""
         try:
@@ -589,67 +589,67 @@ class MigrationManager:
         except Exception as e:
             logger.warning("Could not read migration history, assuming fresh database", error=str(e))
             return []
-    
+
     def get_available_migrations(self) -> List[Tuple[str, Path]]:
         """Get list of available migration files."""
         migration_files = glob.glob(str(self.migrations_dir / "*.sql"))
         migrations = []
-        
+
         for file_path in sorted(migration_files):
             file_name = Path(file_path).name
             # Extract version from filename (e.g., "001_create_table.sql" -> "001")
             version = file_name.split('_')[0]
             migrations.append((version, Path(file_path)))
-        
+
         return migrations
-    
+
     def apply_migration(self, session: Session, version: str, file_path: Path) -> bool:
         """Apply a single migration."""
         try:
             logger.info("Applying migration", version=version, file=str(file_path))
-            
+
             with open(file_path, 'r') as f:
                 migration_sql = f.read()
-            
+
             # Execute migration SQL
             session.execute(text(migration_sql))
             session.commit()
-            
+
             logger.info("Migration applied successfully", version=version)
             return True
-            
+
         except Exception as e:
             logger.error("Failed to apply migration", version=version, error=str(e))
             session.rollback()
             return False
-    
+
     def run_migrations(self) -> bool:
         """Run all pending migrations."""
         try:
             with db_manager.get_session() as session:
                 applied = set(self.get_applied_migrations(session))
                 available = self.get_available_migrations()
-                
+
                 pending = [(v, p) for v, p in available if v not in applied]
-                
+
                 if not pending:
                     logger.info("No pending migrations")
                     return True
-                
+
                 logger.info("Running migrations", pending_count=len(pending))
-                
+
                 for version, file_path in pending:
                     if not self.apply_migration(session, version, file_path):
                         logger.error("Migration failed, stopping", version=version)
                         return False
-                
+
                 logger.info("All migrations completed successfully")
                 return True
-                
+
         except Exception as e:
             logger.error("Migration process failed", error=str(e))
             return False
-    
+
     def create_migration(self, description: str) -> Path:
         """Create a new migration file template."""
         # Get next version number
@@ -659,12 +659,12 @@ class MigrationManager:
             next_version = f"{last_version + 1:03d}"
         else:
             next_version = "001"
-        
+
         # Create filename
         safe_description = description.lower().replace(' ', '_').replace('-', '_')
         filename = f"{next_version}_{safe_description}.sql"
         file_path = self.migrations_dir / filename
-        
+
         # Create template content
         template = f"""-- Migration: {description}
 -- Version: {next_version}
@@ -680,16 +680,16 @@ BEGIN;
 -- );
 
 -- Record this migration
-INSERT INTO schema_migrations (version, description) 
+INSERT INTO schema_migrations (version, description)
 VALUES ('{next_version}', '{description}')
 ON CONFLICT (version) DO NOTHING;
 
 COMMIT;
 """
-        
+
         with open(file_path, 'w') as f:
             f.write(template)
-        
+
         logger.info("Migration template created", file=str(file_path))
         return file_path
 ```
@@ -716,22 +716,22 @@ def init_database(run_migrations: bool = True) -> bool:
     """Initialize the database with required tables and data."""
     try:
         logger.info("Initializing MoRAG database")
-        
+
         # Test database connection
         if not db_manager.test_connection():
             logger.error("Database connection failed")
             return False
-        
+
         # Run migrations if requested
         if run_migrations:
             migration_manager = MigrationManager()
             if not migration_manager.run_migrations():
                 logger.error("Database migrations failed")
                 return False
-        
+
         logger.info("Database initialization completed successfully")
         return True
-        
+
     except Exception as e:
         logger.error("Database initialization failed", error=str(e))
         return False
@@ -740,22 +740,22 @@ def reset_database() -> bool:
     """Reset the database by dropping and recreating all tables."""
     try:
         logger.warning("Resetting database - all data will be lost!")
-        
+
         # Drop all tables
         db_manager.drop_tables()
-        
+
         # Recreate tables
         db_manager.create_tables()
-        
+
         # Run migrations
         migration_manager = MigrationManager()
         if not migration_manager.run_migrations():
             logger.error("Failed to run migrations after reset")
             return False
-        
+
         logger.info("Database reset completed successfully")
         return True
-        
+
     except Exception as e:
         logger.error("Database reset failed", error=str(e))
         return False
@@ -767,9 +767,9 @@ def main():
                        help='Database command to execute')
     parser.add_argument('--force', action='store_true',
                        help='Force operation without confirmation')
-    
+
     args = parser.parse_args()
-    
+
     if args.command == 'init':
         success = init_database()
     elif args.command == 'migrate':
@@ -787,7 +787,7 @@ def main():
     else:
         parser.print_help()
         return
-    
+
     sys.exit(0 if success else 1)
 
 if __name__ == '__main__':
@@ -809,9 +809,9 @@ from morag.database.connection import Base
 
 class RemoteJob(Base):
     """Remote conversion job model."""
-    
+
     __tablename__ = 'remote_jobs'
-    
+
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     ingestion_task_id = Column(String(255), nullable=False, index=True)
     source_file_path = Column(Text, nullable=False)
@@ -827,7 +827,7 @@ class RemoteJob(Base):
     retry_count = Column(Integer, nullable=False, default=0)
     max_retries = Column(Integer, nullable=False, default=3)
     timeout_at = Column(DateTime, nullable=True)
-    
+
     def to_dict(self):
         """Convert model to dictionary."""
         return {
@@ -846,23 +846,23 @@ class RemoteJob(Base):
             'max_retries': self.max_retries,
             'timeout_at': self.timeout_at.isoformat() if self.timeout_at else None
         }
-    
+
     @property
     def is_expired(self) -> bool:
         """Check if job has expired."""
         if not self.timeout_at:
             return False
         return datetime.utcnow() > self.timeout_at
-    
+
     @property
     def processing_duration(self) -> float:
         """Get processing duration in seconds."""
         if not self.started_at:
             return 0.0
-        
+
         end_time = self.completed_at or datetime.utcnow()
         return (end_time - self.started_at).total_seconds()
-    
+
     def can_retry(self) -> bool:
         """Check if job can be retried."""
         return self.retry_count < self.max_retries and self.status in ['failed', 'timeout']

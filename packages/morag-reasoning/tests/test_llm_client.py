@@ -9,7 +9,7 @@ from morag_reasoning.llm import LLMClient, LLMConfig
 
 class TestLLMConfig:
     """Test LLM configuration."""
-    
+
     def test_default_config(self):
         """Test default configuration values."""
         config = LLMConfig()
@@ -18,7 +18,7 @@ class TestLLMConfig:
         assert config.temperature == 0.1
         assert config.max_tokens == 2000
         assert config.max_retries == 8
-    
+
     def test_custom_config(self):
         """Test custom configuration values."""
         config = LLMConfig(
@@ -37,13 +37,13 @@ class TestLLMConfig:
 
 class TestLLMClient:
     """Test LLM client functionality."""
-    
+
     def test_init_with_config(self, llm_config):
         """Test initialization with provided config."""
         client = LLMClient(llm_config)
         assert client.config == llm_config
         assert client.client is not None
-    
+
     def test_init_without_config(self):
         """Test initialization without config (uses environment)."""
         with patch.dict('os.environ', {
@@ -55,14 +55,14 @@ class TestLLMClient:
             assert client.config.provider == 'openai'
             assert client.config.model == 'gpt-3.5-turbo'
             assert client.config.api_key == 'test-key'
-    
+
     @pytest.mark.asyncio
     async def test_context_manager(self, llm_config):
         """Test async context manager functionality."""
         async with LLMClient(llm_config) as client:
             assert client is not None
             assert client.client is not None
-    
+
     @pytest.mark.asyncio
     async def test_generate_simple_prompt(self, mock_llm_client):
         """Test generating text from a simple prompt."""
@@ -70,19 +70,19 @@ class TestLLMClient:
         result = await mock_llm_client.generate(prompt)
         assert isinstance(result, str)
         assert len(result) > 0
-    
+
     @pytest.mark.asyncio
     async def test_generate_with_parameters(self, mock_llm_client):
         """Test generating text with custom parameters."""
         prompt = "Tell me about AI"
         result = await mock_llm_client.generate(
-            prompt, 
-            max_tokens=500, 
+            prompt,
+            max_tokens=500,
             temperature=0.5
         )
         assert isinstance(result, str)
         assert len(result) > 0
-    
+
     @pytest.mark.asyncio
     async def test_generate_from_messages(self, mock_llm_client):
         """Test generating text from message list."""
@@ -93,7 +93,7 @@ class TestLLMClient:
         result = await mock_llm_client.generate_from_messages(messages)
         assert isinstance(result, str)
         assert len(result) > 0
-    
+
     def test_calculate_delay(self, llm_config):
         """Test delay calculation for exponential backoff."""
         # Disable jitter for predictable testing
@@ -118,7 +118,7 @@ class TestLLMClient:
         delay_jitter = client_with_jitter._calculate_delay(1)
         # Should be between 50% and 100% of base delay
         assert llm_config.base_delay * 0.5 <= delay_jitter <= llm_config.base_delay
-    
+
     @pytest.mark.asyncio
     async def test_gemini_api_call_success(self, llm_config):
         """Test successful Gemini API call."""
@@ -147,7 +147,7 @@ class TestLLMClient:
                 0.1
             )
             assert result == "Test response"
-    
+
     @pytest.mark.asyncio
     async def test_openai_api_call_success(self, llm_config):
         """Test successful OpenAI API call."""
@@ -177,7 +177,7 @@ class TestLLMClient:
                 0.1
             )
             assert result == "Test response"
-    
+
     @pytest.mark.asyncio
     async def test_api_call_retry_on_failure(self, llm_config):
         """Test API call retry mechanism on failure."""
@@ -207,12 +207,12 @@ class TestLLMClient:
             )
             assert result == "Success"
             assert mock_post.call_count == 2
-    
+
     @pytest.mark.asyncio
     async def test_unsupported_provider_error(self, llm_config):
         """Test error for unsupported provider."""
         llm_config.provider = "unsupported"
         client = LLMClient(llm_config)
-        
+
         with pytest.raises(ValueError, match="Unsupported LLM provider"):
             await client.generate("test prompt")

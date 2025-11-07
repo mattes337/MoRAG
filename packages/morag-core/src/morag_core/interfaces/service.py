@@ -30,25 +30,25 @@ class ServiceConfig:
 
 class BaseService(ABC):
     """Base class for services."""
-    
+
     @abstractmethod
     async def initialize(self) -> bool:
         """Initialize the service.
-        
+
         Returns:
             True if initialization was successful, False otherwise
         """
         pass
-    
+
     @abstractmethod
     async def shutdown(self) -> None:
         """Shutdown the service and release resources."""
         pass
-    
+
     @abstractmethod
     async def health_check(self) -> Dict[str, Any]:
         """Check service health.
-        
+
         Returns:
             Dictionary with health status information
         """
@@ -57,7 +57,7 @@ class BaseService(ABC):
 
 class CircuitBreaker:
     """Circuit breaker pattern implementation for service resilience."""
-    
+
     def __init__(
         self,
         failure_threshold: int = 5,
@@ -65,7 +65,7 @@ class CircuitBreaker:
         half_open_timeout: float = 30.0
     ):
         """Initialize circuit breaker.
-        
+
         Args:
             failure_threshold: Number of failures before opening circuit
             reset_timeout: Time in seconds before resetting circuit
@@ -78,26 +78,26 @@ class CircuitBreaker:
         self.state = "closed"  # closed, open, half-open
         self.last_failure_time = 0.0
         self.last_success_time = 0.0
-    
+
     def record_success(self) -> None:
         """Record successful operation."""
         self.failures = 0
         self.state = "closed"
-    
+
     def record_failure(self) -> None:
         """Record failed operation."""
         import time
         self.failures += 1
         self.last_failure_time = time.time()
-        
+
         if self.failures >= self.failure_threshold:
             self.state = "open"
-    
+
     def is_closed(self) -> bool:
         """Check if circuit is closed."""
         import time
         current_time = time.time()
-        
+
         if self.state == "open":
             # Check if reset timeout has passed
             if current_time - self.last_failure_time > self.reset_timeout:
@@ -109,5 +109,5 @@ class CircuitBreaker:
             if current_time - self.last_success_time > self.half_open_timeout:
                 return True
             return False
-        
+
         return True

@@ -16,13 +16,13 @@ sys.path.insert(0, str(project_root / "packages" / "morag" / "src"))
 async def test_ingest_workflow():
     """Test the complete ingest workflow that was failing."""
     print("Testing complete ingest workflow...")
-    
+
     try:
         # Import the function that was failing
         from morag.ingest_tasks import store_content_in_vector_db
-        
+
         print("✅ Successfully imported store_content_in_vector_db")
-        
+
         # Test with sample content
         test_content = """
         This is a test document for MoRAG.
@@ -30,23 +30,23 @@ async def test_ingest_workflow():
         The system should be able to process this content and store it in the vector database.
         This test verifies that the QdrantVectorStorage instantiation error has been fixed.
         """
-        
+
         test_metadata = {
             "source_type": "test",
             "source_path": "test_document.txt",
             "test_run": True,
             "description": "Test document for verifying ingest workflow"
         }
-        
+
         print("Attempting to store content in vector database...")
-        
+
         # This should now work without the abstract class error
         point_ids = await store_content_in_vector_db(
             content=test_content.strip(),
             metadata=test_metadata,
             collection_name="test_collection"
         )
-        
+
         if point_ids:
             print(f"✅ Content storage successful!")
             print(f"   Generated {len(point_ids)} vector points")
@@ -56,7 +56,7 @@ async def test_ingest_workflow():
             print("⚠️ Content storage returned empty point IDs")
             print("   This might be due to Qdrant not being available")
             return True  # Still consider this a success since no error was thrown
-        
+
     except Exception as e:
         error_msg = str(e)
         if "Can't instantiate abstract class QdrantVectorStorage" in error_msg:
@@ -76,14 +76,14 @@ async def test_ingest_workflow():
 async def test_services_availability():
     """Test if required services are available."""
     print("\nChecking service availability...")
-    
+
     # Check environment variables
     google_api_key = os.getenv('GOOGLE_API_KEY')
     if google_api_key:
         print("✅ GOOGLE_API_KEY is set")
     else:
         print("⚠️ GOOGLE_API_KEY is not set (embedding service will fail)")
-    
+
     # Check Redis (if available)
     try:
         import redis
@@ -92,7 +92,7 @@ async def test_services_availability():
         print("✅ Redis is available")
     except Exception:
         print("⚠️ Redis is not available")
-    
+
     # Check Qdrant (if available)
     try:
         import requests
@@ -111,15 +111,15 @@ async def main():
 
     # Set a dummy API key for testing
     os.environ['GOOGLE_API_KEY'] = 'dummy_key_for_testing'
-    
+
     # Test service availability
     await test_services_availability()
-    
+
     print("\n" + "=" * 50)
-    
+
     # Test the main workflow
     success = await test_ingest_workflow()
-    
+
     print("\n" + "=" * 50)
     if success:
         print("✅ Ingest workflow test passed!")
@@ -132,7 +132,7 @@ async def main():
     else:
         print("❌ Ingest workflow test failed!")
         print("Check the errors above for details.")
-    
+
     return success
 
 if __name__ == "__main__":

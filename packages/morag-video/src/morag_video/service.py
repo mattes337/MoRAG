@@ -24,17 +24,17 @@ class VideoServiceError(ServiceError):
 
 class VideoService:
     """High-level service for video processing and conversion.
-    
+
     This service provides a unified interface for processing video files,
     generating transcriptions, extracting keyframes, and converting to markdown format.
     """
 
-    def __init__(self, 
+    def __init__(self,
                  config: Optional[VideoConfig] = None,
                  embedding_service: Optional[GeminiEmbeddingService] = None,
                  output_dir: Optional[Union[str, Path]] = None):
         """Initialize the video service.
-        
+
         Args:
             config: Configuration for video processing
             embedding_service: Optional embedding service for enhanced features
@@ -44,14 +44,14 @@ class VideoService:
         self.processor = VideoProcessor(self.config)
         self._converter = None  # Lazy initialization to avoid circular import
         self.embedding_service = embedding_service
-        
+
         # Set up output directory
         if output_dir:
             self.output_dir = Path(output_dir)
             ensure_directory_exists(self.output_dir)
         else:
             self.output_dir = None
-        
+
         logger.info("Video service initialized",
                    extract_audio=self.config.extract_audio,
                    generate_thumbnails=self.config.generate_thumbnails,
@@ -106,24 +106,24 @@ class VideoService:
                          output_format: str = "markdown",
                          progress_callback: callable = None) -> Dict[str, Any]:
         """Process a video file and optionally save the results.
-        
+
         Args:
             file_path: Path to the video file
             save_output: Whether to save the output files
             output_format: Format to save the output (markdown, json, txt)
-            
+
         Returns:
             Dictionary containing processing results and output file paths
-            
+
         Raises:
             VideoServiceError: If processing fails
         """
         start_time = time.time()
         file_path = Path(file_path)
-        
+
         if not file_path.exists():
             raise VideoServiceError(f"Video file not found: {file_path}")
-        
+
         try:
             # Process the video file
             logger.info("Starting video processing", file_path=str(file_path))
@@ -133,7 +133,7 @@ class VideoService:
 
             # Add file_path to result for metadata extraction
             result.file_path = file_path
-            
+
             # Generate embeddings if embedding service is available
             if self.embedding_service and result.audio_processing_result and result.audio_processing_result.transcript:
                 try:
@@ -141,24 +141,24 @@ class VideoService:
                     transcript_embedding = await self.embedding_service.embed_text(
                         result.audio_processing_result.transcript
                     )
-                    
+
                     # Add embeddings to result
                     result.audio_processing_result.embeddings = {
                         "transcript": transcript_embedding
                     }
-                    
+
                     # Generate embeddings for segments if available
                     if result.audio_processing_result.segments:
                         logger.info("Generating embeddings for segments")
                         segment_texts = [seg.text for seg in result.audio_processing_result.segments]
                         segment_embeddings = await self.embedding_service.embed_batch(segment_texts)
-                        
+
                         # Add segment embeddings to result
                         result.audio_processing_result.embeddings["segments"] = segment_embeddings
-                        
+
                 except Exception as e:
                     logger.warning("Failed to generate embeddings", error=str(e))
-            
+
             # Convert to requested format
             formatted_content = None
             if output_format == "markdown":
@@ -188,7 +188,7 @@ class VideoService:
                     formatted_content = await self._convert_to_json(result)
                 except Exception as e:
                     logger.warning("Failed to convert to JSON", error=str(e))
-            
+
             # Save output files if requested
             output_files = {}
             if save_output and self.output_dir:
@@ -214,7 +214,7 @@ class VideoService:
                 "keyframes": [str(path) for path in result.keyframes],
                 "output_files": output_files
             }
-            
+
             # Add audio processing results if available
             if result.audio_processing_result:
                 response["audio"] = {
@@ -225,27 +225,27 @@ class VideoService:
                     "has_topic_segmentation": result.audio_processing_result.metadata.get("has_topic_info", False),
                     "has_embeddings": hasattr(result.audio_processing_result, "embeddings")
                 }
-            
+
             # Add OCR results if available
             if result.ocr_results:
                 response["ocr"] = {
                     "images_processed": len(result.ocr_results),
                     "has_text": any(text.strip() for text in result.ocr_results.values())
                 }
-            
-            logger.info("Video processing completed", 
+
+            logger.info("Video processing completed",
                        file_path=str(file_path),
                        processing_time=processing_time,
                        thumbnails_count=len(result.thumbnails),
                        keyframes_count=len(result.keyframes))
-            
+
             # Clean up temporary files
             self.processor.cleanup_temp_files(result.temp_files)
-            
+
             return response
-            
+
         except Exception as e:
-            logger.error("Video processing failed", 
+            logger.error("Video processing failed",
                         file_path=str(file_path),
                         error=str(e))
             if isinstance(e, VideoServiceError):
@@ -289,7 +289,7 @@ class VideoService:
                 # Create markdown directly from dictionary content
                 logger.info("Converting dictionary content to markdown")
                 markdown_content = await self._convert_dict_to_markdown(content, json_result.get("metadata", {}))
-                
+
                 # Return the same structure but with markdown content
                 markdown_result = json_result.copy()
                 markdown_result["content"] = markdown_content
@@ -311,20 +311,20 @@ class VideoService:
 
     async def _convert_dict_to_markdown(self, content: Dict[str, Any], metadata: Dict[str, Any]) -> str:
         """Convert dictionary content to markdown format with transcription and timecodes.
-        
+
         Args:
             content: Dictionary containing video processing results
             metadata: Metadata dictionary
-            
+
         Returns:
             Markdown formatted string
         """
         markdown_parts = []
-        
+
         # Add title
         title = content.get("title", "Video Analysis")
         markdown_parts.append(f"# {title}\n")
-        
+
         # Add metadata section
         if metadata:
             markdown_parts.append("## Metadata\n")
@@ -333,29 +333,29 @@ class VideoService:
                     formatted_key = key.replace('_', ' ').title()
                     markdown_parts.append(f"- **{formatted_key}**: {value}")
             markdown_parts.append("")
-        
+
         # Add content section with transcription
         if "audio_processing_result" in content:
             audio_result = content["audio_processing_result"]
-            
+
             # Add transcript with segments and timecodes
             if isinstance(audio_result, dict) and "segments" in audio_result:
                 segments = audio_result["segments"]
                 if segments:
                     markdown_parts.append("## Content\n")
-                    
+
                     for segment in segments:
                         if isinstance(segment, dict):
                             start_time = segment.get("start", 0)
                             text = segment.get("text", "").strip()
-                            
+
                             if text:
                                 # Format timestamp as [MM:SS]
                                 minutes = int(start_time // 60)
                                 seconds = int(start_time % 60)
                                 timestamp = f"[{minutes:02d}:{seconds:02d}]"
                                 markdown_parts.append(f"{timestamp} {text}")
-                    
+
                     markdown_parts.append("")
             elif isinstance(audio_result, dict) and "transcript" in audio_result:
                 # Fallback to full transcript if no segments
@@ -364,7 +364,7 @@ class VideoService:
                     markdown_parts.append("## Content\n")
                     markdown_parts.append(transcript)
                     markdown_parts.append("")
-        
+
         # Add topics if available
         if "topics" in content:
             topics = content["topics"]
@@ -374,16 +374,16 @@ class VideoService:
                         topic_title = topic.get("title", "")
                         if topic_title:
                             markdown_parts.append(f"## {topic_title}\n")
-                            
+
                             sentences = topic.get("sentences", [])
                             for sentence in sentences:
                                 if isinstance(sentence, dict):
                                     text = sentence.get("text", "").strip()
                                     if text:
                                         markdown_parts.append(text)
-                            
+
                             markdown_parts.append("")
-        
+
         return "\n".join(markdown_parts)
 
     async def _save_output_files(self,
@@ -429,7 +429,7 @@ class VideoService:
                            path=str(transcript_path),
                            error=str(e))
                 raise VideoServiceError(f"Failed to save transcript: {str(e)}")
-        
+
         # Save markdown if available
         if markdown_content:
             markdown_path = file_output_dir / f"{sanitized_name}.md"
@@ -495,33 +495,33 @@ class VideoService:
             logger.error("Failed to save metadata",
                        path=str(metadata_path),
                        error=str(e))
-        
+
         # Save thumbnails
         if result.thumbnails:
             thumbnail_dir = file_output_dir / "thumbnails"
             ensure_directory_exists(thumbnail_dir)
-            
+
             for i, thumbnail_path in enumerate(result.thumbnails):
                 ext = thumbnail_path.suffix
                 dest_path = thumbnail_dir / f"thumbnail_{i}{ext}"
                 import shutil
                 shutil.copy2(thumbnail_path, dest_path)
-            
+
             output_files["thumbnails_dir"] = str(thumbnail_dir)
-        
+
         # Save keyframes
         if result.keyframes:
             keyframe_dir = file_output_dir / "keyframes"
             ensure_directory_exists(keyframe_dir)
-            
+
             for i, keyframe_path in enumerate(result.keyframes):
                 ext = keyframe_path.suffix
                 dest_path = keyframe_dir / f"keyframe_{i}{ext}"
                 import shutil
                 shutil.copy2(keyframe_path, dest_path)
-            
+
             output_files["keyframes_dir"] = str(keyframe_dir)
-        
+
         # Save OCR results if available
         if result.ocr_results:
             ocr_path = file_output_dir / f"{sanitized_name}_ocr.json"
@@ -534,11 +534,11 @@ class VideoService:
                 logger.error("Failed to save OCR results",
                            path=str(ocr_path),
                            error=str(e))
-        
-        logger.info("Output files saved", 
+
+        logger.info("Output files saved",
                    output_dir=str(file_output_dir),
                    files=list(output_files.keys()))
-        
+
         return output_files
 
     async def _convert_to_json(self, result: VideoProcessingResult) -> Dict[str, Any]:

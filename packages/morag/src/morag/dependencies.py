@@ -271,13 +271,13 @@ class GraphEngine:
         self.traversal = get_graph_traversal()
         self.analytics = get_graph_analytics()
         self.available = self.crud is not None and self.traversal is not None
-    
+
     async def get_entity(self, entity_id: str):
         """Get entity by ID."""
         if not self.available:
             raise HTTPException(status_code=503, detail="Graph engine not available")
         return await self.crud.get_entity(entity_id)
-    
+
     async def find_entities_by_name(self, name: str, entity_type: Optional[str] = None):
         """Find entities by name."""
         if not self.available:

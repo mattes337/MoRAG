@@ -45,17 +45,17 @@ logger = structlog.get_logger(__name__)
 
 class IngestorStage(Stage):
     """Stage that ingests data into databases with deduplication."""
-    
+
     def __init__(self, stage_type: StageType = StageType.INGESTOR):
         """Initialize ingestor stage."""
         super().__init__(stage_type)
-        
+
         if not STORAGE_AVAILABLE:
             logger.warning("Storage services not available for ingestion")
 
         self.neo4j_storage: Optional["Neo4jStorage"] = None
         self.qdrant_storage: Optional["QdrantStorage"] = None
-    
+
     @stage_error_handler("ingestor_execute")
     async def execute(self,
                      input_files: List[Path],
@@ -78,7 +78,7 @@ class IngestorStage(Stage):
                 stage_type=self.stage_type.value,
                 invalid_files=[str(f) for f in input_files]
             )
-        
+
         config = context.get_stage_config(self.stage_type)
 
         # Get effective output directory
@@ -120,24 +120,24 @@ class IngestorStage(Stage):
                     stage_type=self.stage_type.value,
                     invalid_files=[str(f) for f in input_files]
                 )
-            
+
             # Generate output filename
             base_name = chunks_file.stem.replace('.chunks', '')
             output_file = effective_output_dir / f"{base_name}.ingestion.json"
             effective_output_dir.mkdir(parents=True, exist_ok=True)
-            
+
             # Load input data
             chunks_data = self._load_json_file(chunks_file)
             facts_data = self._load_json_file(facts_file) if facts_file else None
-            
+
             # Initialize storage backends
             await self._initialize_storage(config)
-            
+
             # Perform ingestion
             ingestion_results = await self._perform_ingestion(
                 chunks_data, facts_data, config
             )
-            
+
             # Create output data
             output_data = {
                 "ingestion_results": ingestion_results,
@@ -152,11 +152,11 @@ class IngestorStage(Stage):
                     "created_at": datetime.now().isoformat()
                 }
             }
-            
+
             # Write to file
             with open(output_file, 'w', encoding='utf-8') as f:
                 json.dump(output_data, f, indent=2, ensure_ascii=False)
-            
+
             # Create metadata
             stage_metadata = StageMetadata(
                 execution_time=0.0,  # Will be set by manager
@@ -173,7 +173,7 @@ class IngestorStage(Stage):
                     "databases_used": len(config.get('databases', ['qdrant']))
                 }
             )
-            
+
             return StageResult(
                 stage_type=self.stage_type,
                 status=StageStatus.COMPLETED,
@@ -181,17 +181,17 @@ class IngestorStage(Stage):
                 metadata=stage_metadata,
                 data=ingestion_results
             )
-            
+
         except Exception as e:
-            logger.error("Ingestion failed", 
-                        input_files=[str(f) for f in input_files], 
+            logger.error("Ingestion failed",
+                        input_files=[str(f) for f in input_files],
                         error=str(e))
             raise StageExecutionError(
                 f"Ingestion failed: {e}",
                 stage_type=self.stage_type.value,
                 original_error=e
             )
-    
+
     @validation_error_handler("ingestor_validate_inputs")
     def validate_inputs(self, input_files: List[Path]) -> bool:
         """Validate input files for ingestion.
@@ -212,24 +212,24 @@ class IngestorStage(Stage):
 
             if not file.name.endswith('.json'):
                 return False
-            
+
             # Try to parse JSON
             try:
                 with open(file, 'r', encoding='utf-8') as f:
                     json.load(f)
             except (json.JSONDecodeError, IOError):
                 return False
-        
+
         return True
-    
+
     def get_dependencies(self) -> List[StageType]:
         """Get stage dependencies.
-        
+
         Returns:
             List containing chunker and optionally fact-generator stages
         """
         return [StageType.CHUNKER]  # fact-generator is optional
-    
+
     def get_expected_outputs(self, input_files: List[Path], context: StageContext) -> List[Path]:
         """Get expected output file paths.
 
@@ -263,13 +263,13 @@ class IngestorStage(Stage):
         sanitized_name = sanitize_filename(base_name)
         output_file = context.output_dir / f"{sanitized_name}.ingestion.json"
         return [output_file]
-    
+
     def _load_json_file(self, file_path: Path) -> Dict[str, Any]:
         """Load JSON file safely.
-        
+
         Args:
             file_path: Path to JSON file
-            
+
         Returns:
             Loaded JSON data
         """
@@ -283,18 +283,18 @@ class IngestorStage(Stage):
         except Exception as e:
             logger.error("Failed to load JSON file", file=str(file_path), error=str(e))
             raise StageExecutionError(f"Failed to load {file_path}: {e}")
-    
+
     async def _initialize_storage(self, config: Dict[str, Any]) -> None:
         """Initialize storage backends.
-        
+
         Args:
             config: Stage configuration
         """
         if not STORAGE_AVAILABLE:
             return
-        
+
         databases = config.get('databases', ['qdrant'])
-        
+
         # Initialize Qdrant if requested
         if 'qdrant' in databases and STORAGE_AVAILABLE:
             try:
@@ -329,18 +329,18 @@ class IngestorStage(Stage):
             except Exception as e:
                 logger.error("Failed to initialize Neo4j storage", error=str(e))
                 raise StageExecutionError(f"Neo4j initialization failed: {e}")
-    
-    async def _perform_ingestion(self, 
-                               chunks_data: Dict[str, Any], 
-                               facts_data: Optional[Dict[str, Any]], 
+
+    async def _perform_ingestion(self,
+                               chunks_data: Dict[str, Any],
+                               facts_data: Optional[Dict[str, Any]],
                                config: Dict[str, Any]) -> Dict[str, Any]:
         """Perform the actual ingestion.
-        
+
         Args:
             chunks_data: Chunks data
             facts_data: Facts data (optional)
             config: Stage configuration
-            
+
         Returns:
             Ingestion results
         """
@@ -352,11 +352,11 @@ class IngestorStage(Stage):
             "duplicates_skipped": 0,
             "errors": []
         }
-        
+
         collection_name = config.get('collection_name', 'documents')
         batch_size = config.get('batch_size', 50)
         enable_dedup = config.get('enable_deduplication', True)
-        
+
         # Ingest chunks
         chunks = chunks_data.get('chunks', [])
         if chunks:
@@ -364,14 +364,14 @@ class IngestorStage(Stage):
                 chunks, collection_name, batch_size, enable_dedup
             )
             results.update(chunk_results)
-        
+
         # Ingest facts if available
         if facts_data:
             fact_results = await self._ingest_facts(
                 facts_data, collection_name, batch_size, enable_dedup
             )
             results.update(fact_results)
-        
+
         return results
 
     async def _ingest_chunks(self,

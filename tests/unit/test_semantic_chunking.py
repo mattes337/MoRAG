@@ -5,9 +5,9 @@ from morag_services.processing import chunking_service, ChunkInfo, SemanticChunk
 async def test_simple_chunking():
     """Test simple text chunking."""
     text = "This is a simple test. It has multiple sentences. Each sentence should be processed correctly."
-    
+
     chunks = await chunking_service.semantic_chunk(text, chunk_size=50, strategy="simple")
-    
+
     assert len(chunks) > 0
     assert all(len(chunk) <= 60 for chunk in chunks)  # Allow some flexibility
     assert "".join(chunks).replace(" ", "") in text.replace(" ", "")
@@ -20,9 +20,9 @@ async def test_sentence_chunking():
     This is the third sentence. This is the fourth sentence that is quite long and contains multiple clauses.
     This is the fifth sentence.
     """
-    
+
     chunks = await chunking_service.semantic_chunk(text, chunk_size=100, strategy="sentence")
-    
+
     assert len(chunks) > 0
     # Each chunk should contain complete sentences
     for chunk in chunks:
@@ -33,15 +33,15 @@ async def test_paragraph_chunking():
     """Test paragraph-based chunking."""
     text = """
     This is the first paragraph. It contains multiple sentences about a topic.
-    
+
     This is the second paragraph. It discusses a different topic entirely.
     It has more content than the first paragraph.
-    
+
     This is the third paragraph. It's shorter.
     """
-    
+
     chunks = await chunking_service.semantic_chunk(text, chunk_size=200, strategy="paragraph")
-    
+
     assert len(chunks) > 0
     # Should preserve paragraph structure
     for chunk in chunks:
@@ -56,9 +56,9 @@ async def test_semantic_chunking():
     Natural language processing is another AI field. It deals with understanding human language.
     Computer vision helps machines interpret visual information. It's used in many applications today.
     """
-    
+
     chunks = await chunking_service.semantic_chunk(text, chunk_size=150, strategy="semantic")
-    
+
     assert len(chunks) > 0
     assert all(len(chunk) > 0 for chunk in chunks)
 
@@ -66,12 +66,12 @@ async def test_semantic_chunking():
 async def test_chunk_with_metadata():
     """Test chunking with full metadata."""
     text = "This is a test document. It contains multiple sentences for testing purposes."
-    
+
     chunk_infos = await chunking_service.chunk_with_metadata(text, chunk_size=50)
-    
+
     assert len(chunk_infos) > 0
     assert all(isinstance(chunk, ChunkInfo) for chunk in chunk_infos)
-    
+
     for chunk in chunk_infos:
         assert chunk.text
         assert chunk.word_count > 0
@@ -84,7 +84,7 @@ async def test_empty_text_handling():
     """Test handling of empty text."""
     chunks = await chunking_service.semantic_chunk("", chunk_size=100)
     assert len(chunks) == 0
-    
+
     chunks = await chunking_service.semantic_chunk("   ", chunk_size=100)
     assert len(chunks) == 0
 
@@ -93,7 +93,7 @@ async def test_very_short_text():
     """Test handling of very short text."""
     text = "Short."
     chunks = await chunking_service.semantic_chunk(text, chunk_size=100)
-    
+
     assert len(chunks) == 1
     assert chunks[0].strip() == text
 
@@ -103,15 +103,15 @@ async def test_text_structure_analysis():
     text = """
     This is a complex document with multiple paragraphs. Each paragraph contains several sentences.
     The sentences vary in length and complexity.
-    
+
     This second paragraph discusses different topics. It has more technical content.
     The vocabulary is more advanced and specialized.
-    
+
     The final paragraph is shorter. It serves as a conclusion.
     """
-    
+
     analysis = await chunking_service.analyze_text_structure(text)
-    
+
     assert "word_count" in analysis
     assert "sentence_count" in analysis
     assert "paragraph_count" in analysis
@@ -120,7 +120,7 @@ async def test_text_structure_analysis():
     assert "recommended_strategy" in analysis
     assert "estimated_chunks" in analysis
     assert "spacy_available" in analysis
-    
+
     assert analysis["word_count"] > 0
     assert analysis["sentence_count"] > 0
     assert analysis["paragraph_count"] > 0
@@ -131,7 +131,7 @@ async def test_text_structure_analysis():
 async def test_empty_text_analysis():
     """Test analysis of empty text."""
     analysis = await chunking_service.analyze_text_structure("")
-    
+
     assert analysis["text_complexity"] == "empty"
     assert analysis["estimated_chunks"] == 0
     assert analysis["recommended_strategy"] == "simple"
@@ -161,15 +161,15 @@ async def test_chunking_strategies():
     """Test all chunking strategies."""
     text = """
     This is a test document. It has multiple sentences and paragraphs.
-    
+
     This is the second paragraph. It contains different information.
     The content is varied and interesting.
-    
+
     Final paragraph here. Short and sweet.
     """
-    
+
     strategies = ["simple", "sentence", "paragraph", "semantic"]
-    
+
     for strategy in strategies:
         chunks = await chunking_service.semantic_chunk(text, chunk_size=100, strategy=strategy)
         assert len(chunks) > 0, f"Strategy {strategy} failed"
@@ -178,7 +178,7 @@ async def test_chunking_strategies():
 def test_semantic_chunker_initialization():
     """Test SemanticChunker initialization."""
     chunker = SemanticChunker()
-    
+
     # Should initialize without errors
     assert chunker.max_chunk_size > 0
     assert chunker.min_chunk_size > 0
@@ -188,12 +188,12 @@ def test_semantic_chunker_initialization():
 async def test_chunk_overlap():
     """Test that chunks have appropriate overlap when configured."""
     text = "This is sentence one. This is sentence two. This is sentence three. This is sentence four. This is sentence five."
-    
+
     chunker = SemanticChunker()
     chunker.overlap_size = 20  # Set overlap
-    
+
     chunks = await chunker.chunk_text(text, chunk_size=50)
-    
+
     if len(chunks) > 1:
         # Check that there's some overlap between consecutive chunks
         for i in range(1, len(chunks)):
@@ -206,12 +206,12 @@ async def test_large_text_processing():
     # Create a larger text
     paragraph = "This is a test paragraph with multiple sentences. It contains various topics and ideas. The content is designed to test the chunking algorithm's ability to handle longer documents. "
     large_text = paragraph * 10  # Repeat to create larger document
-    
+
     chunks = await chunking_service.semantic_chunk(large_text, chunk_size=200)
-    
+
     assert len(chunks) > 1
     assert all(len(chunk) > 0 for chunk in chunks)
-    
+
     # Verify that all text is preserved
     combined_length = sum(len(chunk) for chunk in chunks)
     # Allow for some variation due to spacing and overlap
@@ -221,12 +221,12 @@ async def test_large_text_processing():
 async def test_special_characters_handling():
     """Test handling of text with special characters."""
     text = "This text has special characters: @#$%^&*(). It also has numbers: 123, 456. And punctuation: hello, world! How are you?"
-    
+
     chunks = await chunking_service.semantic_chunk(text, chunk_size=50)
-    
+
     assert len(chunks) > 0
     assert all(chunk.strip() for chunk in chunks)
-    
+
     # Verify special characters are preserved
     combined_text = " ".join(chunks)
     assert "@#$%^&*()" in combined_text

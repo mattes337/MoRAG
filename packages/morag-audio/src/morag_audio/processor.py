@@ -47,19 +47,19 @@ class AudioProcessor:
 
     def __init__(self, config: Optional[AudioConfig] = None):
         """Initialize the audio processor.
-        
+
         Args:
             config: Configuration for audio processing. If None, default config is used.
         """
         self.config = config or AudioConfig()
         self.metadata = {}
         self.rest_transcription_service = None
-        
+
         if self.config.use_rest_api:
             self._initialize_rest_transcription()
         else:
             self._initialize_components()
-        
+
     def _initialize_components(self):
         """Initialize the required components based on configuration."""
         self.transcriber = None
@@ -111,7 +111,7 @@ class AudioProcessor:
         if self.config.enable_diarization:
             try:
                 from morag_audio.services import SpeakerDiarizationService
-                
+
                 self.diarization_service = SpeakerDiarizationService(
                     model_name="pyannote/speaker-diarization-3.1",
                     device=self.config.device,
@@ -126,12 +126,12 @@ class AudioProcessor:
             except Exception as e:
                 logger.warning(f"Failed to initialize speaker diarization: {e}")
                 self.config.enable_diarization = False
-        
+
         # Initialize topic segmentation if enabled
         if self.config.enable_topic_segmentation:
             try:
                 from morag_audio.services import TopicSegmentationService
-                
+
                 self.topic_segmentation_service = TopicSegmentationService(
                     embedding_model="all-MiniLM-L6-v2",
                     device=self.config.device,
@@ -144,19 +144,19 @@ class AudioProcessor:
             except Exception as e:
                 logger.warning(f"Failed to initialize topic segmentation: {e}")
                 self.config.enable_topic_segmentation = False
-    
+
     def _initialize_rest_transcription(self):
         """Initialize REST transcription service."""
         if RestTranscriptionService is None:
             raise AudioProcessingError("REST transcription service not available. Please install required dependencies.")
-        
+
         try:
             self.rest_transcription_service = RestTranscriptionService(self.config)
             logger.info("REST transcription service initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize REST transcription service: {e}")
             raise AudioProcessingError(f"Failed to initialize REST transcription service: {e}")
-    
+
     async def process(self, file_path: Union[str, Path], progress_callback: callable = None) -> AudioProcessingResult:
         """Process an audio file to extract transcription and metadata.
 
@@ -209,7 +209,7 @@ class AudioProcessor:
                 if progress_callback:
                     progress_callback(0.85, "Applying topic segmentation")
                 segments = await self._apply_topic_segmentation(segments)
-            
+
             processing_time = time.time() - start_time
 
             if progress_callback:
@@ -239,12 +239,12 @@ class AudioProcessor:
                        word_count=self.metadata["word_count"],
                        segment_count=self.metadata["segment_count"],
                        num_speakers=self.metadata.get("num_speakers", 0))
-            
+
             # Generate markdown if using REST API
             markdown_transcript = None
             if self.config.use_rest_api and self.rest_transcription_service:
                 markdown_transcript = self.rest_transcription_service.convert_to_markdown(transcript, segments)
-            
+
             return AudioProcessingResult(
                 transcript=transcript,
                 segments=segments,
@@ -253,12 +253,12 @@ class AudioProcessor:
                 processing_time=processing_time,
                 markdown_transcript=markdown_transcript
             )
-            
+
         except Exception as e:
-            logger.error("Audio processing failed", 
+            logger.error("Audio processing failed",
                         file_path=str(file_path),
                         error=str(e))
-            
+
             processing_time = time.time() - start_time
             self.metadata["error"] = str(e)
             return AudioProcessingResult(
@@ -270,7 +270,7 @@ class AudioProcessor:
                 success=False,
                 error_message=str(e)
             )
-    
+
     async def _extract_metadata(self, file_path: Path) -> Dict[str, Any]:
         """Extract metadata from audio file."""
         metadata = {}
@@ -325,7 +325,7 @@ class AudioProcessor:
 
             # Legacy fields for compatibility
             metadata["filename"] = file_path.name
-            
+
             # Try to extract audio properties with pydub (may fail on Python 3.13+ due to missing audioop)
             try:
                 from pydub import AudioSegment as PydubSegment
@@ -338,7 +338,7 @@ class AudioProcessor:
                 logger.debug("Could not extract audio properties with pydub", error=str(pydub_error))
                 # Fallback: try to get basic info from file extension and size
                 metadata["pydub_unavailable"] = str(pydub_error)
-            
+
             # Try to get additional metadata from mutagen
             try:
                 audio_file = mutagen.File(file_path)
@@ -348,18 +348,18 @@ class AudioProcessor:
                             metadata[f"tag_{key.lower()}"] = str(value)
             except Exception as mutagen_error:
                 logger.debug("Could not extract additional metadata", error=str(mutagen_error))
-                
+
         except Exception as e:
             logger.warning("Error extracting audio metadata", error=str(e))
             metadata["metadata_extraction_error"] = str(e)
-            
+
         return metadata
-    
+
     async def _transcribe_audio(self, file_path: Path) -> tuple[List[AudioSegment], str]:
         """Transcribe audio file using configured transcription method."""
         if self.config.use_rest_api:
             return await self._transcribe_with_rest_api(file_path)
-        
+
         if not self.transcriber:
             raise AudioProcessingError("Transcriber not initialized")
 
@@ -440,20 +440,20 @@ class AudioProcessor:
             full_transcript += segment_data.text + " "
 
         return segments, full_transcript.strip()
-    
+
     async def _transcribe_with_rest_api(self, file_path: Path) -> tuple[List[AudioSegment], str]:
         """Transcribe audio file using REST API."""
         if not self.rest_transcription_service:
             raise AudioProcessingError("REST transcription service not initialized")
-        
+
         try:
             transcript_text, segments, detected_language = await self.rest_transcription_service.transcribe_audio(file_path)
-            
+
             # Store language information in metadata
             self.metadata["language"] = detected_language or self.config.language or "unknown"
-            
+
             return segments, transcript_text
-            
+
         except RestTranscriptionError as e:
             logger.error(f"REST transcription failed: {e}")
             raise AudioProcessingError(f"REST transcription failed: {e}")
@@ -491,21 +491,21 @@ class AudioProcessor:
             segments.append(segment)
 
         return segments, full_transcript.strip()
-    
+
     async def _apply_diarization(self, file_path: Union[str, Path], segments: List[AudioSegment]) -> List[AudioSegment]:
         """Apply speaker diarization to the audio segments.
-        
+
         Args:
             file_path: Path to the audio file
             segments: List of audio segments from transcription
-            
+
         Returns:
             Updated list of audio segments with speaker information
         """
         if not hasattr(self, 'diarization_service') or not self.diarization_service:
             logger.warning("Diarization requested but service not available")
             return segments
-        
+
         try:
             # Call the async diarization service directly
             diarization_result = await self.diarization_service.diarize_audio(
@@ -513,13 +513,13 @@ class AudioProcessor:
                 min_speakers=self.config.min_speakers,
                 max_speakers=self.config.max_speakers
             )
-            
+
             # Map diarization results to segments based on overlap
             for segment in segments:
                 # Find the speaker with the most overlap for this segment
                 max_overlap = 0
                 assigned_speaker = None
-                
+
                 for speaker_segment in diarization_result.segments:
                     # Calculate overlap between transcription segment and speaker segment
                     overlap_start = max(segment.start, speaker_segment.start_time)
@@ -529,33 +529,33 @@ class AudioProcessor:
                     if overlap > max_overlap:
                         max_overlap = overlap
                         assigned_speaker = speaker_segment.speaker_id
-                
+
                 # Assign speaker to segment if found
                 if assigned_speaker:
                     segment.speaker = assigned_speaker
-            
+
             # Add speaker metadata
             self.metadata["num_speakers"] = len(diarization_result.speakers)
             self.metadata["speakers"] = [
                 {"id": s.speaker_id, "name": f"Speaker {s.speaker_id}"}
                 for s in diarization_result.speakers
             ]
-            
+
             return segments
-            
+
         except Exception as e:
             logger.error(f"Error in speaker diarization: {str(e)}", exc_info=True)
             return segments
-    
+
     async def _apply_topic_segmentation(self, segments: List[AudioSegment]) -> List[AudioSegment]:
         """Apply topic segmentation to segments using the topic segmentation service."""
         if not hasattr(self, 'topic_segmentation_service') or not self.topic_segmentation_service or len(segments) < 3:
             return segments
-        
+
         try:
             # Prepare transcript and segments for the service
             full_transcript = " ".join([segment.text for segment in segments])
-            
+
             # Convert our segments to the format expected by the service
             transcript_segments = [
                 {
@@ -565,20 +565,20 @@ class AudioProcessor:
                     "speaker": segment.speaker
                 } for segment in segments
             ]
-            
+
             # Run topic segmentation using the service
             segmentation_result = await self.topic_segmentation_service.segment_transcript(
                 transcript=full_transcript,
                 transcript_segments=transcript_segments,
                 max_segments=5  # Reasonable default
             )
-            
+
             # Create a mapping of topic segments to our audio segments
             # by finding which topic segment each audio segment belongs to
             for segment in segments:
                 segment.topic_id = None
                 segment.topic_label = None
-                
+
                 # Find the topic segment that contains this audio segment
                 for topic in segmentation_result.segments:
                     # Check if the segment falls within this topic's time range
@@ -586,18 +586,18 @@ class AudioProcessor:
                         segment.topic_id = int(topic.topic_id.split('_')[1])  # Convert TOPIC_XX to integer
                         segment.topic_label = topic.title
                         break
-                    
+
                     # If no exact match, find the topic with the most overlap
                     elif max(segment.start, topic.start_time) < min(segment.end, topic.end_time):
                         overlap = min(segment.end, topic.end_time) - max(segment.start, topic.start_time)
                         segment_duration = segment.end - segment.start
-                        
+
                         # If more than 50% of the segment is in this topic, assign it
                         if overlap > (segment_duration * 0.5):
                             segment.topic_id = int(topic.topic_id.split('_')[1])
                             segment.topic_label = topic.title
                             break
-            
+
             # Add topic metadata
             self.metadata["topics"] = [
                 {
@@ -611,9 +611,9 @@ class AudioProcessor:
                     "speaker_distribution": topic.speaker_distribution
                 } for topic in segmentation_result.segments
             ]
-            
+
             return segments
-            
+
         except Exception as e:
             logger.warning("Topic segmentation failed", error=str(e))
             return segments

@@ -76,7 +76,7 @@ You can also install specific feature sets using pyproject.toml:
 # Audio processing only
 pip install -e ".[audio]"
 
-# Video processing only  
+# Video processing only
 pip install -e ".[video]"
 
 # Image processing only

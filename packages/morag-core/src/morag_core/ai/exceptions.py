@@ -5,7 +5,7 @@ from typing import Optional, Any
 
 class AgentError(Exception):
     """Base exception for agent-related errors."""
-    
+
     def __init__(self, message: str, details: Optional[Any] = None):
         super().__init__(message)
         self.details = details

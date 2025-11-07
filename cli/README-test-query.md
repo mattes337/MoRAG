@@ -30,7 +30,7 @@ python cli/test-query.py --help
 # Test Neo4j only
 python cli/test-query.py --neo4j "your query"
 
-# Test Qdrant only  
+# Test Qdrant only
 python cli/test-query.py --qdrant "your query"
 
 # Test both databases
@@ -106,7 +106,7 @@ python cli/test-query.py --all-dbs --test-all \
 
 ### Database Selection
 - `--neo4j`: Test Neo4j queries
-- `--qdrant`: Test Qdrant queries  
+- `--qdrant`: Test Qdrant queries
 - `--all-dbs`: Test all available databases
 
 ### Query Parameters

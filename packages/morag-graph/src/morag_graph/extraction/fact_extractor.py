@@ -1,8 +1,6 @@
 """Extract structured facts from document chunks."""
 
-import json
 import re
-import asyncio
 from typing import List, Dict, Any, Optional
 from concurrent.futures import ThreadPoolExecutor
 import structlog
@@ -21,7 +19,7 @@ except ImportError:
 
 class FactExtractor:
     """Extract structured facts from document chunks."""
-    
+
     def __init__(
         self,
         model_id: str = "gemini-2.0-flash",
@@ -86,28 +84,28 @@ class FactExtractor:
                 "min_confidence": min_confidence
             }
         )
-    
+
     async def extract_facts(
-        self, 
-        chunk_text: str, 
+        self,
+        chunk_text: str,
         chunk_id: str,
         document_id: str,
         context: Optional[Dict[str, Any]] = None
     ) -> List[Fact]:
         """Extract structured facts from a document chunk.
-        
+
         Args:
             chunk_text: Text content to extract facts from
             chunk_id: Unique identifier for the chunk
             document_id: Identifier for the source document
             context: Optional context information (domain, metadata, etc.)
-            
+
         Returns:
             List of validated Fact objects
         """
         if not chunk_text or not chunk_text.strip():
             return []
-        
+
         # Update context from parameters
         base_domain = context.get('domain', self.domain) if context else self.domain
 
@@ -124,7 +122,7 @@ class FactExtractor:
             'chunk_id': chunk_id,
             'document_id': document_id
         }
-        
+
         self.logger.info(
             "Starting fact extraction",
             chunk_id=chunk_id,
@@ -132,11 +130,11 @@ class FactExtractor:
             text_length=len(chunk_text),
             domain=extraction_context['domain']
         )
-        
+
         try:
             # Preprocess the text
             processed_text = self._preprocess_chunk(chunk_text)
-            
+
             # Extract fact candidates using LLM
             fact_candidates = await self._extract_fact_candidates(processed_text, extraction_context)
 
@@ -159,7 +157,7 @@ class FactExtractor:
 
             # Structure facts from candidates
             facts = self._structure_facts(fact_candidates, chunk_id, document_id, extraction_context)
-            
+
             # Validate facts
             validated_facts = []
             for fact in facts:
@@ -172,7 +170,7 @@ class FactExtractor:
                         fact_id=fact.id,
                         issues=issues
                     )
-            
+
             # Generate keywords for validated facts
             for fact in validated_facts:
                 if not fact.keywords:
@@ -202,7 +200,7 @@ class FactExtractor:
             )
 
             return filtered_facts
-            
+
         except Exception as e:
             self.logger.error(
                 "Fact extraction failed",
@@ -218,7 +216,7 @@ class FactExtractor:
                 traceback=traceback.format_exc()
             )
             return []
-    
+
     def _preprocess_chunk(self, text: str) -> str:
         """Clean and prepare text for fact extraction.
 
@@ -321,20 +319,20 @@ class FactExtractor:
 
     async def _extract_fact_candidates(self, text: str, context: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Use LLM to extract fact candidates from text.
-        
+
         Args:
             text: Preprocessed text
             context: Extraction context
-            
+
         Returns:
             List of fact candidate dictionaries
         """
         domain = context.get('domain', 'general')
         language = context.get('language', 'en')
-        
+
         # Extract query context for agent
         query_context = context.get('query_context')
-        
+
         try:
             # Use the agents framework - ALWAYS
             # Pass language as execution parameter to ensure it affects cache key
@@ -374,7 +372,7 @@ class FactExtractor:
                 domain=domain
             )
             return []
-    
+
     def _parse_llm_response(self, response: str) -> List[Dict[str, Any]]:
         """Parse LLM response to extract fact candidates.
 
@@ -444,7 +442,7 @@ class FactExtractor:
                 response_length=len(response)
             )
             return []
-    
+
     def _structure_facts(
         self,
         candidates: List[Dict[str, Any]],
@@ -656,12 +654,12 @@ class FactExtractor:
         text_parts = [fact.fact_text]
         text_parts.extend(fact.structured_metadata.primary_entities)
         text_parts.extend(fact.structured_metadata.domain_concepts)
-        
+
         combined_text = ' '.join(text_parts).lower()
-        
+
         # Extract meaningful words (simple keyword extraction)
         words = re.findall(r'\b[a-zA-Z]{3,}\b', combined_text)
-        
+
         # Filter out common stop words
         stop_words = {
             'the', 'and', 'for', 'are', 'but', 'not', 'you', 'all', 'can', 'had',
@@ -671,10 +669,10 @@ class FactExtractor:
             'with', 'this', 'that', 'they', 'have', 'from', 'will', 'been', 'each',
             'which', 'their', 'said', 'there', 'what', 'were', 'when', 'where'
         }
-        
+
         keywords = [word for word in words if word not in stop_words]
-        
+
         # Remove duplicates and limit count
         unique_keywords = list(dict.fromkeys(keywords))[:10]
-        
+
         return unique_keywords

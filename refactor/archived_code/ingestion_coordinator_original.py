@@ -48,7 +48,7 @@ class IngestionCoordinator:
         self.vector_storage = None
         self.fact_extractor = None
         self.logger = logger  # Initialize logger attribute
-        
+
     async def initialize(self):
         """Initialize all services."""
         from morag_core.config import LLMConfig
@@ -101,7 +101,7 @@ class IngestionCoordinator:
         # Initialize fact extractor service
         # We'll create a simple wrapper that mimics the old interface
         self.fact_extractor = FactExtractionWrapper()
-        
+
     async def ingest_content(
         self,
         content: str,
@@ -118,7 +118,7 @@ class IngestionCoordinator:
     ) -> Dict[str, Any]:
         """
         Perform comprehensive content ingestion.
-        
+
         Args:
             content: Text content to ingest
             source_path: Source file path or URL
@@ -130,29 +130,29 @@ class IngestionCoordinator:
             chunk_overlap: Overlap between chunks
             document_id: Custom document identifier
             replace_existing: Whether to replace existing document
-            
+
         Returns:
             Complete ingestion result dictionary
         """
         if not self.embedding_service:
             await self.initialize()
-            
+
         start_time = datetime.now(timezone.utc)
-        
+
         # Step 1: Determine which databases to use
         database_configs = self._determine_databases(databases)
-        logger.info("Determined databases for ingestion", 
+        logger.info("Determined databases for ingestion",
                    databases=[db.type.value for db in database_configs])
-        
+
         # Step 2: Generate document ID if not provided
         if not document_id:
             document_id = self._generate_document_id(source_path, content)
-            
+
         # Step 3: Generate embeddings and metadata for all databases
         embeddings_data = await self._generate_embeddings_and_metadata(
             content, metadata, chunk_size, chunk_overlap, document_id
         )
-        
+
         # Step 4: Determine language for extraction if not provided
         effective_language = language
         if not effective_language:
@@ -187,7 +187,7 @@ class IngestionCoordinator:
             source_path, content_type, metadata, processing_result,
             embeddings_data, graph_data, database_configs, start_time, document_summary, effective_language
         )
-        
+
         # Step 8: Write ingest_result.json file
         result_file_path = self._write_ingest_result_file(source_path, ingest_result)
 
@@ -212,7 +212,7 @@ class IngestionCoordinator:
 
         # Step 13: Update the ingest_result.json file with final results
         self._write_ingest_result_file(source_path, ingest_result)
-        
+
         logger.info("Ingestion completed successfully",
                    source_path=source_path,
                    databases_used=len(database_configs),
@@ -220,17 +220,17 @@ class IngestionCoordinator:
                    facts_extracted=len(graph_data.get('facts', [])),
                    relationships_extracted=len(graph_data.get('relationships', [])),
                    result_file=result_file_path)
-        
+
         return ingest_result
-        
+
     def _determine_databases(self, databases: Optional[List[DatabaseConfig]]) -> List[DatabaseConfig]:
         """Determine which databases to use for ingestion."""
         if databases:
             return databases
-            
+
         # Default configuration based on environment variables
         default_databases = []
-        
+
         # Check for Qdrant configuration
         import os
         qdrant_url = os.getenv('QDRANT_URL')
@@ -252,12 +252,12 @@ class IngestionCoordinator:
                     port=int(os.getenv('QDRANT_PORT', 6333)),
                     database_name=qdrant_collection
                 ))
-            
+
         # Check for Neo4j configuration
         neo4j_uri = os.getenv('NEO4J_URI')
         neo4j_username = os.getenv('NEO4J_USERNAME')
         neo4j_password = os.getenv('NEO4J_PASSWORD')
-        
+
         if neo4j_uri and neo4j_username and neo4j_password:
             default_databases.append(DatabaseConfig(
                 type=DatabaseType.NEO4J,
@@ -266,16 +266,16 @@ class IngestionCoordinator:
                 password=neo4j_password,
                 database_name=os.getenv('NEO4J_DATABASE', 'neo4j')
             ))
-            
+
         return default_databases
-        
+
     def _generate_document_id(self, source_path: str, content: str) -> str:
         """Generate a unique document ID."""
         # Generate a checksum from the content for deterministic IDs
         import hashlib
         content_hash = hashlib.sha256(content.encode('utf-8')).hexdigest()[:16]
         return UnifiedIDGenerator.generate_document_id(source_path, content_hash)
-        
+
     async def _generate_embeddings_and_metadata(
         self,
         content: str,
@@ -290,11 +290,11 @@ class IngestionCoordinator:
             chunk_size = 4000
         if chunk_overlap is None:
             chunk_overlap = 200
-            
+
         # Create chunks with content-type-aware strategy
         content_type = metadata.get('content_type', 'document')
         chunks = self._create_chunks(content, chunk_size, chunk_overlap, content_type, metadata)
-        
+
         # Generate embeddings for all chunks
         embedding_results = await self.embedding_service.generate_embeddings_batch(
             chunks, task_type="retrieval_document"
@@ -302,7 +302,7 @@ class IngestionCoordinator:
 
         # Extract embeddings from results
         embeddings = [result.embedding for result in embedding_results]
-        
+
         # Create chunk metadata with content-type-specific enhancements
         chunk_metadata = []
         for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
@@ -338,7 +338,7 @@ class IngestionCoordinator:
                 chunk_meta['location_type'] = 'chunk_index'
 
             chunk_metadata.append(chunk_meta)
-            
+
         return {
             'chunks': chunks,
             'embeddings': embeddings,
@@ -347,7 +347,7 @@ class IngestionCoordinator:
             'chunk_size': chunk_size,
             'chunk_overlap': chunk_overlap
         }
-        
+
     def _create_chunks(self, content: str, chunk_size: int, chunk_overlap: int, content_type: str = 'document', metadata: Dict[str, Any] = None) -> List[str]:
         """Create text chunks with content-type-aware strategy.
 

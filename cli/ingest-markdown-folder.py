@@ -11,13 +11,13 @@ Usage:
 Examples:
     # Ingest all markdown files with German language
     python ingest-markdown-folder.py /path/to/markdown/files --language de
-    
+
     # Ingest with custom Neo4j database
     python ingest-markdown-folder.py /path/to/markdown/files --language de --neo4j-database my_graph
-    
+
     # Dry run to see what files would be processed
     python ingest-markdown-folder.py /path/to/markdown/files --dry-run
-    
+
     # Force reprocess files even if already processed
     python ingest-markdown-folder.py /path/to/markdown/files --language de --force-reprocess
 
@@ -85,18 +85,18 @@ def find_markdown_files(folder_path: Path, recursive: bool = True) -> List[Path]
     """Find all markdown files in the folder."""
     markdown_extensions = get_markdown_extensions()
     files = []
-    
+
     if recursive:
         pattern = "**/*"
     else:
         pattern = "*"
-    
+
     for file_path in folder_path.glob(pattern):
-        if (file_path.is_file() and 
+        if (file_path.is_file() and
             file_path.suffix.lower() in markdown_extensions and
             not is_intermediate_file(file_path)):
             files.append(file_path)
-    
+
     return sorted(files)
 
 
@@ -104,12 +104,12 @@ def should_skip_file(file_path: Path, force_reprocess: bool = False) -> tuple[bo
     """Check if a file should be skipped based on existing output files."""
     if force_reprocess:
         return False, "force reprocess enabled"
-    
+
     # Check for ingest_result.json (indicates completed ingestion)
     ingest_result_path = file_path.with_suffix(file_path.suffix + '_ingest_result.json')
     if ingest_result_path.exists():
         return True, "already ingested (ingest_result.json exists)"
-    
+
     return False, "needs processing"
 
 
@@ -121,9 +121,9 @@ async def process_single_markdown_file(
     force_reprocess: bool = False
 ) -> Dict[str, any]:
     """Process a single markdown file."""
-    
+
     print(f"[INFO] Processing: {file_path}")
-    
+
     # Check if we should skip this file
     should_skip, skip_reason = should_skip_file(file_path, force_reprocess)
     if should_skip:
@@ -133,7 +133,7 @@ async def process_single_markdown_file(
             'status': 'skipped',
             'reason': skip_reason
         }
-    
+
     try:
         # Initialize MoRAG API
         api = MoRAGAPI()
@@ -141,7 +141,7 @@ async def process_single_markdown_file(
         # Initialize ingestion coordinator separately
         from morag.ingestion_coordinator import IngestionCoordinator
         coordinator = IngestionCoordinator()
-        
+
         # Enhanced metadata for markdown files
         enhanced_metadata = {
             'source_type': 'markdown',
@@ -150,7 +150,7 @@ async def process_single_markdown_file(
             'language': language,
             **(metadata or {})
         }
-        
+
         # Check for existing ingest_data.json file (intermediate processing result)
         ingest_data_path = file_path.with_suffix(file_path.suffix + '_ingest_data.json')
         if ingest_data_path.exists() and not force_reprocess:
@@ -159,7 +159,7 @@ async def process_single_markdown_file(
                 # Load existing ingest data
                 with open(ingest_data_path, 'r', encoding='utf-8') as f:
                     ingest_data = json.load(f)
-                
+
                 # Create a mock processing result from the ingest data
                 result = ServiceResultWrapper({
                     'success': True,
@@ -167,7 +167,7 @@ async def process_single_markdown_file(
                     'metadata': ingest_data.get('metadata', {}),
                     'processing_time': 0.0
                 })
-                
+
                 # Perform comprehensive ingestion
                 ingestion_result = await coordinator.ingest_content(
                     content=result.content,
@@ -199,7 +199,7 @@ async def process_single_markdown_file(
                 'metadata': enhanced_metadata
             }
         )
-        
+
         if not result.success:
             error_msg = getattr(result, 'error_message', 'Unknown processing error')
             print(f"   [ERROR] Processing failed: {error_msg}")
@@ -247,7 +247,7 @@ async def process_single_markdown_file(
             'task_id': getattr(result, 'task_id', None),
             'processing_time': getattr(result, 'processing_time', None)
         }
-        
+
     except Exception as e:
         print(f"   [ERROR] Error processing {file_path}: {e}")
         import traceback

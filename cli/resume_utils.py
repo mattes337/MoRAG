@@ -48,12 +48,12 @@ async def resume_from_process_result(process_result_data: Dict[str, Any], source
         print_header(f"MoRAG {content_type.title()} Resume from Process Result")
         print_result("Process Result Mode", "[OK] Enabled")
         print_result("Source File", source_file)
-        
+
         # Import ingestion coordinator
         from morag.ingestion_coordinator import IngestionCoordinator
         from morag_graph.models.database_config import DatabaseConfig, DatabaseType
         from morag_core.models.config import ProcessingResult
-        
+
         # Create database configurations
         database_configs = []
         if use_qdrant:
@@ -72,7 +72,7 @@ async def resume_from_process_result(process_result_data: Dict[str, Any], source
                     port=int(os.getenv('QDRANT_PORT', '6333')),
                     database_name=os.getenv('QDRANT_COLLECTION_NAME', 'morag_documents')
                 ))
-        
+
         if use_neo4j:
             database_configs.append(DatabaseConfig(
                 type=DatabaseType.NEO4J,
@@ -81,13 +81,13 @@ async def resume_from_process_result(process_result_data: Dict[str, Any], source
                 password=os.getenv('NEO4J_PASSWORD', 'password'),
                 database_name=os.getenv('NEO4J_DATABASE', 'neo4j')
             ))
-        
+
         # Extract content from process result
         content = process_result_data.get('content', '')
         if not content:
             print("[FAIL] Error: No content found in process result file")
             return False
-        
+
         # Create processing result object
         processing_result = ProcessingResult(
             success=True,
@@ -97,10 +97,10 @@ async def resume_from_process_result(process_result_data: Dict[str, Any], source
             metadata=process_result_data.get('metadata', {}),
             processing_time=process_result_data.get('processing_time', 0.0)
         )
-        
+
         # Initialize ingestion coordinator
         coordinator = IngestionCoordinator()
-        
+
         # Perform ingestion from process result
         print_section("Starting Ingestion from Process Result")
         result = await coordinator.ingest_content(
@@ -115,7 +115,7 @@ async def resume_from_process_result(process_result_data: Dict[str, Any], source
             document_id=Path(source_file).stem,
             replace_existing=True
         )
-        
+
         print_section("Ingestion Results")
         print_result("Status", "[OK] Success")
         print_result("Document ID", result['source_info']['document_id'])
@@ -123,9 +123,9 @@ async def resume_from_process_result(process_result_data: Dict[str, Any], source
         print_result("Chunks Created", str(result['embeddings_data']['chunk_count']))
         print_result("Entities Extracted", str(result['graph_data']['entities_count']))
         print_result("Relations Extracted", str(result['graph_data']['relations_count']))
-        
+
         return True
-        
+
     except Exception as e:
         print(f"[FAIL] Error during resume from process result: {e}")
         import traceback
@@ -142,11 +142,11 @@ async def resume_from_ingestion_data(ingestion_data: Dict[str, Any], source_file
         print_header(f"MoRAG {content_type.title()} Resume from Ingestion Data")
         print_result("Ingestion Data Mode", "[OK] Enabled")
         print_result("Source File", source_file)
-        
+
         # Import ingestion coordinator
         from morag.ingestion_coordinator import IngestionCoordinator
         from morag_graph.models.database_config import DatabaseConfig, DatabaseType
-        
+
         # Create database configurations
         database_configs = []
         if use_qdrant:
@@ -165,7 +165,7 @@ async def resume_from_ingestion_data(ingestion_data: Dict[str, Any], source_file
                     port=int(os.getenv('QDRANT_PORT', '6333')),
                     database_name=os.getenv('QDRANT_COLLECTION_NAME', 'morag_documents')
                 ))
-        
+
         if use_neo4j:
             database_configs.append(DatabaseConfig(
                 type=DatabaseType.NEO4J,
@@ -174,7 +174,7 @@ async def resume_from_ingestion_data(ingestion_data: Dict[str, Any], source_file
                 password=os.getenv('NEO4J_PASSWORD', 'password'),
                 database_name=os.getenv('NEO4J_DATABASE', 'neo4j')
             ))
-        
+
         # Initialize ingestion coordinator
         coordinator = IngestionCoordinator()
 
@@ -382,7 +382,7 @@ async def resume_from_ingestion_data(ingestion_data: Dict[str, Any], source_file
             document_id,
             replace_existing=True
         )
-        
+
         print_section("Database Write Results")
         for db_name, result in results.items():
             if result.get('success', False):
@@ -395,9 +395,9 @@ async def resume_from_ingestion_data(ingestion_data: Dict[str, Any], source_file
                     print_result(f"{db_name.upper()} Relations", str(result['relations_written']))
             else:
                 print_result(f"{db_name.upper()} Status", f"[FAIL] Failed: {result.get('error', 'Unknown error')}")
-        
+
         return True
-        
+
     except Exception as e:
         print(f"[FAIL] Error during resume from ingestion data: {e}")
         import traceback
@@ -495,23 +495,23 @@ def handle_resume_arguments(args, source_file: str, content_type: str, metadata:
             elif detected_files['process_result']:
                 print(f"[AUTO-DETECT] Found existing process result: {detected_files['process_result']}")
                 args.use_process_result = detected_files['process_result']
-    
+
     # Handle --use-process-result argument
     if hasattr(args, 'use_process_result') and args.use_process_result:
         process_result_file = Path(args.use_process_result)
         if not process_result_file.exists():
             print(f"[FAIL] Error: Process result file not found: {process_result_file}")
             sys.exit(1)
-        
+
         try:
             with open(process_result_file, 'r', encoding='utf-8') as f:
                 process_result_data = json.load(f)
             print(f"[OK] Using existing process result from: {process_result_file}")
             print("💡 Skipping processing phase, continuing from result file...")
-            
+
             # Continue with ingestion using the process result data
             success = asyncio.run(resume_from_process_result(
-                process_result_data, 
+                process_result_data,
                 source_file,
                 content_type,
                 use_qdrant=getattr(args, 'qdrant', False),
@@ -519,14 +519,14 @@ def handle_resume_arguments(args, source_file: str, content_type: str, metadata:
                 webhook_url=getattr(args, 'webhook_url', None),
                 metadata=metadata
             ))
-            
+
             if success:
                 print(f"\n[SUCCESS] {content_type.title()} processing resumed successfully!")
                 sys.exit(0)
             else:
                 print(f"\n[ERROR] {content_type.title()} processing resume failed!")
                 sys.exit(1)
-                
+
         except json.JSONDecodeError as e:
             print(f"[FAIL] Error: Invalid JSON in process result file: {e}")
             sys.exit(1)
@@ -540,13 +540,13 @@ def handle_resume_arguments(args, source_file: str, content_type: str, metadata:
         if not ingestion_data_file.exists():
             print(f"[FAIL] Error: Ingestion data file not found: {ingestion_data_file}")
             sys.exit(1)
-        
+
         try:
             with open(ingestion_data_file, 'r', encoding='utf-8') as f:
                 ingestion_data = json.load(f)
             print(f"[OK] Using existing ingestion data from: {ingestion_data_file}")
             print("💡 Skipping processing and ingestion calculation, starting database writes...")
-            
+
             # Continue with database writes using the ingestion data
             success = asyncio.run(resume_from_ingestion_data(
                 ingestion_data,
@@ -557,20 +557,20 @@ def handle_resume_arguments(args, source_file: str, content_type: str, metadata:
                 webhook_url=getattr(args, 'webhook_url', None),
                 metadata=metadata
             ))
-            
+
             if success:
                 print(f"\n[SUCCESS] {content_type.title()} ingestion resumed successfully!")
                 sys.exit(0)
             else:
                 print(f"\n[ERROR] {content_type.title()} ingestion resume failed!")
                 sys.exit(1)
-                
+
         except json.JSONDecodeError as e:
             print(f"[FAIL] Error: Invalid JSON in ingestion data file: {e}")
             sys.exit(1)
         except Exception as e:
             print(f"[FAIL] Error reading ingestion data file: {e}")
             sys.exit(1)
-    
+
     # No resume arguments provided, continue with normal processing
     return False

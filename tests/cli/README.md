@@ -119,8 +119,8 @@ python tests/cli/test-youtube.py https://youtu.be/VIDEO_ID --ingest --webhook-ur
 ## Available Scripts
 
 ### `test-simple.py`
-**Purpose**: Quick system validation and health check  
-**Usage**: `python tests/cli/test-simple.py`  
+**Purpose**: Quick system validation and health check
+**Usage**: `python tests/cli/test-simple.py`
 **Features**:
 - Tests package imports
 - Validates basic functionality
@@ -129,8 +129,8 @@ python tests/cli/test-youtube.py https://youtu.be/VIDEO_ID --ingest --webhook-ur
 - Confirms documentation presence
 
 ### `test-all.py`
-**Purpose**: Comprehensive system testing with detailed reporting  
-**Usage**: `python tests/cli/test-all.py`  
+**Purpose**: Comprehensive system testing with detailed reporting
+**Usage**: `python tests/cli/test-all.py`
 **Features**:
 - Component initialization tests
 - Configuration validation

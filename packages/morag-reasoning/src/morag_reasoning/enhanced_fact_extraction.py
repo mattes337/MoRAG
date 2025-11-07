@@ -2,7 +2,6 @@
 
 import structlog
 from typing import List, Dict, Any, Optional
-from datetime import datetime
 
 from morag_reasoning.llm import LLMClient
 from morag_reasoning.recursive_fact_models import RawFact, SourceMetadata
@@ -12,7 +11,7 @@ from morag_services.embedding import GeminiEmbeddingService
 
 class EnhancedFactExtractionService:
     """Enhanced fact extraction service that combines graph traversal with vector search."""
-    
+
     def __init__(
         self,
         llm_client: LLMClient,
@@ -20,7 +19,7 @@ class EnhancedFactExtractionService:
         embedding_service: Optional[GeminiEmbeddingService] = None
     ):
         """Initialize the enhanced fact extraction service.
-        
+
         Args:
             llm_client: LLM client for fact extraction
             neo4j_storage: Neo4j storage for graph operations
@@ -30,7 +29,7 @@ class EnhancedFactExtractionService:
         self.neo4j_storage = neo4j_storage
         self.embedding_service = embedding_service
         self.logger = structlog.get_logger(__name__)
-    
+
     async def extract_facts_for_query(
         self,
         user_query: str,
@@ -39,13 +38,13 @@ class EnhancedFactExtractionService:
         language: Optional[str] = None
     ) -> List[RawFact]:
         """Extract facts relevant to a query using both graph relationships and vector similarity.
-        
+
         Args:
             user_query: User's query
             entity_names: List of entity names to extract facts for
             max_facts: Maximum number of facts to return
             language: Language for fact extraction
-            
+
         Returns:
             List of extracted facts
         """
@@ -54,20 +53,20 @@ class EnhancedFactExtractionService:
             graph_facts = await self._extract_facts_from_graph(
                 user_query, entity_names, language, user_query
             )
-            
+
             # Extract facts using vector similarity if embedding service is available
             vector_facts = []
             if self.embedding_service:
                 vector_facts = await self._extract_facts_from_vector_search(
                     user_query, max_facts // 2, language
                 )
-            
+
             # Combine and deduplicate facts
             all_facts = self._combine_and_deduplicate_facts(graph_facts, vector_facts)
-            
+
             # Limit to max_facts
             limited_facts = all_facts[:max_facts]
-            
+
             self.logger.info(
                 "Enhanced fact extraction completed",
                 user_query=user_query,
@@ -77,9 +76,9 @@ class EnhancedFactExtractionService:
                 total_unique_facts=len(all_facts),
                 returned_facts=len(limited_facts)
             )
-            
+
             return limited_facts
-            
+
         except Exception as e:
             self.logger.error(
                 "Enhanced fact extraction failed",
@@ -88,7 +87,7 @@ class EnhancedFactExtractionService:
                 error=str(e)
             )
             return []
-    
+
     async def _extract_facts_from_graph(
         self,
         user_query: str,
@@ -97,12 +96,12 @@ class EnhancedFactExtractionService:
         query_context: Optional[str] = None
     ) -> List[RawFact]:
         """Extract facts from graph relationships (existing approach).
-        
+
         Args:
             user_query: User's query
             entity_names: List of entity names
             language: Language for extraction
-            
+
         Returns:
             List of facts from graph traversal
         """
@@ -116,9 +115,9 @@ class EnhancedFactExtractionService:
                    f.domain as domain
             LIMIT 50
             """
-            
+
             result = await self.neo4j_storage._connection_ops._execute_query(query, {"entity_names": entity_names})
-            
+
             facts = []
             for record in result:
                 fact_text = self._create_fact_text(record)
@@ -157,9 +156,9 @@ class EnhancedFactExtractionService:
                     )
                 )
                 facts.append(fact)
-            
+
             return facts
-            
+
         except Exception as e:
             self.logger.error(
                 "Graph fact extraction failed",
@@ -167,7 +166,7 @@ class EnhancedFactExtractionService:
                 error=str(e)
             )
             return []
-    
+
     async def _extract_facts_from_vector_search(
         self,
         user_query: str,
@@ -175,35 +174,35 @@ class EnhancedFactExtractionService:
         language: Optional[str] = None
     ) -> List[RawFact]:
         """Extract facts using vector similarity search.
-        
+
         Args:
             user_query: User's query
             max_facts: Maximum number of facts to return
             language: Language for extraction
-            
+
         Returns:
             List of facts from vector search
         """
         if not self.embedding_service:
             return []
-        
+
         try:
             from morag_graph.services.fact_embedding_service import FactEmbeddingService
-            
+
             fact_embedding_service = FactEmbeddingService(
                 self.neo4j_storage, self.embedding_service
             )
-            
+
             # Generate embedding for the user query
             query_embedding = await self.embedding_service.generate_embedding(
                 user_query, task_type="retrieval_query"
             )
-            
+
             # Search for similar facts
             similar_facts = await fact_embedding_service.search_similar_facts(
                 query_embedding, limit=max_facts, similarity_threshold=0.3
             )
-            
+
             # Convert to RawFact objects
             facts = []
             for fact_data in similar_facts:
@@ -242,9 +241,9 @@ class EnhancedFactExtractionService:
                     )
                 )
                 facts.append(fact)
-            
+
             return facts
-            
+
         except Exception as e:
             self.logger.error(
                 "Vector fact extraction failed",
@@ -252,13 +251,13 @@ class EnhancedFactExtractionService:
                 error=str(e)
             )
             return []
-    
+
     def _create_fact_text(self, fact_data: Dict[str, Any]) -> str:
         """Create readable fact text from fact data.
-        
+
         Args:
             fact_data: Dictionary containing fact information
-            
+
         Returns:
             Formatted fact text
         """
@@ -266,7 +265,7 @@ class EnhancedFactExtractionService:
         approach = fact_data.get("approach", "")
         object_text = fact_data.get("object", "")
         solution = fact_data.get("solution", "")
-        
+
         # Create structured fact text
         parts = []
         if subject:
@@ -277,9 +276,9 @@ class EnhancedFactExtractionService:
             parts.append(f"Object: {object_text}")
         if solution:
             parts.append(f"Solution: {solution}")
-        
+
         return ". ".join(parts) if parts else "No fact text available"
-    
+
     def _combine_and_deduplicate_facts(
         self,
         graph_facts: List[RawFact],

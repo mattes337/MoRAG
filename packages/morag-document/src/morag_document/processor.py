@@ -64,12 +64,12 @@ class DocumentProcessor(BaseProcessor):
         text_converter = TextConverter()
         for format_type in text_converter.supported_formats:
             self.converters[format_type] = text_converter
-            
+
         # Register Excel converter
         excel_converter = ExcelConverter()
         for format_type in excel_converter.supported_formats:
             self.converters[format_type] = excel_converter
-            
+
         # Register PowerPoint converter
         presentation_converter = PresentationConverter()
         for format_type in presentation_converter.supported_formats:

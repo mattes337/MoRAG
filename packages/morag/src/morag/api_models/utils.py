@@ -85,14 +85,14 @@ async def download_remote_file(file_path: str, temp_dir: Path) -> Path:
             import shutil
             shutil.copy2(file_path, local_path)
 
-        logger.info("Remote file downloaded successfully", 
+        logger.info("Remote file downloaded successfully",
                    remote_path=file_path, local_path=str(local_path))
         return local_path
 
     except Exception as e:
         if isinstance(e, HTTPException):
             raise
-        logger.error("Failed to download remote file", 
+        logger.error("Failed to download remote file",
                     remote_path=file_path, error=str(e))
         raise HTTPException(
             status_code=500,
@@ -102,16 +102,16 @@ async def download_remote_file(file_path: str, temp_dir: Path) -> Path:
 
 def normalize_content_type(content_type: Optional[str]) -> Optional[str]:
     """Normalize content type from MIME type to MoRAG content type.
-    
+
     Args:
         content_type: MIME content type
-        
+
     Returns:
         Normalized content type for MoRAG
     """
     if not content_type:
         return None
-    
+
     # Mapping from MIME types to MoRAG content types
     mime_to_morag = {
         'application/pdf': 'document',
@@ -138,19 +138,19 @@ def normalize_content_type(content_type: Optional[str]) -> Optional[str]:
         'video/quicktime': 'video',
         'video/x-msvideo': 'video',
     }
-    
+
     # Clean content type (remove charset, etc.)
     clean_content_type = content_type.split(';')[0].strip().lower()
-    
+
     return mime_to_morag.get(clean_content_type, 'document')
 
 
 def normalize_processing_result(result: ProcessingResult) -> ProcessingResult:
     """Normalize ProcessingResult to ensure it has a content attribute.
-    
+
     Args:
         result: Processing result to normalize
-        
+
     Returns:
         Normalized processing result
     """
@@ -166,21 +166,21 @@ def normalize_processing_result(result: ProcessingResult) -> ProcessingResult:
                 result.content = "No content extracted"
         else:
             result.content = "No content available"
-    
+
     return result
 
 
 def encode_thumbnails_to_base64(thumbnail_paths: List[str]) -> List[str]:
     """Encode thumbnail images to base64 strings.
-    
+
     Args:
         thumbnail_paths: List of paths to thumbnail images
-        
+
     Returns:
         List of base64-encoded thumbnail strings
     """
     encoded_thumbnails = []
-    
+
     for thumbnail_path in thumbnail_paths:
         try:
             with open(thumbnail_path, 'rb') as f:
@@ -191,5 +191,5 @@ def encode_thumbnails_to_base64(thumbnail_paths: List[str]) -> List[str]:
             logger.warning(f"Failed to encode thumbnail {thumbnail_path}: {e}")
             # Add placeholder for failed thumbnail
             encoded_thumbnails.append("")
-    
+
     return encoded_thumbnails

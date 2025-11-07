@@ -55,7 +55,7 @@ logger = structlog.get_logger(__name__)
 
 class RemoteConverter:
     """Remote conversion worker that processes MoRAG jobs."""
-    
+
     def __init__(self, config: Dict[str, Any]):
         self.config = config
         self.worker_id = config['worker_id']
@@ -66,7 +66,7 @@ class RemoteConverter:
         self.max_concurrent_jobs = config.get('max_concurrent_jobs', 2)
         self.running = False
         self.active_jobs = {}
-        
+
         # Initialize processors
         self.processors = {
             'audio': AudioProcessor(),
@@ -76,34 +76,34 @@ class RemoteConverter:
             'web': WebProcessor(),
             'youtube': YouTubeProcessor()
         }
-        
+
         logger.info("Remote converter initialized",
                    worker_id=self.worker_id,
                    content_types=self.content_types,
                    api_base_url=self.api_base_url)
-    
+
     def start(self):
         """Start the remote converter worker."""
         self.running = True
         logger.info("Starting remote converter worker", worker_id=self.worker_id)
-        
+
         # Set up signal handlers for graceful shutdown
         signal.signal(signal.SIGINT, self._signal_handler)
         signal.signal(signal.SIGTERM, self._signal_handler)
-        
+
         # Start main processing loop
         asyncio.run(self._main_loop())
-    
+
     def stop(self):
         """Stop the remote converter worker."""
         self.running = False
         logger.info("Stopping remote converter worker", worker_id=self.worker_id)
-    
+
     def _signal_handler(self, signum, frame):
         """Handle shutdown signals."""
         logger.info("Received shutdown signal", signal=signum)
         self.stop()
-    
+
     async def _main_loop(self):
         """Main processing loop."""
         while self.running:
@@ -116,22 +116,22 @@ class RemoteConverter:
                         # Process job in background
                         task = asyncio.create_task(self._process_job(job))
                         self.active_jobs[job['job_id']] = task
-                
+
                 # Clean up completed jobs
                 await self._cleanup_completed_jobs()
-                
+
                 # Wait before next poll
                 await asyncio.sleep(self.poll_interval)
-                
+
             except Exception as e:
                 logger.error("Error in main loop", error=str(e))
                 await asyncio.sleep(self.poll_interval)
-        
+
         # Wait for active jobs to complete
         if self.active_jobs:
             logger.info("Waiting for active jobs to complete", count=len(self.active_jobs))
             await asyncio.gather(*self.active_jobs.values(), return_exceptions=True)
-    
+
     async def _poll_for_job(self) -> Optional[Dict[str, Any]]:
         """Poll the API for available jobs."""
         try:
@@ -169,19 +169,19 @@ class RemoteConverter:
         except Exception as e:
             logger.error("Error polling for jobs", error=str(e))
             return None
-    
+
     async def _process_job(self, job: Dict[str, Any]):
         """Process a single job."""
         job_id = job['job_id']
         content_type = job['content_type']
         source_file_url = job['source_file_url']
         task_options = job.get('task_options', {})
-        
+
         try:
             logger.info("Starting job processing",
                        job_id=job_id,
                        content_type=content_type)
-            
+
             # Download source file
             source_file_path = await self._download_source_file(source_file_url, job_id)
             if not source_file_path:
@@ -190,12 +190,12 @@ class RemoteConverter:
                     'error_message': 'Failed to download source file'
                 })
                 return
-            
+
             # Process the file
             start_time = time.time()
             result = await self._process_file(source_file_path, content_type, task_options)
             processing_time = time.time() - start_time
-            
+
             # Submit result
             if result and result.success:
                 await self._submit_job_result(job_id, {
@@ -217,7 +217,7 @@ class RemoteConverter:
                 logger.error("Job processing failed",
                            job_id=job_id,
                            error=error_message)
-            
+
             # Clean up source file
             try:
                 os.unlink(source_file_path)
@@ -225,7 +225,7 @@ class RemoteConverter:
                 logger.warning("Failed to clean up source file",
                              file_path=source_file_path,
                              error=str(e))
-            
+
         except Exception as e:
             logger.error("Exception processing job", job_id=job_id, error=str(e))
             await self._submit_job_result(job_id, {
@@ -235,26 +235,26 @@ class RemoteConverter:
         finally:
             # Remove from active jobs
             self.active_jobs.pop(job_id, None)
-    
+
     async def _download_source_file(self, source_file_url: str, job_id: str) -> Optional[str]:
         """Download source file from API."""
         try:
             headers = {}
             if self.api_key:
                 headers['Authorization'] = f'Bearer {self.api_key}'
-            
+
             response = requests.get(
                 f"{self.api_base_url}{source_file_url}",
                 headers=headers,
                 stream=True,
                 timeout=300  # 5 minute timeout for download
             )
-            
+
             if response.status_code == 200:
                 # Create temp directory for this job
                 temp_dir = Path(f"/tmp/morag_remote_{job_id}")
                 temp_dir.mkdir(exist_ok=True)
-                
+
                 # Determine file extension from content-disposition or URL
                 filename = f"source_file_{job_id}"
                 if 'content-disposition' in response.headers:
@@ -263,32 +263,32 @@ class RemoteConverter:
                     match = re.search(r'filename="?([^"]+)"?', cd)
                     if match:
                         filename = match.group(1)
-                
+
                 file_path = temp_dir / filename
-                
+
                 # Download file
                 with open(file_path, 'wb') as f:
                     for chunk in response.iter_content(chunk_size=8192):
                         f.write(chunk)
-                
+
                 logger.info("Source file downloaded",
                            job_id=job_id,
                            file_path=str(file_path),
                            file_size=file_path.stat().st_size)
-                
+
                 return str(file_path)
             else:
                 logger.error("Failed to download source file",
                            job_id=job_id,
                            status_code=response.status_code)
                 return None
-                
+
         except Exception as e:
             logger.error("Exception downloading source file",
                         job_id=job_id,
                         error=str(e))
             return None
-    
+
     async def _process_file(self, file_path: str, content_type: str, options: Dict[str, Any]) -> Optional[ProcessingResult]:
         """Process file using appropriate MoRAG processor."""
         try:
@@ -302,7 +302,7 @@ class RemoteConverter:
                     processing_time=0.0,
                     error_message=f"No processor available for content type: {content_type}"
                 )
-            
+
             # Process the file
             if content_type == 'audio':
                 result = await processor.process_audio(file_path, options)
@@ -324,9 +324,9 @@ class RemoteConverter:
                 result = await processor.process_youtube_video(url, options)
             else:
                 raise ValueError(f"Unsupported content type: {content_type}")
-            
+
             return result
-            
+
         except Exception as e:
             logger.error("Exception processing file",
                         file_path=file_path,
@@ -339,21 +339,21 @@ class RemoteConverter:
                 processing_time=0.0,
                 error_message=str(e)
             )
-    
+
     async def _submit_job_result(self, job_id: str, result: Dict[str, Any]):
         """Submit job result to API."""
         try:
             headers = {'Content-Type': 'application/json'}
             if self.api_key:
                 headers['Authorization'] = f'Bearer {self.api_key}'
-            
+
             response = requests.put(
                 f"{self.api_base_url}/api/v1/remote-jobs/{job_id}/result",
                 json=result,
                 headers=headers,
                 timeout=30
             )
-            
+
             if response.status_code == 200:
                 logger.info("Job result submitted successfully", job_id=job_id)
             else:
@@ -361,12 +361,12 @@ class RemoteConverter:
                            job_id=job_id,
                            status_code=response.status_code,
                            response=response.text)
-                
+
         except Exception as e:
             logger.error("Exception submitting job result",
                         job_id=job_id,
                         error=str(e))
-    
+
     async def _cleanup_completed_jobs(self):
         """Clean up completed job tasks."""
         completed_jobs = []
@@ -379,7 +379,7 @@ class RemoteConverter:
                     logger.error("Job task completed with exception",
                                job_id=job_id,
                                error=str(e))
-        
+
         for job_id in completed_jobs:
             self.active_jobs.pop(job_id, None)
 ```
@@ -399,15 +399,15 @@ logger = structlog.get_logger(__name__)
 
 class RemoteConverterConfig:
     """Configuration management for remote converter."""
-    
+
     def __init__(self, config_file: str = None):
         self.config_file = config_file or "remote_converter_config.yaml"
         self.config = self._load_config()
-    
+
     def _load_config(self) -> Dict[str, Any]:
         """Load configuration from file and environment variables."""
         config = {}
-        
+
         # Load from config file if it exists
         if os.path.exists(self.config_file):
             try:
@@ -418,7 +418,7 @@ class RemoteConverterConfig:
                 logger.info("Loaded configuration from file", file=self.config_file)
             except Exception as e:
                 logger.warning("Failed to load config file", file=self.config_file, error=str(e))
-        
+
         # Override with environment variables
         env_config = {
             'worker_id': os.getenv('MORAG_WORKER_ID', f'remote-worker-{os.getpid()}'),
@@ -430,40 +430,40 @@ class RemoteConverterConfig:
             'log_level': os.getenv('MORAG_LOG_LEVEL', 'INFO'),
             'temp_dir': os.getenv('MORAG_TEMP_DIR', '/tmp/morag_remote')
         }
-        
+
         # Remove None values
         env_config = {k: v for k, v in env_config.items() if v is not None}
         config.update(env_config)
-        
+
         return config
-    
+
     def get(self, key: str, default=None):
         """Get configuration value."""
         return self.config.get(key, default)
-    
+
     def validate(self) -> bool:
         """Validate configuration."""
         required_fields = ['worker_id', 'api_base_url', 'content_types']
-        
+
         for field in required_fields:
             if not self.config.get(field):
                 logger.error("Missing required configuration", field=field)
                 return False
-        
+
         # Validate content types
         valid_types = ['audio', 'video', 'document', 'image', 'web', 'youtube']
         for content_type in self.config['content_types']:
             if content_type not in valid_types:
                 logger.error("Invalid content type", content_type=content_type, valid_types=valid_types)
                 return False
-        
+
         return True
-    
+
     def create_sample_config(self, file_path: str = None):
         """Create a sample configuration file."""
         if not file_path:
             file_path = "remote_converter_config.yaml.example"
-        
+
         sample_config = {
             'worker_id': 'gpu-worker-01',
             'api_base_url': 'https://api.morag.com',
@@ -474,10 +474,10 @@ class RemoteConverterConfig:
             'log_level': 'INFO',
             'temp_dir': '/tmp/morag_remote'
         }
-        
+
         with open(file_path, 'w') as f:
             yaml.dump(sample_config, f, default_flow_style=False)
-        
+
         logger.info("Sample configuration created", file=file_path)
 ```
 
@@ -518,7 +518,7 @@ def setup_logging(log_level: str):
         wrapper_class=structlog.stdlib.BoundLogger,
         cache_logger_on_first_use=True,
     )
-    
+
     import logging
     logging.basicConfig(
         format="%(message)s",
@@ -539,22 +539,22 @@ def main():
     parser.add_argument('--log-level', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'], help='Log level')
     parser.add_argument('--create-config', action='store_true', help='Create sample configuration file')
     parser.add_argument('--test-connection', action='store_true', help='Test API connection and exit')
-    
+
     args = parser.parse_args()
-    
+
     # Load environment variables
     load_dotenv()
-    
+
     # Create sample config if requested
     if args.create_config:
         config_manager = RemoteConverterConfig()
         config_manager.create_sample_config()
         print("Sample configuration created: remote_converter_config.yaml.example")
         return
-    
+
     # Load configuration
     config_manager = RemoteConverterConfig(args.config)
-    
+
     # Override with command line arguments
     if args.worker_id:
         config_manager.config['worker_id'] = args.worker_id
@@ -570,16 +570,16 @@ def main():
         config_manager.config['max_concurrent_jobs'] = args.max_jobs
     if args.log_level:
         config_manager.config['log_level'] = args.log_level
-    
+
     # Validate configuration
     if not config_manager.validate():
         print("Configuration validation failed. Use --create-config to create a sample configuration.")
         sys.exit(1)
-    
+
     # Set up logging
     setup_logging(config_manager.get('log_level', 'INFO'))
     logger = structlog.get_logger(__name__)
-    
+
     # Test connection if requested
     if args.test_connection:
         import requests
@@ -597,7 +597,7 @@ def main():
         except Exception as e:
             print(f"✗ API connection failed: {e}")
             sys.exit(1)
-    
+
     # Create and start remote converter
     try:
         converter = RemoteConverter(config_manager.config)
@@ -737,19 +737,19 @@ class TestRemoteConverter:
     def test_initialization(self):
         # Test converter initialization
         pass
-    
+
     def test_job_polling(self):
         # Test job polling mechanism
         pass
-    
+
     def test_file_processing(self):
         # Test file processing with different content types
         pass
-    
+
     def test_error_handling(self):
         # Test error handling and recovery
         pass
-    
+
     def test_concurrent_processing(self):
         # Test concurrent job processing
         pass

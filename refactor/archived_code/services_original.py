@@ -90,7 +90,7 @@ class MoRAGServices:
 
     def __init__(self, config: Optional[ServiceConfig] = None, graph_config: Optional[GraphProcessingConfig] = None, data_output_dir: Optional[str] = None):
         """Initialize MoRAG services.
-        
+
         Args:
             config: Configuration for services
             graph_config: Configuration for graph processing
@@ -98,7 +98,7 @@ class MoRAGServices:
         """
         self.config = config or ServiceConfig()
         self.data_output_dir = data_output_dir
-        
+
         # Initialize specialized services
         self.document_service = DocumentService()
 
@@ -116,10 +116,10 @@ class MoRAGServices:
         self.embedding_service = GeminiEmbeddingService()
         self.web_service = WebService()
         self.youtube_service = YouTubeService()
-        
+
         # Initialize graph processor with data output directory
         self.graph_processor = GraphProcessor(graph_config, data_output_dir)
-        
+
         # Initialize data file writer
         self._data_writer = None
         if data_output_dir:
@@ -133,7 +133,7 @@ class MoRAGServices:
         self._vector_storage = None
         self._gemini_embedding_service = None
         self._initialize_search_services()
-        
+
         # Create semaphore for concurrent processing
         self.semaphore = asyncio.Semaphore(self.config.max_concurrent_tasks)
 
@@ -191,7 +191,7 @@ class MoRAGServices:
             logger.error("Failed to initialize search services", error=str(e))
             self._vector_storage = None
             self._gemini_embedding_service = None
-        
+
         # Register content type detectors
         self._content_type_detectors = {
             ContentType.DOCUMENT: self._is_document,
@@ -201,72 +201,72 @@ class MoRAGServices:
             ContentType.WEB: self._is_web,
             ContentType.YOUTUBE: self._is_youtube,
         }
-    
+
     def _is_document(self, path_or_url: str) -> bool:
         """Check if content is a document."""
         if path_or_url.startswith("http"):
             return False
-        
+
         document_extensions = {
             ".pdf", ".docx", ".doc", ".pptx", ".ppt", ".xlsx", ".xls",
             ".txt", ".rtf", ".md", ".csv", ".json", ".xml", ".html", ".htm"
         }
         return Path(path_or_url).suffix.lower() in document_extensions
-    
+
     def _is_audio(self, path_or_url: str) -> bool:
         """Check if content is audio."""
         if path_or_url.startswith("http"):
             return False
-        
+
         audio_extensions = {
             ".mp3", ".wav", ".ogg", ".flac", ".aac", ".m4a", ".wma", ".opus"
         }
         return Path(path_or_url).suffix.lower() in audio_extensions
-    
+
     def _is_video(self, path_or_url: str) -> bool:
         """Check if content is video."""
         if path_or_url.startswith("http"):
             return False
-        
+
         video_extensions = {
             ".mp4", ".avi", ".mov", ".mkv", ".wmv", ".flv", ".webm", ".m4v"
         }
         return Path(path_or_url).suffix.lower() in video_extensions
-    
+
     def _is_image(self, path_or_url: str) -> bool:
         """Check if content is an image."""
         if path_or_url.startswith("http"):
             return False
-        
+
         image_extensions = {
             ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".tiff", ".svg"
         }
         return Path(path_or_url).suffix.lower() in image_extensions
-    
+
     def _is_web(self, path_or_url: str) -> bool:
         """Check if content is a web URL."""
         return path_or_url.startswith("http") and not self._is_youtube(path_or_url)
-    
+
     def _is_youtube(self, path_or_url: str) -> bool:
         """Check if content is a YouTube URL."""
         youtube_domains = ["youtube.com", "youtu.be", "youtube-nocookie.com"]
         return path_or_url.startswith("http") and any(domain in path_or_url for domain in youtube_domains)
-    
+
     def detect_content_type(self, path_or_url: str) -> str:
         """Detect content type from path or URL.
-        
+
         Args:
             path_or_url: File path or URL
-            
+
         Returns:
             Content type string
         """
         for content_type, detector in self._content_type_detectors.items():
             if detector(path_or_url):
                 return content_type
-        
+
         return ContentType.UNKNOWN
-    
+
     async def process_content(self, path_or_url: str, content_type: Optional[str] = None, options: Optional[Dict[str, Any]] = None) -> ProcessingResult:
         """Process content based on its type.
 
@@ -281,7 +281,7 @@ class MoRAGServices:
         # Detect content type if not provided
         if content_type is None:
             content_type = self.detect_content_type(path_or_url)
-        
+
         # Convert Path objects to strings
         if isinstance(path_or_url, Path):
             path_or_url = str(path_or_url)
@@ -312,7 +312,7 @@ class MoRAGServices:
                 success=False,
                 error_message=str(e)
             )
-    
+
     async def process_document(self, document_path: str, options: Optional[Dict[str, Any]] = None) -> ProcessingResult:
         """Process a document file.
 
@@ -365,7 +365,7 @@ class MoRAGServices:
                         'content_type': ContentType.DOCUMENT,
                         **json_result.get("metadata", {})
                     }
-                    
+
                     if database_configs:
                         # Use new multi-database approach
                         if self.graph_processor:
@@ -383,7 +383,7 @@ class MoRAGServices:
                             document_path=document_path,
                             document_metadata=document_metadata
                         )
-                    
+
                     if graph_result:
                         logger.info("Graph processing completed",
                                    document_path=document_path,
@@ -391,7 +391,7 @@ class MoRAGServices:
                                    entities_count=graph_result.entities_count,
                                    relations_count=graph_result.relations_count,
                                    databases_processed=len(graph_result.database_results) if hasattr(graph_result, 'database_results') else 1)
-                    
+
                 except Exception as e:
                     logger.warning("Graph processing failed, continuing with document processing",
                                  document_path=document_path,
@@ -400,14 +400,14 @@ class MoRAGServices:
                         success=False,
                         error_message=f"Graph processing failed: {str(e)}"
                     )
-            
+
             # Write data file even if graph processing is not enabled
             data_file_path = None
             if self._data_writer and text_content:
                 try:
                     # Create chunks from text content for data file
                     chunks = [(text_content, json_result.get("metadata", {}))]
-                    
+
                     data_file_path = self._data_writer.write_processing_data(
                         source_path=document_path,
                         entities=[],  # No entities extracted without graph processing
@@ -433,7 +433,7 @@ class MoRAGServices:
                 raw_result=json_result,  # JSON for API response
                 graph_result=graph_result  # Graph processing result
             )
-            
+
             # Update data file with complete processing result if data file was created
             if self._data_writer and data_file_path and text_content:
                 try:
@@ -450,7 +450,7 @@ class MoRAGServices:
                     )
                 except Exception as e:
                     logger.warning(f"Failed to update data file with processing result: {str(e)}")
-            
+
             return processing_result
         except Exception as e:
             logger.exception(f"Error processing document", document_path=document_path)
@@ -461,7 +461,7 @@ class MoRAGServices:
                 success=False,
                 error_message=str(e)
             )
-    
+
     async def process_audio(self, audio_path: str, options: Optional[Dict[str, Any]] = None) -> ProcessingResult:
         """Process an audio file.
 
@@ -495,7 +495,7 @@ class MoRAGServices:
                     # Import here to avoid circular imports
                     from morag_audio.converters import AudioConversionOptions
                     from morag_audio.processor import AudioProcessingResult
-                    
+
                     # Create AudioProcessingResult from JSON data for conversion
                     # This is a simplified approach - in practice, we'd need to reconstruct the full result
                     # For now, extract the transcript from JSON content
@@ -513,12 +513,12 @@ class MoRAGServices:
 
                         # Sort segments by timestamp
                         all_segments.sort(key=lambda x: x.get("timestamp", 0))
-                        
+
                         # Create basic markdown content with timestamps
                         markdown_parts = []
                         file_name = Path(audio_path).name
                         markdown_parts.append(f"# Audio Transcription: {file_name}\n")
-                        
+
                         # Add metadata if available
                         metadata = json_result.get("metadata", {})
                         if metadata:
@@ -527,7 +527,7 @@ class MoRAGServices:
                                 if key not in ["transcript_embedding"]:
                                     markdown_parts.append(f"- **{key.replace('_', ' ').title()}**: {value}")
                             markdown_parts.append("")
-                        
+
                         # Add transcript with timestamps if segments are available
                         if all_segments:
                             markdown_parts.append("## Detailed Transcript\n")
@@ -542,7 +542,7 @@ class MoRAGServices:
                                     markdown_parts.append(f"{timestamp} {text}")
                         else:
                             markdown_parts.append("*No transcript available*")
-                        
+
                         text_content = "\n".join(markdown_parts)
                     elif isinstance(content, str):
                         text_content = content
@@ -574,7 +574,7 @@ class MoRAGServices:
                 success=False,
                 error_message=str(e)
             )
-    
+
     async def process_video(self, video_path: str, options: Optional[Dict[str, Any]] = None) -> ProcessingResult:
         """Process a video file.
 
@@ -670,7 +670,7 @@ class MoRAGServices:
                 success=False,
                 error_message=str(e)
             )
-    
+
     async def process_image(self, image_path: str, options: Optional[Dict[str, Any]] = None) -> ProcessingResult:
         """Process an image file.
 
@@ -722,7 +722,7 @@ class MoRAGServices:
                 success=False,
                 error_message=str(e)
             )
-    
+
     async def process_url(self, url: str, options: Optional[Dict[str, Any]] = None) -> ProcessingResult:
         """Process a web URL.
 
@@ -738,7 +738,7 @@ class MoRAGServices:
                 url,
                 config_options=self.config.web_config.to_dict() if self.config.web_config and hasattr(self.config.web_config, 'to_dict') else None
             )
-            
+
             return ProcessingResult(
                 content_type=ContentType.WEB,
                 content_url=url,
@@ -758,7 +758,7 @@ class MoRAGServices:
                 success=False,
                 error_message=str(e)
             )
-    
+
     async def process_youtube(self, url: str, options: Optional[Dict[str, Any]] = None) -> ProcessingResult:
         """Process a YouTube URL using Apify service.
 
@@ -859,13 +859,13 @@ class MoRAGServices:
                 success=False,
                 error_message=str(e)
             )
-    
+
     async def process_batch(self, items: List[str]) -> Dict[str, ProcessingResult]:
         """Process multiple content items concurrently.
-        
+
         Args:
             items: List of file paths or URLs
-            
+
         Returns:
             Dictionary mapping items to their processing results
         """
@@ -873,13 +873,13 @@ class MoRAGServices:
             async with self.semaphore:
                 result = await self.process_content(item)
                 return item, result
-        
+
         # Create tasks for all items
         tasks = [process_with_semaphore(item) for item in items]
-        
+
         # Wait for all tasks to complete
         results = await asyncio.gather(*tasks, return_exceptions=True)
-        
+
         # Convert results to dictionary
         result_dict = {}
         for i, result in enumerate(results):
@@ -898,15 +898,15 @@ class MoRAGServices:
                 # result is a tuple (item, processing_result)
                 _, processing_result = result
                 result_dict[item] = processing_result
-        
+
         return result_dict
-    
+
     async def generate_embeddings(self, text: Union[str, List[str]]) -> Union[List[float], List[List[float]]]:
         """Generate embeddings for text.
-        
+
         Args:
             text: Text or list of texts to embed
-            
+
         Returns:
             Embeddings as list of floats or list of list of floats
         """
@@ -920,7 +920,7 @@ class MoRAGServices:
                 text,
                 config=self.config.embedding_config
             )
-    
+
     async def get_health_status(self) -> Dict[str, Any]:
         """Get health status of all services.
 

@@ -21,13 +21,13 @@ class TestDatabaseInitialization:
     def test_init_script_imports(self):
         """Test that the init script can import required modules."""
         script_path = Path("scripts/init_db.py")
-        
+
         # Test that the script can be imported without errors
         result = subprocess.run([
-            sys.executable, "-c", 
+            sys.executable, "-c",
             f"import sys; sys.path.insert(0, 'src'); exec(open('{script_path}').read().split('if __name__')[0])"
         ], capture_output=True, text=True)
-        
+
         # Should not have import errors
         assert "ImportError" not in result.stderr
         assert "ModuleNotFoundError" not in result.stderr
@@ -53,7 +53,7 @@ class TestDatabaseInitialization:
         # Import and test the main function from the script
         import sys
         sys.path.insert(0, str(Path("scripts").resolve()))
-        
+
         # Mock the script's main function logic
         await mock_service.connect()
         await mock_service.create_collection(vector_size=768, force_recreate=False)
@@ -65,7 +65,7 @@ class TestDatabaseInitialization:
         mock_service.create_collection.assert_called_once_with(vector_size=768, force_recreate=False)
         mock_service.get_collection_info.assert_called_once()
         mock_service.disconnect.assert_called_once()
-        
+
         assert info["name"] == "morag_documents"
         assert info["config"]["vector_size"] == 768
 
@@ -73,9 +73,9 @@ class TestDatabaseInitialization:
     async def test_collection_configuration(self):
         """Test that collection is configured correctly."""
         from morag_services.storage import QdrantService
-        
+
         service = QdrantService()
-        
+
         # Mock the client and its methods
         mock_client = MagicMock()
         mock_client.get_collections.return_value = MagicMock(collections=[])
@@ -96,7 +96,7 @@ class TestDatabaseInitialization:
             )
         )
         mock_client.close = MagicMock()
-        
+
         service.client = mock_client
 
         with patch('asyncio.to_thread', new_callable=AsyncMock) as mock_to_thread:
@@ -106,7 +106,7 @@ class TestDatabaseInitialization:
                 None,  # create_collection
                 mock_client.get_collection.return_value  # get_collection
             ]
-            
+
             await service.create_collection(vector_size=768, force_recreate=True)
             info = await service.get_collection_info()
 
@@ -142,11 +142,11 @@ except Exception as e:
     def test_script_path_handling(self):
         """Test that the script correctly handles path setup."""
         script_path = Path("scripts/init_db.py")
-        
+
         # Read the script and check path setup
         with open(script_path, 'r') as f:
             content = f.read()
-        
+
         # Should have proper path setup
         assert "sys.path.insert" in content
         assert "src" in content
@@ -157,15 +157,15 @@ except Exception as e:
         """Test that the script uses proper logging."""
         mock_log = MagicMock()
         mock_logger.return_value = mock_log
-        
+
         # Test logging setup
         import structlog
         logger = structlog.get_logger()
-        
+
         # Simulate log calls
         logger.info("Test message")
         logger.error("Test error")
-        
+
         # Verify logger was called
         assert mock_logger.called
 
@@ -176,20 +176,20 @@ class TestDatabaseConfiguration:
         """Test that collection name is properly configured."""
         from morag_core.config import settings
         from morag_services.storage import qdrant_service
-        
+
         assert hasattr(settings, 'qdrant_collection_name')
         assert qdrant_service.collection_name == settings.qdrant_collection_name
 
     def test_qdrant_connection_parameters(self):
         """Test Qdrant connection parameters."""
         from morag_core.config import settings
-        
+
         # Test that all required Qdrant settings exist
         assert hasattr(settings, 'qdrant_host')
         assert hasattr(settings, 'qdrant_port')
         assert hasattr(settings, 'qdrant_collection_name')
         assert hasattr(settings, 'qdrant_api_key')
-        
+
         # Test default values
         assert settings.qdrant_host == "localhost"
         assert settings.qdrant_port == 6333
@@ -199,13 +199,13 @@ class TestDatabaseConfiguration:
     async def test_service_initialization(self):
         """Test service initialization process."""
         from morag_services.storage import QdrantService
-        
+
         service = QdrantService()
-        
+
         # Test initial state
         assert service.client is None
         assert service.collection_name is not None
-        
+
         # Test that service can be created without errors
         assert isinstance(service, QdrantService)
 
@@ -213,10 +213,10 @@ class TestDatabaseConfiguration:
         """Test vector configuration parameters."""
         # Test that the expected vector size is 768 (for text-embedding-004)
         expected_vector_size = 768
-        
+
         # This would be used in the initialization
         assert expected_vector_size == 768
-        
+
         # Test distance metric
         expected_distance = "Cosine"
         assert expected_distance in ["Cosine", "Dot", "Euclidean"]

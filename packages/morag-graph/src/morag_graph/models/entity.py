@@ -1,11 +1,9 @@
 """Entity model for graph-augmented RAG."""
 
 import json
-import uuid
-import hashlib
 import logging
 from datetime import datetime
-from typing import Dict, List, Optional, Any, Union, ClassVar
+from typing import Dict, List, Optional, Any, ClassVar
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -17,12 +15,12 @@ logger = logging.getLogger(__name__)
 
 class Entity(BaseModel):
     """Entity model representing a node in the knowledge graph.
-    
+
     An entity can be a person, organization, location, concept, etc.
     Each entity has a unique ID, a name, a type, and optional attributes.
     Entities are global and can be referenced from multiple documents through
     DocumentChunk -> MENTIONS -> Entity relationships.
-    
+
     Attributes:
         id: Unique identifier for the entity
         name: Human-readable name of the entity
@@ -30,7 +28,7 @@ class Entity(BaseModel):
         attributes: Additional attributes of the entity
         confidence: Confidence score of the entity extraction (0.0 to 1.0)
     """
-    
+
     id: EntityId = Field(default="")
     name: str
     type: str = "CUSTOM"
@@ -42,12 +40,12 @@ class Entity(BaseModel):
     embedding: Optional[List[float]] = Field(default=None, description="Vector embedding")
     created_at: Optional[datetime] = Field(default_factory=datetime.now, description="Creation timestamp")
     updated_at: Optional[datetime] = Field(default_factory=datetime.now, description="Last update timestamp")
-    
 
-    
+
+
     # Class variables for Neo4J integration
     _neo4j_label: ClassVar[str] = "Entity"
-    
+
     def __init__(self, **data):
         """Initialize entity with unified deterministic ID based on name, type, and source document."""
         if 'id' not in data or not data['id']:
@@ -57,7 +55,7 @@ class Entity(BaseModel):
             source_doc_id = data.get('source_doc_id', '')
             data['id'] = UnifiedIDGenerator.generate_entity_id(name, entity_type, source_doc_id)
         super().__init__(**data)
-    
+
     @field_validator('id')
     @classmethod
     def validate_id_format(cls, v):
@@ -65,7 +63,7 @@ class Entity(BaseModel):
         if v and not IDValidator.validate_entity_id(v):
             raise ValueError(f"Invalid entity ID format: {v}")
         return v
-    
+
     def __setattr__(self, name, value):
         """Override setattr to regenerate ID when source_doc_id changes."""
         if name == 'source_doc_id' and hasattr(self, 'source_doc_id') and self.source_doc_id != value:
@@ -76,11 +74,11 @@ class Entity(BaseModel):
             super().__setattr__('id', UnifiedIDGenerator.generate_entity_id(self.name, entity_type, value or ''))
         else:
             super().__setattr__(name, value)
-    
+
     def get_unified_id(self) -> str:
         """Get unified entity ID."""
         return self.id
-    
+
     def is_unified_format(self) -> bool:
         """Check if using unified ID format."""
         return IDValidator.validate_entity_id(self.id)
@@ -142,7 +140,7 @@ class Entity(BaseModel):
         if not 0.0 <= v <= 1.0:
             raise ValueError(f"Confidence must be between 0.0 and 1.0, got {v}")
         return v
-    
+
     @field_validator('type')
     @classmethod
     def validate_type(cls, v: str) -> str:
@@ -150,17 +148,17 @@ class Entity(BaseModel):
         if not isinstance(v, str) or not v.strip():
             raise ValueError("Entity type must be a non-empty string")
         return v.strip()
-    
+
     def __hash__(self) -> int:
         """Make Entity hashable based on its ID."""
         return hash(self.id)
-    
+
     def __eq__(self, other) -> bool:
         """Compare entities based on their ID."""
         if not isinstance(other, Entity):
             return False
         return self.id == other.id
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert entity to dictionary for JSON serialization."""
         data = self.model_dump()
@@ -169,7 +167,7 @@ class Entity(BaseModel):
         data['type'] = str(data['type'])
 
         return data
-    
+
     def to_neo4j_node(self) -> Dict[str, Any]:
         """Convert entity to Neo4J node properties.
 
@@ -200,7 +198,7 @@ class Entity(BaseModel):
         properties['_labels'] = [type_label]
 
         return properties
-    
+
     @classmethod
     def from_neo4j_node(cls, node: Dict[str, Any]) -> 'Entity':
         """Create entity from Neo4J node properties."""

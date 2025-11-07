@@ -14,10 +14,10 @@ logger = structlog.get_logger(__name__)
 
 class EnhancedResponseBuilder:
     """Builder for enhanced query responses."""
-    
+
     def __init__(self):
         self.logger = structlog.get_logger(__name__)
-    
+
     async def build_response(
         self,
         query_id: str,
@@ -26,13 +26,13 @@ class EnhancedResponseBuilder:
         processing_time: float
     ) -> EnhancedQueryResponse:
         """Build enhanced query response from retrieval results.
-        
+
         Args:
             query_id: Unique query identifier
             request: Original query request
             retrieval_result: Results from hybrid retrieval
             processing_time: Processing time in milliseconds
-            
+
         Returns:
             Enhanced query response
         """
@@ -44,34 +44,34 @@ class EnhancedResponseBuilder:
                 raw_results = retrieval_result
             else:
                 raw_results = []
-            
+
             # Build enhanced results
             enhanced_results = []
             for i, result in enumerate(raw_results[:request.max_results]):
                 enhanced_result = await self._build_enhanced_result(result, i)
                 if enhanced_result.relevance_score >= request.min_relevance_score:
                     enhanced_results.append(enhanced_result)
-            
+
             # Build graph context
             graph_context = await self._build_graph_context(
-                enhanced_results, 
+                enhanced_results,
                 request,
                 retrieval_result
             )
-            
+
             # Calculate quality metrics
             confidence_score = self._calculate_confidence_score(enhanced_results, graph_context)
             completeness_score = self._calculate_completeness_score(enhanced_results, request)
-            
+
             # Determine actual strategies used
             fusion_strategy_used = self._determine_fusion_strategy_used(request, retrieval_result)
             expansion_strategy_used = self._determine_expansion_strategy_used(request, retrieval_result)
-            
+
             # Build debug info if needed
             debug_info = None
             if hasattr(retrieval_result, 'debug_info'):
                 debug_info = retrieval_result.debug_info
-            
+
             return EnhancedQueryResponse(
                 query_id=query_id,
                 query=request.query,
@@ -85,7 +85,7 @@ class EnhancedResponseBuilder:
                 completeness_score=completeness_score,
                 debug_info=debug_info
             )
-            
+
         except Exception as e:
             self.logger.error("Error building enhanced response", error=str(e))
             # Return minimal response on error
@@ -102,7 +102,7 @@ class EnhancedResponseBuilder:
                 completeness_score=0.0,
                 debug_info={"error": str(e)}
             )
-    
+
     async def _build_enhanced_result(self, raw_result: Any, index: int) -> EnhancedResult:
         """Build enhanced result from raw retrieval result."""
         try:
@@ -122,12 +122,12 @@ class EnhancedResponseBuilder:
                 document_id = getattr(raw_result, 'document_id', getattr(raw_result, 'source', f"doc_{index}"))
                 metadata = getattr(raw_result, 'metadata', {})
                 source_type = getattr(raw_result, 'source_type', 'vector')
-            
+
             # Extract graph-specific information if available
             connected_entities = []
             relation_context = []
             reasoning_path = None
-            
+
             if isinstance(raw_result, dict):
                 connected_entities = raw_result.get('connected_entities', [])
                 relation_context = [
@@ -135,7 +135,7 @@ class EnhancedResponseBuilder:
                     for rel in raw_result.get('relation_context', [])
                 ]
                 reasoning_path = raw_result.get('reasoning_path')
-            
+
             return EnhancedResult(
                 id=result_id,
                 content=content,
@@ -147,7 +147,7 @@ class EnhancedResponseBuilder:
                 relation_context=relation_context,
                 reasoning_path=reasoning_path
             )
-            
+
         except Exception as e:
             self.logger.warning("Error building enhanced result", error=str(e), index=index)
             return EnhancedResult(
@@ -158,7 +158,7 @@ class EnhancedResponseBuilder:
                 document_id=f"doc_{index}",
                 metadata={"error": str(e)}
             )
-    
+
     async def _build_graph_context(
         self,
         results: List[EnhancedResult],
@@ -168,13 +168,13 @@ class EnhancedResponseBuilder:
         """Build graph context from results and request."""
         if not request.include_graph_context:
             return GraphContext()
-        
+
         try:
             entities = {}
             relations = []
             expansion_path = []
             reasoning_steps = None
-            
+
             # Extract entities from results
             for result in results:
                 for entity_id in result.connected_entities:
@@ -186,10 +186,10 @@ class EnhancedResponseBuilder:
                             relevance_score=0.5,
                             source_documents=[result.document_id]
                         )
-                
+
                 # Add relations from result context
                 relations.extend(result.relation_context)
-            
+
             # Extract from retrieval result if available
             if hasattr(retrieval_result, 'graph_context'):
                 graph_ctx = retrieval_result.graph_context
@@ -199,22 +199,22 @@ class EnhancedResponseBuilder:
                     relations.extend(graph_ctx.relations)
                 if hasattr(graph_ctx, 'expansion_path'):
                     expansion_path = graph_ctx.expansion_path
-            
+
             # Build reasoning steps if requested
             if request.include_reasoning_path:
                 reasoning_steps = self._build_reasoning_steps(results, request)
-            
+
             return GraphContext(
                 entities=entities,
                 relations=relations,
                 expansion_path=expansion_path,
                 reasoning_steps=reasoning_steps
             )
-            
+
         except Exception as e:
             self.logger.warning("Error building graph context", error=str(e))
             return GraphContext()
-    
+
     def _build_reasoning_steps(
         self,
         results: List[EnhancedResult],
@@ -222,29 +222,29 @@ class EnhancedResponseBuilder:
     ) -> List[str]:
         """Build reasoning steps for the query."""
         steps = []
-        
+
         steps.append(f"1. Analyzed query: '{request.query}' (type: {request.query_type})")
-        
+
         if request.expansion_strategy != "none":
             steps.append(f"2. Applied {request.expansion_strategy} expansion strategy with depth {request.expansion_depth}")
-        
+
         vector_results = [r for r in results if r.source_type == "vector"]
         graph_results = [r for r in results if r.source_type == "graph"]
         hybrid_results = [r for r in results if r.source_type == "hybrid"]
-        
+
         if vector_results:
             steps.append(f"3. Found {len(vector_results)} vector-based results")
         if graph_results:
             steps.append(f"4. Found {len(graph_results)} graph-based results")
         if hybrid_results:
             steps.append(f"5. Found {len(hybrid_results)} hybrid results")
-        
+
         steps.append(f"6. Applied {request.fusion_strategy} fusion strategy")
         steps.append(f"7. Filtered results by minimum relevance score {request.min_relevance_score}")
         steps.append(f"8. Returned top {len(results)} results")
-        
+
         return steps
-    
+
     def _calculate_confidence_score(
         self,
         results: List[EnhancedResult],
@@ -253,10 +253,10 @@ class EnhancedResponseBuilder:
         """Calculate overall confidence score for the response."""
         if not results:
             return 0.0
-        
+
         # Base confidence from result scores
         avg_relevance = sum(r.relevance_score for r in results) / len(results)
-        
+
         # Boost confidence if we have graph context
         graph_boost = 0.0
         if graph_context.entities:
@@ -265,15 +265,15 @@ class EnhancedResponseBuilder:
             graph_boost += 0.1
         if graph_context.reasoning_steps:
             graph_boost += 0.05
-        
+
         # Penalty for very few results
         result_penalty = 0.0
         if len(results) < 3:
             result_penalty = 0.1
-        
+
         confidence = min(avg_relevance + graph_boost - result_penalty, 1.0)
         return max(confidence, 0.0)
-    
+
     def _calculate_completeness_score(
         self,
         results: List[EnhancedResult],
@@ -281,27 +281,27 @@ class EnhancedResponseBuilder:
     ) -> float:
         """Calculate completeness score based on request fulfillment."""
         score = 0.0
-        
+
         # Base score from number of results vs requested
         if results:
             result_ratio = len(results) / request.max_results
             score += min(result_ratio, 1.0) * 0.5
-        
+
         # Bonus for diverse source types
         source_types = set(r.source_type for r in results)
         if len(source_types) > 1:
             score += 0.2
-        
+
         # Bonus for graph context if requested
         if request.include_graph_context:
             score += 0.2
-        
+
         # Bonus for reasoning path if requested
         if request.include_reasoning_path:
             score += 0.1
-        
+
         return min(score, 1.0)
-    
+
     def _determine_fusion_strategy_used(
         self,
         request: EnhancedQueryRequest,
@@ -311,7 +311,7 @@ class EnhancedResponseBuilder:
         if hasattr(retrieval_result, 'fusion_strategy_used'):
             return retrieval_result.fusion_strategy_used
         return request.fusion_strategy
-    
+
     def _determine_expansion_strategy_used(
         self,
         request: EnhancedQueryRequest,

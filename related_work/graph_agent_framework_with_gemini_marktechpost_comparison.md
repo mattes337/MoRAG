@@ -111,7 +111,7 @@ async def test_citation_format():
     for f in facts:
         # New structured format: [document_type:filename:chunk_index:metadata]
         assert re.match(r"^\[\w+:[^:]+:\d+(?::[^\]]+)*\]$", f['source'])
-        
+
 async def test_structured_citations():
     # Test different document types
     test_cases = [

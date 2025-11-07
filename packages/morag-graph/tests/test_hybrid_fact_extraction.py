@@ -9,7 +9,7 @@ from morag_graph.extraction.fact_entity_converter import FactEntityConverter
 
 class TestStructuredMetadata:
     """Test the StructuredMetadata model."""
-    
+
     def test_structured_metadata_creation(self):
         """Test basic structured metadata creation."""
         metadata = StructuredMetadata(
@@ -17,17 +17,17 @@ class TestStructuredMetadata:
             relationships=["relates_to", "affects"],
             domain_concepts=["concept1", "concept2"]
         )
-        
+
         assert metadata.primary_entities == ["entity1", "entity2"]
         assert metadata.relationships == ["relates_to", "affects"]
         assert metadata.domain_concepts == ["concept1", "concept2"]
-    
+
 
 
 
 class TestHybridFact:
     """Test the hybrid Fact model."""
-    
+
     def test_hybrid_fact_creation(self):
         """Test basic hybrid fact creation."""
         metadata = StructuredMetadata(
@@ -35,7 +35,7 @@ class TestHybridFact:
             relationships=["treats", "reduces"],
             domain_concepts=["herbal medicine", "adaptogen", "dosage"]
         )
-        
+
         fact = Fact(
             fact_text="Ashwagandha extract containing 5% withanolides should be taken at 300-600mg twice daily with meals for 8-12 weeks to effectively manage chronic stress and anxiety.",
             structured_metadata=metadata,
@@ -45,13 +45,13 @@ class TestHybridFact:
             fact_type="methodological",
             keywords=["ashwagandha", "stress", "anxiety", "dosage"]
         )
-        
+
         assert fact.fact_text.startswith("Ashwagandha extract")
         assert fact.structured_metadata.primary_entities == ["Ashwagandha", "stress", "anxiety"]
         assert fact.extraction_confidence == 0.9
         assert fact.fact_type == "methodological"
         assert fact.id.startswith("fact_")
-    
+
     def test_fact_display_text(self):
         """Test fact display text returns fact_text."""
         fact = Fact(
@@ -61,9 +61,9 @@ class TestHybridFact:
             extraction_confidence=0.8,
             fact_type="definition"
         )
-        
+
         assert fact.get_display_text() == "This is a complete fact statement."
-    
+
     def test_fact_is_complete(self):
         """Test fact completeness check."""
         # Complete fact with entities
@@ -77,7 +77,7 @@ class TestHybridFact:
             fact_type="definition"
         )
         assert fact.is_complete()
-        
+
         # Incomplete fact without entities or text
         empty_fact = Fact(
             fact_text="",
@@ -87,7 +87,7 @@ class TestHybridFact:
             fact_type="definition"
         )
         assert not empty_fact.is_complete()
-    
+
     def test_fact_search_text(self):
         """Test fact search text generation."""
         metadata = StructuredMetadata(
@@ -95,7 +95,7 @@ class TestHybridFact:
             relationships=["relates_to"],
             domain_concepts=["concept1"]
         )
-        
+
         fact = Fact(
             fact_text="This is a fact about entities.",
             structured_metadata=metadata,
@@ -105,7 +105,7 @@ class TestHybridFact:
             fact_type="definition",
             keywords=["keyword1", "keyword2"]
         )
-        
+
         search_text = fact.get_search_text()
         assert "This is a fact about entities." in search_text
         assert "entity1" in search_text
@@ -114,7 +114,7 @@ class TestHybridFact:
         assert "concept1" in search_text
         assert "keyword1" in search_text
         assert "keyword2" in search_text
-    
+
     def test_fact_to_dict_and_from_dict(self):
         """Test fact serialization and deserialization."""
         metadata = StructuredMetadata(
@@ -122,7 +122,7 @@ class TestHybridFact:
             relationships=["relates_to"],
             domain_concepts=["concept1"]
         )
-        
+
         original_fact = Fact(
             fact_text="Original fact text.",
             structured_metadata=metadata,
@@ -131,13 +131,13 @@ class TestHybridFact:
             extraction_confidence=0.8,
             fact_type="definition"
         )
-        
+
         # Convert to dict
         fact_dict = original_fact.to_dict()
         assert fact_dict["fact_text"] == "Original fact text."
         assert "structured_metadata" in fact_dict
         assert fact_dict["structured_metadata"]["primary_entities"] == ["entity1"]
-        
+
         # Convert back to fact
         restored_fact = Fact.from_dict(fact_dict)
         assert restored_fact.fact_text == original_fact.fact_text
@@ -147,14 +147,14 @@ class TestHybridFact:
 
 class TestHybridFactExtraction:
     """Test hybrid fact extraction process."""
-    
+
     @pytest.fixture
     def mock_llm_client(self):
         """Mock LLM client for testing."""
         client = AsyncMock()
         client.generate = AsyncMock()
         return client
-    
+
     @pytest.fixture
     def fact_extractor(self, mock_llm_client):
         """Create fact extractor with mocked LLM."""
@@ -162,7 +162,7 @@ class TestHybridFactExtraction:
             llm_client=mock_llm_client,
             max_facts_per_chunk=5
         )
-    
+
     @pytest.mark.asyncio
     async def test_hybrid_fact_extraction_response_parsing(self, fact_extractor):
         """Test parsing of hybrid fact extraction response."""
@@ -180,9 +180,9 @@ class TestHybridFactExtraction:
             "keywords": ["PostgreSQL", "B-tree index", "query optimization"]
           }
         ]'''
-        
+
         fact_extractor.llm_client.generate.return_value = mock_response
-        
+
         # Extract facts
         facts = await fact_extractor.extract_facts(
             chunk_text="Sample text about PostgreSQL optimization",
@@ -190,7 +190,7 @@ class TestHybridFactExtraction:
             document_id="doc_456",
             context={"domain": "technical", "language": "en"}
         )
-        
+
         assert len(facts) == 1
         fact = facts[0]
         assert fact.fact_text.startswith("PostgreSQL query performance")
@@ -199,18 +199,18 @@ class TestHybridFactExtraction:
         assert "CREATE INDEX" in fact.structured_metadata.domain_concepts
         assert fact.fact_type == "methodological"
         assert fact.extraction_confidence == 0.95
-    
+
 
 
 
 class TestHybridFactEntityConversion:
     """Test entity conversion from hybrid facts."""
-    
+
     @pytest.fixture
     def fact_entity_converter(self):
         """Create fact entity converter."""
         return FactEntityConverter()
-    
+
     def test_hybrid_fact_to_entities(self, fact_entity_converter):
         """Test conversion of hybrid fact to entities and relationships."""
         metadata = StructuredMetadata(
@@ -218,7 +218,7 @@ class TestHybridFactEntityConversion:
             relationships=["optimizes", "improves"],
             domain_concepts=["database optimization", "indexing strategy"]
         )
-        
+
         fact = Fact(
             fact_text="PostgreSQL B-tree indexes optimize query performance through strategic column selection.",
             structured_metadata=metadata,
@@ -228,9 +228,9 @@ class TestHybridFactEntityConversion:
             fact_type="methodological",
             keywords=["PostgreSQL", "optimization"]
         )
-        
+
         entities, relationships = fact_entity_converter.convert_facts_to_entities([fact])
-        
+
         # Should create entities from primary_entities, domain_concepts, and keywords
         entity_names = [e.name for e in entities]
         assert "PostgreSQL" in entity_names
@@ -238,7 +238,7 @@ class TestHybridFactEntityConversion:
         assert "query performance" in entity_names
         assert "database optimization" in entity_names
         assert "indexing strategy" in entity_names
-        
+
         # Should create relationships
         assert len(relationships) > 0
         relation_types = [r.type for r in relationships]

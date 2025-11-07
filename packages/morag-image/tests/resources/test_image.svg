@@ -1,23 +1,23 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600">
   <!-- Background -->
   <rect width="800" height="600" fill="#f0f0f0"/>
-  
+
   <!-- Sky -->
   <rect width="800" height="300" fill="#87ceeb"/>
-  
+
   <!-- Sun -->
   <circle cx="650" cy="120" r="60" fill="#ffff00"/>
-  
+
   <!-- Mountains -->
   <polygon points="0,300 200,100 400,250 600,50 800,300" fill="#6b8e23"/>
-  
+
   <!-- Lake -->
   <rect y="300" width="800" height="300" fill="#4682b4"/>
-  
+
   <!-- Tree -->
   <rect x="100" y="250" width="20" height="50" fill="#8b4513"/>
   <circle cx="110" cy="220" r="30" fill="#228b22"/>
-  
+
   <!-- Sample Text for OCR Testing -->
   <text x="400" y="400" font-family="Arial" font-size="24" text-anchor="middle" fill="#ffffff">
     Sample Text for OCR Testing

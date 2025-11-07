@@ -1,7 +1,7 @@
 # MoRAG Refactoring Task 3: Code Deduplication
 
 ## Priority: MEDIUM
-## Estimated Time: 6-10 hours  
+## Estimated Time: 6-10 hours
 ## Impact: Significant codebase reduction and maintainability improvement
 
 ## Overview
@@ -13,13 +13,13 @@ This task identifies and eliminates duplicate code patterns across the MoRAG cod
 **Files Affected**: All storage implementations across packages
 ```
 morag-graph/storage/: qdrant_storage.py, neo4j_storage.py, json_storage.py
-morag-services/: storage.py  
+morag-services/: storage.py
 morag-core/interfaces/: storage.py
 ```
 
 **Duplicate Patterns**:
 - Connection management boilerplate
-- CRUD operation structures  
+- CRUD operation structures
 - Error handling patterns
 - Health check implementations
 - Configuration initialization
@@ -35,12 +35,12 @@ import structlog
 
 class BaseStorage(ABC):
     """Unified base class for all storage implementations."""
-    
+
     def __init__(self, config: Dict[str, Any]):
         self.config = config
         self.logger = structlog.get_logger(self.__class__.__name__)
         self._connection = None
-        
+
     async def connect(self) -> bool:
         """Standard connection pattern."""
         try:
@@ -50,17 +50,17 @@ class BaseStorage(ABC):
         except Exception as e:
             self.logger.error("Connection failed", error=str(e))
             return False
-    
-    @abstractmethod 
+
+    @abstractmethod
     async def _establish_connection(self):
         """Subclass-specific connection logic."""
         pass
-        
+
     @abstractmethod
     async def _validate_connection(self):
         """Subclass-specific validation logic."""
         pass
-        
+
     # Common CRUD patterns...
     async def health_check(self) -> Dict[str, Any]:
         """Standard health check pattern."""
@@ -73,11 +73,11 @@ class BaseStorage(ABC):
 
 **Estimated Reduction**: 800+ lines across storage files
 
-### 2. Processor Class Pattern Duplication (34 files) 
+### 2. Processor Class Pattern Duplication (34 files)
 **Files Affected**: All processor implementations
 ```
 morag-audio/: processor.py
-morag-video/: processor.py  
+morag-video/: processor.py
 morag-document/: processor.py
 morag-web/: processor.py
 morag-stages/processors/: *.py (8 files)
@@ -86,12 +86,12 @@ morag-stages/processors/: *.py (8 files)
 **Duplicate Patterns**:
 - Processing pipeline structure
 - Error handling and logging
-- Result formatting 
+- Result formatting
 - Configuration management
 - Progress tracking
 
 **Consolidation Strategy**:
-```python  
+```python
 # packages/morag-core/src/morag_core/processing/base.py
 
 from abc import ABC, abstractmethod
@@ -101,47 +101,47 @@ from morag_core.utils.logging import get_logger
 
 class BaseProcessor(ABC):
     """Unified base processor with common processing patterns."""
-    
+
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         self.config = config or {}
         self.logger = get_logger(self.__class__.__name__)
-        
+
     async def process(self, input_data: Any, **kwargs) -> ProcessingResult:
         """Standard processing pipeline."""
         try:
             # Pre-processing validation
             validated_input = await self._validate_input(input_data)
-            
+
             # Progress tracking
             progress_callback = kwargs.get('progress_callback')
             if progress_callback:
                 await progress_callback(0, "Starting processing")
-                
+
             # Main processing
             result = await self._process_implementation(validated_input, **kwargs)
-            
+
             # Post-processing
             formatted_result = await self._format_result(result)
-            
+
             if progress_callback:
                 await progress_callback(100, "Processing complete")
-                
+
             return formatted_result
-            
+
         except Exception as e:
             self.logger.error("Processing failed", error=str(e), input_type=type(input_data))
             raise
-    
+
     @abstractmethod
     async def _validate_input(self, input_data: Any) -> Any:
         """Subclass-specific input validation."""
         pass
-        
-    @abstractmethod  
+
+    @abstractmethod
     async def _process_implementation(self, input_data: Any, **kwargs) -> Any:
         """Subclass-specific processing logic."""
         pass
-        
+
     @abstractmethod
     async def _format_result(self, result: Any) -> ProcessingResult:
         """Subclass-specific result formatting."""
@@ -152,7 +152,7 @@ class BaseProcessor(ABC):
 
 ### 3. Service Class Initialization Patterns (27 service classes)
 **Duplicate Patterns**:
-- Client initialization (httpx, database clients) 
+- Client initialization (httpx, database clients)
 - Configuration loading
 - Logger setup
 - Health check methods
@@ -164,12 +164,12 @@ class BaseProcessor(ABC):
 
 class BaseService(ABC):
     """Unified base service class."""
-    
+
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         self.config = self._load_config(config)
         self.logger = get_logger(self.__class__.__name__)
         self._client = None
-        
+
     def _load_config(self, config: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         """Standard configuration loading pattern."""
         base_config = {
@@ -180,7 +180,7 @@ class BaseService(ABC):
         if config:
             base_config.update(config)
         return base_config
-        
+
     async def initialize(self) -> bool:
         """Standard service initialization."""
         try:
@@ -190,7 +190,7 @@ class BaseService(ABC):
         except Exception as e:
             self.logger.error("Service initialization failed", error=str(e))
             return False
-    
+
     @abstractmethod
     async def _create_client(self):
         """Subclass-specific client creation."""
@@ -236,10 +236,10 @@ def standard_error_handling(
                 error_type = type(e)
                 if error_mapping and error_type in error_mapping:
                     mapped_error = error_mapping[error_type]
-                    logger.error(f"{func.__name__} failed", 
+                    logger.error(f"{func.__name__} failed",
                                error=str(e), error_type=error_type.__name__)
                     raise mapped_error(f"Failed to {func.__name__}: {e}")
-                logger.error(f"Unexpected error in {func.__name__}", 
+                logger.error(f"Unexpected error in {func.__name__}",
                            error=str(e), error_type=error_type.__name__)
                 raise
         return wrapper
@@ -252,7 +252,7 @@ async def process_data(data):
     pass
 ```
 
-### 5. Configuration Loading Duplication 
+### 5. Configuration Loading Duplication
 **Pattern**: Same configuration loading logic in 50+ files
 
 **Consolidation Strategy**:
@@ -266,7 +266,7 @@ from dotenv import load_dotenv
 
 class ConfigLoader:
     """Unified configuration loading utility."""
-    
+
     @staticmethod
     def load_service_config(
         service_name: str,
@@ -276,28 +276,28 @@ class ConfigLoader:
     ) -> Dict[str, Any]:
         """Load configuration with standard precedence:
         1. Explicit config_file
-        2. Environment variables  
+        2. Environment variables
         3. Default values
         """
         config = defaults or {}
-        
+
         # Load from environment
         load_dotenv()
         env_config = {}
         prefix = f"{env_prefix}_{service_name.upper()}_"
-        
+
         for key, value in os.environ.items():
             if key.startswith(prefix):
                 config_key = key[len(prefix):].lower()
                 env_config[config_key] = value
-                
+
         config.update(env_config)
-        
+
         # Load from file if provided
         if config_file:
             file_config = ConfigLoader._load_from_file(config_file)
             config.update(file_config)
-            
+
         return config
 ```
 
@@ -307,18 +307,18 @@ class ConfigLoader:
 1. **Create base storage class** (1 hour)
    - `morag-core/storage/base.py`
    - Common connection, CRUD, health check patterns
-   
-2. **Create base processor class** (1 hour)  
+
+2. **Create base processor class** (1 hour)
    - `morag-core/processing/base.py`
    - Standard processing pipeline
-   
+
 3. **Create base service class** (1 hour)
    - `morag-core/services/base.py`
    - Client initialization and configuration
 
 ### Phase 2: Utility Functions (2 hours)
 1. **Error handling decorator** (30 minutes)
-2. **Configuration loader** (30 minutes)  
+2. **Configuration loader** (30 minutes)
 3. **Logger utility enhancement** (30 minutes)
 4. **Progress tracking utility** (30 minutes)
 
@@ -328,7 +328,7 @@ class ConfigLoader:
    - Remove duplicated code
    - Test functionality preservation
 
-2. **Migrate processor classes** (1.5 hours) 
+2. **Migrate processor classes** (1.5 hours)
    - Update 34 processor files to inherit from BaseProcessor
    - Remove duplicated patterns
    - Test processing pipeline
@@ -343,14 +343,14 @@ class ConfigLoader:
    - Remove try-catch boilerplate
 
 2. **Replace configuration patterns** (1 hour)
-   - Use ConfigLoader utility  
+   - Use ConfigLoader utility
    - Remove custom config loading
 
 ## Expected Results
 
 ### Code Reduction Metrics
 - **Storage files**: 800+ lines removed (30% reduction)
-- **Processor files**: 600+ lines removed (25% reduction)  
+- **Processor files**: 600+ lines removed (25% reduction)
 - **Service files**: 400+ lines removed (20% reduction)
 - **Error handling**: 300+ lines removed (duplicated try-catch)
 - **Configuration**: 200+ lines removed (config loading)
@@ -380,7 +380,7 @@ class ConfigLoader:
 # For each migrated class, verify:
 # 1. Same functionality as before
 # 2. Same API surface
-# 3. Same error behavior  
+# 3. Same error behavior
 # 4. Performance not degraded
 
 # Example test:
@@ -399,7 +399,7 @@ async def test_storage_migration_compatibility():
 - [ ] All tests pass after migration
 - [ ] No performance regression >5%
 
-### Qualitative Goals  
+### Qualitative Goals
 - [ ] Consistent patterns across all storage/processor/service classes
 - [ ] Single source of truth for common functionality
 - [ ] Easier to add new storage/processor implementations
@@ -411,13 +411,13 @@ async def test_storage_migration_compatibility():
 ```bash
 # Migrate one category at a time:
 1. Create base classes first (test in isolation)
-2. Migrate 1-2 storage classes (validate approach)  
+2. Migrate 1-2 storage classes (validate approach)
 3. Migrate remaining storage classes
 4. Repeat for processors and services
 ```
 
 ### Compatibility Testing
-```bash  
+```bash
 # After each migration batch:
 pytest tests/integration/ -v
 python tests/cli/test-all.py
@@ -427,7 +427,7 @@ python tests/cli/test-all.py
 ```bash
 # Each phase gets its own branch:
 git checkout -b refactor/dedup-storage-classes
-git checkout -b refactor/dedup-processor-classes  
+git checkout -b refactor/dedup-processor-classes
 git checkout -b refactor/dedup-service-classes
 ```
 

@@ -323,13 +323,13 @@ plt.figure(figsize=(15, 6))
 for i in range(10):
     plt.subplot(2, 5, i + 1)
     plt.imshow(x_test[i], cmap='gray')
-    
+
     predicted_digit = np.argmax(predictions[i])
     confidence = np.max(predictions[i])
     actual_digit = y_test[i]
-    
+
     color = 'green' if predicted_digit == actual_digit else 'red'
-    plt.title(f'Predicted: {predicted_digit}\nActual: {actual_digit}\nConfidence: {confidence:.2f}', 
+    plt.title(f'Predicted: {predicted_digit}\nActual: {actual_digit}\nConfidence: {confidence:.2f}',
               color=color)
     plt.axis('off')
 plt.tight_layout()

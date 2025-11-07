@@ -16,7 +16,7 @@ def services():
     """Create a MoRAGServices instance for testing."""
     # Create services with mocked specialized services
     services = MoRAGServices()
-    
+
     # Mock all specialized services
     services.document_service = AsyncMock()
     services.audio_service = AsyncMock()
@@ -25,53 +25,53 @@ def services():
     services.embedding_service = AsyncMock()
     services.web_service = AsyncMock()
     services.youtube_service = AsyncMock()
-    
+
     return services
 
 class TestContentTypeDetection:
     """Tests for content type detection."""
-    
+
     def test_detect_document(self, services):
         """Test document detection."""
         assert services.detect_content_type("test.pdf") == ContentType.DOCUMENT
         assert services.detect_content_type("test.docx") == ContentType.DOCUMENT
         assert services.detect_content_type("test.txt") == ContentType.DOCUMENT
-    
+
     def test_detect_audio(self, services):
         """Test audio detection."""
         assert services.detect_content_type("test.mp3") == ContentType.AUDIO
         assert services.detect_content_type("test.wav") == ContentType.AUDIO
         assert services.detect_content_type("test.flac") == ContentType.AUDIO
-    
+
     def test_detect_video(self, services):
         """Test video detection."""
         assert services.detect_content_type("test.mp4") == ContentType.VIDEO
         assert services.detect_content_type("test.avi") == ContentType.VIDEO
         assert services.detect_content_type("test.mkv") == ContentType.VIDEO
-    
+
     def test_detect_image(self, services):
         """Test image detection."""
         assert services.detect_content_type("test.jpg") == ContentType.IMAGE
         assert services.detect_content_type("test.png") == ContentType.IMAGE
         assert services.detect_content_type("test.gif") == ContentType.IMAGE
-    
+
     def test_detect_web(self, services):
         """Test web URL detection."""
         assert services.detect_content_type("http://example.com") == ContentType.WEB
         assert services.detect_content_type("https://example.com/page") == ContentType.WEB
-    
+
     def test_detect_youtube(self, services):
         """Test YouTube URL detection."""
         assert services.detect_content_type("https://www.youtube.com/watch?v=dQw4w9WgXcQ") == ContentType.YOUTUBE
         assert services.detect_content_type("https://youtu.be/dQw4w9WgXcQ") == ContentType.YOUTUBE
-    
+
     def test_detect_unknown(self, services):
         """Test unknown content type detection."""
         assert services.detect_content_type("test.unknown") == ContentType.UNKNOWN
 
 class TestProcessContent:
     """Tests for content processing."""
-    
+
     @pytest.mark.asyncio
     async def test_process_document(self, services):
         """Test document processing."""
@@ -92,12 +92,12 @@ class TestProcessContent:
                 }
             ]
         }
-        
+
         services.document_service.process_document_to_json.return_value = mock_json_result
-        
+
         # Process document
         result = await services.process_document("test.pdf")
-        
+
         # Verify result
         assert result.content_type == ContentType.DOCUMENT
         assert result.content_path == "test.pdf"
@@ -107,10 +107,10 @@ class TestProcessContent:
         assert result.processing_time == 1.5
         assert result.success is True
         assert result.error_message is None
-        
+
         # Verify service call
         services.document_service.process_document_to_json.assert_called_once()
-    
+
     @pytest.mark.asyncio
     async def test_process_audio(self, services):
         """Test audio processing."""
@@ -131,18 +131,18 @@ class TestProcessContent:
             },
             "metadata": {"duration": 120}
         }
-        
+
         # Configure the mock to return the dictionary directly
         async def mock_process_file(*args, **kwargs):
             if kwargs.get('output_format') == 'json':
                 return mock_json_result
             return mock_json_result
-        
+
         services.audio_service.process_file = mock_process_file
-        
+
         # Process audio
         result = await services.process_audio("test.mp3")
-        
+
         # Verify result
         assert result.content_type == ContentType.AUDIO
         assert result.content_path == "test.mp3"
@@ -151,7 +151,7 @@ class TestProcessContent:
         assert result.processing_time == 2.0
         assert result.success is True
         assert result.error_message is None
-    
+
     @pytest.mark.asyncio
     async def test_process_video(self, services):
         """Test video processing."""
@@ -207,7 +207,7 @@ class TestProcessContent:
         assert result.error_message is None
 
         # Test passed - video processing works correctly
-    
+
     @pytest.mark.asyncio
     async def test_process_image(self, services):
         """Test image processing."""
@@ -225,13 +225,13 @@ class TestProcessContent:
             success=True,
             error_message=None
         )
-        
+
         # Mock the entire process_image method
         services.process_image = AsyncMock(return_value=mock_processing_result)
-        
+
         # Process image
         result = await services.process_image("test.jpg")
-        
+
         # Verify result
         assert result.content_type == ContentType.IMAGE
         assert result.content_path == "test.jpg"
@@ -241,7 +241,7 @@ class TestProcessContent:
         assert result.processing_time == 1.0
         assert result.success is True
         assert result.error_message is None
-    
+
     @pytest.mark.asyncio
     async def test_process_url(self, services):
         """Test URL processing."""
@@ -265,12 +265,12 @@ class TestProcessContent:
             success=True,
             error_message=None
         )
-        
+
         services.web_service.process_url.return_value = mock_result
-        
+
         # Process URL
         result = await services.process_url("https://example.com")
-        
+
         # Verify result
         assert result.content_type == ContentType.WEB
         assert result.content_url == "https://example.com"
@@ -279,10 +279,10 @@ class TestProcessContent:
         assert result.processing_time == 0.5
         assert result.success is True
         assert result.error_message is None
-        
+
         # Verify service call
         services.web_service.process_url.assert_called_once()
-    
+
     @pytest.mark.asyncio
     async def test_process_youtube(self, services):
         """Test YouTube processing."""
@@ -303,7 +303,7 @@ class TestProcessContent:
         mock_metadata.webpage_url = "https://youtube.com/watch?v=dQw4w9WgXcQ"
         mock_metadata.channel_id = "UC123"
         mock_metadata.channel_url = "https://youtube.com/channel/UC123"
-        
+
         # Mock YouTube service response
         mock_result = MagicMock()
         mock_result.metadata = mock_metadata
@@ -314,12 +314,12 @@ class TestProcessContent:
         mock_result.processing_time = 10.0
         mock_result.success = True
         mock_result.error_message = None
-        
+
         services.youtube_service.process_video.return_value = mock_result
-        
+
         # Process YouTube URL
         result = await services.process_youtube("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
-        
+
         # Verify result
         assert result.content_type == ContentType.YOUTUBE
         assert result.content_url == "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
@@ -332,16 +332,16 @@ class TestProcessContent:
         assert result.processing_time == 10.0
         assert result.success is True
         assert result.error_message is None
-        
+
         # Verify service call
         services.youtube_service.process_video.assert_called_once()
-    
+
     @pytest.mark.asyncio
     async def test_process_content_auto_detect(self, services):
         """Test content processing with auto-detection."""
         # Import WebContent and WebScrapingResult
         from morag_web.processor import WebContent, WebScrapingResult
-        
+
         # Mock document service JSON response
         mock_doc_json = {
             "title": "Test Document",
@@ -357,7 +357,7 @@ class TestProcessContent:
             ]
         }
         services.document_service.process_document_to_json.return_value = mock_doc_json
-        
+
         # Mock web service with proper WebScrapingResult structure
         mock_web_result = WebScrapingResult(
             url="https://example.com",
@@ -378,28 +378,28 @@ class TestProcessContent:
             success=True
         )
         services.web_service.process_url.return_value = mock_web_result
-        
+
         # Process with auto-detection
         doc_result = await services.process_content("test.pdf")
         web_result = await services.process_content("https://example.com")
-        
+
         # Verify document result
         assert doc_result.content_type == ContentType.DOCUMENT
         assert "Document text" in doc_result.text_content  # Content should be in the markdown
-        
+
         # Verify web result
         assert web_result.content_type == ContentType.WEB
         assert web_result.text_content == "Web content"
-    
+
     @pytest.mark.asyncio
     async def test_process_content_error_handling(self, services):
         """Test error handling in content processing."""
         # Mock service to raise exception
         services.document_service.process_document_to_json.side_effect = Exception("Test error")
-        
+
         # Process with error
         result = await services.process_content("test.pdf")
-        
+
         # Verify error handling
         assert result.content_type == ContentType.DOCUMENT
         assert result.content_path == "test.pdf"
@@ -409,12 +409,12 @@ class TestProcessContent:
 @pytest.mark.asyncio
 class TestBatchProcessing:
     """Tests for batch processing."""
-    
+
     async def test_process_batch(self, services):
         """Test batch processing."""
         # Import WebContent and WebScrapingResult
         from morag_web.processor import WebContent, WebScrapingResult
-        
+
         # Mock document service JSON response
         mock_doc_json = {
             "title": "Test Document",
@@ -430,7 +430,7 @@ class TestBatchProcessing:
             ]
         }
         services.document_service.process_document_to_json.return_value = mock_doc_json
-        
+
         # Mock web service with proper WebScrapingResult structure
         mock_web_result = WebScrapingResult(
             url="https://example.com",
@@ -451,18 +451,18 @@ class TestBatchProcessing:
             success=True
         )
         services.web_service.process_url.return_value = mock_web_result
-        
+
         # Process batch
         items = ["test.pdf", "https://example.com"]
         results = await services.process_batch(items)
-        
+
         # Verify results
         assert len(results) == 2
         assert results["test.pdf"].content_type == ContentType.DOCUMENT
         assert results["https://example.com"].content_type == ContentType.WEB
         assert results["test.pdf"].success is True
         assert results["https://example.com"].success is True
-    
+
     async def test_process_batch_with_errors(self, services):
         """Test batch processing with errors."""
         # Mock document service to succeed
@@ -480,14 +480,14 @@ class TestBatchProcessing:
             ]
         }
         services.document_service.process_document_to_json.return_value = mock_doc_json
-        
+
         # Mock web service to fail
         services.web_service.process_url.side_effect = Exception("Web error")
-        
+
         # Process batch
         items = ["test.pdf", "https://example.com"]
         results = await services.process_batch(items)
-        
+
         # Verify results
         assert len(results) == 2
         assert results["test.pdf"].success is True
@@ -502,16 +502,16 @@ async def test_generate_embeddings(services):
         [0.1, 0.2, 0.3],
         [0.4, 0.5, 0.6]
     ]
-    
+
     # Generate embeddings
     texts = ["Text 1", "Text 2"]
     embeddings = await services.generate_embeddings(texts)
-    
+
     # Verify results
     assert len(embeddings) == 2
     assert embeddings[0] == [0.1, 0.2, 0.3]
     assert embeddings[1] == [0.4, 0.5, 0.6]
-    
+
     # Verify service call
     services.embedding_service.generate_embeddings.assert_called_once_with(
         texts,

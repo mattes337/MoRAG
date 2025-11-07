@@ -11,17 +11,17 @@ logger = logging.getLogger(__name__)
 
 class ConnectionOperations(BaseOperations):
     """Handles Neo4j connection and database management operations."""
-    
+
     def __init__(self, config):
         """Initialize connection operations.
-        
+
         Args:
             config: Neo4j configuration object
         """
         self.config = config
         self.driver: Optional[AsyncDriver] = None
         # Don't call super().__init__ yet since driver is None
-    
+
     async def connect(self) -> None:
         """Connect to Neo4J database."""
         try:
@@ -32,7 +32,7 @@ class ConnectionOperations(BaseOperations):
                 "max_connection_pool_size": self.config.max_connection_pool_size,
                 "connection_acquisition_timeout": self.config.connection_acquisition_timeout,
             }
-            
+
             # Handle SSL configuration for newer Neo4j driver versions
             # Note: The 'trust' parameter has been deprecated in Neo4j driver 5.x
             # For now, we'll use the basic SSL configuration without the deprecated trust parameter
@@ -40,23 +40,23 @@ class ConnectionOperations(BaseOperations):
                 # For SSL configurations, we'll rely on the URI scheme (bolt+s, neo4j+s, etc.)
                 # and let the driver handle SSL based on the URI
                 pass
-            
+
             self.driver = AsyncGraphDatabase.driver(self.config.uri, **driver_kwargs)
-            
+
             # Test the connection
             await self.driver.verify_connectivity()
             logger.info(f"Connected to Neo4J at {self.config.uri}")
-            
+
             # Ensure database exists
             await self._ensure_database_exists()
-            
+
             # Now initialize base class with driver
             super().__init__(self.driver, self.config.database)
 
         except Exception as e:
             logger.error(f"Failed to connect to Neo4J: {e}")
             raise
-    
+
     async def disconnect(self) -> None:
         """Disconnect from Neo4J database."""
         if self.driver:
@@ -75,9 +75,9 @@ class ConnectionOperations(BaseOperations):
                     "SHOW DATABASES YIELD name WHERE name = $db_name",
                     {"db_name": self.config.database}
                 )
-                
+
                 databases = [record async for record in result]
-                
+
                 if not databases:
                     # Database doesn't exist, try to create it
                     logger.info(f"Database '{self.config.database}' not found, attempting to create it")
@@ -85,9 +85,9 @@ class ConnectionOperations(BaseOperations):
                     logger.info(f"Created database '{self.config.database}'")
                 else:
                     logger.info(f"Database '{self.config.database}' already exists")
-                    
+
         except Exception as e:
-            # If we can't access system database or create databases, 
+            # If we can't access system database or create databases,
             # try to connect directly to the target database
             try:
                 async with self.driver.session(database=self.config.database) as session:
@@ -118,9 +118,9 @@ class ConnectionOperations(BaseOperations):
                     "SHOW DATABASES YIELD name WHERE name = $db_name",
                     {"db_name": database_name}
                 )
-                
+
                 databases = [record async for record in result]
-                
+
                 if not databases:
                     # Create the database
                     await session.run(f"CREATE DATABASE `{database_name}`")

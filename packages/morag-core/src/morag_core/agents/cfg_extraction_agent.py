@@ -12,7 +12,7 @@ logger = structlog.get_logger(__name__)
 
 class KnowledgeTriple(BaseModel):
     """A knowledge triple in subject-predicate-object format."""
-    
+
     subject: str = Field(description="Subject entity")
     predicate: str = Field(description="Relationship/predicate")
     object: str = Field(description="Object entity")
@@ -21,7 +21,7 @@ class KnowledgeTriple(BaseModel):
 
 class CFGExtractionResult(BaseModel):
     """Result from CFG-based extraction."""
-    
+
     triples: List[KnowledgeTriple] = Field(description="Extracted knowledge triples")
     total_triples: int = Field(description="Total number of triples")
     confidence: ConfidenceLevel = Field(description="Overall confidence level")
@@ -31,10 +31,10 @@ class CFGExtractionResult(BaseModel):
 
 class CFGExtractionAgent(MoRAGBaseAgent[CFGExtractionResult]):
     """CFG extraction agent using context-free grammars for structured output."""
-    
+
     def __init__(self, config: Optional[AgentConfig] = None):
         """Initialize the CFG extraction agent.
-        
+
         Args:
             config: Agent configuration
         """
@@ -44,13 +44,13 @@ class CFGExtractionAgent(MoRAGBaseAgent[CFGExtractionResult]):
                 temperature=0.1,
                 outlines_provider="gemini"
             )
-        
+
         super().__init__(config)
-        
+
         # CFG extraction configuration
         self.min_confidence = 0.6
         self.max_triples = 15
-        
+
         # Define context-free grammar for knowledge triples
         self.knowledge_triple_grammar = """
         ?start: triple_list
@@ -71,7 +71,7 @@ class CFGExtractionAgent(MoRAGBaseAgent[CFGExtractionResult]):
 
         %ignore WS_INLINE
         """
-        
+
         # Alternative grammar for more complex structures
         self.complex_grammar = """
         ?start: knowledge_base
@@ -94,18 +94,18 @@ class CFGExtractionAgent(MoRAGBaseAgent[CFGExtractionResult]):
 
         %ignore WS_INLINE
         """
-    
+
     def get_result_type(self) -> Type[CFGExtractionResult]:
         """Return the Pydantic model for CFG extraction results.
-        
+
         Returns:
             CFGExtractionResult class
         """
         return CFGExtractionResult
-    
+
     def get_system_prompt(self) -> str:
         """Return the system prompt for CFG extraction.
-        
+
         Returns:
             The system prompt string
         """
@@ -150,7 +150,7 @@ EXAMPLES:
 - Subject: "Tim Cook", Predicate: "serves as CEO of", Object: "Apple Inc."
 - Subject: "iPhone", Predicate: "is manufactured by", Object: "Apple Inc."
 
-IMPORTANT: 
+IMPORTANT:
 - Ensure triples represent factual relationships
 - Maintain consistency in entity naming
 - Use clear, descriptive predicates
@@ -164,13 +164,13 @@ IMPORTANT:
         min_confidence: Optional[float] = None
     ) -> CFGExtractionResult:
         """Extract knowledge using context-free grammar constraints.
-        
+
         Args:
             text: Text to extract from
             domain: Domain context for extraction
             grammar_type: Type of grammar to use (knowledge_triples, complex)
             min_confidence: Minimum confidence threshold
-            
+
         Returns:
             CFGExtractionResult with grammar-constrained output
         """
@@ -182,11 +182,11 @@ IMPORTANT:
                 grammar_used=grammar_type,
                 metadata={"error": "Empty text", "domain": domain}
             )
-        
+
         # Update configuration for this extraction
         if min_confidence is not None:
             self.min_confidence = min_confidence
-        
+
         self.logger.info(
             "Starting CFG extraction",
             text_length=len(text),
@@ -194,18 +194,18 @@ IMPORTANT:
             grammar_type=grammar_type,
             structured_generation=self.is_outlines_available()
         )
-        
+
         # Prepare the extraction prompt
         prompt = self._create_extraction_prompt(text, domain, grammar_type)
-        
+
         try:
             # For now, use structured generation with Pydantic models
             # In a full implementation, you would use Outlines CFG support
             result = await self.run(prompt)
-            
+
             # Post-process the result
             result = self._post_process_result(result, text, domain, grammar_type)
-            
+
             self.logger.info(
                 "CFG extraction completed",
                 triples_extracted=result.total_triples,
@@ -213,9 +213,9 @@ IMPORTANT:
                 grammar_used=result.grammar_used,
                 used_outlines=self.is_outlines_available()
             )
-            
+
             return result
-            
+
         except Exception as e:
             self.logger.error("CFG extraction failed", error=str(e))
             # Return a fallback result
@@ -230,13 +230,13 @@ IMPORTANT:
                     "fallback": True
                 }
             )
-    
+
     def get_cfg_generator(self, grammar_type: str = "knowledge_triples"):
         """Get a CFG generator for the specified grammar type.
-        
+
         Args:
             grammar_type: Type of grammar to use
-            
+
         Returns:
             CFG generator (placeholder for actual implementation)
         """
@@ -244,27 +244,27 @@ IMPORTANT:
             # This would be the actual CFG implementation with Outlines
             # from outlines.types import CFG
             # from outlines import Generator
-            
+
             if grammar_type == "knowledge_triples":
                 grammar = self.knowledge_triple_grammar
             elif grammar_type == "complex":
                 grammar = self.complex_grammar
             else:
                 raise ValueError(f"Unknown grammar type: {grammar_type}")
-            
+
             # In actual implementation:
             # cfg = CFG(grammar)
             # generator = Generator(self.outlines_provider._outlines_model, cfg)
             # return generator
-            
+
             # For now, return a placeholder
             self.logger.info(f"CFG grammar prepared for type: {grammar_type}")
             return None
-            
+
         except Exception as e:
             self.logger.error("Failed to create CFG generator", error=str(e))
             raise
-    
+
     def _create_extraction_prompt(
         self,
         text: str,
@@ -272,12 +272,12 @@ IMPORTANT:
         grammar_type: str
     ) -> str:
         """Create the extraction prompt for CFG-based extraction.
-        
+
         Args:
             text: Text to extract from
             domain: Domain context
             grammar_type: Type of grammar to use
-            
+
         Returns:
             Formatted prompt string
         """
@@ -293,7 +293,7 @@ EXTRACTION PARAMETERS:
 - Minimum confidence: {self.min_confidence}
 
 Extract structured knowledge triples that follow the grammar constraints and represent factual relationships in the text."""
-    
+
     def _post_process_result(
         self,
         result: CFGExtractionResult,
@@ -302,13 +302,13 @@ Extract structured knowledge triples that follow the grammar constraints and rep
         grammar_type: str
     ) -> CFGExtractionResult:
         """Post-process and validate the CFG extraction result.
-        
+
         Args:
             result: Raw extraction result
             original_text: Original input text
             domain: Domain context
             grammar_type: Grammar type used
-            
+
         Returns:
             Post-processed and validated result
         """
@@ -317,7 +317,7 @@ Extract structured knowledge triples that follow the grammar constraints and rep
             triple for triple in result.triples
             if triple.confidence >= self.min_confidence
         ]
-        
+
         # Limit to max_triples
         if len(filtered_triples) > self.max_triples:
             # Sort by confidence and take top triples
@@ -326,7 +326,7 @@ Extract structured knowledge triples that follow the grammar constraints and rep
                 key=lambda t: t.confidence,
                 reverse=True
             )[:self.max_triples]
-        
+
         # Update metadata
         metadata = result.metadata or {}
         metadata.update({
@@ -340,7 +340,7 @@ Extract structured knowledge triples that follow the grammar constraints and rep
             "extraction_method": "outlines_cfg" if self.is_outlines_available() else "fallback",
             "grammar_constraints": "applied"
         })
-        
+
         # Create updated result
         return CFGExtractionResult(
             triples=filtered_triples,

@@ -107,7 +107,7 @@ class TestConfigurationParsing:
         monkeypatch.setenv("MORAG_REL_CLEANUP_BATCH_SIZE", "50")
         monkeypatch.setenv("MORAG_REL_CLEANUP_MIN_CONFIDENCE", "0.4")
         monkeypatch.setenv("MORAG_REL_CLEANUP_REMOVE_UNRELATED", "false")
-        
+
         overrides = parse_cleanup_overrides()
         assert overrides["dry_run"] is False
         assert overrides["batch_size"] == 50

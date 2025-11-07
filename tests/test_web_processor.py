@@ -6,9 +6,9 @@ import httpx
 from bs4 import BeautifulSoup
 
 from src.morag.processors.web import (
-    WebProcessor, 
-    WebScrapingConfig, 
-    WebContent, 
+    WebProcessor,
+    WebScrapingConfig,
+    WebContent,
     WebScrapingResult
 )
 from src.morag.core.exceptions import ValidationError, ProcessingError
@@ -16,12 +16,12 @@ from src.morag.core.exceptions import ValidationError, ProcessingError
 
 class TestWebProcessor:
     """Test cases for WebProcessor."""
-    
+
     @pytest.fixture
     def web_processor(self):
         """Create a web processor instance."""
         return WebProcessor()
-    
+
     @pytest.fixture
     def sample_html(self):
         """Sample HTML content for testing."""
@@ -61,38 +61,38 @@ class TestWebProcessor:
         </body>
         </html>
         """
-    
+
     def test_validate_url_valid(self, web_processor):
         """Test URL validation with valid URLs."""
         # Test with protocol
         assert web_processor._validate_url("https://example.com") == "https://example.com"
         assert web_processor._validate_url("http://example.com") == "http://example.com"
-        
+
         # Test without protocol (should add https)
         assert web_processor._validate_url("example.com") == "https://example.com"
-        
+
         # Test with path
         assert web_processor._validate_url("example.com/path") == "https://example.com/path"
-    
+
     def test_validate_url_invalid(self, web_processor):
         """Test URL validation with invalid URLs."""
         with pytest.raises(ValidationError):
             web_processor._validate_url("")
-        
+
         with pytest.raises(ValidationError):
             web_processor._validate_url(None)
-        
+
         with pytest.raises(ValidationError):
             web_processor._validate_url("not-a-url")
-        
+
         with pytest.raises(ValidationError):
             web_processor._validate_url("://invalid")
-    
+
     def test_extract_metadata(self, web_processor, sample_html):
         """Test metadata extraction from HTML."""
         soup = BeautifulSoup(sample_html, 'html.parser')
         metadata = web_processor._extract_metadata(soup, "https://example.com")
-        
+
         assert metadata['url'] == "https://example.com"
         assert metadata['domain'] == "example.com"
         assert metadata['title'] == "Test Page"
@@ -101,56 +101,56 @@ class TestWebProcessor:
         assert metadata['og_title'] == "Test Page OG"
         assert metadata['twitter_card'] == "summary"
         assert 'extracted_at' in metadata
-    
+
     def test_clean_html(self, web_processor, sample_html):
         """Test HTML cleaning functionality."""
         soup = BeautifulSoup(sample_html, 'html.parser')
         config = WebScrapingConfig(remove_navigation=True, remove_footer=True)
-        
+
         cleaned_soup = web_processor._clean_html(soup, config)
-        
+
         # Navigation should be removed
         assert not cleaned_soup.find('nav')
-        
+
         # Footer should be removed
         assert not cleaned_soup.find('footer')
-        
+
         # Main content should remain
         assert cleaned_soup.find('main')
         assert cleaned_soup.find('h1')
-    
+
     def test_extract_links(self, web_processor, sample_html):
         """Test link extraction from HTML."""
         soup = BeautifulSoup(sample_html, 'html.parser')
         links = web_processor._extract_links(soup, "https://example.com")
-        
+
         expected_links = [
             "https://example.com/home",
-            "https://example.com/about", 
+            "https://example.com/about",
             "https://example.com"  # External link should be converted to absolute
         ]
-        
+
         # Check that all expected links are found
         for link in expected_links:
             assert any(link in found_link for found_link in links)
-    
+
     def test_extract_images(self, web_processor, sample_html):
         """Test image extraction from HTML."""
         soup = BeautifulSoup(sample_html, 'html.parser')
         images = web_processor._extract_images(soup, "https://example.com")
-        
+
         assert "https://example.com/image.jpg" in images
-    
+
     def test_extract_main_content(self, web_processor, sample_html):
         """Test main content extraction."""
         soup = BeautifulSoup(sample_html, 'html.parser')
         main_content = web_processor._extract_main_content(soup)
-        
+
         # Should find the main tag
         assert main_content.name == 'main'
         assert main_content.find('h1')
         assert "Main Title" in main_content.get_text()
-    
+
     def test_convert_to_markdown(self, web_processor):
         """Test HTML to Markdown conversion."""
         html_content = """
@@ -161,129 +161,129 @@ class TestWebProcessor:
             <li>Item 2</li>
         </ul>
         """
-        
+
         config = WebScrapingConfig(preserve_lists=True)
         markdown = web_processor._convert_to_markdown(html_content, config)
-        
+
         assert "# Title" in markdown
         assert "**paragraph**" in markdown
         assert "*emphasis*" in markdown
         assert "- Item 1" in markdown
         assert "- Item 2" in markdown
-    
+
     def test_clean_markdown(self, web_processor):
         """Test markdown cleaning functionality."""
         messy_markdown = """
         # Title
-        
-        
-        
-        This is content.   
-        
-        
+
+
+
+        This is content.
+
+
         []()
-        
-        
+
+
         # Another Title
         """
-        
+
         cleaned = web_processor._clean_markdown(messy_markdown)
-        
+
         # Should remove excessive line breaks
         assert "\n\n\n" not in cleaned
-        
+
         # Should remove empty links
         assert "[]()" not in cleaned
-        
+
         # Should preserve proper structure
         assert "# Title" in cleaned
         assert "This is content." in cleaned
-    
+
     @pytest.mark.asyncio
     async def test_rate_limit(self, web_processor):
         """Test rate limiting functionality."""
         import time
-        
+
         start_time = time.time()
         await web_processor._rate_limit(0.1)
         await web_processor._rate_limit(0.1)
         end_time = time.time()
-        
+
         # Should have waited at least 0.1 seconds
         assert end_time - start_time >= 0.1
-    
+
     @pytest.mark.asyncio
     async def test_fetch_content_success(self, web_processor, sample_html):
         """Test successful content fetching."""
         config = WebScrapingConfig()
-        
+
         # Mock httpx response
         mock_response = Mock()
         mock_response.text = sample_html
         mock_response.headers = {'content-type': 'text/html'}
         mock_response.content = sample_html.encode()
         mock_response.raise_for_status = Mock()
-        
+
         with patch('httpx.AsyncClient') as mock_client:
             mock_client.return_value.__aenter__.return_value.get = AsyncMock(return_value=mock_response)
-            
+
             content, content_type, headers = await web_processor._fetch_content(
                 "https://example.com", config
             )
-            
+
             assert content == sample_html
             assert "text/html" in content_type
             assert headers['content-type'] == 'text/html'
-    
+
     @pytest.mark.asyncio
     async def test_fetch_content_http_error(self, web_processor):
         """Test content fetching with HTTP error."""
         config = WebScrapingConfig()
-        
+
         # Mock HTTP error
         mock_response = Mock()
         mock_response.status_code = 404
-        
+
         with patch('httpx.AsyncClient') as mock_client:
             mock_client.return_value.__aenter__.return_value.get = AsyncMock(
                 side_effect=httpx.HTTPStatusError("Not Found", request=Mock(), response=mock_response)
             )
-            
+
             with pytest.raises(ProcessingError):
                 await web_processor._fetch_content("https://example.com", config)
-    
+
     @pytest.mark.asyncio
     async def test_fetch_content_unsupported_type(self, web_processor):
         """Test content fetching with unsupported content type."""
         config = WebScrapingConfig()
-        
+
         # Mock response with unsupported content type
         mock_response = Mock()
         mock_response.headers = {'content-type': 'application/pdf'}
         mock_response.content = b"PDF content"
         mock_response.raise_for_status = Mock()
-        
+
         with patch('httpx.AsyncClient') as mock_client:
             mock_client.return_value.__aenter__.return_value.get = AsyncMock(return_value=mock_response)
-            
+
             with pytest.raises(ValidationError, match="Unsupported content type"):
                 await web_processor._fetch_content("https://example.com", config)
-    
+
     @pytest.mark.asyncio
     async def test_fetch_content_too_large(self, web_processor):
         """Test content fetching with content too large."""
         config = WebScrapingConfig(max_content_length=100)
-        
+
         # Mock response with large content
         large_content = "x" * 200
         mock_response = Mock()
         mock_response.headers = {'content-type': 'text/html'}
         mock_response.content = large_content.encode()
         mock_response.raise_for_status = Mock()
-        
+
         with patch('httpx.AsyncClient') as mock_client:
             mock_client.return_value.__aenter__.return_value.get = AsyncMock(return_value=mock_response)
-            
+
             with pytest.raises(ValidationError, match="Content too large"):
                 await web_processor._fetch_content("https://example.com", config)
 

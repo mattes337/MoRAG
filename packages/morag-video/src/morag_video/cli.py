@@ -29,7 +29,7 @@ async def process_video(file_path: Union[str, Path],
                       language: Optional[str] = None,
                       device: str = "auto"):
     """Process a video file and save or print the results.
-    
+
     Args:
         file_path: Path to the video file
         output_dir: Directory to save output files (if None, prints to console)
@@ -58,10 +58,10 @@ async def process_video(file_path: Union[str, Path],
         language=language,
         device=device
     )
-    
+
     # Initialize video service
     video_service = VideoService(config=config, output_dir=output_dir)
-    
+
     try:
         # Process the video file
         result = await video_service.process_file(
@@ -69,7 +69,7 @@ async def process_video(file_path: Union[str, Path],
             save_output=(output_dir is not None),
             output_format=output_format
         )
-        
+
         # If no output directory is specified, print results to console
         if not output_dir:
             if output_format == "markdown" and "markdown" in result:
@@ -77,9 +77,9 @@ async def process_video(file_path: Union[str, Path],
             else:
                 import json
                 print(json.dumps(result, indent=2))
-                
+
         return result
-    
+
     except Exception as e:
         logger.error("Video processing failed", error=str(e))
         raise
@@ -88,14 +88,14 @@ async def process_video(file_path: Union[str, Path],
 def main():
     """Main entry point for the CLI."""
     parser = argparse.ArgumentParser(description="Process video files with morag-video")
-    
+
     # Input file arguments
     parser.add_argument(
-        "input_files", 
-        nargs="+", 
+        "input_files",
+        nargs="+",
         help="Path(s) to video file(s) to process"
     )
-    
+
     # Output arguments
     parser.add_argument(
         "-o", "--output-dir",
@@ -107,7 +107,7 @@ def main():
         default="markdown",
         help="Output format (default: markdown)"
     )
-    
+
     # Processing options
     parser.add_argument(
         "--no-audio",
@@ -124,7 +124,7 @@ def main():
         action="store_true",
         help="Disable keyframe extraction"
     )
-    
+
     # Enhanced audio processing options
     parser.add_argument(
         "--enhanced-audio",
@@ -141,14 +141,14 @@ def main():
         action="store_true",
         help="Enable topic segmentation"
     )
-    
+
     # OCR options
     parser.add_argument(
         "--ocr",
         action="store_true",
         help="Enable OCR on keyframes"
     )
-    
+
     # Whisper model options
     parser.add_argument(
         "--whisper-model",
@@ -166,29 +166,29 @@ def main():
         default="auto",
         help="Device to use for processing (default: auto)"
     )
-    
+
     args = parser.parse_args()
-    
+
     # Validate input files
     input_files = [Path(f) for f in args.input_files]
     invalid_files = [f for f in input_files if not f.exists()]
-    
+
     if invalid_files:
         print(f"Error: The following files do not exist: {', '.join(str(f) for f in invalid_files)}")
         sys.exit(1)
-    
+
     # Create output directory if specified
     if args.output_dir:
         output_dir = Path(args.output_dir)
         os.makedirs(output_dir, exist_ok=True)
     else:
         output_dir = None
-    
+
     # Process each input file
     for file_path in input_files:
         try:
             print(f"Processing {file_path}...")
-            
+
             # Run the async processing function
             result = asyncio.run(process_video(
                 file_path=file_path,
@@ -205,12 +205,12 @@ def main():
                 language=args.language,
                 device=args.device
             ))
-            
+
             if output_dir:
                 print(f"Results saved to {output_dir}")
-                
+
             print(f"Successfully processed {file_path}")
-            
+
         except Exception as e:
             print(f"Error processing {file_path}: {str(e)}")
             continue

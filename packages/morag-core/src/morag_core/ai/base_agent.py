@@ -69,14 +69,14 @@ class MoRAGBaseAgent(Generic[T], ABC):
                 error=str(e)
             )
             raise AgentError(f"Outlines provider initialization failed: {e}") from e
-        
+
     @property
     def agent(self) -> Agent:
         """Get the PydanticAI agent instance, creating it if necessary."""
         if self._agent is None:
             self._agent = self._create_agent()
         return self._agent
-    
+
     def _create_agent(self) -> Agent:
         """Create the PydanticAI agent instance."""
         try:
@@ -94,25 +94,25 @@ class MoRAGBaseAgent(Generic[T], ABC):
             )
         except Exception as e:
             raise AgentError(f"Failed to create agent: {e}") from e
-    
+
     @abstractmethod
     def get_result_type(self) -> Type[T]:
         """Return the Pydantic model for structured output.
-        
+
         Returns:
             The Pydantic model class for this agent's output
         """
         pass
-    
+
     @abstractmethod
     def get_system_prompt(self) -> str:
         """Return the system prompt for this agent.
-        
+
         Returns:
             The system prompt string
         """
         pass
-    
+
     def get_deps_type(self) -> Optional[Type]:
         """Return the dependencies type for this agent.
 
@@ -133,7 +133,7 @@ class MoRAGBaseAgent(Generic[T], ABC):
         if ":" in model:
             return model.split(":", 1)[1]
         return model
-    
+
     async def run(
         self,
         user_prompt: str,
@@ -178,7 +178,7 @@ class MoRAGBaseAgent(Generic[T], ABC):
                 error=str(e)
             )
             raise AgentError(f"Structured generation failed: {e}") from e
-    
+
     def run_sync(
         self,
         user_prompt: str,
@@ -186,26 +186,26 @@ class MoRAGBaseAgent(Generic[T], ABC):
         **kwargs
     ) -> T:
         """Synchronous version of run().
-        
+
         Args:
             user_prompt: The user prompt to process
             deps: Optional dependencies for the agent
             **kwargs: Additional arguments passed to the agent
-            
+
         Returns:
             The structured result from the agent
         """
         return asyncio.run(self.run(user_prompt, deps, **kwargs))
-    
+
     def _validate_result(self, result: Any) -> T:
         """Validate the agent result.
-        
+
         Args:
             result: The raw result from the agent
-            
+
         Returns:
             The validated result
-            
+
         Raises:
             ValidationError: If validation fails
         """
@@ -218,17 +218,17 @@ class MoRAGBaseAgent(Generic[T], ABC):
                 return self.get_result_type().model_validate(result)
         except Exception as e:
             raise ValidationError(f"Result validation failed: {e}") from e
-    
+
     def add_tool(self, func):
         """Add a tool function to the agent.
-        
+
         Args:
             func: The tool function to add
         """
         if self._agent is None:
             self._agent = self._create_agent()
         return self._agent.tool(func)
-    
+
     def add_system_prompt_part(self, func):
         """Add a system prompt part to the agent.
 
@@ -262,5 +262,3 @@ class MoRAGBaseAgent(Generic[T], ABC):
             "outlines_provider": self.config.outlines_provider,
             "model": self.config.model
         }
-
-

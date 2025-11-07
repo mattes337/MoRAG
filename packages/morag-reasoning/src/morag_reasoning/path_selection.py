@@ -1,13 +1,11 @@
 """Path selection agent for multi-hop reasoning."""
 
-import asyncio
 import json
 import logging
-from typing import List, Dict, Any, Optional, Set
+from typing import List, Optional
 from dataclasses import dataclass
 
 from morag_graph.operations import GraphPath
-from morag_graph.models import Entity, Relation
 from .llm import LLMClient
 
 # Import agents framework
@@ -37,7 +35,7 @@ class ReasoningStrategy:
 
 class PathSelectionAgent:
     """Agent for LLM-guided path selection in multi-hop reasoning."""
-    
+
     def __init__(self, llm_client: Optional[LLMClient] = None, max_paths: int = 10):
         """Initialize the path selection agent.
 
@@ -52,7 +50,7 @@ class PathSelectionAgent:
         self.llm_client = llm_client  # Keep for backward compatibility
         self.max_paths = max_paths
         self.logger = logging.getLogger(__name__)
-        
+
         # Define reasoning strategies
         self.strategies = {
             "forward_chaining": ReasoningStrategy(
@@ -63,7 +61,7 @@ class PathSelectionAgent:
                 use_weights=True
             ),
             "backward_chaining": ReasoningStrategy(
-                name="backward_chaining", 
+                name="backward_chaining",
                 description="Start from potential answers and work backward",
                 max_depth=3,
                 bidirectional=False,
@@ -77,30 +75,30 @@ class PathSelectionAgent:
                 use_weights=True
             )
         }
-    
+
     async def select_paths(
-        self, 
-        query: str, 
+        self,
+        query: str,
         available_paths: List[GraphPath],
         strategy: str = "forward_chaining"
     ) -> List[PathRelevanceScore]:
         """Use LLM to select most relevant paths for answering the query.
-        
+
         Args:
             query: Search query
             available_paths: List of available graph paths
             strategy: Reasoning strategy to use
-            
+
         Returns:
             List of selected paths with relevance scores
         """
         if not available_paths:
             return []
-        
+
         try:
             # Create path selection prompt
             prompt = self._create_path_selection_prompt(query, available_paths)
-            
+
             # Use path selection agent - ALWAYS
             result = await self.path_agent.execute(
                 query,
@@ -110,19 +108,19 @@ class PathSelectionAgent:
 
             # Convert agent result to legacy format
             selected_paths = self._convert_agent_result_to_paths(result, available_paths)
-            
+
             # Apply additional scoring
             scored_paths = await self._score_paths(query, selected_paths, strategy)
-            
+
             # Sort by relevance and return top paths
             scored_paths.sort(key=lambda x: x.relevance_score, reverse=True)
             return scored_paths[:self.max_paths]
-        
+
         except Exception as e:
             self.logger.error(f"Error in path selection: {str(e)}")
             # Fallback to simple scoring
             return self._fallback_path_selection(available_paths)
-    
+
     def _create_path_selection_prompt(self, query: str, paths: List[GraphPath]) -> str:
         """Create a prompt for LLM to select relevant paths."""
         prompt = f"""Given the following query and available reasoning paths, select the most relevant paths that could help answer the question.
@@ -131,11 +129,11 @@ Query: {query}
 
 Available Paths:
 """
-        
+
         for i, path in enumerate(paths[:20]):  # Limit to avoid token overflow
             path_description = self._describe_path(path)
             prompt += f"{i+1}. {path_description}\n"
-        
+
         prompt += """
 For each path, provide:
 1. Relevance score (0-10)
@@ -153,24 +151,24 @@ Format your response as JSON:
     }
   ]
 }"""
-        
+
         return prompt
-    
+
     def _describe_path(self, path: GraphPath) -> str:
         """Create a human-readable description of a graph path."""
         if len(path.entities) < 2:
             entity_name = path.entities[0].name if path.entities else 'Unknown'
             return f"Single entity: {entity_name}"
-        
+
         description_parts = []
         for i in range(len(path.entities) - 1):
             entity1 = path.entities[i].name
             entity2 = path.entities[i + 1].name
             relation = path.relations[i].type if i < len(path.relations) else "connected_to"
             description_parts.append(f"{entity1} --[{relation}]--> {entity2}")
-        
+
         return " -> ".join(description_parts)
-    
+
     def _parse_path_selection(self, response: str, available_paths: List[GraphPath]) -> List[PathRelevanceScore]:
         """Parse LLM response to extract selected paths."""
         try:
@@ -226,16 +224,16 @@ Format your response as JSON:
             self.logger.error(f"Raw response was: {response}")
             print(f"Error parsing LLM response: {str(e)}")
             return self._fallback_path_selection(available_paths)
-    
+
     async def _score_paths(
-        self, 
-        query: str, 
-        paths: List[PathRelevanceScore], 
+        self,
+        query: str,
+        paths: List[PathRelevanceScore],
         strategy: str
     ) -> List[PathRelevanceScore]:
         """Apply additional scoring based on reasoning strategy."""
         strategy_config = self.strategies.get(strategy, self.strategies["forward_chaining"])
-        
+
         for path_score in paths:
             # Apply strategy-specific adjustments
             if strategy_config.use_weights:
@@ -243,19 +241,19 @@ Format your response as JSON:
                 if hasattr(path_score.path, 'total_weight'):
                     weight_bonus = min(path_score.path.total_weight / 10.0, 2.0)
                     path_score.relevance_score += weight_bonus
-            
+
             # Penalize very long paths unless strategy allows it
             path_length = len(path_score.path.entities)
             if path_length > strategy_config.max_depth:
                 penalty = (path_length - strategy_config.max_depth) * 0.5
                 path_score.relevance_score = max(0, path_score.relevance_score - penalty)
-            
+
             # Boost confidence for shorter, more direct paths
             if path_length <= 3:
                 path_score.confidence += 1.0
-        
+
         return paths
-    
+
     def _fallback_path_selection(self, available_paths: List[GraphPath]) -> List[PathRelevanceScore]:
         """Fallback path selection when LLM fails."""
         fallback_paths = []
@@ -265,7 +263,7 @@ Format your response as JSON:
             weight_score = getattr(path, 'total_weight', 5.0)  # Default weight if not available
             weight_score = min(weight_score, 10)
             combined_score = (length_score + weight_score) / 2
-            
+
             path_score = PathRelevanceScore(
                 path=path,
                 relevance_score=combined_score,
@@ -273,7 +271,7 @@ Format your response as JSON:
                 reasoning="Fallback scoring based on path length and weight"
             )
             fallback_paths.append(path_score)
-        
+
         return fallback_paths
 
     def _convert_agent_result_to_paths(self, agent_result, available_paths: List[GraphPath]) -> List[PathRelevanceScore]:

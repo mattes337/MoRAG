@@ -68,7 +68,7 @@ has_speaker_diarization: true
 
 ### [00:05:30] Dashboard Demonstration
 
-**SPEAKER_01**: Absolutely. As you can see on screen, the new dashboard provides a clean, organized view of all your key metrics. 
+**SPEAKER_01**: Absolutely. As you can see on screen, the new dashboard provides a clean, organized view of all your key metrics.
 
 *[Screen shows dashboard interface with various widgets and charts]*
 

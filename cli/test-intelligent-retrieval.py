@@ -104,7 +104,7 @@ class IntelligentRetrievalTester:
         self.gemini_model = gemini_model or os.getenv("MORAG_GEMINI_MODEL", "gemini-1.5-flash")
 
         self.service = None
-    
+
     async def initialize(self) -> bool:
         """Initialize the intelligent retrieval service.
 
@@ -204,7 +204,7 @@ class IntelligentRetrievalTester:
             health["error"] = str(e)
 
         return health
-    
+
     async def get_endpoint_info(self) -> Dict[str, Any]:
         """Get information about the intelligent retrieval service.
 
@@ -235,7 +235,7 @@ class IntelligentRetrievalTester:
                 "language": "Language for processing (optional)"
             }
         }
-    
+
     async def test_intelligent_retrieval(
         self,
         query: str,
@@ -308,10 +308,10 @@ class IntelligentRetrievalTester:
                     await self.service.qdrant_storage.close()
             except Exception as e:
                 logger.warning("Error during cleanup", error=str(e))
-    
+
     def print_results(self, results: Dict[str, Any], verbose: bool = False):
         """Print test results in a formatted way.
-        
+
         Args:
             results: Results from the test
             verbose: Whether to print verbose output
@@ -321,7 +321,7 @@ class IntelligentRetrievalTester:
             if "status_code" in results:
                 print(f"   Status code: {results['status_code']}")
             return
-        
+
         data = results["data"]
         print(f"[OK] Test successful!")
         print(f"   Query ID: {data['query_id']}")
@@ -334,10 +334,10 @@ class IntelligentRetrievalTester:
         print(f"   Key facts found: {len(data['key_facts'])}")
         print(f"   Confidence score: {data['confidence_score']:.2f}")
         print(f"   Completeness score: {data['completeness_score']:.2f}")
-        
+
         if data['initial_entities']:
             print(f"   Initial entities: {', '.join(data['initial_entities'])}")
-        
+
         # Print key facts
         if data['key_facts']:
             print("\n[INFO] Key Facts:")
@@ -351,7 +351,7 @@ class IntelligentRetrievalTester:
                     for j, source in enumerate(fact['sources'][:2], 1):  # Show first 2 sources
                         print(f"        Source {j}: {source['document_name']}")
                 print()
-        
+
         # Print iteration details if verbose
         if verbose and data['iterations']:
             print("\n[PROCESSING] Iteration Details:")

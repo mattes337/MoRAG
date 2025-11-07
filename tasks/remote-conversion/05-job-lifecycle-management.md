@@ -43,7 +43,7 @@ class JobStatus(Enum):
 
 class JobLifecycleManager:
     """Manages the complete lifecycle of remote conversion jobs."""
-    
+
     def __init__(self):
         self.heartbeat_timeout = timedelta(minutes=5)  # Worker must send heartbeat every 5 minutes
         self.job_timeouts = {
@@ -54,7 +54,7 @@ class JobLifecycleManager:
             'web': timedelta(minutes=10),
             'youtube': timedelta(minutes=30)
         }
-    
+
     def transition_job_status(self, job_id: str, new_status: JobStatus,
                              error_message: str = None, result_data: Dict[str, Any] = None) -> bool:
         """Transition job to new status with validation."""
@@ -113,7 +113,7 @@ class JobLifecycleManager:
                         job_id=job_id,
                         error=str(e))
             return False
-    
+
     def _is_valid_transition(self, old_status: str, new_status: str) -> bool:
         """Validate if status transition is allowed."""
         valid_transitions = {
@@ -125,9 +125,9 @@ class JobLifecycleManager:
             'completed': ['cancelled'],  # Allow cancellation of completed jobs for cleanup
             'cancelled': []  # Terminal state
         }
-        
+
         return new_status in valid_transitions.get(old_status, [])
-    
+
     def _handle_status_transition(self, job: RemoteJob, old_status: str, new_status: str):
         """Handle post-transition actions."""
         try:
@@ -140,20 +140,20 @@ class JobLifecycleManager:
             elif new_status in ['failed', 'timeout', 'cancelled']:
                 # Handle final failure
                 self._handle_job_failure(job)
-                
+
         except Exception as e:
             logger.error("Error in post-transition handling",
                         job_id=str(job.id),
                         error=str(e))
-    
+
     def _continue_ingestion_pipeline(self, job: RemoteJob):
         """Continue the ingestion pipeline after successful remote processing."""
         try:
             from morag.ingest_tasks import continue_ingestion_after_remote_processing
-            
+
             # Extract result data
             result_data = job.result_data or {}
-            
+
             # Continue ingestion task
             continue_ingestion_after_remote_processing.delay(
                 job.ingestion_task_id,
@@ -165,16 +165,16 @@ class JobLifecycleManager:
                 },
                 job.task_options
             )
-            
+
             logger.info("Ingestion pipeline continuation scheduled",
                        job_id=str(job.id),
                        ingestion_task_id=job.ingestion_task_id)
-            
+
         except Exception as e:
             logger.error("Failed to continue ingestion pipeline",
                         job_id=str(job.id),
                         error=str(e))
-    
+
     def _schedule_retry(self, job: RemoteJob):
         """Schedule job retry with exponential backoff."""
         try:
@@ -202,12 +202,12 @@ class JobLifecycleManager:
             logger.error("Failed to schedule job retry",
                         job_id=job.id,
                         error=str(e))
-    
+
     def _handle_job_failure(self, job: RemoteJob):
         """Handle final job failure."""
         try:
             from morag.ingest_tasks import handle_remote_job_failure
-            
+
             # Notify ingestion task of failure
             handle_remote_job_failure.delay(
                 job.ingestion_task_id,
@@ -217,16 +217,16 @@ class JobLifecycleManager:
                     'job_id': str(job.id)
                 }
             )
-            
+
             logger.info("Job failure handled",
                        job_id=str(job.id),
                        ingestion_task_id=job.ingestion_task_id)
-            
+
         except Exception as e:
             logger.error("Failed to handle job failure",
                         job_id=str(job.id),
                         error=str(e))
-    
+
     def check_expired_jobs(self) -> int:
         """Check for and handle expired jobs."""
         try:
@@ -247,7 +247,7 @@ class JobLifecycleManager:
         except Exception as e:
             logger.error("Failed to check expired jobs", error=str(e))
             return 0
-    
+
     def cleanup_old_jobs(self, days_old: int = 7) -> int:
         """Clean up old completed/failed jobs."""
         try:
@@ -279,13 +279,13 @@ class JobLifecycleManager:
         except Exception as e:
             logger.error("Failed to cleanup old jobs", error=str(e))
             return 0
-    
+
     def _cleanup_job_files(self, job: RemoteJob):
         """Clean up files associated with a job."""
         try:
             import os
             from pathlib import Path
-            
+
             # Clean up temporary files for this job
             temp_dir = Path(f"/tmp/morag_remote_{job.id}")
             if temp_dir.exists():
@@ -294,12 +294,12 @@ class JobLifecycleManager:
                 logger.debug("Cleaned up job temp directory",
                            job_id=str(job.id),
                            temp_dir=str(temp_dir))
-                
+
         except Exception as e:
             logger.warning("Failed to cleanup job files",
                           job_id=str(job.id),
                           error=str(e))
-    
+
     def get_job_statistics(self) -> Dict[str, Any]:
         """Get statistics about job processing."""
         try:
@@ -375,21 +375,21 @@ logger = structlog.get_logger(__name__)
 
 class JobMonitorService:
     """Background service for monitoring remote job lifecycle."""
-    
+
     def __init__(self):
         self.lifecycle_manager = JobLifecycleManager()
         self.running = False
         self.check_interval = int(os.getenv('MORAG_JOB_MONITOR_INTERVAL', '60'))  # 1 minute
         self.cleanup_interval = int(os.getenv('MORAG_JOB_CLEANUP_INTERVAL', '3600'))  # 1 hour
         self.last_cleanup = datetime.utcnow()
-    
+
     async def start(self):
         """Start the job monitor service."""
         self.running = True
         logger.info("Starting job monitor service",
                    check_interval=self.check_interval,
                    cleanup_interval=self.cleanup_interval)
-        
+
         while self.running:
             try:
                 await self._monitor_cycle()
@@ -397,12 +397,12 @@ class JobMonitorService:
             except Exception as e:
                 logger.error("Error in job monitor cycle", error=str(e))
                 await asyncio.sleep(self.check_interval)
-    
+
     def stop(self):
         """Stop the job monitor service."""
         self.running = False
         logger.info("Stopping job monitor service")
-    
+
     async def _monitor_cycle(self):
         """Execute one monitoring cycle."""
         try:
@@ -410,7 +410,7 @@ class JobMonitorService:
             expired_count = self.lifecycle_manager.check_expired_jobs()
             if expired_count > 0:
                 logger.info("Handled expired jobs", count=expired_count)
-            
+
             # Periodic cleanup
             now = datetime.utcnow()
             if (now - self.last_cleanup).total_seconds() >= self.cleanup_interval:
@@ -418,13 +418,13 @@ class JobMonitorService:
                 if cleanup_count > 0:
                     logger.info("Cleaned up old jobs", count=cleanup_count)
                 self.last_cleanup = now
-            
+
             # Log statistics periodically
             if now.minute % 10 == 0:  # Every 10 minutes
                 stats = self.lifecycle_manager.get_job_statistics()
                 if stats:
                     logger.info("Job statistics", **stats)
-                    
+
         except Exception as e:
             logger.error("Error in monitor cycle", error=str(e))
 ```
@@ -445,19 +445,19 @@ from morag_core.models import ProcessingResult
 logger = structlog.get_logger(__name__)
 
 @celery_app.task(bind=True)
-def continue_ingestion_after_remote_processing(self, ingestion_task_id: str, 
-                                             processing_result: Dict[str, Any], 
+def continue_ingestion_after_remote_processing(self, ingestion_task_id: str,
+                                             processing_result: Dict[str, Any],
                                              task_options: Dict[str, Any]):
     """Continue ingestion pipeline after remote processing completion."""
-    
+
     async def _continue():
         try:
             logger.info("Continuing ingestion after remote processing",
                        ingestion_task_id=ingestion_task_id,
                        task_id=self.request.id)
-            
+
             self.update_state(state='PROGRESS', meta={'stage': 'remote_processing_completed', 'progress': 0.6})
-            
+
             # Convert processing result back to ProcessingResult object
             result = ProcessingResult(
                 success=processing_result['success'],
@@ -466,37 +466,37 @@ def continue_ingestion_after_remote_processing(self, ingestion_task_id: str,
                 processing_time=processing_result.get('processing_time', 0.0),
                 error_message=processing_result.get('error_message')
             )
-            
+
             # Continue with vector storage (reuse existing logic)
             from morag.ingest_tasks_enhanced import _complete_ingestion
             return await _complete_ingestion(self, result, task_options)
-            
+
         except Exception as e:
             logger.error("Failed to continue ingestion after remote processing",
                         ingestion_task_id=ingestion_task_id,
                         error=str(e))
             self.update_state(state='FAILURE', meta={'error': str(e)})
             raise
-    
+
     return asyncio.run(_continue())
 
 @celery_app.task(bind=True)
 def handle_remote_job_failure(self, ingestion_task_id: str, failure_info: Dict[str, Any]):
     """Handle remote job failure and update ingestion task."""
-    
+
     try:
         logger.error("Remote job failed for ingestion task",
                     ingestion_task_id=ingestion_task_id,
                     failure_info=failure_info)
-        
+
         # Update the original ingestion task with failure information
         error_message = failure_info.get('error_message', 'Remote processing failed')
         retry_count = failure_info.get('retry_count', 0)
         job_id = failure_info.get('job_id')
-        
+
         # Check if we should attempt local fallback
         # This would depend on the original task options
-        
+
         self.update_state(
             state='FAILURE',
             meta={
@@ -506,10 +506,10 @@ def handle_remote_job_failure(self, ingestion_task_id: str, failure_info: Dict[s
                 'stage': 'remote_processing_failed'
             }
         )
-        
+
         # Send webhook notification if configured
         # This would be handled by existing webhook logic
-        
+
     except Exception as e:
         logger.error("Failed to handle remote job failure",
                     ingestion_task_id=ingestion_task_id,
@@ -544,16 +544,16 @@ async def cancel_job(
         success = lifecycle_manager.transition_job_status(
             db, job_id, JobStatus.CANCELLED
         )
-        
+
         if not success:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Job {job_id} not found or cannot be cancelled"
             )
-        
+
         logger.info("Job cancelled", job_id=job_id)
         return {"status": "cancelled", "job_id": job_id}
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -574,16 +574,16 @@ async def retry_job(
         success = lifecycle_manager.transition_job_status(
             db, job_id, JobStatus.RETRYING
         )
-        
+
         if not success:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Job {job_id} not found or cannot be retried"
             )
-        
+
         logger.info("Job retry initiated", job_id=job_id)
         return {"status": "retrying", "job_id": job_id}
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -600,7 +600,7 @@ async def get_job_statistics():
         lifecycle_manager = JobLifecycleManager()
         stats = lifecycle_manager.get_job_statistics()
         return stats
-        
+
     except Exception as e:
         logger.error("Failed to get job statistics", error=str(e))
         raise HTTPException(
@@ -617,10 +617,10 @@ async def cleanup_old_jobs(
     try:
         lifecycle_manager = JobLifecycleManager()
         cleaned_count = lifecycle_manager.cleanup_old_jobs(days_old)
-        
+
         logger.info("Manual job cleanup completed", count=cleaned_count)
         return {"cleaned_jobs": cleaned_count, "days_old": days_old}
-        
+
     except Exception as e:
         logger.error("Failed to cleanup old jobs", error=str(e))
         raise HTTPException(
@@ -673,19 +673,19 @@ class TestJobLifecycleManager:
     def test_status_transitions(self):
         # Test valid and invalid status transitions
         pass
-    
+
     def test_job_timeout_handling(self):
         # Test timeout detection and handling
         pass
-    
+
     def test_retry_mechanism(self):
         # Test job retry with exponential backoff
         pass
-    
+
     def test_cleanup_old_jobs(self):
         # Test cleanup of old completed jobs
         pass
-    
+
     def test_ingestion_continuation(self):
         # Test continuation of ingestion pipeline
         pass

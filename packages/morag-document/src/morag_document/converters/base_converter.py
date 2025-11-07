@@ -45,18 +45,18 @@ class BaseMarkitdownConverter(BaseConverter, ABC):
 
     def _get_markitdown_options(self, options: ConversionOptions) -> Dict[str, Any]:
         """Convert MoRAG conversion options to markitdown options.
-        
+
         Args:
             options: MoRAG conversion options
-            
+
         Returns:
             Dictionary of markitdown options
         """
         markitdown_options = {}
-        
+
         # Map relevant options to markitdown format
         # Note: Specific option mapping will be refined as we implement each converter
-        
+
         return markitdown_options
 
     async def supports_format(self, format_type: str) -> bool:

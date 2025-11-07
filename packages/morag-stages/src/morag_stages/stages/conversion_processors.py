@@ -40,14 +40,14 @@ except ImportError:
     # Fallback implementations
     def is_url(path_like) -> bool:
         return str(path_like).startswith(('http://', 'https://'))
-    
+
     def get_url_string(path_like) -> str:
         return str(path_like)
 
 
 class ConversionProcessors:
     """Collection of processors for different content types."""
-    
+
     def __init__(self):
         """Initialize conversion processors."""
         self.converter_factory = ConverterFactory()
@@ -57,23 +57,23 @@ class ConversionProcessors:
         """Initialize processors."""
         if self._initialized:
             return
-            
+
         await self.converter_factory.initialize()
         self._initialized = True
 
-    async def process_file(self, 
-                          input_file: Union[Path, 'URLPath'], 
-                          output_file: Path, 
+    async def process_file(self,
+                          input_file: Union[Path, 'URLPath'],
+                          output_file: Path,
                           content_type: Any,
                           config: Dict[str, Any]) -> Dict[str, Any]:
         """Process a file based on its content type."""
         if not self._initialized:
             await self.initialize()
-        
+
         try:
             # Determine processing method based on content type
             converter_type = self.converter_factory.get_converter_type(input_file, content_type)
-            
+
             if converter_type == 'youtube':
                 return await self._process_youtube(input_file, output_file, config)
             elif converter_type == 'video':
@@ -90,7 +90,7 @@ class ConversionProcessors:
                     return await self._process_with_services(input_file, output_file, config)
                 else:
                     return await self._process_text(input_file, output_file, config)
-                    
+
         except Exception as e:
             logger.error("Processing failed", file=str(input_file), error=str(e))
             return {
@@ -105,7 +105,7 @@ class ConversionProcessors:
     async def _process_with_markitdown(self, input_file: Union[Path, 'URLPath'], output_file: Path, config: Dict[str, Any]) -> Dict[str, Any]:
         """Process file using markitdown converter."""
         start_time = datetime.now()
-        
+
         try:
             # Import markitdown - this is optional
             try:
@@ -118,10 +118,10 @@ class ConversionProcessors:
                     'error': 'Markitdown library not installed',
                     'metadata': {'processor_type': 'markitdown', 'processing_time': 0}
                 }
-            
+
             # Initialize markitdown
             md = MarkItDown()
-            
+
             # Process the file
             if is_url(str(input_file)):
                 # Process URL
@@ -129,10 +129,10 @@ class ConversionProcessors:
             else:
                 # Process local file
                 result = md.convert(str(input_file))
-            
+
             # Extract text content
             content = result.text_content if hasattr(result, 'text_content') else str(result)
-            
+
             # Validate conversion quality
             if not self.converter_factory.validate_conversion_quality(content, input_file):
                 logger.warning("Conversion quality validation failed", file=str(input_file))
@@ -145,13 +145,13 @@ class ConversionProcessors:
                         'content_length': len(content) if content else 0
                     }
                 }
-            
+
             # Write to output file
             with open(output_file, 'w', encoding='utf-8') as f:
                 f.write(content)
-            
+
             processing_time = (datetime.now() - start_time).total_seconds()
-            
+
             return {
                 'success': True,
                 'content': content,
@@ -162,7 +162,7 @@ class ConversionProcessors:
                     'output_file': str(output_file)
                 }
             }
-            
+
         except Exception as e:
             processing_time = (datetime.now() - start_time).total_seconds()
             logger.error("Markitdown processing failed", file=str(input_file), error=str(e))
@@ -178,20 +178,20 @@ class ConversionProcessors:
     async def _process_video(self, input_file: Union[Path, 'URLPath'], output_file: Path, config: Dict[str, Any]) -> Dict[str, Any]:
         """Process video file."""
         start_time = datetime.now()
-        
+
         try:
             # Use MoRAG services if available
             if self.converter_factory.is_services_available():
                 services = await self.converter_factory.get_services()
                 result = await services.process_video(str(input_file), config)
-                
+
                 if result.success:
                     # Write content to output file
                     with open(output_file, 'w', encoding='utf-8') as f:
                         f.write(result.text_content)
-                    
+
                     processing_time = (datetime.now() - start_time).total_seconds()
-                    
+
                     return {
                         'success': True,
                         'content': result.text_content,
@@ -220,7 +220,7 @@ class ConversionProcessors:
                         'processing_time': (datetime.now() - start_time).total_seconds()
                     }
                 }
-                
+
         except Exception as e:
             processing_time = (datetime.now() - start_time).total_seconds()
             logger.error("Video processing failed", file=str(input_file), error=str(e))
@@ -236,20 +236,20 @@ class ConversionProcessors:
     async def _process_audio(self, input_file: Union[Path, 'URLPath'], output_file: Path, config: Dict[str, Any]) -> Dict[str, Any]:
         """Process audio file."""
         start_time = datetime.now()
-        
+
         try:
             # Use MoRAG services if available
             if self.converter_factory.is_services_available():
                 services = await self.converter_factory.get_services()
                 result = await services.process_audio(str(input_file), config)
-                
+
                 if result.success:
                     # Write content to output file
                     with open(output_file, 'w', encoding='utf-8') as f:
                         f.write(result.text_content)
-                    
+
                     processing_time = (datetime.now() - start_time).total_seconds()
-                    
+
                     return {
                         'success': True,
                         'content': result.text_content,
@@ -278,7 +278,7 @@ class ConversionProcessors:
                         'processing_time': (datetime.now() - start_time).total_seconds()
                     }
                 }
-                
+
         except Exception as e:
             processing_time = (datetime.now() - start_time).total_seconds()
             logger.error("Audio processing failed", file=str(input_file), error=str(e))
@@ -294,20 +294,20 @@ class ConversionProcessors:
     async def _process_web(self, input_file: Union[Path, 'URLPath'], output_file: Path, config: Dict[str, Any]) -> Dict[str, Any]:
         """Process web URL."""
         start_time = datetime.now()
-        
+
         try:
             # Use MoRAG services if available
             if self.converter_factory.is_services_available():
                 services = await self.converter_factory.get_services()
                 result = await services.process_url(str(input_file), config)
-                
+
                 if result.success:
                     # Write content to output file
                     with open(output_file, 'w', encoding='utf-8') as f:
                         f.write(result.text_content)
-                    
+
                     processing_time = (datetime.now() - start_time).total_seconds()
-                    
+
                     return {
                         'success': True,
                         'content': result.text_content,
@@ -336,7 +336,7 @@ class ConversionProcessors:
                         'processing_time': (datetime.now() - start_time).total_seconds()
                     }
                 }
-                
+
         except Exception as e:
             processing_time = (datetime.now() - start_time).total_seconds()
             logger.error("Web processing failed", file=str(input_file), error=str(e))
@@ -352,20 +352,20 @@ class ConversionProcessors:
     async def _process_youtube(self, input_file: Union[Path, 'URLPath'], output_file: Path, config: Dict[str, Any]) -> Dict[str, Any]:
         """Process YouTube URL."""
         start_time = datetime.now()
-        
+
         try:
             # Use MoRAG services if available
             if self.converter_factory.is_services_available():
                 services = await self.converter_factory.get_services()
                 result = await services.process_youtube(str(input_file), config)
-                
+
                 if result.success:
                     # Write content to output file
                     with open(output_file, 'w', encoding='utf-8') as f:
                         f.write(result.text_content)
-                    
+
                     processing_time = (datetime.now() - start_time).total_seconds()
-                    
+
                     return {
                         'success': True,
                         'content': result.text_content,
@@ -391,13 +391,13 @@ class ConversionProcessors:
                     youtube_service = YouTubeService()
                     await youtube_service.initialize()
                     result = await youtube_service.process(str(input_file), config)
-                    
+
                     if result.success:
                         with open(output_file, 'w', encoding='utf-8') as f:
                             f.write(result.content)
-                        
+
                         processing_time = (datetime.now() - start_time).total_seconds()
-                        
+
                         return {
                             'success': True,
                             'content': result.content,
@@ -426,7 +426,7 @@ class ConversionProcessors:
                             'processing_time': (datetime.now() - start_time).total_seconds()
                         }
                     }
-                
+
         except Exception as e:
             processing_time = (datetime.now() - start_time).total_seconds()
             logger.error("YouTube processing failed", file=str(input_file), error=str(e))
@@ -442,18 +442,18 @@ class ConversionProcessors:
     async def _process_with_services(self, input_file: Union[Path, 'URLPath'], output_file: Path, config: Dict[str, Any]) -> Dict[str, Any]:
         """Process using general MoRAG services."""
         start_time = datetime.now()
-        
+
         try:
             services = await self.converter_factory.get_services()
             result = await services.process_content(str(input_file), config=config)
-            
+
             if result.success:
                 # Write content to output file
                 with open(output_file, 'w', encoding='utf-8') as f:
                     f.write(result.text_content)
-                
+
                 processing_time = (datetime.now() - start_time).total_seconds()
-                
+
                 return {
                     'success': True,
                     'content': result.text_content,
@@ -473,7 +473,7 @@ class ConversionProcessors:
                         'processing_time': (datetime.now() - start_time).total_seconds()
                     }
                 }
-                
+
         except Exception as e:
             processing_time = (datetime.now() - start_time).total_seconds()
             logger.error("Services processing failed", file=str(input_file), error=str(e))
@@ -489,7 +489,7 @@ class ConversionProcessors:
     async def _process_text(self, input_file: Union[Path, 'URLPath'], output_file: Path, config: Dict[str, Any]) -> Dict[str, Any]:
         """Fallback text processing."""
         start_time = datetime.now()
-        
+
         try:
             if is_url(str(input_file)):
                 return {
@@ -500,14 +500,14 @@ class ConversionProcessors:
                         'processing_time': (datetime.now() - start_time).total_seconds()
                     }
                 }
-            
+
             # Read text file directly
             input_path = Path(input_file)
-            
+
             # Try different encodings
             encodings = ['utf-8', 'latin-1', 'cp1252']
             content = None
-            
+
             for encoding in encodings:
                 try:
                     with open(input_path, 'r', encoding=encoding) as f:
@@ -515,7 +515,7 @@ class ConversionProcessors:
                     break
                 except UnicodeDecodeError:
                     continue
-            
+
             if content is None:
                 return {
                     'success': False,
@@ -525,7 +525,7 @@ class ConversionProcessors:
                         'processing_time': (datetime.now() - start_time).total_seconds()
                     }
                 }
-            
+
             # Basic markdown formatting for text files
             if input_path.suffix.lower() in ['.txt', '.md']:
                 # Just copy content as-is for markdown files
@@ -533,13 +533,13 @@ class ConversionProcessors:
             else:
                 # Add basic formatting for other text files
                 formatted_content = f"# {input_path.name}\n\n{content}"
-            
+
             # Write to output file
             with open(output_file, 'w', encoding='utf-8') as f:
                 f.write(formatted_content)
-            
+
             processing_time = (datetime.now() - start_time).total_seconds()
-            
+
             return {
                 'success': True,
                 'content': formatted_content,
@@ -550,7 +550,7 @@ class ConversionProcessors:
                     'encoding_used': encoding
                 }
             }
-            
+
         except Exception as e:
             processing_time = (datetime.now() - start_time).total_seconds()
             logger.error("Text processing failed", file=str(input_file), error=str(e))

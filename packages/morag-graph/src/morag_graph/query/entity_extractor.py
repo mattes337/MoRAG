@@ -14,15 +14,15 @@ logger = logging.getLogger(__name__)
 
 class QueryEntityExtractor:
     """Extract and link entities from user queries to the knowledge graph."""
-    
+
     def __init__(
-        self, 
+        self,
         entity_extractor: EntityExtractor,
         graph_storage: BaseStorage,
         similarity_threshold: float = 0.8
     ):
         """Initialize the query entity extractor.
-        
+
         Args:
             entity_extractor: Entity extractor for NLP processing
             graph_storage: Graph storage backend
@@ -32,25 +32,25 @@ class QueryEntityExtractor:
         self.graph_storage = graph_storage
         self.similarity_threshold = similarity_threshold
         self.logger = logging.getLogger(__name__)
-    
+
     async def extract_and_link_entities(self, query: str) -> QueryAnalysis:
         """Extract entities from query and link to knowledge graph.
-        
+
         Args:
             query: User query text
-            
+
         Returns:
             QueryAnalysis with extracted and linked entities
-            
+
         Raises:
             QueryProcessingError: If entity extraction fails
         """
         try:
             self.logger.info(f"Processing query: {query}")
-            
+
             # Extract entities using NLP pipeline
             extracted_entities = await self.entity_extractor.extract(query)
-            
+
             # Convert to QueryEntity objects and link to graph
             query_entities = []
             for entity in extracted_entities:
@@ -61,23 +61,23 @@ class QueryEntityExtractor:
                     start_pos=0,  # Could be enhanced with NER position info
                     end_pos=len(entity.name)
                 )
-                
+
                 # Attempt to link to existing entities in graph
                 linked_entity = await self._link_to_graph_entity(query_entity)
                 if linked_entity:
                     query_entity.linked_entity_id = linked_entity.id
                     query_entity.linked_entity = linked_entity
                     self.logger.debug(f"Linked '{query_entity.text}' to entity {linked_entity.id}")
-                
+
                 query_entities.append(query_entity)
-            
+
             # Analyze query intent and type
             intent = self._analyze_query_intent(query, query_entities)
             query_type = self._classify_query_type(query, query_entities)
             complexity = self._calculate_complexity_score(query, query_entities)
-            
+
             self.logger.info(f"Query analysis complete: {len(query_entities)} entities, intent={intent}, type={query_type}")
-            
+
             return QueryAnalysis(
                 original_query=query,
                 entities=query_entities,
@@ -85,17 +85,17 @@ class QueryEntityExtractor:
                 query_type=query_type,
                 complexity_score=complexity
             )
-        
+
         except Exception as e:
             self.logger.error(f"Error extracting entities from query '{query}': {str(e)}")
             raise QueryProcessingError(f"Failed to extract entities: {str(e)}")
-    
+
     async def _link_to_graph_entity(self, query_entity: QueryEntity) -> Optional[Entity]:
         """Link query entity to existing entity in knowledge graph.
-        
+
         Args:
             query_entity: Entity extracted from query
-            
+
         Returns:
             Linked Entity if found, None otherwise
         """
@@ -106,30 +106,30 @@ class QueryEntityExtractor:
                 entity_type=query_entity.entity_type,
                 limit=20  # Get more candidates for better matching
             )
-            
+
             if not candidates:
                 self.logger.debug(f"No candidates found for entity '{query_entity.text}'")
                 return None
-            
+
             # Find best match using similarity scoring
             best_match = None
             best_score = 0.0
-            
+
             for candidate in candidates:
                 similarity = self._calculate_entity_similarity(query_entity, candidate)
                 if similarity > best_score and similarity >= self.similarity_threshold:
                     best_score = similarity
                     best_match = candidate
-            
+
             if best_match:
                 self.logger.debug(f"Found match for '{query_entity.text}': {best_match.name} (score: {best_score:.3f})")
-            
+
             return best_match
-            
+
         except Exception as e:
             self.logger.warning(f"Error linking entity '{query_entity.text}': {e}")
             return None
-    
+
     def _calculate_entity_similarity(self, query_entity: QueryEntity, graph_entity: Entity) -> float:
         """Calculate similarity between query entity and graph entity.
 
@@ -174,31 +174,31 @@ class QueryEntityExtractor:
         )
 
         return final_score
-    
+
     def _calculate_text_similarity(self, text1: str, text2: str) -> float:
         """Calculate text similarity using Levenshtein distance.
-        
+
         Args:
             text1: First text
             text2: Second text
-            
+
         Returns:
             Similarity ratio between 0.0 and 1.0
         """
         return difflib.SequenceMatcher(None, text1, text2).ratio()
-    
+
     def _analyze_query_intent(self, query: str, entities: List[QueryEntity]) -> str:
         """Analyze the intent of the query.
-        
+
         Args:
             query: Original query text
             entities: Extracted entities
-            
+
         Returns:
             Intent classification string
         """
         query_lower = query.lower()
-        
+
         # Intent keywords
         if any(word in query_lower for word in ['what', 'who', 'where', 'when', 'which']):
             return 'factual'
@@ -210,14 +210,14 @@ class QueryEntityExtractor:
             return 'exploratory'
         else:
             return 'general'
-    
+
     def _classify_query_type(self, query: str, entities: List[QueryEntity]) -> str:
         """Classify the type of query based on structure and entities.
-        
+
         Args:
             query: Original query text
             entities: Extracted entities
-            
+
         Returns:
             Query type classification string
         """
@@ -229,25 +229,25 @@ class QueryEntityExtractor:
             return 'entity_relationship'
         else:
             return 'multi_entity'
-    
+
     def _calculate_complexity_score(self, query: str, entities: List[QueryEntity]) -> float:
         """Calculate query complexity score.
-        
+
         Args:
             query: Original query text
             entities: Extracted entities
-            
+
         Returns:
             Complexity score between 0.0 and 1.0
         """
         # Base complexity from query length
         length_score = min(len(query.split()) / 20.0, 1.0)
-        
+
         # Entity complexity
         entity_score = min(len(entities) / 5.0, 1.0)
-        
+
         # Linked entities bonus
         linked_entities = sum(1 for e in entities if e.linked_entity_id)
         linked_score = min(linked_entities / len(entities) if entities else 0, 1.0)
-        
+
         return (length_score + entity_score + linked_score) / 3.0

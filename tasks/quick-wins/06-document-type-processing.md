@@ -2,8 +2,8 @@
 
 ## Overview
 
-**Priority**: 📋 **Planned** (2-3 weeks, Medium Impact, Medium ROI)  
-**Source**: INRAExplorer domain specialization approach  
+**Priority**: 📋 **Planned** (2-3 weeks, Medium Impact, Medium ROI)
+**Source**: INRAExplorer domain specialization approach
 **Expected Impact**: 20-30% improvement in structured knowledge extraction
 
 ## Problem Statement
@@ -496,7 +496,7 @@ class EnhancedDocumentProcessor:
         """Combine and deduplicate generic and specialized entities."""
         # Convert specialized entities to common format
         combined = list(generic_entities)
-        
+
         for spec_entity in specialized_entities:
             # Convert to common entity format
             entity_dict = {
@@ -508,7 +508,7 @@ class EnhancedDocumentProcessor:
                 'metadata': spec_entity.metadata
             }
             combined.append(entity_dict)
-        
+
         # Simple deduplication by name (could be more sophisticated)
         seen_names = set()
         deduplicated = []
@@ -516,7 +516,7 @@ class EnhancedDocumentProcessor:
             if entity['name'] not in seen_names:
                 seen_names.add(entity['name'])
                 deduplicated.append(entity)
-        
+
         return deduplicated
 ```
 
@@ -526,11 +526,11 @@ class EnhancedDocumentProcessor:
 # document_type_processing.yml
 document_type_processing:
   enabled: true
-  
+
   classification:
     confidence_threshold: 0.3
     fallback_to_generic: true
-    
+
   academic_papers:
     enabled: true
     extract_authors: true
@@ -538,23 +538,23 @@ document_type_processing:
     extract_methodologies: true
     extract_findings: true
     extract_citations: true
-    
+
   meeting_notes:
     enabled: true
     extract_participants: true
     extract_action_items: true
     extract_decisions: true
     extract_topics: true
-    
+
   business_reports:
     enabled: true
     extract_metrics: true
     extract_recommendations: true
     extract_executives: true
-    
+
   legal_documents:
     enabled: false  # Future implementation
-    
+
   technical_docs:
     enabled: false  # Future implementation
 ```
@@ -579,7 +579,7 @@ class TestDocumentClassification:
         Conclusion: We have demonstrated that our approach...
         References: [1] Smith, J. et al. (2020)...
         """
-        
+
         result = self.classifier.classify_document(content)
         assert result.document_type == DocumentType.ACADEMIC_PAPER
         assert result.confidence > 0.7
@@ -597,7 +597,7 @@ class TestDocumentClassification:
         Decisions:
         - Approved budget increase of 10%
         """
-        
+
         result = self.classifier.classify_document(content)
         assert result.document_type == DocumentType.MEETING_NOTES
         assert result.confidence > 0.7

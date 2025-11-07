@@ -26,25 +26,25 @@ logger = get_logger(__name__)
 
 class ChunkProcessor:
     """Refactored chunk processor that coordinates chunking, embedding, and result processing."""
-    
+
     def __init__(self):
         """Initialize the chunk processor with specialized components."""
         self.chunkers = ContentChunkers()
         self.embedding_processor = EmbeddingProcessor()
         self.result_processor = ResultProcessor()
         self.fact_extractor = None
-    
+
     async def initialize(self):
         """Initialize all services and components."""
         try:
             # Initialize embedding processor
             await self.embedding_processor.initialize()
-            
+
             # Initialize fact extraction service
             self.fact_extractor = FactExtractionService()
-            
+
             logger.info("Chunk processor initialized successfully")
-            
+
         except Exception as e:
             logger.error("Failed to initialize chunk processor", error=str(e))
             raise
@@ -56,7 +56,7 @@ class ChunkProcessor:
 
         # Determine the best chunking strategy for this content
         chunk_type = self._determine_chunk_type(content_type, metadata)
-        
+
         try:
             if chunk_type == 'topic':
                 return self.chunkers.create_topic_based_chunks(content, chunk_size, chunk_overlap, metadata)
@@ -77,9 +77,9 @@ class ChunkProcessor:
             else:
                 # Default to character-based chunking
                 return self.chunkers.create_character_chunks(content, chunk_size, chunk_overlap)
-                
+
         except Exception as e:
-            logger.error("Chunking failed, falling back to character chunking", 
+            logger.error("Chunking failed, falling back to character chunking",
                         chunk_type=chunk_type, error=str(e))
             return self.chunkers.create_character_chunks(content, chunk_size, chunk_overlap)
 
@@ -91,27 +91,27 @@ class ChunkProcessor:
                 return 'topic'
             else:
                 return 'timestamp'
-        
+
         # Image content
         if content_type == 'image':
             return 'image_section'
-        
+
         # Web content
         if content_type == 'web' or metadata.get('source_type') == 'web':
             return 'web_article'
-        
+
         # Code content
         if content_type == 'code' or metadata.get('file_extension') in ['.py', '.js', '.java', '.cpp', '.c']:
             return 'code_structural'
-        
+
         # Archive content
         if content_type == 'archive' or metadata.get('file_extension') in ['.zip', '.tar', '.gz']:
             return 'archive'
-        
+
         # Document content (PDF, Word, etc.)
         if content_type in ['document', 'pdf', 'docx', 'doc']:
             return 'document'
-        
+
         # Default to semantic text chunking
         return 'text_semantic'
 

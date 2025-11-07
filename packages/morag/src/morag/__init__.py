@@ -261,7 +261,7 @@ __version__ = "0.1.0"
 
 __all__ = [
     "MoRAGAPI",
-    "MoRAGOrchestrator", 
+    "MoRAGOrchestrator",
     "MoRAGServices",
     "ServiceConfig",
     "ContentType",
@@ -273,6 +273,6 @@ __all__ = [
     "YouTubeProcessor",
     "create_app",
     "cli_main",
-    "server_main", 
+    "server_main",
     "worker_main",
 ]

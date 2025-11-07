@@ -71,13 +71,13 @@ def main():
     """Run all tests."""
     print("🐳 Testing Docker Infrastructure Setup")
     print("=" * 50)
-    
+
     tests = [
         test_redis,
         test_qdrant_http,
         test_qdrant,
     ]
-    
+
     results = []
     for test in tests:
         try:
@@ -87,11 +87,11 @@ def main():
             print(f"❌ Test failed with exception: {e}")
             results.append(False)
         print()
-    
+
     print("=" * 50)
     passed = sum(results)
     total = len(results)
-    
+
     if passed == total:
         print(f"🎉 All tests passed! ({passed}/{total})")
         print("✅ Docker infrastructure is ready for MoRAG")

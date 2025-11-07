@@ -23,17 +23,17 @@ class AudioServiceError(ServiceError):
 
 class AudioService:
     """High-level service for audio processing and conversion.
-    
+
     This service provides a unified interface for processing audio files,
     generating transcriptions, and converting to markdown format.
     """
 
-    def __init__(self, 
+    def __init__(self,
                  config: Optional[AudioConfig] = None,
                  embedding_service: Optional[GeminiEmbeddingService] = None,
                  output_dir: Optional[Union[str, Path]] = None):
         """Initialize the audio service.
-        
+
         Args:
             config: Configuration for audio processing
             embedding_service: Optional embedding service for enhanced features
@@ -43,14 +43,14 @@ class AudioService:
         self.processor = AudioProcessor(self.config)
         self.converter = AudioConverter()
         self.embedding_service = embedding_service
-        
+
         # Set up output directory
         if output_dir:
             self.output_dir = Path(output_dir)
             ensure_directory_exists(self.output_dir)
         else:
             self.output_dir = None
-        
+
         logger.info("Audio service initialized",
                    enable_diarization=self.config.enable_diarization,
                    enable_topic_segmentation=self.config.enable_topic_segmentation,
@@ -92,61 +92,61 @@ class AudioService:
                 "status": "unhealthy",
                 "error": str(e)
             }
-    
+
     async def process_file(self,
                          file_path: Union[str, Path],
                          save_output: bool = True,
                          output_format: str = "markdown",
                          progress_callback: callable = None) -> Dict[str, Any]:
         """Process an audio file and optionally save the results.
-        
+
         Args:
             file_path: Path to the audio file
             save_output: Whether to save the output files
             output_format: Format to save the output (markdown, json, txt)
-            
+
         Returns:
             Dictionary containing processing results and output file paths
-            
+
         Raises:
             AudioServiceError: If processing fails
         """
         start_time = time.time()
         file_path = Path(file_path)
-        
+
         if not file_path.exists():
             raise AudioServiceError(f"File not found: {file_path}")
-        
-        logger.info("Processing audio file", 
+
+        logger.info("Processing audio file",
                    file_path=str(file_path),
                    save_output=save_output,
                    output_format=output_format)
-        
+
         try:
             # Process the audio file
             result = await self.processor.process(file_path, progress_callback)
-            
+
             # Generate embeddings if embedding service is available
             if self.embedding_service and result.success:
                 try:
                     # Generate embeddings for the full transcript
                     transcript_embedding = await self.embedding_service.embed_text(result.transcript)
                     result.metadata["transcript_embedding"] = transcript_embedding.tolist()
-                    
+
                     # Generate embeddings for each segment
                     segment_texts = [segment.text for segment in result.segments]
                     segment_embeddings = await self.embedding_service.embed_batch(segment_texts)
-                    
+
                     # Add embeddings to segments
                     for i, segment in enumerate(result.segments):
                         segment.embedding = segment_embeddings[i].tolist()
-                        
+
                     logger.info("Generated embeddings for transcript and segments",
                               transcript_length=len(result.transcript),
                               segment_count=len(result.segments))
                 except Exception as e:
                     logger.warning("Failed to generate embeddings", error=str(e))
-            
+
             # Convert to requested format
             formatted_content = None
             if result.success:
@@ -163,7 +163,7 @@ class AudioService:
                     formatted_content = markdown_result.content
                 elif output_format == "json":
                     formatted_content = await self.converter.convert_to_json(result, conversion_options)
-            
+
             # Save output files if requested
             output_files = {}
             if save_output and result.success and self.output_dir:
@@ -186,19 +186,19 @@ class AudioService:
                     response["content"] = formatted_content
                 elif output_format == "txt":
                     response["content"] = result.transcript
-            
+
             logger.info("Audio processing completed",
                        file_path=str(file_path),
                        processing_time=processing_time,
                        success=result.success)
-            
+
             return response
-            
+
         except Exception as e:
-            logger.error("Audio processing failed", 
+            logger.error("Audio processing failed",
                         file_path=str(file_path),
                         error=str(e))
-            
+
             processing_time = time.time() - start_time
             return {
                 "success": False,
@@ -206,7 +206,7 @@ class AudioService:
                 "error": str(e),
                 "output_files": {}
             }
-    
+
     async def _save_output_files(self,
                                file_path: Path,
                                result: AudioProcessingResult,
@@ -316,9 +316,9 @@ class AudioService:
                        path=str(metadata_path),
                        error=str(e))
 
-        
-        logger.info("Saved output files", 
+
+        logger.info("Saved output files",
                    output_dir=str(file_output_dir),
                    files=list(output_files.keys()))
-        
+
         return output_files

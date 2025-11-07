@@ -125,20 +125,20 @@ while True:
         "content_types": ",".join(CONTENT_TYPES),
         "max_jobs": 1
     })
-    
+
     if response.status_code == 200:
         job_data = response.json()
-        
+
         if job_data.get("job_id"):
             job_id = job_data["job_id"]
-            
+
             try:
                 # Download source file
                 file_response = requests.get(f"{SERVER_URL}{job_data['source_file_url']}")
-                
+
                 # Process the file (your processing logic here)
                 result_content = process_audio_file(file_response.content)
-                
+
                 # Submit successful result
                 result = {
                     "success": True,
@@ -146,20 +146,20 @@ while True:
                     "metadata": {"duration": 120.5},
                     "processing_time": 45.2
                 }
-                
-                requests.put(f"{SERVER_URL}/api/v1/remote-jobs/{job_id}/result", 
+
+                requests.put(f"{SERVER_URL}/api/v1/remote-jobs/{job_id}/result",
                            json=result)
-                
+
             except Exception as e:
                 # Submit error result
                 error_result = {
                     "success": False,
                     "error_message": str(e)
                 }
-                
-                requests.put(f"{SERVER_URL}/api/v1/remote-jobs/{job_id}/result", 
+
+                requests.put(f"{SERVER_URL}/api/v1/remote-jobs/{job_id}/result",
                            json=error_result)
-    
+
     time.sleep(5)  # Poll every 5 seconds
 ```
 
@@ -172,7 +172,7 @@ while True:
 ### Job Timeouts
 
 - Audio jobs: 60 minutes
-- Video jobs: 1 hour  
+- Video jobs: 1 hour
 - Document jobs: 15 minutes
 
 ## File Storage Structure
@@ -228,7 +228,7 @@ python run_tests.py
 Run end-to-end tests:
 
 ```bash
-cd tests/remote_conversion  
+cd tests/remote_conversion
 python test_end_to_end.py
 ```
 

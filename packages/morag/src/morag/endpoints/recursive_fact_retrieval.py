@@ -27,23 +27,23 @@ async def get_recursive_fact_retrieval_service(
     request: RecursiveFactRetrievalRequest
 ) -> RecursiveFactRetrievalService:
     """Get recursive fact retrieval service with specified databases."""
-    
+
     # Get LLM client
     llm_client = get_llm_client()
-    
+
     # Create stronger LLM client for final synthesis (could use a different model)
     stronger_llm_config = LLMConfig(
         api_key=llm_client.config.api_key,
         model=llm_client.config.model  # Could be configured to use a stronger model
     )
     stronger_llm_client = LLMClient(stronger_llm_config)
-    
+
     # Handle database connections
     if request.database_servers:
         # Use custom database servers
         neo4j_storage = None
         qdrant_storage = None
-        
+
         for server_config in request.database_servers:
             if server_config.get("type") == DatabaseType.NEO4J.value:
                 from morag_graph import DatabaseServerConfig
@@ -53,7 +53,7 @@ async def get_recursive_fact_retrieval_service(
                 from morag_graph import DatabaseServerConfig
                 config = DatabaseServerConfig(**server_config)
                 qdrant_storage = await DatabaseConnectionFactory.create_qdrant_storage(config)
-        
+
         if not neo4j_storage or not qdrant_storage:
             raise HTTPException(
                 status_code=400,
@@ -67,7 +67,7 @@ async def get_recursive_fact_retrieval_service(
         qdrant_storage = await get_connected_default_qdrant_storage(
             collection=request.qdrant_collection
         )
-    
+
     # Initialize embedding service for enhanced retrieval
     embedding_service = None
     try:
@@ -98,22 +98,22 @@ async def recursive_fact_retrieval(
 ):
     """
     Perform recursive fact retrieval using graph-based RAG system.
-    
+
     This endpoint implements the complete recursive fact retrieval system as specified
     in RECURSIVE_FACT_RETRIEVAL.md, including:
-    
-    1. **GraphTraversalAgent (GTA)**: Navigates the Neo4j graph, identifies relevant 
+
+    1. **GraphTraversalAgent (GTA)**: Navigates the Neo4j graph, identifies relevant
        nodes and relationships, and extracts raw facts
-    2. **FactCriticAgent (FCA)**: Evaluates the relevance and quality of raw facts, 
+    2. **FactCriticAgent (FCA)**: Evaluates the relevance and quality of raw facts,
        assigns scores and generates user-friendly source descriptions
-    3. **Orchestration Logic**: Manages the overall process including initial query 
-       processing, iterative graph traversal, fact collection, scoring, relevance 
+    3. **Orchestration Logic**: Manages the overall process including initial query
+       processing, iterative graph traversal, fact collection, scoring, relevance
        decay, and final answer generation
-    
+
     The system performs intelligent graph traversal, extracts facts at each node,
     evaluates their relevance, applies depth-based decay, and synthesizes a final
     answer using a stronger LLM.
-    
+
     **Key Features:**
     - Intelligent entity identification from user queries
     - Breadth-first graph traversal with LLM-guided decisions
@@ -130,7 +130,7 @@ async def recursive_fact_retrieval(
             max_depth=request.max_depth,
             decay_rate=request.decay_rate
         )
-        
+
         # Get service with specified databases
         service = await get_recursive_fact_retrieval_service(request)
 
@@ -140,11 +140,11 @@ async def recursive_fact_retrieval(
 
         max_retries = 3
         base_delay = 1.0
-        
+
         for attempt in range(max_retries):
             try:
                 response = await perform_retrieval()
-                
+
                 logger.info(
                     "Recursive fact retrieval completed",
                     query_id=response.query_id,
@@ -152,9 +152,9 @@ async def recursive_fact_retrieval(
                     confidence=response.confidence_score,
                     processing_time_ms=response.processing_time_ms
                 )
-                
+
                 return response
-                
+
             except httpx.HTTPStatusError as e:
                 if e.response.status_code == 503 and "overloaded" in str(e).lower():
                     if attempt < max_retries - 1:
@@ -244,7 +244,7 @@ async def get_recursive_fact_retrieval_info():
             "total_scored_facts": "Total facts after scoring",
             "final_facts": "Final facts after decay and filtering",
             "gta_llm_calls": "Number of GraphTraversalAgent LLM calls",
-            "fca_llm_calls": "Number of FactCriticAgent LLM calls", 
+            "fca_llm_calls": "Number of FactCriticAgent LLM calls",
             "final_llm_calls": "Number of final synthesis LLM calls",
             "final_answer": "Final synthesized answer (null if facts_only=true)",
             "confidence_score": "Overall confidence in the answer"
@@ -269,12 +269,12 @@ async def check_recursive_fact_retrieval_health():
         # Check if we can create the service with default settings
         test_request = RecursiveFactRetrievalRequest(user_query="test")
         service = await get_recursive_fact_retrieval_service(test_request)
-        
+
         health = {
             "status": "healthy",
             "components": {}
         }
-        
+
         # Check Neo4j connection
         try:
             await service.neo4j_storage.health_check()
@@ -282,7 +282,7 @@ async def check_recursive_fact_retrieval_health():
         except Exception as e:
             health["components"]["neo4j"] = False
             health["neo4j_error"] = str(e)
-        
+
         # Check Qdrant connection
         try:
             await service.qdrant_storage.health_check()
@@ -290,17 +290,17 @@ async def check_recursive_fact_retrieval_health():
         except Exception as e:
             health["components"]["qdrant"] = False
             health["qdrant_error"] = str(e)
-        
+
         # Check LLM clients
         health["components"]["llm_client"] = service.llm_client is not None
         health["components"]["stronger_llm_client"] = service.stronger_llm_client is not None
-        
+
         # Overall status
         if not all(health["components"].values()):
             health["status"] = "degraded"
-        
+
         return health
-        
+
     except Exception as e:
         logger.error("Health check failed", error=str(e))
         return {

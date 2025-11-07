@@ -38,7 +38,7 @@ class Relation(BaseModel):
 
 class EntityExtractionResult(BaseModel):
     """Result of entity extraction."""
-    
+
     entities: List[Entity] = Field(description="List of extracted entities")
     confidence: ConfidenceLevel = Field(description="Overall confidence level")
     processing_time: Optional[float] = Field(default=None, description="Processing time in seconds")
@@ -47,7 +47,7 @@ class EntityExtractionResult(BaseModel):
 
 class RelationExtractionResult(BaseModel):
     """Result of relation extraction."""
-    
+
     relations: List[Relation] = Field(description="List of extracted relations")
     confidence: ConfidenceLevel = Field(description="Overall confidence level")
     processing_time: Optional[float] = Field(default=None, description="Processing time in seconds")
@@ -56,7 +56,7 @@ class RelationExtractionResult(BaseModel):
 
 class SummaryResult(BaseModel):
     """Result of text summarization."""
-    
+
     summary: str = Field(description="The generated summary")
     key_points: List[str] = Field(description="Key points from the text")
     confidence: ConfidenceLevel = Field(description="Confidence in the summary quality")
@@ -67,7 +67,7 @@ class SummaryResult(BaseModel):
 
 class TopicBoundary(BaseModel):
     """Represents a topic boundary in text."""
-    
+
     position: int = Field(description="Character position of the boundary")
     confidence: float = Field(ge=0.0, le=1.0, description="Confidence in the boundary")
     topic_before: Optional[str] = Field(default=None, description="Topic before the boundary")
@@ -77,7 +77,7 @@ class TopicBoundary(BaseModel):
 
 class SemanticChunkingResult(BaseModel):
     """Result of semantic chunking."""
-    
+
     boundaries: List[TopicBoundary] = Field(description="List of topic boundaries")
     chunks: List[str] = Field(description="List of semantic chunks")
     chunk_topics: List[str] = Field(description="Topic for each chunk")
@@ -90,7 +90,7 @@ class SemanticChunkingResult(BaseModel):
 
 class ContentAnalysisResult(BaseModel):
     """Result of content analysis."""
-    
+
     content_type: str = Field(description="Type of content")
     language: str = Field(description="Detected language")
     sentiment: str = Field(description="Overall sentiment")
@@ -103,7 +103,7 @@ class ContentAnalysisResult(BaseModel):
 
 class TranscriptAnalysisResult(BaseModel):
     """Result of transcript analysis."""
-    
+
     speakers: List[str] = Field(description="Identified speakers")
     topics: List[str] = Field(description="Main topics discussed")
     key_moments: List[Dict[str, Any]] = Field(description="Key moments with timestamps")

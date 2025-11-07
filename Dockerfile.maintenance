@@ -28,4 +28,3 @@ USER morag
 # Default command runs the selected maintenance jobs to completion
 # Select jobs via MORAG_MAINT_JOBS (comma-separated), e.g. "keyword_hierarchization"
 ENTRYPOINT ["python", "scripts/maintenance_runner.py"]
-

@@ -115,14 +115,14 @@ class GeminiEmbeddingService(BaseService):
         try:
             # Configure the Gemini API
             genai.configure(api_key=self.api_key)
-            
+
             # Test the API with a simple embedding request
             # Ensure model name has proper prefix for new SDK
             model_name = self.embedding_model
             if not model_name.startswith(('models/', 'tunedModels/')):
                 model_name = f"models/{model_name}"
             _ = genai.embed_content(model=model_name, content="Test")
-            
+
             self._initialized = True
             logger.info(
                 "Gemini embedding service initialized",
@@ -152,7 +152,7 @@ class GeminiEmbeddingService(BaseService):
         """
         status = "healthy" if self._initialized else "unhealthy"
         circuit_status = self.circuit_breaker.state
-        
+
         return {
             "status": status,
             "embedding_model": self.embedding_model,
@@ -173,13 +173,13 @@ class GeminiEmbeddingService(BaseService):
         current_time = time.time()
         time_elapsed = current_time - self.rate_limit_last_refill
         new_tokens = time_elapsed * self.rate_limit_refill_rate
-        
+
         self.rate_limit_tokens = min(
             self.rate_limit_per_minute,
             self.rate_limit_tokens + new_tokens
         )
         self.rate_limit_last_refill = current_time
-        
+
         return int(self.rate_limit_tokens)
 
     def _consume_rate_limit_token(self) -> bool:
@@ -191,7 +191,7 @@ class GeminiEmbeddingService(BaseService):
         remaining = self._get_rate_limit_remaining()
         if remaining <= 0:
             return False
-        
+
         self.rate_limit_tokens -= 1
         return True
 

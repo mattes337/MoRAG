@@ -39,12 +39,12 @@ def main():
     parser.add_argument('--create-config', action='store_true', help='Create sample configuration file')
     parser.add_argument('--test-connection', action='store_true', help='Test API connection and exit')
     parser.add_argument('--show-config', action='store_true', help='Show current configuration and exit')
-    
+
     args = parser.parse_args()
-    
+
     # Load environment variables
     load_dotenv()
-    
+
     # Create sample config if requested
     if args.create_config:
         config_manager = RemoteConverterConfig()
@@ -59,10 +59,10 @@ def main():
         else:
             print("Failed to create sample configuration")
             return 1
-    
+
     # Load configuration
     config_manager = RemoteConverterConfig(args.config)
-    
+
     # Override with command line arguments
     if args.worker_id:
         config_manager.config['worker_id'] = args.worker_id
@@ -80,23 +80,23 @@ def main():
         config_manager.config['log_level'] = args.log_level
     if args.temp_dir:
         config_manager.config['temp_dir'] = args.temp_dir
-    
+
     # Set up logging
     log_level = config_manager.config.get('log_level', 'INFO')
     setup_logging(log_level)
-    
+
     # Show configuration if requested
     if args.show_config:
         config_manager.print_config()
         return 0
-    
+
     # Validate configuration
     if not config_manager.validate_config():
         logger.error("Configuration validation failed")
         print("\nConfiguration errors detected. Please check your configuration.")
         print("Use --create-config to create a sample configuration file.")
         return 1
-    
+
     # Test connection if requested
     if args.test_connection:
         print("Testing connection to MoRAG API...")
@@ -106,7 +106,7 @@ def main():
         else:
             print("❌ Connection test failed!")
             return 1
-    
+
     # Print startup information
     print("🚀 MoRAG Remote Converter")
     print("=" * 50)
@@ -117,16 +117,16 @@ def main():
     print(f"Max Concurrent Jobs: {config_manager.config['max_concurrent_jobs']}")
     print(f"Temp Directory: {config_manager.config['temp_dir']}")
     print("=" * 50)
-    
+
     # Test connection before starting
     print("Testing API connection...")
     if not test_connection(config_manager.get_config()):
         print("❌ Failed to connect to MoRAG API. Please check your configuration.")
         return 1
-    
+
     print("✅ API connection successful!")
     print("Starting remote converter...")
-    
+
     # Create and start remote converter
     try:
         converter = RemoteConverter(config_manager.get_config())

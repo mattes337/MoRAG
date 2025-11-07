@@ -75,22 +75,22 @@ class AudioConfig:
         env_topic_seg = os.environ.get("MORAG_ENABLE_TOPIC_SEGMENTATION")
         if env_topic_seg is not None:
             self.enable_topic_segmentation = env_topic_seg.lower() in ("true", "1", "yes", "on")
-        
+
         # Override REST API settings
         env_use_rest = os.environ.get("MORAG_USE_REST_TRANSCRIPTION")
         if env_use_rest is not None:
             self.use_rest_api = env_use_rest.lower() in ("true", "1", "yes", "on")
-        
+
         # Override OpenAI API key
         env_openai_key = os.environ.get("OPENAI_API_KEY")
         if env_openai_key and self.openai_api_key is None:
             self.openai_api_key = env_openai_key
-        
+
         # Override API base URL
         env_api_base = os.environ.get("OPENAI_API_BASE")
         if env_api_base and self.api_base_url == "https://api.openai.com/v1":
             self.api_base_url = env_api_base
-        
+
         # Override timeout setting
         env_timeout = os.environ.get("MORAG_REST_TIMEOUT")
         if env_timeout and self.timeout == 3600:  # Only override if using default

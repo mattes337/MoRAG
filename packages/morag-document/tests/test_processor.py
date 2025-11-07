@@ -63,11 +63,11 @@ async def test_supports_format(processor):
     assert await processor.supports_format("txt")
     assert await processor.supports_format("xlsx")
     assert await processor.supports_format("pptx")
-    
+
     # Check case insensitivity
     assert await processor.supports_format("PDF")
     assert await processor.supports_format("DOCX")
-    
+
     # Check unsupported format
     assert not await processor.supports_format("invalid")
 
@@ -78,19 +78,19 @@ async def test_validate_input(processor, tmp_path):
     # Create test file
     test_file = tmp_path / "test.txt"
     test_file.write_text("Test content")
-    
+
     # Valid input
     config = ProcessingConfig(file_path=str(test_file))
     assert await processor.validate_input(config)
-    
+
     # Missing file path
     with pytest.raises(ValidationError):
         await processor.validate_input(ProcessingConfig())
-    
+
     # Non-existent file
     with pytest.raises(ValidationError):
         await processor.validate_input(ProcessingConfig(file_path="non_existent.txt"))
-    
+
     # Directory instead of file
     with pytest.raises(ValidationError):
         await processor.validate_input(ProcessingConfig(file_path=str(tmp_path)))
@@ -102,27 +102,27 @@ async def test_process_with_custom_converter(processor, mock_converter, sample_d
     # Create test file
     test_file = tmp_path / "test.test"
     test_file.write_text("Test content")
-    
+
     # Set up mock converter
     mock_converter.convert.return_value = MagicMock(
         document=sample_document,
         quality=MagicMock(score=0.9, issues=[]),
         warnings=[],
     )
-    
+
     # Register mock converter
     processor.converters["test"] = mock_converter
-    
+
     # Process file
     with patch("morag_document.processor.detect_format", return_value="test"):
         result = await processor.process_file(test_file)
-    
+
     # Check result
     assert result.document == sample_document
     assert result.metadata["quality_score"] == 0.9
     assert result.metadata["quality_issues"] == []
     assert result.metadata["warnings"] == []
-    
+
     # Check converter was called with correct arguments
     mock_converter.convert.assert_called_once()
     call_args = mock_converter.convert.call_args[0]
@@ -138,7 +138,7 @@ async def test_process_with_unsupported_format(processor, tmp_path):
     # Create test file
     test_file = tmp_path / "test.unsupported"
     test_file.write_text("Test content")
-    
+
     # Process file with unsupported format
     with patch("morag_document.processor.detect_format", return_value="unsupported"):
         with pytest.raises(ProcessingError):
@@ -151,17 +151,17 @@ async def test_process_with_custom_options(processor, mock_converter, sample_doc
     # Create test file
     test_file = tmp_path / "test.test"
     test_file.write_text("Test content")
-    
+
     # Set up mock converter
     mock_converter.convert.return_value = MagicMock(
         document=sample_document,
         quality=MagicMock(score=0.9, issues=[]),
         warnings=[],
     )
-    
+
     # Register mock converter
     processor.converters["test"] = mock_converter
-    
+
     # Process file with custom options
     with patch("morag_document.processor.detect_format", return_value="test"):
         result = await processor.process_file(
@@ -171,7 +171,7 @@ async def test_process_with_custom_options(processor, mock_converter, sample_doc
             chunk_overlap=50,
             extract_metadata=False,
         )
-    
+
     # Check converter was called with correct options
     mock_converter.convert.assert_called_once()
     call_args = mock_converter.convert.call_args[0]

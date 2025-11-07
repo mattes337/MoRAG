@@ -196,7 +196,7 @@ class SelfCorrectingPipeline:
             validation = await self.quality_pipeline.validate_response(
                 query, response.source_documents, response.answer
             )
-            
+
             if validation.overall_quality >= 0.8:
                 return CorrectedResponse(
                     answer=response.answer,
@@ -204,7 +204,7 @@ class SelfCorrectingPipeline:
                     attempts=attempt + 1,
                     quality_score=validation.overall_quality
                 )
-            
+
             # Apply correction strategies based on failure type
             if not validation.is_grounded:
                 web_docs = await self._web_search(query)
@@ -225,7 +225,7 @@ class QualityControlPipeline:
         doc_relevance = await self.document_grader.grade_documents(query, documents)
         is_grounded = await self.hallucination_detector.check_grounding(response, documents)
         answers_query = await self.answer_grader.assess_quality(query, response)
-        
+
         return ValidationResult(
             document_relevance=doc_relevance,
             is_grounded=is_grounded,

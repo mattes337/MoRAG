@@ -30,7 +30,7 @@
       }
     },
     {
-      "chunk_id": "chunk_002", 
+      "chunk_id": "chunk_002",
       "sequence_number": 2,
       "title": "Key Insights and Technical Implementation",
       "content": "Primary Insight: Advanced concept extraction and relationship mapping enable better understanding. Secondary Insight: Structured data organization facilitates improved information retrieval. The optimization process encompasses multiple enhancement strategies including content structure improvement, error correction, and metadata enhancement.",
@@ -45,7 +45,7 @@
     },
     {
       "chunk_id": "chunk_003",
-      "sequence_number": 3, 
+      "sequence_number": 3,
       "title": "Content Structure and Error Correction",
       "content": "Header Standardization: Consistent heading hierarchy and formatting. List Organization: Improved bullet point and numbered list structure. Transcription Fixes: Corrected OCR and speech-to-text errors. Grammar Enhancement: Improved sentence structure and clarity. Terminology Standardization: Consistent use of technical terms.",
       "word_count": 48,

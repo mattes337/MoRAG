@@ -9,7 +9,7 @@ This task folder contains the implementation plan for transitioning from the cur
 ### 1. Language Word Removal Problems
 - **Location**: `packages/morag-graph/src/morag_graph/extraction/relation_extractor.py:502-505`
 - **Issue**: Hardcoded language word removal is too aggressive and language-specific
-- **Code**: 
+- **Code**:
 ```python
 words_to_remove = [
     'sich', 'zu', 'der', 'die', 'das', 'den', 'dem', 'des',
@@ -21,7 +21,7 @@ words_to_remove = [
 ### 2. Entity Type Labeling Issues
 - **Location**: Entity extraction and storage operations
 - **Issue**: All entities are getting labeled as "ORGANIZATION" regardless of their actual type
-- **Root Cause**: 
+- **Root Cause**:
   - Default entity type assignment in auto-creation logic
   - Insufficient type determination in LLM extraction prompts
   - Type normalization logic that defaults to generic labels

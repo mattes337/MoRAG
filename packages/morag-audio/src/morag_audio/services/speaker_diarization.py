@@ -72,8 +72,8 @@ class DiarizationResult:
 
 class SpeakerDiarizationService:
     """Enhanced speaker diarization with advanced features."""
-    
-    def __init__(self, 
+
+    def __init__(self,
                  model_name: str = "pyannote/speaker-diarization-3.1",
                  huggingface_token: Optional[str] = None,
                  device: str = "auto",
@@ -81,7 +81,7 @@ class SpeakerDiarizationService:
                  max_speakers: int = 5,
                  confidence_threshold: float = 0.5):
         """Initialize the speaker diarization service.
-        
+
         Args:
             model_name: Name of the pyannote model to use
             huggingface_token: Hugging Face API token for accessing models
@@ -96,13 +96,13 @@ class SpeakerDiarizationService:
         self.min_speakers = min_speakers
         self.max_speakers = max_speakers
         self.confidence_threshold = confidence_threshold
-        
+
         self.pipeline = None
         self.model_loaded = False
-        
+
         if PYANNOTE_AVAILABLE:
             self._initialize_pipeline()
-    
+
     def _initialize_pipeline(self):
         """Initialize the pyannote pipeline with safe device configuration."""
         try:
@@ -165,7 +165,7 @@ class SpeakerDiarizationService:
                           error=str(e))
             self.pipeline = None
             self.model_loaded = False
-    
+
     async def diarize_audio(
         self,
         audio_path: Union[str, Path],
@@ -174,33 +174,33 @@ class SpeakerDiarizationService:
         confidence_threshold: Optional[float] = None
     ) -> DiarizationResult:
         """Perform speaker diarization on audio file.
-        
+
         Args:
             audio_path: Path to audio file
             min_speakers: Minimum number of speakers to detect
             max_speakers: Maximum number of speakers to detect
             confidence_threshold: Minimum confidence for speaker segments
-            
+
         Returns:
             DiarizationResult with speaker information
         """
         if not self.model_loaded or not self.pipeline:
             return await self._fallback_diarization(audio_path)
-        
+
         start_time = time.time()
         audio_path = Path(audio_path)
-        
+
         # Use instance defaults if not provided
         min_speakers = min_speakers or self.min_speakers
         max_speakers = max_speakers or self.max_speakers
         confidence_threshold = confidence_threshold or self.confidence_threshold
-        
+
         try:
             logger.info("Starting speaker diarization",
                        audio_path=str(audio_path),
                        min_speakers=min_speakers,
                        max_speakers=max_speakers)
-            
+
             # Run diarization in thread pool to avoid blocking
             diarization = await asyncio.to_thread(
                 self._run_diarization,
@@ -208,27 +208,27 @@ class SpeakerDiarizationService:
                 min_speakers,
                 max_speakers
             )
-            
+
             # Process results
             result = await self._process_diarization_result(
                 diarization,
                 confidence_threshold,
                 time.time() - start_time
             )
-            
+
             logger.info("Speaker diarization completed",
                        speakers_detected=result.total_speakers,
                        processing_time=result.processing_time)
-            
+
             return result
-            
+
         except Exception as e:
             logger.error("Speaker diarization failed",
                         audio_path=str(audio_path),
                         error=str(e))
             # Fallback to simple diarization
             return await self._fallback_diarization(audio_path)
-    
+
     def _run_diarization(
         self,
         audio_path: str,
@@ -245,10 +245,10 @@ class SpeakerDiarizationService:
                     'max_num_speakers': max_speakers
                 }
             })
-        
+
         # Run diarization
         return self.pipeline(audio_path)
-    
+
     async def _process_diarization_result(
         self,
         diarization: Annotation,
@@ -260,12 +260,12 @@ class SpeakerDiarizationService:
         segments = []
         total_duration = 0.0
         overlap_time = 0.0
-        
+
         # Process each segment
         for segment, _, speaker in diarization.itertracks(yield_label=True):
             duration = segment.end - segment.start
             total_duration = max(total_duration, segment.end)
-            
+
             # Create speaker segment
             speaker_segment = SpeakerSegment(
                 speaker_id=speaker,
@@ -275,7 +275,7 @@ class SpeakerDiarizationService:
                 confidence=1.0  # pyannote doesn't provide confidence per segment
             )
             segments.append(speaker_segment)
-            
+
             # Update speaker statistics
             if speaker not in speakers_data:
                 speakers_data[speaker] = {
@@ -284,7 +284,7 @@ class SpeakerDiarizationService:
                     'first_appearance': segment.start,
                     'last_appearance': segment.end
                 }
-            
+
             speakers_data[speaker]['total_time'] += duration
             speakers_data[speaker]['segments'].append(speaker_segment)
             speakers_data[speaker]['first_appearance'] = min(
@@ -295,16 +295,16 @@ class SpeakerDiarizationService:
                 speakers_data[speaker]['last_appearance'],
                 segment.end
             )
-        
+
         # Calculate overlap time (simplified)
         overlap_time = self._calculate_overlap_time(segments)
-        
+
         # Create speaker info objects
         speakers = []
         for speaker_id, data in speakers_data.items():
             speaker_segments = data['segments']
             avg_duration = data['total_time'] / len(speaker_segments)
-            
+
             speaker_info = SpeakerInfo(
                 speaker_id=speaker_id,
                 total_speaking_time=data['total_time'],
@@ -315,10 +315,10 @@ class SpeakerDiarizationService:
                 last_appearance=data['last_appearance']
             )
             speakers.append(speaker_info)
-        
+
         # Sort speakers by total speaking time (descending)
         speakers.sort(key=lambda x: x.total_speaking_time, reverse=True)
-        
+
         return DiarizationResult(
             speakers=speakers,
             segments=segments,
@@ -329,12 +329,12 @@ class SpeakerDiarizationService:
             model_used=self.model_name,
             confidence_threshold=confidence_threshold
         )
-    
+
     def _calculate_overlap_time(self, segments: List[SpeakerSegment]) -> float:
         """Calculate total time where multiple speakers are talking."""
         # Simple overlap calculation - can be enhanced
         overlap_time = 0.0
-        
+
         for i, seg1 in enumerate(segments):
             for seg2 in segments[i+1:]:
                 if seg1.speaker_id != seg2.speaker_id:
@@ -343,13 +343,13 @@ class SpeakerDiarizationService:
                     overlap_end = min(seg1.end_time, seg2.end_time)
                     if overlap_start < overlap_end:
                         overlap_time += overlap_end - overlap_start
-        
+
         return overlap_time
-    
+
     async def _fallback_diarization(self, audio_path: Union[str, Path]) -> DiarizationResult:
         """Fallback diarization when pyannote is not available."""
         logger.info("Using fallback speaker diarization")
-        
+
         try:
             # Simple fallback: assume single speaker or split by duration
             duration = 60.0  # Default duration fallback
@@ -367,7 +367,7 @@ class SpeakerDiarizationService:
                     duration = max(60.0, file_size / 16000)
                 except Exception:
                     duration = 60.0  # Final fallback
-            
+
             if duration > 60:  # If longer than 1 minute, assume 2 speakers
                 mid_point = duration / 2
                 segments = [
@@ -384,7 +384,7 @@ class SpeakerDiarizationService:
                 segments = [SpeakerSegment("SPEAKER_00", 0.0, duration, duration, 0.9)]
                 speakers = [SpeakerInfo("SPEAKER_00", duration, 1, duration, [0.9], 0.0, duration)]
                 total_speakers = 1
-            
+
             return DiarizationResult(
                 speakers=speakers,
                 segments=segments,
@@ -395,7 +395,7 @@ class SpeakerDiarizationService:
                 model_used="fallback",
                 confidence_threshold=0.5
             )
-            
+
         except Exception as e:
             logger.error("Fallback diarization failed", error=str(e))
             # Ultimate fallback

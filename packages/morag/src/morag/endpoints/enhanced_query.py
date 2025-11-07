@@ -271,20 +271,20 @@ async def enhanced_query_stream(
                 hybrid_system = create_dynamic_hybrid_retrieval_coordinator(request.database_servers)
 
             logger.info("Starting streaming query", query_id=query_id)
-            
+
             # For now, we'll simulate streaming by processing normally
             # and yielding partial results. In a full implementation,
             # the hybrid system would support streaming.
-            
+
             # Send initial status
             yield f"data: {{\"status\": \"processing\", \"query_id\": \"{query_id}\"}}\n\n"
-            
+
             # Process query
             retrieval_result = await hybrid_system.retrieve(
                 query=request.query,
                 max_results=request.max_results
             )
-            
+
             # Build response
             response_builder = EnhancedResponseBuilder()
             response = await response_builder.build_response(
@@ -293,7 +293,7 @@ async def enhanced_query_stream(
                 retrieval_result=retrieval_result,
                 processing_time=0.0  # Will be calculated properly in full implementation
             )
-            
+
             # Stream results
             for i, result in enumerate(response.results):
                 partial_response = {
@@ -303,10 +303,10 @@ async def enhanced_query_stream(
                     "query_id": query_id
                 }
                 yield f"data: {json.dumps(partial_response)}\n\n"
-                
+
                 # Small delay to simulate streaming
                 await asyncio.sleep(0.1)
-            
+
             # Send final response
             final_response = {
                 "type": "complete",
@@ -316,15 +316,15 @@ async def enhanced_query_stream(
                 "processing_time_ms": response.processing_time_ms
             }
             yield f"data: {json.dumps(final_response)}\n\n"
-            
+
         except Exception as e:
             error_data = {
                 "type": "error",
-                "error": str(e), 
+                "error": str(e),
                 "query_id": query_id
             }
             yield f"data: {json.dumps(error_data)}\n\n"
-    
+
     return StreamingResponse(
         generate_stream(),
         media_type="text/plain",
@@ -346,7 +346,7 @@ async def entity_query(
         logger.info("Processing entity query",
                    entity_id_param=request.entity_id,
                    entity_name_param=request.entity_name)
-        
+
         # Find entity
         entity = None
         if request.entity_id:
@@ -357,10 +357,10 @@ async def entity_query(
                 entity_type=request.entity_type
             )
             entity = entities[0] if entities else None
-        
+
         if not entity:
             raise HTTPException(status_code=404, detail="Entity not found")
-        
+
         # Get relations if requested
         relations = []
         if request.include_relations:
@@ -369,7 +369,7 @@ async def entity_query(
                 depth=request.relation_depth,
                 max_relations=request.max_relations
             )
-        
+
         # Convert to dict format
         entity_dict = entity.dict() if hasattr(entity, 'dict') else {
             'id': getattr(entity, 'id', ''),
@@ -377,7 +377,7 @@ async def entity_query(
             'type': getattr(entity, 'type', ''),
             'properties': getattr(entity, 'properties', {})
         }
-        
+
         relations_dict = []
         for rel in relations:
             if hasattr(rel, 'dict'):
@@ -389,13 +389,13 @@ async def entity_query(
                     'type': getattr(rel, 'type', ''),
                     'properties': getattr(rel, 'properties', {})
                 })
-        
+
         return {
             "entity": entity_dict,
             "relations": relations_dict,
             "relation_count": len(relations)
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -410,7 +410,7 @@ async def graph_traversal(
 ):
     """Perform graph traversal between entities."""
     start_time = datetime.now()
-    
+
     try:
         # Use dynamic database connections if provided
         if request.database_servers:
@@ -420,18 +420,18 @@ async def graph_traversal(
                    start_entity=request.start_entity,
                    end_entity=request.end_entity,
                    traversal_type=request.traversal_type)
-        
+
         # Validate entities exist
         start_entity = await graph_engine.get_entity(request.start_entity)
         if not start_entity:
             raise HTTPException(status_code=404, detail="Start entity not found")
-        
+
         end_entity = None
         if request.end_entity:
             end_entity = await graph_engine.get_entity(request.end_entity)
             if not end_entity:
                 raise HTTPException(status_code=404, detail="End entity not found")
-        
+
         # Perform traversal
         paths = []
         if request.traversal_type == "shortest_path" and end_entity:
@@ -454,9 +454,9 @@ async def graph_traversal(
                 status_code=400,
                 detail=f"Unsupported traversal type: {request.traversal_type}"
             )
-        
+
         processing_time = (datetime.now() - start_time).total_seconds() * 1000
-        
+
         # Convert paths to response format
         response_paths = []
         for path in paths:
@@ -466,7 +466,7 @@ async def graph_traversal(
                 "total_weight": getattr(path, 'total_weight', 1.0),
                 "confidence": getattr(path, 'confidence', 0.8)
             })
-        
+
         return GraphTraversalResponse(
             start_entity=request.start_entity,
             end_entity=request.end_entity,
@@ -474,7 +474,7 @@ async def graph_traversal(
             total_paths_found=len(paths),
             processing_time_ms=processing_time
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -522,7 +522,7 @@ async def graph_analytics(
                     "density": 0.0,
                     "note": "Statistics not available"
                 }
-        
+
         elif request.metric_type == "centrality":
             try:
                 centrality = await graph_engine.calculate_centrality_measures()
@@ -539,7 +539,7 @@ async def graph_analytics(
                     "top_entities_by_pagerank": [],
                     "note": "Centrality measures not available"
                 }
-        
+
         elif request.metric_type == "communities":
             try:
                 communities = await graph_engine.detect_communities()
@@ -556,13 +556,13 @@ async def graph_analytics(
                     "modularity_score": 0.0,
                     "note": "Community detection not available"
                 }
-        
+
         else:
             raise HTTPException(
                 status_code=400,
                 detail=f"Unknown metric type: {request.metric_type}"
             )
-            
+
     except HTTPException:
         raise
     except Exception as e:
@@ -589,10 +589,10 @@ async def log_query_analytics(
             "fusion_strategy": response.fusion_strategy_used,
             "timestamp": datetime.now().isoformat()
         }
-        
+
         # For now, just log to structured logger
         # In production, this would send to analytics service
         logger.info("Query analytics", **analytics_data)
-        
+
     except Exception as e:
         logger.error("Error logging analytics", error=str(e))

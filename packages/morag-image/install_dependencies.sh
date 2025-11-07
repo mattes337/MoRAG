@@ -17,44 +17,44 @@ fi
 # Install dependencies based on OS
 if [[ "$OS" == *"Ubuntu"* ]] || [[ "$OS" == *"Debian"* ]]; then
     echo "Detected Debian/Ubuntu-based system"
-    
+
     # Update package lists
     sudo apt-get update
-    
+
     # Install Tesseract OCR and language data
     echo "Installing Tesseract OCR..."
     sudo apt-get install -y tesseract-ocr
     sudo apt-get install -y tesseract-ocr-eng
     # Add more language packs as needed, e.g.:
     # sudo apt-get install -y tesseract-ocr-fra tesseract-ocr-deu
-    
+
     # Install OpenCV dependencies
     echo "Installing OpenCV dependencies..."
     sudo apt-get install -y libsm6 libxext6 libxrender-dev libgl1-mesa-dri
-    
+
     # Install Python development headers (needed for some packages)
     sudo apt-get install -y python3-dev
-    
+
     echo "System dependencies installed successfully."
-    
+
  elif [[ "$OS" == *"Fedora"* ]] || [[ "$OS" == *"CentOS"* ]] || [[ "$OS" == *"Red Hat"* ]]; then
     echo "Detected Red Hat/Fedora-based system"
-    
+
     # Install Tesseract OCR and language data
     echo "Installing Tesseract OCR..."
     sudo dnf install -y tesseract
     sudo dnf install -y tesseract-langpack-eng
     # Add more language packs as needed
-    
+
     # Install OpenCV dependencies
     echo "Installing OpenCV dependencies..."
     sudo dnf install -y libSM libXext libXrender mesa-libGL
-    
+
     # Install Python development headers
     sudo dnf install -y python3-devel
-    
+
     echo "System dependencies installed successfully."
-    
+
 else
     echo "Unsupported operating system: $OS"
     echo "Please install the following dependencies manually:"

@@ -54,7 +54,7 @@ def test_fixes():
     """Test the core fixes without heavy imports."""
     print("🧪 Testing Remote Converter Fixes (Simple)")
     print("=" * 50)
-    
+
     # Test 1: ProcessingResult with text_content
     print("\n1. Testing ProcessingResult with text_content parameter...")
     try:
@@ -73,7 +73,7 @@ def test_fixes():
     except Exception as e:
         print(f"❌ ProcessingResult creation failed: {e}")
         return False
-    
+
     # Test 2: Result conversion
     print("\n2. Testing result conversion...")
     try:
@@ -87,20 +87,20 @@ def test_fixes():
             success=True,
             error_message=None
         )
-        
+
         # Convert to unified result
         unified = convert_to_unified_result(audio_result)
-        
+
         print(f"✅ Result conversion successful:")
         print(f"   Success: {unified.success}")
         print(f"   Text content: {unified.text_content}")
         print(f"   Metadata: {unified.metadata}")
         print(f"   Processing time: {unified.processing_time}")
-        
+
     except Exception as e:
         print(f"❌ Result conversion failed: {e}")
         return False
-    
+
     # Test 3: Method name verification
     print("\n3. Testing method name expectations...")
     print("✅ Expected method names:")
@@ -110,7 +110,7 @@ def test_fixes():
     print("   - ImageProcessor.process() ✓")
     print("   - WebProcessor.process_url() ✓")
     print("   - YouTubeProcessor.process_url() ✓")
-    
+
     # Test 4: Error handling
     print("\n4. Testing error handling...")
     try:
@@ -127,7 +127,7 @@ def test_fixes():
     except Exception as e:
         print(f"❌ Error result creation failed: {e}")
         return False
-    
+
     # Test 5: AudioProcessingResult attribute access
     print("\n5. Testing AudioProcessingResult attribute access...")
     try:

@@ -22,18 +22,18 @@ def enhanced_process_ingest_task(
     options: Dict[str, Any]
 ) -> Dict[str, Any]:
     """Enhanced processing task with detailed webhook notifications.
-    
+
     Args:
         file_path: Path to file to process
         options: Processing options including webhook_url, document_id, etc.
-        
+
     Returns:
         Processing result dictionary
     """
     async def _process():
         webhook_service = get_webhook_service()
         task_id = self.request.id
-        
+
         # Extract options
         webhook_url = options.get('webhook_url')
         webhook_auth_token = options.get('webhook_auth_token')
@@ -44,11 +44,11 @@ def enhanced_process_ingest_task(
         chunk_size = options.get('chunk_size')
         chunk_overlap = options.get('chunk_overlap')
         metadata = options.get('metadata', {})
-        
+
         # Generate document ID if not provided
         if not document_id:
             document_id = str(uuid.uuid4())
-        
+
         try:
             # Validate webhook URL
             if webhook_url and not webhook_service.validate_webhook_url(webhook_url, allow_localhost=True):
@@ -74,12 +74,12 @@ def enhanced_process_ingest_task(
                        document_id=document_id,
                        file_path=file_path,
                        webhook_url=webhook_url)
-            
+
             # Step 1: Markdown Conversion (0-20%)
             await webhook_service.send_step_started(
                 webhook_url, task_id, document_id, "markdown_conversion", 0.0, webhook_auth_token
             )
-            
+
             # Convert to markdown using the conversion service
             from morag_document.services.markitdown_service import MarkitdownService
             markitdown_service = MarkitdownService()
@@ -87,13 +87,13 @@ def enhanced_process_ingest_task(
 
             # Store markdown in temp storage
             await temp_service.store_text_file(task_id, "markdown.md", markdown_content)
-            
+
             conversion_metadata = {
                 "original_format": file_path_obj.suffix.lower().lstrip('.'),
                 "file_size_bytes": file_path_obj.stat().st_size,
                 "content_length": len(markdown_content)
             }
-            
+
             await webhook_service.send_step_completed(
                 webhook_url, task_id, document_id, "markdown_conversion", 20.0,
                 {
@@ -103,12 +103,12 @@ def enhanced_process_ingest_task(
                 },
                 webhook_auth_token
             )
-            
+
             # Step 2: Metadata Extraction (20-40%)
             await webhook_service.send_step_started(
                 webhook_url, task_id, document_id, "metadata_extraction", 20.0, webhook_auth_token
             )
-            
+
             # Extract metadata using existing services
             file_metadata = {
                 "format": file_path_obj.suffix.lower().lstrip('.'),
@@ -116,12 +116,12 @@ def enhanced_process_ingest_task(
                 "created_at": file_path_obj.stat().st_ctime,
                 "modified_at": file_path_obj.stat().st_mtime
             }
-            
+
             # Store metadata in temp storage
             import json
             metadata_json = json.dumps(file_metadata, indent=2)
             await temp_service.store_text_file(task_id, "metadata.json", metadata_json)
-            
+
             await webhook_service.send_step_completed(
                 webhook_url, task_id, document_id, "metadata_extraction", 40.0,
                 {
@@ -130,12 +130,12 @@ def enhanced_process_ingest_task(
                 },
                 webhook_auth_token
             )
-            
+
             # Step 3: Content Processing (40-70%)
             await webhook_service.send_step_started(
                 webhook_url, task_id, document_id, "content_processing", 40.0, webhook_auth_token
             )
-            
+
             # Process the file using the full MoRAG pipeline
             processing_options = {
                 "document_id": document_id,
@@ -145,7 +145,7 @@ def enhanced_process_ingest_task(
                 "chunk_overlap": chunk_overlap,
                 "metadata": {**metadata, **file_metadata}
             }
-            
+
             # Determine content type
             content_type = None
             file_ext = file_path_obj.suffix.lower().lstrip('.')
@@ -155,26 +155,26 @@ def enhanced_process_ingest_task(
                 content_type = "audio"
             elif file_ext in ['mp4', 'avi', 'mov', 'mkv', 'webm']:
                 content_type = "video"
-            
+
             # Process the content
             result = await api.process_file(file_path, content_type, processing_options)
-            
+
             if not result.success:
                 raise Exception(f"Content processing failed: {result.error_message}")
-            
+
             # Analyze content for summary
             summary_data = {
                 "summary": result.content[:500] + "..." if len(result.content) > 500 else result.content,
                 "content_length": len(result.content),
                 "language": language or "auto-detected"
             }
-            
+
             await webhook_service.send_step_completed(
                 webhook_url, task_id, document_id, "content_processing", 70.0,
                 summary_data,
                 webhook_auth_token
             )
-            
+
             # Step 4: Ingestion (70-100%)
             await webhook_service.send_step_started(
                 webhook_url, task_id, document_id, "ingestion", 70.0, webhook_auth_token
@@ -208,18 +208,18 @@ def enhanced_process_ingest_task(
                 "database_collection": collection_name or "morag_documents",
                 "processing_time_seconds": result.processing_time or 0.0
             }
-            
+
             await webhook_service.send_step_completed(
                 webhook_url, task_id, document_id, "ingestion", 100.0,
                 ingestion_stats,
                 webhook_auth_token
             )
-            
+
             logger.info("Enhanced processing task completed successfully",
                        task_id=task_id,
                        document_id=document_id,
                        chunks_processed=ingestion_stats["chunks_processed"])
-            
+
             return {
                 "success": True,
                 "document_id": document_id,
@@ -233,27 +233,27 @@ def enhanced_process_ingest_task(
                 "ingestion_stats": ingestion_stats,
                 "processing_time": result.processing_time
             }
-            
+
         except Exception as e:
             logger.error("Enhanced processing task failed",
                         task_id=task_id,
                         document_id=document_id,
                         error=str(e))
-            
+
             # Send failure notification
             if webhook_url:
                 await webhook_service.send_step_failed(
                     webhook_url, task_id, document_id, "processing", 0.0,
                     str(e), webhook_auth_token
                 )
-            
+
             # Clean up temp files
             try:
                 if file_path_obj.exists():
                     file_path_obj.unlink()
             except Exception:
                 pass
-            
+
             return {
                 "success": False,
                 "document_id": document_id,
@@ -263,7 +263,7 @@ def enhanced_process_ingest_task(
                 "metadata": {},
                 "processing_time": 0.0
             }
-        
+
         finally:
             # Clean up original file
             try:
@@ -273,6 +273,6 @@ def enhanced_process_ingest_task(
             except Exception as e:
                 logger.warning("Failed to clean up temporary file",
                              file_path=file_path, error=str(e))
-    
+
     # Run the async function using shared event loop
     return run_async(_process())

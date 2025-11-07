@@ -39,10 +39,10 @@ def check_project_structure():
     print("\n" + "="*60)
     print("  Project Structure Check")
     print("="*60)
-    
+
     required_dirs = [
         "packages/morag",
-        "packages/morag-core", 
+        "packages/morag-core",
         "packages/morag-document",
         "packages/morag-services",
         "packages/morag-embedding",
@@ -51,7 +51,7 @@ def check_project_structure():
         "cli",
         "docs"
     ]
-    
+
     all_good = True
     for dir_path in required_dirs:
         if Path(dir_path).exists():
@@ -59,7 +59,7 @@ def check_project_structure():
         else:
             print(f"❌ {dir_path}")
             all_good = False
-    
+
     return all_good
 
 
@@ -68,27 +68,27 @@ def check_optional_dependencies():
     print("\n" + "="*60)
     print("  Optional Dependencies Check")
     print("="*60)
-    
+
     try:
         from morag_core.optional_deps import optional_deps
-        
+
         available = optional_deps.get_available_features()
         missing = optional_deps.get_missing_features()
-        
+
         if available:
             print(f"\n✅ Available Features ({len(available)}):")
             for feature in available:
                 print(f"   • {feature}")
-        
+
         if missing:
             print(f"\n⚠️  Missing Features ({len(missing)}):")
             for item in missing:
                 print(f"   • {item['feature']}")
                 print(f"     Install: {item['install_command']}")
-        
+
         print(f"\nTotal: {len(available)} available, {len(missing)} missing")
         return True
-        
+
     except Exception as e:
         print(f"❌ Failed to check optional dependencies: {e}")
         return False
@@ -99,14 +99,14 @@ def check_graph_processing():
     print("\n" + "="*60)
     print("  Graph Processing Check")
     print("="*60)
-    
+
     try:
         from morag_graph import BaseExtractor, Entity, Relation, GraphStorage
         print("✅ Graph processing components available")
-        
+
         # Test basic functionality - BaseExtractor is abstract, so skip instantiation
         print("✅ BaseExtractor class available")
-        
+
         # Test entity creation with UUID format
         import uuid
         entity = Entity(
@@ -125,9 +125,9 @@ def check_graph_processing():
             properties={}
         )
         print("✅ Relation model working")
-        
+
         return True
-        
+
     except Exception as e:
         print(f"❌ Graph processing not available: {e}")
         return False
@@ -138,7 +138,7 @@ def check_core_imports():
     print("\n" + "="*60)
     print("  Core Package Imports Check")
     print("="*60)
-    
+
     imports_to_test = [
         ("morag_core.config", "Settings"),
         ("morag_core.exceptions", "MoRAGException"),
@@ -146,7 +146,7 @@ def check_core_imports():
         ("morag_services.embedding", "GeminiEmbeddingService"),
         ("morag_embedding.service", "GeminiEmbeddingService"),
     ]
-    
+
     all_good = True
     for module_name, class_name in imports_to_test:
         try:
@@ -156,7 +156,7 @@ def check_core_imports():
         except Exception as e:
             print(f"❌ {module_name}.{class_name}: {e}")
             all_good = False
-    
+
     return all_good
 
 
@@ -165,11 +165,11 @@ def check_configuration():
     print("\n" + "="*60)
     print("  Configuration Check")
     print("="*60)
-    
+
     try:
         from morag_core.config import Settings
         settings = Settings()
-        
+
         print(f"✅ Configuration loaded successfully")
         print(f"   • API Host: {settings.api_host}")
         print(f"   • API Port: {settings.api_port}")
@@ -177,9 +177,9 @@ def check_configuration():
         print(f"   • Embedding Model: {settings.gemini_embedding_model}")
         print(f"   • Embedding Batch Size: {settings.embedding_batch_size}")
         print(f"   • Performance Monitoring: {settings.enable_performance_monitoring}")
-        
+
         return True
-        
+
     except Exception as e:
         print(f"❌ Configuration loading failed: {e}")
         return False
@@ -190,26 +190,26 @@ def check_performance_optimizations():
     print("\n" + "="*60)
     print("  Performance Optimizations Check")
     print("="*60)
-    
+
     try:
         from morag_core.optimization import ProcessingOptimizer, PerformanceTracker
         from morag_core.performance import PerformanceMonitor
-        
+
         print("✅ Performance optimization modules available")
-        
+
         # Test optimization
         optimizer = ProcessingOptimizer()
         config = optimizer.get_optimal_chunk_config(0.5, 10000, "pdf")
         print(f"✅ Chunk optimization working: {config['chunk_size']} chars")
-        
+
         # Test performance tracking
         tracker = PerformanceTracker()
         start_time = tracker.start_operation("test_operation")
         tracker.end_operation("test_operation", start_time)
         print("✅ Performance tracking working")
-        
+
         return True
-        
+
     except Exception as e:
         print(f"❌ Performance optimizations not available: {e}")
         return False
@@ -220,23 +220,23 @@ def run_basic_functionality_test():
     print("\n" + "="*60)
     print("  Basic Functionality Test")
     print("="*60)
-    
+
     try:
         # Test document processor initialization
         from morag_document.processor import DocumentProcessor
         processor = DocumentProcessor()
         print("✅ Document processor initialized")
-        
+
         # Test embedding service initialization
         from morag_services.embedding import GeminiEmbeddingService
         from morag_core.config import Settings
         settings = Settings()
         embedding_service = GeminiEmbeddingService(api_key=settings.gemini_api_key)
         print("✅ Embedding service initialized")
-        
+
         print("✅ Basic functionality test passed")
         return True
-        
+
     except Exception as e:
         print(f"❌ Basic functionality test failed: {e}")
         return False
@@ -246,7 +246,7 @@ def main():
     """Main function to run all checks."""
     print("🔍 MoRAG System Status Check")
     print("="*60)
-    
+
     checks = [
         ("Project Structure", check_project_structure),
         ("Core Imports", check_core_imports),
@@ -256,7 +256,7 @@ def main():
         ("Performance Optimizations", check_performance_optimizations),
         ("Basic Functionality", run_basic_functionality_test),
     ]
-    
+
     results = {}
     for check_name, check_func in checks:
         try:
@@ -264,21 +264,21 @@ def main():
         except Exception as e:
             print(f"\n❌ {check_name} check failed with exception: {e}")
             results[check_name] = False
-    
+
     # Summary
     print("\n" + "="*60)
     print("  Summary")
     print("="*60)
-    
+
     passed = sum(1 for result in results.values() if result)
     total = len(results)
-    
+
     for check_name, result in results.items():
         status = "✅ PASS" if result else "❌ FAIL"
         print(f"{status} {check_name}")
-    
+
     print(f"\nOverall: {passed}/{total} checks passed")
-    
+
     if passed == total:
         print("🎉 All checks passed! MoRAG system is ready.")
         return 0

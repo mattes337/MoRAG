@@ -131,35 +131,35 @@ class VideoConverter:
         except Exception as e:
             logger.error("Video conversion failed", error=str(e), file_path=str(file_path))
             raise ConversionError(f"Failed to convert video file: {e}") from e
-            
+
         except Exception as e:
             logger.error("Video conversion failed", file_path=str(file_path), error=str(e))
             raise
 
-    async def convert_to_markdown(self, 
-                                result: VideoProcessingResult, 
+    async def convert_to_markdown(self,
+                                result: VideoProcessingResult,
                                 options: Optional[VideoConversionOptions] = None) -> str:
         """Convert video processing result to markdown.
-        
+
         Args:
             result: Video processing result
             options: Conversion options
-            
+
         Returns:
             Markdown string
         """
         options = options or VideoConversionOptions()
-        
+
         # Create markdown content
         markdown_parts = []
-        
+
         # Add title in format: Video Analysis: filename.ext
         if hasattr(result, "file_path") and result.file_path:
             filename = Path(result.file_path).name
             markdown_parts.append(f"# Video Analysis: {filename}\n")
         else:
             markdown_parts.append("# Video Analysis\n")
-        
+
         # Add metadata section (standardized bullet point format)
         if options.include_metadata:
             markdown_parts.append("## Video Information\n")
@@ -176,19 +176,19 @@ class VideoConverter:
 
             if result.metadata.creation_time:
                 markdown_parts.append(f"- **Creation Time**: {result.metadata.creation_time}")
-                
+
             markdown_parts.append("\n")
-        
+
         # Add OCR results if available
         if options.include_ocr and result.ocr_results:
             markdown_parts.append("## Text Detected in Video\n")
-            
+
             for image_path, text in result.ocr_results.items():
                 if text.strip():
                     image_name = Path(image_path).name
                     markdown_parts.append(f"### Text from {image_name}\n")
                     markdown_parts.append(f"{text.strip()}\n\n")
-        
+
         # Add transcript section if available
         if options.include_transcript and result.audio_processing_result:
             markdown_parts.append("## Transcript\n")
@@ -234,106 +234,106 @@ class VideoConverter:
                 markdown_parts.append("*No transcript available*")
 
             markdown_parts.append("\n")
-        
+
         # Add thumbnails section if available
         if options.include_thumbnails and result.thumbnails:
             markdown_parts.append("## Thumbnails\n")
-            
+
             # Limit the number of thumbnails based on options
             thumbnails_to_show = result.thumbnails[:options.max_thumbnails]
-            
+
             for i, thumbnail_path in enumerate(thumbnails_to_show):
                 timestamp = self._get_timestamp_from_filename(thumbnail_path)
                 markdown_parts.append(f"### Thumbnail {i+1} {timestamp}\n")
                 markdown_parts.append(f"![Thumbnail {i+1}]({thumbnail_path})\n\n")
-                
+
             if len(result.thumbnails) > options.max_thumbnails:
                 markdown_parts.append(f"*{len(result.thumbnails) - options.max_thumbnails} more thumbnails not shown*\n\n")
-        
+
         # Add keyframes section if available
         if options.include_keyframes and result.keyframes:
             markdown_parts.append("## Key Frames\n")
-            
+
             # Limit the number of keyframes based on options
             keyframes_to_show = result.keyframes[:options.max_keyframes]
-            
+
             for i, keyframe_path in enumerate(keyframes_to_show):
                 timestamp = self._get_timestamp_from_filename(keyframe_path)
                 markdown_parts.append(f"### Key Frame {i+1} {timestamp}\n")
                 markdown_parts.append(f"![Key Frame {i+1}]({keyframe_path})\n\n")
-                
+
                 # Add OCR text for this keyframe if available
                 if options.include_ocr and result.ocr_results and str(keyframe_path) in result.ocr_results:
                     ocr_text = result.ocr_results[str(keyframe_path)]
                     if ocr_text.strip():
                         markdown_parts.append(f"**Text detected:**\n\n{ocr_text.strip()}\n\n")
-                
+
             if len(result.keyframes) > options.max_keyframes:
                 markdown_parts.append(f"*{len(result.keyframes) - options.max_keyframes} more key frames not shown*\n\n")
-        
+
         return "\n".join(markdown_parts)
 
-    def _calculate_quality_score(self, 
-                               result: VideoProcessingResult, 
+    def _calculate_quality_score(self,
+                               result: VideoProcessingResult,
                                options: VideoConversionOptions) -> float:
         """Calculate a quality score for the conversion result."""
         score = 0.0
         total_weight = 0.0
-        
+
         # Base score for having metadata
         if result.metadata:
             score += 0.2
             total_weight += 0.2
-        
+
         # Score for thumbnails
         if options.include_thumbnails and result.thumbnails:
             thumbnail_weight = 0.15
             thumbnail_score = min(1.0, len(result.thumbnails) / 5)  # Max score at 5+ thumbnails
             score += thumbnail_weight * thumbnail_score
             total_weight += thumbnail_weight
-        
+
         # Score for keyframes
         if options.include_keyframes and result.keyframes:
             keyframe_weight = 0.15
             keyframe_score = min(1.0, len(result.keyframes) / 10)  # Max score at 10+ keyframes
             score += keyframe_weight * keyframe_score
             total_weight += keyframe_weight
-        
+
         # Score for transcript
         if options.include_transcript and result.audio_processing_result and result.audio_processing_result.transcript:
             transcript_weight = 0.3
-            
+
             # Base transcript score
             transcript_score = 0.5
-            
+
             # Bonus for segments
             if result.audio_processing_result.segments:
                 transcript_score += 0.2
-            
+
             # Bonus for speaker diarization
             if options.group_by_speaker and result.audio_processing_result.speaker_segments:
                 transcript_score += 0.15
-            
+
             # Bonus for topic segmentation
             if options.group_by_topic and result.audio_processing_result.topic_segments:
                 transcript_score += 0.15
-            
+
             score += transcript_weight * min(1.0, transcript_score)
             total_weight += transcript_weight
-        
+
         # Score for OCR
         if options.include_ocr and result.ocr_results:
             ocr_weight = 0.2
-            
+
             # Calculate how many keyframes have OCR text
             frames_with_text = sum(1 for text in result.ocr_results.values() if text.strip())
             total_frames = len(result.ocr_results)
-            
+
             if total_frames > 0:
                 ocr_score = frames_with_text / total_frames
                 score += ocr_weight * ocr_score
                 total_weight += ocr_weight
-        
+
         # Normalize score
         if total_weight > 0:
             return score / total_weight
@@ -343,7 +343,7 @@ class VideoConverter:
         """Format duration in seconds to HH:MM:SS format."""
         hours, remainder = divmod(int(seconds), 3600)
         minutes, seconds = divmod(remainder, 60)
-        
+
         if hours > 0:
             return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
         return f"{minutes:02d}:{seconds:02d}"
@@ -351,10 +351,10 @@ class VideoConverter:
     def _get_timestamp_from_filename(self, file_path: Union[str, Path]) -> str:
         """Extract timestamp from filename if available."""
         filename = Path(file_path).stem
-        
+
         # Try to find timestamp in format like "keyframe_00h05m30s" or "thumbnail_330s"
         import re
-        
+
         # Check for hours, minutes, seconds format
         match = re.search(r'(\d+)h(\d+)m(\d+)s', filename)
         if match:
@@ -362,18 +362,18 @@ class VideoConverter:
             if hours > 0:
                 return f"({hours:02d}:{minutes:02d}:{seconds:02d})"
             return f"({minutes:02d}:{seconds:02d})"
-        
+
         # Check for seconds format
         match = re.search(r'_(\d+)s', filename)
         if match:
             total_seconds = int(match.group(1))
             minutes, seconds = divmod(total_seconds, 60)
             hours, minutes = divmod(minutes, 60)
-            
+
             if hours > 0:
                 return f"({hours:02d}:{minutes:02d}:{seconds:02d})"
             return f"({minutes:02d}:{seconds:02d})"
-        
+
         return ""
 
     def _format_segments(self, segments: List[Any], options: Optional[VideoConversionOptions] = None) -> str:
@@ -553,30 +553,30 @@ class VideoConverter:
     def _format_speaker_segments(self, speaker_segments: Dict[str, List[Any]]) -> str:
         """Format transcript segments grouped by speaker."""
         result = []
-        
+
         for speaker, segments in speaker_segments.items():
             result.append(f"### Speaker {speaker}\n")
-            
+
             for segment in segments:
                 timestamp = f"[{self._format_duration(segment.start)} - {self._format_duration(segment.end)}]"
                 result.append(f"{timestamp} {segment.text}\n")
-            
+
             result.append("\n")
-        
+
         return "\n".join(result)
 
     def _format_topic_segments(self, topic_segments: List[Any]) -> str:
         """Format transcript segments grouped by topic."""
         result = []
-        
+
         for topic_segment in topic_segments:
             topic = topic_segment.topic if hasattr(topic_segment, "topic") else "Topic"
             result.append(f"### {topic}\n")
-            
+
             if hasattr(topic_segment, "segments") and topic_segment.segments:
                 for segment in topic_segment.segments:
                     timestamp = f"[{self._format_duration(segment.start)} - {self._format_duration(segment.end)}]"
-                    
+
                     if hasattr(segment, "speaker") and segment.speaker:
                         result.append(f"{timestamp} **Speaker {segment.speaker}:** {segment.text}\n")
                     else:
@@ -584,7 +584,7 @@ class VideoConverter:
             elif hasattr(topic_segment, "text") and topic_segment.text:
                 timestamp = f"[{self._format_duration(topic_segment.start)} - {self._format_duration(topic_segment.end)}]"
                 result.append(f"{timestamp} {topic_segment.text}\n")
-            
+
             result.append("\n")
-        
+
         return "\n".join(result)

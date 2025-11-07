@@ -30,20 +30,20 @@ def write_env_file(env_path: Path, env_vars: dict):
 def update_mock_mode(enable: bool, mock_data_dir: str = "./mock"):
     """Update mock mode settings in .env file."""
     env_path = Path(".env")
-    
+
     if not env_path.exists():
         print("❌ .env file not found. Please create one first.")
         return False
-    
+
     # Read current environment variables
     env_vars = {}
     with open(env_path, 'r', encoding='utf-8') as f:
         lines = f.readlines()
-    
+
     # Update mock mode settings
     mock_mode_found = False
     mock_dir_found = False
-    
+
     updated_lines = []
     for line in lines:
         stripped = line.strip()
@@ -55,7 +55,7 @@ def update_mock_mode(enable: bool, mock_data_dir: str = "./mock"):
             mock_dir_found = True
         else:
             updated_lines.append(line)
-    
+
     # Add missing variables if not found
     if not mock_mode_found:
         # Find a good place to insert (after processing configuration)
@@ -68,7 +68,7 @@ def update_mock_mode(enable: bool, mock_data_dir: str = "./mock"):
                         insert_index = j
                         break
                 break
-        
+
         updated_lines.insert(insert_index, f"\n# Mock Mode Configuration\n")
         updated_lines.insert(insert_index + 1, f"MORAG_MOCK_MODE={'true' if enable else 'false'}\n")
         if not mock_dir_found:
@@ -79,25 +79,25 @@ def update_mock_mode(enable: bool, mock_data_dir: str = "./mock"):
             if line.strip().startswith('MORAG_MOCK_MODE='):
                 updated_lines.insert(i + 1, f"MORAG_MOCK_DATA_DIR={mock_data_dir}\n")
                 break
-    
+
     # Write updated file
     with open(env_path, 'w', encoding='utf-8') as f:
         f.writelines(updated_lines)
-    
+
     return True
 
 
 def check_mock_data(mock_data_dir: str):
     """Check if mock data directory and files exist."""
     mock_path = Path(mock_data_dir)
-    
+
     if not mock_path.exists():
         print(f"⚠ Mock data directory not found: {mock_path}")
         print("  Run the following to create mock data:")
         print(f"  mkdir -p {mock_path}")
         print("  # Copy mock files from the repository")
         return False
-    
+
     required_files = [
         'markdown-conversion/sample.md',
         'markdown-optimizer/sample.optimized.md',
@@ -105,19 +105,19 @@ def check_mock_data(mock_data_dir: str):
         'fact-generator/sample.facts.json',
         'ingestor/sample.ingestion.json'
     ]
-    
+
     missing_files = []
     for file_path in required_files:
         full_path = mock_path / file_path
         if not full_path.exists():
             missing_files.append(file_path)
-    
+
     if missing_files:
         print(f"⚠ Missing {len(missing_files)} mock files:")
         for file_path in missing_files:
             print(f"  - {file_path}")
         return False
-    
+
     print(f"✓ All mock files present in {mock_path}")
     return True
 
@@ -125,7 +125,7 @@ def check_mock_data(mock_data_dir: str):
 def main():
     parser = argparse.ArgumentParser(description="Toggle MoRAG mock mode")
     parser.add_argument(
-        'action', 
+        'action',
         choices=['on', 'off', 'status'],
         help='Action to perform: on (enable), off (disable), or status (check current state)'
     )
@@ -134,36 +134,36 @@ def main():
         default='./mock',
         help='Mock data directory (default: ./mock)'
     )
-    
+
     args = parser.parse_args()
-    
+
     print("MoRAG Mock Mode Toggle")
     print("=" * 30)
-    
+
     if args.action == 'status':
         # Check current status
         env_path = Path(".env")
         if not env_path.exists():
             print("❌ .env file not found")
             sys.exit(1)
-        
+
         env_vars = read_env_file(env_path)
         mock_mode = env_vars.get('MORAG_MOCK_MODE', 'false').lower() == 'true'
         mock_dir = env_vars.get('MORAG_MOCK_DATA_DIR', './mock')
-        
+
         print(f"Mock mode: {'ENABLED' if mock_mode else 'DISABLED'}")
         print(f"Mock data directory: {mock_dir}")
-        
+
         if mock_mode:
             check_mock_data(mock_dir)
-        
+
     elif args.action == 'on':
         # Enable mock mode
         print("Enabling mock mode...")
-        
+
         if update_mock_mode(True, args.mock_dir):
             print("✓ Mock mode enabled in .env file")
-            
+
             # Check mock data
             if check_mock_data(args.mock_dir):
                 print("✓ Mock data is ready")
@@ -174,11 +174,11 @@ def main():
         else:
             print("❌ Failed to enable mock mode")
             sys.exit(1)
-    
+
     elif args.action == 'off':
         # Disable mock mode
         print("Disabling mock mode...")
-        
+
         if update_mock_mode(False, args.mock_dir):
             print("✓ Mock mode disabled in .env file")
             print("\nMock mode is now DISABLED")

@@ -35,7 +35,7 @@ class StageStatus(Enum):
     SKIPPED = "skipped"
 
 class StageResult:
-    def __init__(self, 
+    def __init__(self,
                  stage_type: StageType,
                  status: StageStatus,
                  output_files: List[Path],
@@ -64,19 +64,19 @@ class StageContext:
 class Stage(ABC):
     def __init__(self, stage_type: StageType):
         self.stage_type = stage_type
-        
+
     @abstractmethod
-    async def execute(self, 
-                     input_files: List[Path], 
+    async def execute(self,
+                     input_files: List[Path],
                      context: StageContext) -> StageResult:
         """Execute the stage with given input files and context."""
         pass
-        
+
     @abstractmethod
     def validate_inputs(self, input_files: List[Path]) -> bool:
         """Validate that input files are suitable for this stage."""
         pass
-        
+
     @abstractmethod
     def get_dependencies(self) -> List[StageType]:
         """Return list of stages that must complete before this stage."""
@@ -179,35 +179,35 @@ class StageDependencyManager:
         StageType.FACT_GENERATOR: [StageType.CHUNKER],
         StageType.INGESTOR: [StageType.CHUNKER, StageType.FACT_GENERATOR]
     }
-    
+
     @classmethod
     def get_execution_order(cls, requested_stages: List[StageType]) -> List[StageType]:
         """Return stages in correct execution order based on dependencies."""
         all_required = set()
-        
+
         def add_dependencies(stage: StageType):
             if stage not in all_required:
                 all_required.add(stage)
                 for dep in cls.DEPENDENCIES[stage]:
                     add_dependencies(dep)
-        
+
         for stage in requested_stages:
             add_dependencies(stage)
-        
+
         # Sort by stage number (enum value)
         return sorted(all_required, key=lambda x: x.value)
-    
+
     @classmethod
     def validate_stage_chain(cls, stages: List[StageType]) -> bool:
         """Validate that all dependencies are satisfied."""
         completed = set()
-        
+
         for stage in stages:
             for dep in cls.DEPENDENCIES[stage]:
                 if dep not in completed:
                     return False
             completed.add(stage)
-        
+
         return True
 ```
 
@@ -220,14 +220,14 @@ from typing import Optional
 class WebhookNotifier:
     def __init__(self, webhook_url: Optional[str] = None):
         self.webhook_url = webhook_url
-    
-    async def notify_stage_completion(self, 
+
+    async def notify_stage_completion(self,
                                     stage_result: StageResult,
                                     context: StageContext):
         """Send webhook notification when stage completes."""
         if not self.webhook_url:
             return
-        
+
         payload = {
             "stage": stage_result.stage_type.value,
             "status": stage_result.status.value,
@@ -237,7 +237,7 @@ class WebhookNotifier:
             "execution_time": stage_result.execution_time,
             "error_message": stage_result.error_message
         }
-        
+
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.post(

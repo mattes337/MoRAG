@@ -172,7 +172,7 @@ class KeywordDeduplicationService(MaintenanceJobBase):
             raise MaintenanceJobError(f"Job execution failed: {str(e)}") from e
 
         processing_time = time.time() - start_time
-        
+
         return {
             "job_tag": self.config.job_tag,
             "processed": len(entities),
@@ -305,24 +305,24 @@ class KeywordDeduplicationService(MaintenanceJobBase):
         """Find merge candidates using enhanced keyword similarity."""
         candidates = []
         processed = set()
-        
+
         for i, entity1 in enumerate(entities):
             if entity1.id in processed:
                 continue
-                
+
             similar_entities = []
-            
+
             for j, entity2 in enumerate(entities[i+1:], i+1):
                 if entity2.id in processed or entity2.type != entity1.type:
                     continue
-                
+
                 # Calculate enhanced similarity for keywords
                 similarity = await self._calculate_keyword_similarity(entity1, entity2)
-                
+
                 if similarity >= self.config.similarity_threshold:
                     similar_entities.append(entity2)
                     processed.add(entity2.id)
-            
+
             if similar_entities and len(similar_entities) < self.config.max_cluster_size:
                 # Get fact counts for viability analysis
                 fact_counts = await self._get_fact_counts([entity1] + similar_entities)
@@ -341,9 +341,9 @@ class KeywordDeduplicationService(MaintenanceJobBase):
                     merge_confidence=0.0,  # Will be set by LLM validation
                     merge_reason=f"keyword_similarity_cluster_{len(similar_entities)}_entities"
                 ))
-                
+
                 processed.add(entity1.id)
-        
+
         logger.info(f"Found {len(candidates)} keyword merge candidates")
         return candidates
 
@@ -351,16 +351,16 @@ class KeywordDeduplicationService(MaintenanceJobBase):
         """Calculate enhanced similarity for keyword entities."""
         # Use existing similarity calculator as base
         base_similarity = self.deduplicator.similarity_calculator.calculate_similarity(entity1, entity2)
-        
+
         # Add keyword-specific enhancements
         keyword_bonus = self._calculate_keyword_specific_similarity(entity1.name, entity2.name)
-        
+
         # Combine with weights
         enhanced_similarity = (
             base_similarity * (1 - self.config.semantic_similarity_weight) +
             keyword_bonus * self.config.semantic_similarity_weight
         )
-        
+
         return min(1.0, enhanced_similarity)
 
     def _calculate_keyword_specific_similarity(self, name1: str, name2: str) -> float:
@@ -414,22 +414,22 @@ class KeywordDeduplicationService(MaintenanceJobBase):
     async def _get_fact_counts(self, entities: List[Entity]) -> Dict[str, int]:
         """Get fact counts for entities."""
         entity_ids = [e.id for e in entities]
-        
+
         query = """
         UNWIND $entity_ids AS entity_id
         MATCH (e:Entity {id: entity_id})
         OPTIONAL MATCH (f:Fact)-[r]->(e)
         RETURN e.id AS entity_id, count(DISTINCT f) AS fact_count
         """
-        
+
         results = await self.storage._connection_ops._execute_query(
             query, {"entity_ids": entity_ids}
         )
-        
+
         return {r["entity_id"]: r["fact_count"] for r in results}
 
     async def _validate_merges_with_viability_analysis(
-        self, 
+        self,
         candidates: List[MergeCandidate]
     ) -> List[MergeCandidate]:
         """Validate merges using LLM viability analysis."""
@@ -437,9 +437,9 @@ class KeywordDeduplicationService(MaintenanceJobBase):
         if not client:
             logger.warning("No LLM available for viability analysis, using rule-based validation")
             return self._rule_based_validation(candidates)
-        
+
         confirmed_merges = []
-        
+
         # Process candidates in batches with error handling
         batch_result = await self.safe_execute_batch(
             candidates,
@@ -457,7 +457,7 @@ class KeywordDeduplicationService(MaintenanceJobBase):
         if batch_result.failed:
             logger.warning(f"Viability analysis failed for {len(batch_result.failed)} candidates",
                          success_rate=batch_result.success_rate)
-        
+
         logger.info(f"Confirmed {len(confirmed_merges)} merges via viability analysis")
         return confirmed_merges
 
@@ -483,21 +483,21 @@ class KeywordDeduplicationService(MaintenanceJobBase):
             return False, 0.0, candidate
 
     async def _analyze_merge_viability(
-        self, 
-        client, 
+        self,
+        client,
         candidate: MergeCandidate
     ) -> Tuple[bool, float, str]:
         """Analyze merge viability using LLM."""
         # Get fact counts for analysis
         all_entities = [candidate.primary_entity] + candidate.duplicate_entities
         fact_counts = await self._get_fact_counts(all_entities)
-        
+
         # Create viability analysis prompt
         entity_info = []
         for entity in all_entities:
             fact_count = fact_counts.get(entity.id, 0)
             entity_info.append(f"- {entity.name} (Type: {entity.type}, Facts: {fact_count})")
-        
+
         prompt = f"""
         Should these entities be merged? Entities:
         {chr(10).join(entity_info)}
@@ -512,10 +512,10 @@ class KeywordDeduplicationService(MaintenanceJobBase):
             "confidence": 0.0-1.0
         }}
         """
-        
+
         try:
             response = await client.generate(prompt)
-            
+
             # Parse JSON response
             import re
             json_match = re.search(r'\{.*\}', response, re.DOTALL)
@@ -526,40 +526,40 @@ class KeywordDeduplicationService(MaintenanceJobBase):
                     float(data.get("confidence", 0.0)),
                     "llm_approved"
                 )
-            
+
         except Exception as e:
             logger.warning(f"Failed to parse LLM viability response: {e}")
-        
+
         # Fallback to rule-based decision
         return False, 0.0, "llm_failed"
 
     def _rule_based_validation(self, candidates: List[MergeCandidate]) -> List[MergeCandidate]:
         """Rule-based validation fallback."""
         confirmed = []
-        
+
         for candidate in candidates:
             # Simple rule: high similarity + same type = merge
-            if (candidate.similarity_score >= 0.85 and 
+            if (candidate.similarity_score >= 0.85 and
                 all(e.type == candidate.primary_entity.type for e in candidate.duplicate_entities)):
                 candidate.merge_confidence = candidate.similarity_score
                 candidate.merge_reason = "rule_based_high_similarity"
                 confirmed.append(candidate)
-        
+
         return confirmed
 
     async def _apply_keyword_merges(self, confirmed_merges: List[MergeCandidate]) -> int:
         """Apply confirmed keyword merges to the graph."""
         merges_applied = 0
-        
+
         for merge in confirmed_merges:
             try:
                 # Merge entities in the graph
                 await self._merge_entities_in_graph(merge)
                 merges_applied += 1
-                
+
             except Exception as e:
                 logger.error(f"Failed to apply merge: {e}", merge=merge)
-        
+
         return merges_applied
 
     async def _merge_entities_in_graph(self, merge: MergeCandidate) -> None:

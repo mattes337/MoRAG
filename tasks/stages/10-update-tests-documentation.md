@@ -29,38 +29,38 @@ from morag_stages.file_manager import FileManager
 
 class StageTestFramework:
     """Test framework for stage-based processing."""
-    
+
     def __init__(self):
         self.temp_dir = None
         self.stage_manager = None
         self.file_manager = None
-    
+
     async def setup(self):
         """Set up test environment."""
         self.temp_dir = Path(tempfile.mkdtemp())
         self.stage_manager = StageManager()
         self.file_manager = FileManager(self.temp_dir / "storage")
-        
+
         # Create test data directory
         self.test_data_dir = self.temp_dir / "test_data"
         self.test_data_dir.mkdir()
-        
+
         # Create output directory
         self.output_dir = self.temp_dir / "output"
         self.output_dir.mkdir()
-    
+
     async def teardown(self):
         """Clean up test environment."""
         import shutil
         if self.temp_dir and self.temp_dir.exists():
             shutil.rmtree(self.temp_dir)
-    
+
     def create_test_file(self, filename: str, content: str) -> Path:
         """Create a test file with given content."""
         file_path = self.test_data_dir / filename
         file_path.write_text(content, encoding='utf-8')
         return file_path
-    
+
     def create_test_markdown(self, filename: str = "test.md") -> Path:
         """Create a test markdown file."""
         content = """---
@@ -82,7 +82,7 @@ Some content here with important information.
 More content with different topics and concepts.
 """
         return self.create_test_file(filename, content)
-    
+
     def create_test_chunks_json(self, filename: str = "test.chunks.json") -> Path:
         """Create a test chunks JSON file."""
         chunks_data = {
@@ -109,11 +109,11 @@ More content with different topics and concepts.
                 }
             ]
         }
-        
+
         file_path = self.test_data_dir / filename
         file_path.write_text(json.dumps(chunks_data, indent=2), encoding='utf-8')
         return file_path
-    
+
     def create_test_facts_json(self, filename: str = "test.facts.json") -> Path:
         """Create a test facts JSON file."""
         facts_data = {
@@ -150,41 +150,41 @@ More content with different topics and concepts.
                 }
             ]
         }
-        
+
         file_path = self.test_data_dir / filename
         file_path.write_text(json.dumps(facts_data, indent=2), encoding='utf-8')
         return file_path
-    
-    async def execute_stage_test(self, 
+
+    async def execute_stage_test(self,
                                 stage_type: StageType,
                                 input_files: List[Path],
                                 config: Dict[str, Any] = None) -> 'StageResult':
         """Execute a stage for testing."""
-        
+
         context = StageContext(
             source_path=input_files[0],
             output_dir=self.output_dir,
             config=config or {}
         )
-        
+
         return await self.stage_manager.execute_stage(stage_type, input_files, context)
-    
+
     def assert_stage_success(self, result: 'StageResult'):
         """Assert that stage execution was successful."""
         assert result.status == StageStatus.COMPLETED
         assert result.error_message is None
         assert len(result.output_files) > 0
         assert all(f.exists() for f in result.output_files)
-    
+
     def assert_file_content(self, file_path: Path, expected_content: str = None, min_length: int = None):
         """Assert file content meets expectations."""
         assert file_path.exists(), f"File {file_path} does not exist"
-        
+
         content = file_path.read_text(encoding='utf-8')
-        
+
         if expected_content:
             assert expected_content in content
-        
+
         if min_length:
             assert len(content) >= min_length
 
@@ -209,19 +209,19 @@ from morag_stages.tests.test_framework import StageTestFramework
 @pytest.mark.asyncio
 async def test_stage1_markdown_input(stage_test_framework: StageTestFramework):
     """Test Stage 1 with markdown input."""
-    
+
     # Create test markdown file
     test_file = stage_test_framework.create_test_markdown("input.md")
-    
+
     # Execute markdown-conversion
     result = await stage_test_framework.execute_stage_test(
         StageType.MARKDOWN_CONVERSION,
         [test_file]
     )
-    
+
     # Assert success
     stage_test_framework.assert_stage_success(result)
-    
+
     # Check output file
     output_file = result.output_files[0]
     stage_test_framework.assert_file_content(output_file, "# Test Document")
@@ -229,27 +229,27 @@ async def test_stage1_markdown_input(stage_test_framework: StageTestFramework):
 @pytest.mark.asyncio
 async def test_stage1_pdf_input(stage_test_framework: StageTestFramework):
     """Test Stage 1 with PDF input (mock)."""
-    
+
     # This would require actual PDF processing
     # For now, test with markdown as placeholder
     test_file = stage_test_framework.create_test_markdown("input.md")
-    
+
     result = await stage_test_framework.execute_stage_test(
         StageType.MARKDOWN_CONVERSION,
         [test_file],
         config={'markdown_conversion': {'preserve_formatting': True}}
     )
-    
+
     stage_test_framework.assert_stage_success(result)
 
 # packages/morag-stages/tests/test_stage3.py
 @pytest.mark.asyncio
 async def test_stage3_chunking(stage_test_framework: StageTestFramework):
     """Test Stage 3 chunking functionality."""
-    
+
     # Create test markdown file
     test_file = stage_test_framework.create_test_markdown("input.md")
-    
+
     # Execute Stage 3
     result = await stage_test_framework.execute_stage_test(
         StageType.CHUNKING,
@@ -262,23 +262,23 @@ async def test_stage3_chunking(stage_test_framework: StageTestFramework):
             }
         }
     )
-    
+
     # Assert success
     stage_test_framework.assert_stage_success(result)
-    
+
     # Check chunks file
     chunks_file = result.output_files[0]
     assert chunks_file.name.endswith('.chunks.json')
-    
+
     # Validate chunks content
     import json
     with open(chunks_file, 'r') as f:
         chunks_data = json.load(f)
-    
+
     assert 'chunks' in chunks_data
     assert 'summary' in chunks_data
     assert len(chunks_data['chunks']) > 0
-    
+
     # Check chunk structure
     chunk = chunks_data['chunks'][0]
     assert 'content' in chunk
@@ -289,29 +289,29 @@ async def test_stage3_chunking(stage_test_framework: StageTestFramework):
 @pytest.mark.asyncio
 async def test_full_stage_chain(stage_test_framework: StageTestFramework):
     """Test complete stage chain execution."""
-    
+
     # Create test input
     test_file = stage_test_framework.create_test_markdown("input.md")
-    
+
     # Define stage chain using canonical names
     stages = [
         StageType.MARKDOWN_CONVERSION,
         StageType.CHUNKER,
         StageType.FACT_GENERATOR
     ]
-    
+
     # Execute stage chain
     results = await stage_test_framework.stage_manager.execute_stage_chain(
         stages,
         [test_file],
         stage_test_framework.create_context(test_file)
     )
-    
+
     # Assert all stages completed
     assert len(results) == len(stages)
     for stage_type, result in results.items():
         stage_test_framework.assert_stage_success(result)
-    
+
     # Check final output
     final_result = results[StageType.FACT_GENERATOR]
     facts_file = final_result.output_files[0]
@@ -332,13 +332,13 @@ client = TestClient(app)
 
 def test_stage1_api_endpoint():
     """Test Stage 1 API endpoint."""
-    
+
     # Create test file
     test_content = "# Test Document\n\nThis is test content."
-    
+
     with open("test_input.md", "w") as f:
         f.write(test_content)
-    
+
     # Test API call
     with open("test_input.md", "rb") as f:
         response = client.post(
@@ -346,17 +346,17 @@ def test_stage1_api_endpoint():
             files={"file": ("test.md", f, "text/markdown")},
             data={"config": json.dumps({"include_timestamps": False})}
         )
-    
+
     assert response.status_code == 200
     data = response.json()
-    
+
     assert data["stage"] == 1
     assert data["status"] == "completed"
     assert len(data["output_files"]) > 0
 
 def test_stage_chain_api():
     """Test stage chain API endpoint."""
-    
+
     request_data = {
         "stages": [1, 3, 4],
         "input_file": "test_input.md",
@@ -365,22 +365,22 @@ def test_stage_chain_api():
             "stage4": {"extract_entities": True}
         }
     }
-    
+
     response = client.post("/api/v1/stages/chain", json=request_data)
-    
+
     assert response.status_code == 200
     data = response.json()
-    
+
     assert data["overall_success"] == True
     assert len(data["results"]) == 3
 
 def test_file_download_api():
     """Test file download API."""
-    
+
     # This would require a valid file_id from previous stage execution
     # For now, test the endpoint structure
     response = client.get("/api/v1/files/download/invalid_id")
-    
+
     # Should return 404 for invalid ID
     assert response.status_code == 404
 ```
@@ -398,11 +398,11 @@ from morag_stages.tests.test_framework import StageTestFramework
 @pytest.mark.asyncio
 async def test_stage_performance_benchmarks(stage_test_framework: StageTestFramework):
     """Test performance benchmarks for stages."""
-    
+
     # Create larger test content
     large_content = "# Large Document\n\n" + "This is test content. " * 1000
     test_file = stage_test_framework.create_test_file("large.md", large_content)
-    
+
     # Benchmark markdown-conversion
     start_time = time.time()
     result1 = await stage_test_framework.execute_stage_test(
@@ -418,48 +418,48 @@ async def test_stage_performance_benchmarks(stage_test_framework: StageTestFrame
         result1.output_files
     )
     stage3_time = time.time() - start_time
-    
+
     # Assert performance expectations
     assert stage1_time < 10.0  # Should complete within 10 seconds
     assert stage3_time < 30.0  # Should complete within 30 seconds
-    
+
     print(f"Stage 1 time: {stage1_time:.2f}s")
     print(f"Stage 3 time: {stage3_time:.2f}s")
 
 @pytest.mark.asyncio
 async def test_concurrent_stage_execution():
     """Test concurrent execution of multiple stages."""
-    
+
     frameworks = [StageTestFramework() for _ in range(3)]
-    
+
     try:
         # Setup all frameworks
         await asyncio.gather(*[f.setup() for f in frameworks])
-        
+
         # Create test files
         test_files = []
         for i, framework in enumerate(frameworks):
             test_file = framework.create_test_markdown(f"test_{i}.md")
             test_files.append((framework, test_file))
-        
+
         # Execute stages concurrently
         start_time = time.time()
-        
+
         tasks = []
         for framework, test_file in test_files:
             task = framework.execute_stage_test(StageType.MARKDOWN_CONVERSION, [test_file])
             tasks.append(task)
-        
+
         results = await asyncio.gather(*tasks)
-        
+
         concurrent_time = time.time() - start_time
-        
+
         # All should succeed
         for result in results:
             assert result.status.value == "completed"
-        
+
         print(f"Concurrent execution time: {concurrent_time:.2f}s")
-        
+
     finally:
         # Cleanup
         await asyncio.gather(*[f.teardown() for f in frameworks])

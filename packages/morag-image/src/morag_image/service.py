@@ -14,7 +14,7 @@ logger = structlog.get_logger()
 
 class ImageService(BaseService):
     """Service for processing images with OCR and captioning."""
-    
+
     def __init__(self, api_key: Optional[str] = None, output_dir: Optional[Path] = None):
         """Initialize the image service.
 
@@ -120,11 +120,11 @@ class ImageService(BaseService):
                           file_path: Path,
                           config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Process a single image file.
-        
+
         Args:
             file_path: Path to the image file
             config: Optional configuration parameters
-            
+
         Returns:
             Dictionary with processing results
         """
@@ -135,30 +135,30 @@ class ImageService(BaseService):
                 for key, value in config.items():
                     if hasattr(image_config, key):
                         setattr(image_config, key, value)
-            
+
             # Process the image
             result = await self.processor.process_image(file_path, image_config)
 
             # Convert result to dictionary with file path information
             return self._result_to_dict(result, file_path)
-            
+
         except Exception as e:
-            logger.error("Image processing failed", 
+            logger.error("Image processing failed",
                         file_path=str(file_path),
                         error=str(e))
             raise ProcessingError(f"Image processing failed: {str(e)}") from e
-        
-    async def process_batch(self, 
-                           file_paths: List[Path], 
+
+    async def process_batch(self,
+                           file_paths: List[Path],
                            config: Optional[Dict[str, Any]] = None,
                            max_concurrency: int = 3) -> List[Dict[str, Any]]:
         """Process multiple image files concurrently.
-        
+
         Args:
             file_paths: List of paths to image files
             config: Optional configuration parameters
             max_concurrency: Maximum number of concurrent processing tasks
-            
+
         Returns:
             List of dictionaries with processing results
         """
@@ -169,23 +169,23 @@ class ImageService(BaseService):
                 for key, value in config.items():
                     if hasattr(image_config, key):
                         setattr(image_config, key, value)
-            
+
             # Process images in batch
             results = await self.processor.process_images(
-                file_paths, 
+                file_paths,
                 image_config,
                 max_concurrency=max_concurrency
             )
-            
+
             # Convert results to dictionaries
             return [self._result_to_dict(result) for result in results]
-            
+
         except Exception as e:
-            logger.error("Batch image processing failed", 
+            logger.error("Batch image processing failed",
                         file_count=len(file_paths),
                         error=str(e))
             raise ProcessingError(f"Batch image processing failed: {str(e)}") from e
-    
+
     def _result_to_dict(self, result: ImageProcessingResult, file_path: Optional[Path] = None) -> Dict[str, Any]:
         """Convert ImageProcessingResult to a dictionary."""
         # Convert metadata to dictionary with required document fields
@@ -216,7 +216,7 @@ class ImageService(BaseService):
         # Add legacy filename field for compatibility
         if file_path:
             metadata_dict["filename"] = file_path.name
-        
+
         # Create result dictionary
         return {
             "caption": result.caption,

@@ -97,7 +97,7 @@ def test_qdrant_endpoints(base_url):
         "health",  # Health check
         "collections",  # Collections endpoint
     ]
-    
+
     print(f"Testing Qdrant endpoints on {base_url}...")
     for endpoint in endpoints:
         url = f"{base_url.rstrip('/')}/{endpoint}" if endpoint else base_url
@@ -120,13 +120,13 @@ async def main():
     """Main diagnostic function."""
     print("Qdrant Network Diagnostic Script")
     print("=" * 50)
-    
+
     # Parse the Qdrant URL
     qdrant_url = settings.qdrant_host
     parsed = urlparse(qdrant_url)
     hostname = parsed.hostname
     port = parsed.port or (443 if parsed.scheme == 'https' else 6333)
-    
+
     print(f"Configuration:")
     print(f"  URL: {qdrant_url}")
     print(f"  Hostname: {hostname}")
@@ -134,56 +134,56 @@ async def main():
     print(f"  Scheme: {parsed.scheme}")
     print(f"  API Key: {'***' if settings.qdrant_api_key else 'None'}")
     print()
-    
+
     # Test 1: DNS Resolution
     print("1. DNS Resolution Test")
     print("-" * 30)
     dns_ok = test_dns_resolution(hostname)
     print()
-    
+
     if not dns_ok:
         print("❌ DNS resolution failed. Cannot proceed with further tests.")
         return False
-    
+
     # Test 2: TCP Connection
     print("2. TCP Connection Test")
     print("-" * 30)
     tcp_ok = test_tcp_connection(hostname, port)
     print()
-    
+
     if not tcp_ok:
         print("❌ TCP connection failed. Cannot proceed with SSL/HTTP tests.")
         return False
-    
+
     # Test 3: SSL/TLS Connection (if HTTPS)
     if parsed.scheme == 'https':
         print("3. SSL/TLS Connection Test")
         print("-" * 30)
         ssl_ok = test_ssl_connection(hostname, port)
         print()
-        
+
         if not ssl_ok:
             print("❌ SSL/TLS connection failed. HTTPS requests will fail.")
             return False
-    
+
     # Test 4: Basic HTTP Request
     print("4. Basic HTTP Request Test")
     print("-" * 30)
     http_ok = test_http_request(qdrant_url)
     print()
-    
+
     # Test 5: HTTPX Request (same as Qdrant client)
     print("5. HTTPX Request Test")
     print("-" * 30)
     httpx_ok = await test_httpx_request(qdrant_url)
     print()
-    
+
     # Test 6: Qdrant-specific endpoints
     print("6. Qdrant Endpoints Test")
     print("-" * 30)
     test_qdrant_endpoints(qdrant_url)
     print()
-    
+
     # Summary
     print("Summary")
     print("=" * 50)
@@ -202,7 +202,7 @@ async def main():
             print("   - TCP connection failed")
         if parsed.scheme == 'https' and not ssl_ok:
             print("   - SSL/TLS connection failed")
-    
+
     return dns_ok and tcp_ok
 
 if __name__ == "__main__":

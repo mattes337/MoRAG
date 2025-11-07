@@ -102,7 +102,7 @@ For split pages:
 The system maintains backward compatibility with existing chunking strategies:
 - `semantic`: Advanced semantic chunking using NLP
 - `sentence`: Sentence-based chunking
-- `paragraph`: Paragraph-based chunking  
+- `paragraph`: Paragraph-based chunking
 - `simple`: Basic character-based chunking
 
 You can override the default strategy per document by specifying the `chunking_strategy` parameter.

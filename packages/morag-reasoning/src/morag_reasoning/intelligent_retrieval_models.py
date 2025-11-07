@@ -1,12 +1,11 @@
 """Models for intelligent entity-based retrieval with recursive path following."""
 
-from typing import Dict, Any, List, Optional, Union
+from typing import Dict, Any, List, Optional
 from pydantic import BaseModel, Field
-from datetime import datetime
 from enum import Enum
 
 # Import existing database configuration models
-from morag_graph.models.database_config import DatabaseServerConfig, DatabaseType
+from morag_graph.models.database_config import DatabaseServerConfig
 
 
 class PathDecision(str, Enum):
@@ -69,7 +68,7 @@ class IntelligentRetrievalRequest(BaseModel):
     max_depth: int = Field(default=3, ge=1, le=5, description="Maximum path depth")
     min_relevance_threshold: float = Field(default=0.3, ge=0.0, le=1.0, description="Minimum relevance threshold")
     include_debug_info: bool = Field(default=False, description="Include debug information in response")
-    
+
     # Database configuration
     neo4j_database: Optional[str] = Field(None, description="Neo4j database name")
     qdrant_collection: Optional[str] = Field(None, description="Qdrant collection name")
@@ -90,27 +89,27 @@ class IntelligentRetrievalResponse(BaseModel):
     """Response from intelligent entity-based retrieval."""
     query_id: str = Field(..., description="Unique query identifier")
     query: str = Field(..., description="Original user query")
-    
+
     # Main results
     key_facts: List[KeyFact] = Field(..., description="Extracted key facts relevant to the query")
-    
+
     # Process information
     total_iterations: int = Field(..., description="Total iterations performed")
     iterations: List[RetrievalIteration] = Field(..., description="Details of each iteration")
-    
+
     # Entity and path information
     initial_entities: List[str] = Field(..., description="Initially identified entities")
     total_entities_explored: int = Field(..., description="Total unique entities explored")
     total_chunks_retrieved: int = Field(..., description="Total chunks retrieved")
-    
+
     # Quality metrics
     confidence_score: float = Field(ge=0.0, le=1.0, description="Overall confidence in results")
     completeness_score: float = Field(ge=0.0, le=1.0, description="Estimated completeness of information")
-    
+
     # Metadata
     processing_time_ms: float = Field(..., description="Total processing time in milliseconds")
     llm_calls_made: int = Field(..., description="Number of LLM calls made")
-    
+
     # Debug information (optional)
     debug_info: Optional[Dict[str, Any]] = Field(None, description="Debug information if requested")
 

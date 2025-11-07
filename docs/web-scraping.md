@@ -24,17 +24,17 @@ from morag.processors.web import WebProcessor, WebScrapingConfig
 async def scrape_website():
     # Create processor
     processor = WebProcessor()
-    
+
     # Configure scraping
     config = WebScrapingConfig(
         timeout=30,
         extract_links=True,
         convert_to_markdown=True
     )
-    
+
     # Process URL
     result = await processor.process_url("https://example.com", config)
-    
+
     if result.success:
         print(f"Title: {result.content.title}")
         print(f"Content: {result.content.content}")
@@ -103,31 +103,31 @@ respectful_config = WebScrapingConfig(
 async def process_single_url():
     processor = WebProcessor()
     config = WebScrapingConfig()
-    
+
     result = await processor.process_url("https://example.com", config)
-    
+
     if result.success:
         content = result.content
-        
+
         # Basic information
         print(f"URL: {content.url}")
         print(f"Title: {content.title}")
         print(f"Content Type: {content.content_type}")
         print(f"Content Length: {content.content_length}")
-        
+
         # Extracted content
         print(f"Text Content: {content.content}")
         print(f"Markdown: {content.markdown_content}")
-        
+
         # Metadata
         print(f"Description: {content.metadata.get('description')}")
         print(f"Keywords: {content.metadata.get('keywords')}")
         print(f"Author: {content.metadata.get('author')}")
-        
+
         # Links and images
         print(f"Links found: {len(content.links)}")
         print(f"Images found: {len(content.images)}")
-        
+
         # Processing info
         print(f"Extraction time: {content.extraction_time:.2f}s")
         print(f"Total processing time: {result.processing_time:.2f}s")
@@ -140,22 +140,22 @@ async def process_single_url():
 async def process_multiple_urls():
     processor = WebProcessor()
     config = WebScrapingConfig(rate_limit_delay=1.0)
-    
+
     urls = [
         "https://example1.com",
-        "https://example2.com", 
+        "https://example2.com",
         "https://example3.com"
     ]
-    
+
     results = await processor.process_urls(urls, config)
-    
+
     successful = [r for r in results if r.success]
     failed = [r for r in results if not r.success]
-    
+
     print(f"Processed {len(urls)} URLs")
     print(f"Successful: {len(successful)}")
     print(f"Failed: {len(failed)}")
-    
+
     for result in failed:
         print(f"Failed {result.url}: {result.error_message}")
 ```
@@ -251,10 +251,10 @@ The scraper handles various error conditions:
 ```python
 async def handle_errors():
     processor = WebProcessor()
-    
+
     try:
         result = await processor.process_url("https://invalid-url.com")
-        
+
         if not result.success:
             if "timeout" in result.error_message.lower():
                 print("Request timed out - try increasing timeout")
@@ -264,7 +264,7 @@ async def handle_errors():
                 print("Unsupported content type")
             else:
                 print(f"Other error: {result.error_message}")
-                
+
     except Exception as e:
         print(f"Unexpected error: {e}")
 ```
@@ -300,7 +300,7 @@ Run the web scraping tests:
 # Unit tests
 pytest tests/test_web_processor.py -v
 
-# Integration tests  
+# Integration tests
 pytest tests/test_web_integration.py -v
 
 # Task tests

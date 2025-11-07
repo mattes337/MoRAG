@@ -2,8 +2,8 @@
 
 ## Overview
 
-**Priority**: 🔥 **Immediate** (1 week, High Impact, Very High ROI)  
-**Source**: LightRAG dual-level retrieval and GraphRAG global vs local classification  
+**Priority**: 🔥 **Immediate** (1 week, High Impact, Very High ROI)
+**Source**: LightRAG dual-level retrieval and GraphRAG global vs local classification
 **Expected Impact**: 25-30% improvement in query response relevance
 
 ## Problem Statement
@@ -155,7 +155,7 @@ class QueryClassifier:
         """Map query type to retrieval strategy."""
         strategy_map = {
             QueryType.FACTUAL: "direct_entity_lookup",
-            QueryType.ANALYTICAL: "multi_hop_traversal", 
+            QueryType.ANALYTICAL: "multi_hop_traversal",
             QueryType.SUMMARY: "broad_context_retrieval",
             QueryType.COMPARATIVE: "multi_entity_comparison",
             QueryType.TEMPORAL: "temporal_graph_traversal"
@@ -189,7 +189,7 @@ class StrategyRouter:
             'reasoning': classification.reasoning,
             'strategy': classification.suggested_strategy
         }
-        
+
         # Route to appropriate strategy
         if classification.query_type == QueryType.FACTUAL:
             return await self._factual_strategy(query, context)
@@ -288,9 +288,9 @@ async def enhanced_query(request: QueryRequest):
         'collection_name': request.collection_name,
         'max_results': request.max_results or 10
     }
-    
+
     result = await graph_agent.process_query(request.query, context)
-    
+
     # Include classification info in response
     return {
         'answer': result['answer'],
@@ -359,7 +359,7 @@ class TestStrategyRouting:
     async def test_factual_query_routing(self):
         # Test that factual queries use direct lookup
         pass
-        
+
     @pytest.mark.asyncio
     async def test_analytical_query_routing(self):
         # Test that analytical queries use multi-hop traversal
@@ -376,28 +376,28 @@ query_classification:
   enabled: true
   confidence_threshold: 0.3
   default_strategy: "analytical"
-  
+
   strategies:
     factual:
       max_hops: 1
       max_chunks: 5
       similarity_threshold: 0.8
-      
+
     analytical:
       max_hops: 3
       max_chunks: 10
       similarity_threshold: 0.7
-      
+
     summary:
       max_hops: 2
       max_chunks: 15
       similarity_threshold: 0.6
-      
+
     comparative:
       max_hops: 2
       max_chunks: 12
       similarity_threshold: 0.7
-      
+
     temporal:
       max_hops: 2
       max_chunks: 8

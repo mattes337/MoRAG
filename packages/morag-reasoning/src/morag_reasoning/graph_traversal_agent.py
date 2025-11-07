@@ -1,14 +1,13 @@
 """GraphTraversalAgent for intelligent graph traversal and fact extraction."""
 
-import json
 import os
 import structlog
-from typing import List, Set, Dict, Any, Optional
+from typing import List, Dict, Any, Optional
 from pydantic_ai import Agent
 from pydantic import BaseModel, Field
 
 from morag_reasoning.llm import LLMClient
-from morag_reasoning.recursive_fact_models import RawFact, GTAResponse
+from morag_reasoning.recursive_fact_models import GTAResponse
 from morag_graph.storage.neo4j_storage import Neo4jStorage
 from morag_graph.storage.qdrant_storage import QdrantStorage
 from morag_services.embedding import GeminiEmbeddingService
@@ -713,4 +712,3 @@ Remember: Extract EVERYTHING useful - the more facts the better!"""
         except Exception as e:
             self.logger.warning("Co-occurrence neighbor computation failed", error=str(e))
             return []
-

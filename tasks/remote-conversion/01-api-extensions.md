@@ -645,24 +645,24 @@ async def submit_job_result(
     try:
         service = RemoteJobService(db)
         job = service.submit_result(job_id, result)
-        
+
         if not job:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Job {job_id} not found"
             )
-        
+
         logger.info("Job result submitted",
                    job_id=job_id,
                    status=job.status,
                    success=result.success)
-        
+
         # TODO: Continue ingestion pipeline if successful
         ingestion_continued = False
         if result.success:
             # Trigger continuation of ingestion task
             ingestion_continued = True
-        
+
         return SubmitResultResponse(
             status=job.status,
             ingestion_continued=ingestion_continued
@@ -685,13 +685,13 @@ async def get_job_status(
     try:
         service = RemoteJobService(db)
         job = service.get_job_status(job_id)
-        
+
         if not job:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Job {job_id} not found"
             )
-        
+
         # Estimate completion time based on content type and processing time
         estimated_completion = None
         if job.status == 'processing' and job.started_at:
@@ -701,9 +701,9 @@ async def get_job_status(
                 estimated_duration = timedelta(minutes=15)  # Estimate 15 minutes for video
             else:
                 estimated_duration = timedelta(minutes=10)  # Default estimate
-            
+
             estimated_completion = job.started_at + estimated_duration
-        
+
         return JobStatusResponse(
             job_id=str(job.id),
             status=job.status,
@@ -775,19 +775,19 @@ class TestRemoteJobService:
     def test_create_job(self):
         # Test job creation
         pass
-    
+
     def test_poll_available_jobs(self):
         # Test job polling
         pass
-    
+
     def test_submit_result_success(self):
         # Test successful result submission
         pass
-    
+
     def test_submit_result_failure(self):
         # Test failed result submission
         pass
-    
+
     def test_cleanup_expired_jobs(self):
         # Test job timeout cleanup
         pass
@@ -808,15 +808,15 @@ class TestRemoteJobAPI:
     def test_create_remote_job(self):
         # Test job creation endpoint
         pass
-    
+
     def test_poll_for_jobs(self):
         # Test job polling endpoint
         pass
-    
+
     def test_submit_job_result(self):
         # Test result submission endpoint
         pass
-    
+
     def test_get_job_status(self):
         # Test status endpoint
         pass

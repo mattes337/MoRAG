@@ -303,7 +303,7 @@ In case of migration issues:
 ```python
 # Generate rollback plan from migration logs
 successful_migrations = [
-    log for log in migration_service.migration_log 
+    log for log in migration_service.migration_log
     if log['status'] == 'success'
 ]
 

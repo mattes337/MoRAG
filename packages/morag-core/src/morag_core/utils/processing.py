@@ -64,7 +64,7 @@ def get_output_paths(input_path: Union[str, Path], mode: ProcessingMode) -> Dict
     input_path = Path(input_path)
     stem = input_path.stem
     parent = input_path.parent
-    
+
     if mode == ProcessingMode.PROCESSING:
         return {
             'intermediate_json': parent / f"{stem}_intermediate.json",

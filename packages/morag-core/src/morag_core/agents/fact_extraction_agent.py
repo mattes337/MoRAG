@@ -11,10 +11,10 @@ logger = get_logger(__name__)
 
 class FactExtractionAgent(MoRAGBaseAgent[FactExtractionResult]):
     """Fact extraction agent with guaranteed structured output using Outlines."""
-    
+
     def __init__(self, config: Optional[AgentConfig] = None):
         """Initialize the fact extraction agent.
-        
+
         Args:
             config: Agent configuration
         """
@@ -24,9 +24,9 @@ class FactExtractionAgent(MoRAGBaseAgent[FactExtractionResult]):
                 temperature=0.1,
                 outlines_provider="gemini"
             )
-        
+
         super().__init__(config)
-        
+
         # Fact extraction specific configuration
         self.fact_types = [
             "statistical", "causal", "technical", "definition", "procedural",
@@ -37,18 +37,18 @@ class FactExtractionAgent(MoRAGBaseAgent[FactExtractionResult]):
         self.focus_on_actionable = True
         self.include_technical_details = True
         self.filter_generic_advice = True
-    
+
     def get_result_type(self) -> Type[FactExtractionResult]:
         """Return the Pydantic model for fact extraction results.
-        
+
         Returns:
             FactExtractionResult class
         """
         return FactExtractionResult
-    
+
     def get_system_prompt(self) -> str:
         """Return the system prompt for fact extraction.
-        
+
         Returns:
             The system prompt string
         """
@@ -91,7 +91,7 @@ Each fact should have:
 - keywords: List of relevant technical terms
 - source_text: Original text span (optional)
 
-IMPORTANT: 
+IMPORTANT:
 - Ensure facts are self-contained and meaningful
 - Focus on information that adds value
 - Maintain high quality standards
@@ -106,14 +106,14 @@ IMPORTANT:
         min_confidence: Optional[float] = None
     ) -> FactExtractionResult:
         """Extract facts from text with guaranteed structured output.
-        
+
         Args:
             text: Text to extract facts from
             domain: Domain context for extraction
             query_context: Optional query context for relevance
             max_facts: Maximum number of facts to extract
             min_confidence: Minimum confidence threshold
-            
+
         Returns:
             FactExtractionResult with guaranteed structure
         """
@@ -126,13 +126,13 @@ IMPORTANT:
                 language="en",
                 metadata={"error": "Empty text", "domain": domain}
             )
-        
+
         # Update configuration for this extraction
         if max_facts is not None:
             self.max_facts = max_facts
         if min_confidence is not None:
             self.min_confidence = min_confidence
-        
+
         self.logger.info(
             "Starting fact extraction with Outlines",
             text_length=len(text),
@@ -140,26 +140,26 @@ IMPORTANT:
             has_query_context=query_context is not None,
             structured_generation=self.is_outlines_available()
         )
-        
+
         # Prepare the extraction prompt
         prompt = self._create_extraction_prompt(text, domain, query_context)
-        
+
         try:
             # Use structured generation with Outlines
             result = await self.run(prompt)
-            
+
             # Post-process the result
             result = self._post_process_result(result, text, domain)
-            
+
             self.logger.info(
                 "Fact extraction completed",
                 facts_extracted=result.total_facts,
                 confidence=result.confidence,
                 used_outlines=self.is_outlines_available()
             )
-            
+
             return result
-            
+
         except Exception as e:
             self.logger.error("Fact extraction failed", error=str(e))
             # Return a fallback result
@@ -175,7 +175,7 @@ IMPORTANT:
                     "fallback": True
                 }
             )
-    
+
     async def extract_facts_batch(
         self,
         texts: List[str],
@@ -183,33 +183,33 @@ IMPORTANT:
         query_context: Optional[str] = None
     ) -> List[FactExtractionResult]:
         """Extract facts from multiple texts.
-        
+
         Args:
             texts: List of texts to process
             domain: Domain context
             query_context: Optional query context
-            
+
         Returns:
             List of fact extraction results
         """
         if not texts:
             return []
-        
+
         self.logger.info(
             "Starting batch fact extraction",
             batch_size=len(texts),
             domain=domain
         )
-        
+
         results = []
         for i, text in enumerate(texts):
             try:
                 result = await self.extract_facts(text, domain, query_context)
                 results.append(result)
-                
+
                 if (i + 1) % 10 == 0:
                     self.logger.info(f"Processed {i + 1}/{len(texts)} texts")
-                    
+
             except Exception as e:
                 self.logger.warning(
                     "Failed to extract facts from text",
@@ -225,10 +225,10 @@ IMPORTANT:
                     language="en",
                     metadata={"error": str(e), "text_index": i}
                 ))
-        
+
         self.logger.info(f"Batch fact extraction completed for {len(results)} texts")
         return results
-    
+
     def _create_extraction_prompt(
         self,
         text: str,
@@ -236,12 +236,12 @@ IMPORTANT:
         query_context: Optional[str] = None
     ) -> str:
         """Create the extraction prompt for the given text and domain.
-        
+
         Args:
             text: Text to extract facts from
             domain: Domain context
             query_context: Optional query context
-            
+
         Returns:
             Formatted prompt string
         """
@@ -265,9 +265,9 @@ EXTRACTION PARAMETERS:
         prompt += """
 
 Extract high-quality, self-contained facts that provide valuable information about the content."""
-        
+
         return prompt
-    
+
     def _post_process_result(
         self,
         result: FactExtractionResult,
@@ -275,12 +275,12 @@ Extract high-quality, self-contained facts that provide valuable information abo
         domain: str
     ) -> FactExtractionResult:
         """Post-process the extraction result.
-        
+
         Args:
             result: Raw extraction result
             original_text: Original input text
             domain: Domain context
-            
+
         Returns:
             Post-processed result
         """
@@ -289,7 +289,7 @@ Extract high-quality, self-contained facts that provide valuable information abo
             fact for fact in result.facts
             if fact.confidence >= self.min_confidence
         ]
-        
+
         # Limit to max_facts
         if len(filtered_facts) > self.max_facts:
             # Sort by confidence and take top facts
@@ -298,7 +298,7 @@ Extract high-quality, self-contained facts that provide valuable information abo
                 key=lambda f: f.confidence,
                 reverse=True
             )[:self.max_facts]
-        
+
         # Update metadata
         metadata = result.metadata or {}
         metadata.update({
@@ -310,7 +310,7 @@ Extract high-quality, self-contained facts that provide valuable information abo
             "max_facts_limit": self.max_facts,
             "extraction_method": "outlines" if self.is_outlines_available() else "fallback"
         })
-        
+
         # Create updated result
         return FactExtractionResult(
             facts=filtered_facts,

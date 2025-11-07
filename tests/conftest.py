@@ -71,7 +71,7 @@ def temp_files():
 def sample_documents(temp_files):
     """Create sample documents for testing."""
     docs = {}
-    
+
     # Sample text document
     docs['sample.txt'] = temp_files / "sample.txt"
     docs['sample.txt'].write_text("""
@@ -92,7 +92,7 @@ The system should handle this text appropriately.
 
 This concludes the sample document.
     """)
-    
+
     # Sample markdown
     docs['sample.md'] = temp_files / "sample.md"
     docs['sample.md'].write_text("""
@@ -103,21 +103,21 @@ Machine learning is a subset of artificial intelligence.
 ## Types of Learning
 
 - Supervised Learning
-- Unsupervised Learning  
+- Unsupervised Learning
 - Reinforcement Learning
 
 ## Applications
 
 Machine learning has many applications in various fields.
     """)
-    
+
     return docs
 
 
 @pytest.fixture
 def mock_gemini_service():
     """Mock Gemini service for testing."""
-    
+
     class MockGeminiService:
         async def generate_embedding(self, text, task_type="retrieval_document"):
             # Return mock embedding
@@ -126,14 +126,14 @@ def mock_gemini_service():
                 token_count=len(text.split()),
                 model='mock-embedding-model'
             )
-        
+
         async def generate_embeddings_batch(self, texts, **kwargs):
             results = []
             for text in texts:
                 result = await self.generate_embedding(text)
                 results.append(result)
             return results
-        
+
         async def generate_summary(self, text, max_length=150, style="concise"):
             # Return mock summary
             summary = text[:max_length] + "..." if len(text) > max_length else text
@@ -142,7 +142,7 @@ def mock_gemini_service():
                 token_count=len(summary.split()),
                 model='mock-text-model'
             )
-        
+
         async def health_check(self):
             return {
                 "status": "healthy",
@@ -150,25 +150,25 @@ def mock_gemini_service():
                 "text_model": "mock-text-model",
                 "embedding_dimension": 768
             }
-    
+
     return MockGeminiService()
 
 
 @pytest.fixture
 def mock_qdrant_service():
     """Mock Qdrant service for testing."""
-    
+
     class MockQdrantService:
         def __init__(self):
             self.connected = False
             self.points = []
-        
+
         async def connect(self):
             self.connected = True
-        
+
         async def create_collection(self, vector_size=768, force_recreate=False):
             return True
-        
+
         async def store_embedding(self, embedding, text, metadata, collection_name="test"):
             point_id = len(self.points)
             self.points.append({
@@ -178,7 +178,7 @@ def mock_qdrant_service():
                 "metadata": metadata
             })
             return point_id
-        
+
         async def search_similar(self, query_embedding, limit=5, score_threshold=0.5):
             # Return mock search results
             return [
@@ -189,25 +189,25 @@ def mock_qdrant_service():
                     "metadata": {"test": True}
                 }
             ]
-        
+
         async def get_collection_info(self):
             return {
                 "name": TestSettings.qdrant_collection_name,
                 "vectors_count": len(self.points),
                 "points_count": len(self.points)
             }
-    
+
     return MockQdrantService()
 
 
 @pytest.fixture
 def mock_task_manager():
     """Mock task manager for testing."""
-    
+
     class MockTaskManager:
         def __init__(self):
             self.tasks = {}
-        
+
         async def create_task(self, task_type, source_data, metadata=None):
             task_id = f"test_task_{len(self.tasks)}"
             self.tasks[task_id] = {
@@ -219,16 +219,16 @@ def mock_task_manager():
                 "result": None
             }
             return task_id
-        
+
         async def get_task_status(self, task_id):
             return self.tasks.get(task_id, {"status": "not_found"})
-        
+
         async def update_task_status(self, task_id, status, result=None):
             if task_id in self.tasks:
                 self.tasks[task_id]["status"] = status
                 if result:
                     self.tasks[task_id]["result"] = result
-    
+
     return MockTaskManager()
 
 
@@ -272,14 +272,14 @@ def mock_youtube_metadata():
 @pytest.fixture
 def mock_celery_task():
     """Mock Celery task for testing."""
-    
+
     class MockCeleryTask:
         def __init__(self):
             self.request = MagicMock()
             self.request.id = "test_task_id"
             self.status_updates = []
-        
+
         async def update_status(self, status, result=None):
             self.status_updates.append({"status": status, "result": result})
-    
+
     return MockCeleryTask()

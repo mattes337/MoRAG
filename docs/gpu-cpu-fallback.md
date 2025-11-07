@@ -63,7 +63,7 @@ def detect_device() -> str:
         pass  # PyTorch not available
     except Exception:
         pass  # GPU detection failed
-    
+
     return "cpu"  # Safe fallback
 ```
 

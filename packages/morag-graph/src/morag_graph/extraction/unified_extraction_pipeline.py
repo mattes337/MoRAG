@@ -26,7 +26,7 @@ class ProcessingResult:
     deduplication_result: Optional[DeduplicationResult] = None
     processing_time: float = 0.0
     chunks_processed: int = 0
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert result to dictionary format."""
         return {
@@ -55,28 +55,28 @@ class PipelineConfig:
     entity_target_confidence: float = 0.85
     entity_confidence_threshold: float = 0.4
     enable_entity_gleaning: bool = True
-    
+
     # Relation extraction settings
     relation_max_rounds: int = 2
     relation_confidence_threshold: float = 0.4
     enable_relation_validation: bool = True
-    
+
     # Deduplication settings
     enable_deduplication: bool = True
     similarity_threshold: float = 0.7
     merge_confidence_threshold: float = 0.5
     enable_llm_validation: bool = True
-    
+
     # Performance settings
     chunk_size: int = 1200
     chunk_overlap: int = 200
     max_workers: int = 4
     enable_parallel_processing: bool = True
-    
+
     # Domain and language settings
     domain: str = "general"
     language: Optional[str] = None
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert config to dictionary."""
         return {
@@ -112,7 +112,7 @@ class PipelineConfig:
 
 class UnifiedExtractionPipeline:
     """Unified extraction pipeline integrating all enhanced components."""
-    
+
     def __init__(
         self,
         config: Optional[PipelineConfig] = None,
@@ -120,7 +120,7 @@ class UnifiedExtractionPipeline:
         model_id: str = "gemini-2.0-flash"
     ):
         """Initialize unified extraction pipeline.
-        
+
         Args:
             config: Pipeline configuration
             api_key: API key for LLM services
@@ -129,20 +129,20 @@ class UnifiedExtractionPipeline:
         self.config = config or PipelineConfig()
         self.api_key = api_key or self._get_api_key()
         self.model_id = model_id
-        
+
         self.logger = logger.bind(component="unified_extraction_pipeline")
-        
+
         # Initialize components
         self._initialize_components()
-        
+
         # Thread pool for parallel processing
         self._executor = ThreadPoolExecutor(max_workers=self.config.max_workers)
-    
+
     def _get_api_key(self) -> Optional[str]:
         """Get API key from environment variables."""
         import os
         return os.getenv("GEMINI_API_KEY") or os.getenv("LANGEXTRACT_API_KEY")
-    
+
     def _initialize_components(self):
         """Initialize extraction components."""
         # Base extractors
@@ -155,7 +155,7 @@ class UnifiedExtractionPipeline:
             api_key=self.api_key,
             domain=self.config.domain
         )
-        
+
         base_relation_extractor = RelationExtractor(
             min_confidence=self.config.relation_confidence_threshold,
             chunk_size=self.config.chunk_size,
@@ -165,7 +165,7 @@ class UnifiedExtractionPipeline:
             api_key=self.api_key,
             domain=self.config.domain
         )
-        
+
         # Enhanced extractors
         self.entity_extractor = EnhancedEntityExtractor(
             base_extractor=base_entity_extractor,
@@ -174,14 +174,14 @@ class UnifiedExtractionPipeline:
             confidence_threshold=self.config.entity_confidence_threshold,
             enable_gleaning=self.config.enable_entity_gleaning
         )
-        
+
         self.relation_extractor = EnhancedRelationExtractor(
             base_extractor=base_relation_extractor,
             max_rounds=self.config.relation_max_rounds,
             confidence_threshold=self.config.relation_confidence_threshold,
             enable_validation=self.config.enable_relation_validation
         )
-        
+
         # Deduplicator
         if self.config.enable_deduplication:
             self.deduplicator = SystematicDeduplicator(
@@ -191,43 +191,43 @@ class UnifiedExtractionPipeline:
             )
         else:
             self.deduplicator = None
-        
+
         self.logger.info("Unified extraction pipeline initialized", config=self.config.to_dict())
-    
+
     async def process_document(
         self,
         document: Document,
         chunk_size: Optional[int] = None
     ) -> ProcessingResult:
         """Process document with enhanced extraction pipeline.
-        
+
         Args:
             document: Document to process
             chunk_size: Override default chunk size
-            
+
         Returns:
             ProcessingResult with extracted entities and relations
         """
         start_time = time.time()
-        
+
         self.logger.info(
             "Starting document processing",
             document_id=document.id if hasattr(document, 'id') else 'unknown',
             content_length=len(document.content) if hasattr(document, 'content') else 0
         )
-        
+
         # Step 1: Chunk document
         chunks = await self._chunk_document(document, chunk_size or self.config.chunk_size)
-        
+
         # Step 2: Extract entities and relations with gleaning
         entities_by_chunk, relations_by_chunk = await self._extract_from_chunks(chunks, document)
-        
+
         # Step 3: Cross-chunk deduplication
         if self.config.enable_deduplication and self.deduplicator:
             deduplicated_entities, dedup_result = await self.deduplicator.deduplicate_across_chunks(
                 entities_by_chunk
             )
-            
+
             # Update relations based on entity merges
             deduplicated_relations = await self.deduplicator.deduplicate_relations(
                 relations_by_chunk, dedup_result.merge_details[0].primary_entity.id if dedup_result.merge_details else {}
@@ -239,22 +239,22 @@ class UnifiedExtractionPipeline:
             }
             deduplicated_relations = relations_by_chunk
             dedup_result = None
-        
+
         # Step 4: Flatten results
         all_entities = []
         all_relations = []
-        
+
         for entities in deduplicated_entities.values():
             all_entities.extend(entities)
-        
+
         for relations in deduplicated_relations.values():
             all_relations.extend(relations)
-        
+
         processing_time = time.time() - start_time
-        
+
         # Create processing metadata
         metadata = self._create_metadata(document, chunks, processing_time)
-        
+
         result = ProcessingResult(
             entities=all_entities,
             relations=all_relations,
@@ -263,7 +263,7 @@ class UnifiedExtractionPipeline:
             processing_time=processing_time,
             chunks_processed=len(chunks)
         )
-        
+
         self.logger.info(
             "Document processing completed",
             entities_extracted=len(all_entities),
@@ -271,9 +271,9 @@ class UnifiedExtractionPipeline:
             processing_time=f"{processing_time:.2f}s",
             chunks_processed=len(chunks)
         )
-        
+
         return result
-    
+
     async def _chunk_document(
         self,
         document: Document,
@@ -283,10 +283,10 @@ class UnifiedExtractionPipeline:
         # Simple chunking implementation
         content = document.content if hasattr(document, 'content') else str(document)
         chunks = []
-        
+
         for i in range(0, len(content), chunk_size - self.config.chunk_overlap):
             chunk_content = content[i:i + chunk_size]
-            
+
             if chunk_content.strip():
                 chunks.append({
                     'id': f"chunk_{i // (chunk_size - self.config.chunk_overlap)}",
@@ -295,9 +295,9 @@ class UnifiedExtractionPipeline:
                     'end_offset': min(i + chunk_size, len(content)),
                     'document_id': document.id if hasattr(document, 'id') else 'unknown'
                 })
-        
+
         return chunks
-    
+
     async def _extract_from_chunks(
         self,
         chunks: List[Dict[str, Any]],
@@ -306,16 +306,16 @@ class UnifiedExtractionPipeline:
         """Extract entities and relations from document chunks."""
         entities_by_chunk = {}
         relations_by_chunk = {}
-        
+
         if self.config.enable_parallel_processing and len(chunks) > 1:
             # Process chunks in parallel
             tasks = [
                 self._process_single_chunk(chunk, document)
                 for chunk in chunks
             ]
-            
+
             results = await asyncio.gather(*tasks, return_exceptions=True)
-            
+
             for i, result in enumerate(results):
                 if isinstance(result, Exception):
                     self.logger.error(f"Chunk processing failed: {result}", chunk_id=chunks[i]['id'])
@@ -336,7 +336,7 @@ class UnifiedExtractionPipeline:
                     self.logger.error(f"Chunk processing failed: {e}", chunk_id=chunk['id'])
                     entities_by_chunk[chunk['id']] = []
                     relations_by_chunk[chunk['id']] = []
-        
+
         return entities_by_chunk, relations_by_chunk
 
     async def _process_single_chunk(

@@ -6,7 +6,7 @@ Performs intelligent deduplication of similar keywords/entities using LLM-based 
 
 The current keyword linking system creates connections between keywords based on co-occurrence, but it doesn't address the fundamental issue of having multiple similar entities that should be merged:
 
-- **Plurals vs Singulars**: "Omega 3" vs "Omega-3s" 
+- **Plurals vs Singulars**: "Omega 3" vs "Omega-3s"
 - **Formatting Variations**: "Omega 3" vs "Omega-3" vs "Omega-3 Wert"
 - **Semantic Extensions**: "Omega-3", "Omega-3 Blutwert", "Omega-3 Mangel" (all referring to the same core concept)
 - **Gender/Language Variations**: Male vs female forms, different language variants
@@ -228,7 +228,7 @@ python -m morag_graph.maintenance.keyword_deduplication \
 Keyword deduplication should run **before** keyword linking and hierarchization:
 
 1. **Deduplication** → Clean up similar entities
-2. **Hierarchization** → Create parent-child relationships  
+2. **Hierarchization** → Create parent-child relationships
 3. **Linking** → Create semantic connections
 
 This order ensures that linking operates on a clean, deduplicated entity set.

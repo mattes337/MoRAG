@@ -1,9 +1,8 @@
 """Iterative context refinement for multi-hop reasoning."""
 
-import asyncio
 import json
 import logging
-from typing import List, Dict, Any, Optional, Set
+from typing import List, Dict, Any, Optional
 from dataclasses import dataclass, field
 
 from morag_graph.operations import GraphPath
@@ -47,7 +46,7 @@ class RetrievalContext:
 
 class IterativeRetriever:
     """Iterative context refinement system."""
-    
+
     def __init__(
         self,
         llm_client: Optional[LLMClient] = None,
@@ -75,70 +74,70 @@ class IterativeRetriever:
         self.max_iterations = max_iterations
         self.sufficiency_threshold = sufficiency_threshold
         self.logger = logging.getLogger(__name__)
-    
+
     async def refine_context(
-        self, 
-        query: str, 
+        self,
+        query: str,
         initial_context: RetrievalContext
     ) -> RetrievalContext:
         """Iteratively refine context until sufficient for answering the query.
-        
+
         Args:
             query: Query to answer
             initial_context: Initial retrieval context
-            
+
         Returns:
             Refined context with additional information
         """
         current_context = initial_context
         iteration_count = 0
-        
+
         self.logger.info(f"Starting iterative context refinement for query: {query}")
-        
+
         while iteration_count < self.max_iterations:
             iteration_count += 1
             self.logger.info(f"Iteration {iteration_count}/{self.max_iterations}")
-            
+
             # Analyze current context
             analysis = await self._analyze_context(query, current_context)
-            
+
             self.logger.info(
                 f"Context analysis - Sufficient: {analysis.is_sufficient}, "
                 f"Confidence: {analysis.confidence:.2f}, Gaps: {len(analysis.gaps)}"
             )
-            
+
             # Check if context is sufficient
             if analysis.is_sufficient and analysis.confidence >= self.sufficiency_threshold:
                 self.logger.info("Context deemed sufficient, stopping refinement")
                 break
-            
+
             # Retrieve additional information based on gaps
             additional_context = await self._retrieve_additional(
                 query, analysis.gaps, current_context
             )
-            
+
             # Merge contexts
             current_context = self._merge_context(current_context, additional_context)
-            
+
             # Log progress
             self.logger.info(
                 f"Added {len(additional_context.entities)} entities, "
                 f"{len(additional_context.relations)} relations, "
                 f"{len(additional_context.documents)} documents"
             )
-        
+
         # Final analysis
         final_analysis = await self._analyze_context(query, current_context)
         current_context.metadata['final_analysis'] = final_analysis
         current_context.metadata['iterations_used'] = iteration_count
-        
+
         self.logger.info(
             f"Context refinement completed after {iteration_count} iterations. "
             f"Final confidence: {final_analysis.confidence:.2f}"
         )
-        
+
         return current_context
-    
+
     async def _analyze_context(self, query: str, context: RetrievalContext) -> ContextAnalysis:
         """Analyze current context to determine if it's sufficient."""
         try:
@@ -199,30 +198,30 @@ Current Context:
 
 Entities ({len(context.entities)}):
 """
-        
+
         # Add entity information
         for entity_id, entity_data in list(context.entities.items())[:10]:  # Limit for token efficiency
             entity_type = entity_data.get('type', 'Unknown') if isinstance(entity_data, dict) else 'Unknown'
             prompt += f"- {entity_id}: {entity_type}\n"
-        
+
         prompt += f"\nRelations ({len(context.relations)}):\n"
-        
+
         # Add relation information
         for relation in context.relations[:10]:
             subject = relation.get('subject', '?')
             predicate = relation.get('predicate', '?')
             obj = relation.get('object', '?')
             prompt += f"- {subject} --[{predicate}]--> {obj}\n"
-        
+
         prompt += f"\nDocuments ({len(context.documents)}):\n"
-        
+
         # Add document information
         for doc in context.documents[:5]:
             content = doc.get('content', '')
             content_preview = content[:200] + "..." if len(content) > 200 else content
             doc_id = doc.get('id', 'Unknown')
             prompt += f"- {doc_id}: {content_preview}\n"
-        
+
         prompt += """
 Analyze this context and provide:
 1. Is the context sufficient to answer the query? (true/false)
@@ -245,7 +244,7 @@ Format as JSON:
   ],
   "suggested_queries": ["What is the relationship between X and Y?"]
 }"""
-        
+
         return prompt
 
     def _parse_context_analysis(self, response: str) -> ContextAnalysis:

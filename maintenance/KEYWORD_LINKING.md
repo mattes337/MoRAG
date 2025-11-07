@@ -109,4 +109,3 @@ ORDER BY to;
   - This is the fallback if the model couldn’t confidently infer a specific type
 - Confirm graph writes
   - Use the verification queries with the job_tag printed in the job output
-

@@ -64,7 +64,7 @@ refined_context = await iterative_retriever.refine_context(
 The system supports three main reasoning strategies:
 
 1. **Forward Chaining**: Start from query entities and explore forward
-2. **Backward Chaining**: Start from potential answers and work backward  
+2. **Backward Chaining**: Start from potential answers and work backward
 3. **Bidirectional**: Search from both ends and meet in the middle
 
 ```python
@@ -75,7 +75,7 @@ paths = await path_finder.find_reasoning_paths(
 
 # Backward chaining
 paths = await path_finder.find_reasoning_paths(
-    query, start_entities, target_entities=["target1", "target2"], 
+    query, start_entities, target_entities=["target1", "target2"],
     strategy="backward_chaining"
 )
 

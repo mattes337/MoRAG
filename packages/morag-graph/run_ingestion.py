@@ -133,19 +133,19 @@ async def main():
     parser.add_argument("--neo4j-user", default="neo4j", help="Neo4j username")
     parser.add_argument("--neo4j-password", required=True, help="Neo4j password")
     parser.add_argument("--clear", action="store_true", help="Clear existing data before ingestion")
-    
+
     args = parser.parse_args()
-    
+
     input_path = Path(args.input_file)
     if not input_path.exists():
         print(f"Error: Input file {input_path} does not exist")
         return 1
-    
+
     try:
         # Load data
         print(f"Loading data from {input_path}...")
         data = load_extracted_data(input_path)
-        
+
         # Parse facts and relationships
         print("Parsing facts and relationships from data...")
         facts, relationships = parse_facts_and_relationships(data)
@@ -162,10 +162,10 @@ async def main():
             neo4j_password=args.neo4j_password,
             clear_existing=args.clear
         )
-        
+
         print("\n✓ Ingestion completed successfully!")
         return 0
-        
+
     except Exception as e:
         print(f"Error: {e}")
         return 1

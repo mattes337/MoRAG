@@ -45,7 +45,7 @@ def temp_dir():
 async def test_youtube_config_defaults():
     """Test that YouTubeConfig has the expected default values."""
     config = YouTubeConfig()
-    
+
     assert config.quality == "best"
     assert config.format_preference == "mp4"
     assert config.extract_audio is True
@@ -115,7 +115,7 @@ async def test_process_url(mock_download, mock_metadata, youtube_processor):
     # Configure the mocks
     metadata = YouTubeMetadata(**SAMPLE_METADATA)
     mock_metadata.return_value = metadata
-    
+
     mock_download.return_value = {
         'video_path': Path('/tmp/video.mp4'),
         'audio_path': Path('/tmp/audio.mp3'),
@@ -124,11 +124,11 @@ async def test_process_url(mock_download, mock_metadata, youtube_processor):
         'file_size': 10000,
         'temp_files': [Path('/tmp/video.mp4'), Path('/tmp/audio.mp3')]
     }
-    
+
     # Call the method
     url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
     result = await youtube_processor.process_url(url)
-    
+
     # Verify the result
     assert result.success is True
     assert result.metadata == metadata
@@ -139,7 +139,7 @@ async def test_process_url(mock_download, mock_metadata, youtube_processor):
     assert len(result.thumbnail_paths) == 1
     assert result.thumbnail_paths[0] == Path('/tmp/thumb.jpg')
     assert result.file_size == 10000
-    
+
     # Verify the mocks were called correctly
     mock_metadata.assert_called_once_with(url)
     mock_download.assert_called_once()
@@ -151,12 +151,12 @@ async def test_process_url_metadata_only(mock_metadata, youtube_processor):
     # Configure the mock
     metadata = YouTubeMetadata(**SAMPLE_METADATA)
     mock_metadata.return_value = metadata
-    
+
     # Call the method with metadata-only config
     url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
     config = YouTubeConfig(extract_metadata_only=True)
     result = await youtube_processor.process_url(url, config)
-    
+
     # Verify the result
     assert result.success is True
     assert result.metadata == metadata
@@ -165,7 +165,7 @@ async def test_process_url_metadata_only(mock_metadata, youtube_processor):
     assert len(result.subtitle_paths) == 0
     assert len(result.thumbnail_paths) == 0
     assert result.file_size == 0
-    
+
     # Verify the mock was called correctly
     mock_metadata.assert_called_once_with(url)
 
@@ -179,24 +179,24 @@ async def test_download_video(mock_to_thread, mock_ytdl, youtube_processor, temp
     audio_file = temp_dir / "video-id.mp3"
     subtitle_file = temp_dir / "video-id.en.vtt"
     thumbnail_file = temp_dir / "video-id.jpg"
-    
+
     video_file.touch()
     audio_file.touch()
     subtitle_file.touch()
     thumbnail_file.touch()
-    
+
     # Configure the mocks
     mock_instance = MagicMock()
     mock_ytdl.return_value.__enter__.return_value = mock_instance
     mock_to_thread.return_value = SAMPLE_METADATA
-    
+
     # Patch the temp_dir to use our test directory
     with patch.object(youtube_processor, 'temp_dir', temp_dir):
         # Call the method
         url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
         config = YouTubeConfig()
         result = await youtube_processor._download_video(url, config)
-        
+
         # Verify the result contains the expected files
         assert 'video_path' in result
         assert 'audio_path' in result
@@ -204,7 +204,7 @@ async def test_download_video(mock_to_thread, mock_ytdl, youtube_processor, temp
         assert 'thumbnail_paths' in result
         assert 'file_size' in result
         assert 'temp_files' in result
-        
+
         # Verify the mock was called correctly
         mock_ytdl.assert_called_once()
         mock_to_thread.assert_called_once()
@@ -220,28 +220,28 @@ async def test_process_playlist(mock_process_url, youtube_processor):
             {'url': 'https://www.youtube.com/watch?v=video2'},
         ]
     }
-    
+
     # Mock YoutubeDL for playlist extraction
     with patch('yt_dlp.YoutubeDL') as mock_ytdl:
         mock_instance = MagicMock()
         mock_ytdl.return_value.__enter__.return_value = mock_instance
         mock_instance.extract_info.return_value = playlist_info
-        
+
         # Mock process_url to return dummy results
         mock_result1 = MagicMock(success=True)
         mock_result2 = MagicMock(success=True)
         mock_process_url.side_effect = [mock_result1, mock_result2]
-        
+
         # Call the method
         url = "https://www.youtube.com/playlist?list=PLsomething"
         config = YouTubeConfig()
         results = await youtube_processor.process_playlist(url, config)
-        
+
         # Verify the results
         assert len(results) == 2
         assert results[0] == mock_result1
         assert results[1] == mock_result2
-        
+
         # Verify process_url was called for each video
         assert mock_process_url.call_count == 2
         mock_process_url.assert_any_call('https://www.youtube.com/watch?v=video1', config)

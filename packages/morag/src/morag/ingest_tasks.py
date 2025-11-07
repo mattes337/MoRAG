@@ -121,7 +121,7 @@ def send_webhook_notification(webhook_url: str, task_id: str, status: str, resul
     """Send webhook notification when task completes."""
     if not webhook_url:
         return
-    
+
     try:
         payload = {
             "task_id": task_id,
@@ -129,26 +129,26 @@ def send_webhook_notification(webhook_url: str, task_id: str, status: str, resul
             "result": result,
             "completed_at": "2024-01-01T12:05:30"  # Would use actual timestamp
         }
-        
+
         response = httpx.post(
             webhook_url,
             json=payload,
             timeout=10,
             headers={"Content-Type": "application/json"}
         )
-        
+
         if response.status_code == 200:
-            logger.info("Webhook notification sent successfully", 
+            logger.info("Webhook notification sent successfully",
                        webhook_url=webhook_url, task_id=task_id)
         else:
-            logger.warning("Webhook notification failed", 
-                          webhook_url=webhook_url, 
+            logger.warning("Webhook notification failed",
+                          webhook_url=webhook_url,
                           status_code=response.status_code)
-            
+
     except Exception as e:
-        logger.error("Failed to send webhook notification", 
-                    webhook_url=webhook_url, 
-                    task_id=task_id, 
+        logger.error("Failed to send webhook notification",
+                    webhook_url=webhook_url,
+                    task_id=task_id,
                     error=str(e))
 
 
@@ -294,7 +294,7 @@ async def store_content_in_vector_db(
                 chunk = content[i:i + chunk_size]
                 if chunk.strip():
                     chunks.append(chunk)
-        
+
         # Generate embeddings for all chunks using batch processing
         logger.info("Generating embeddings for chunks", chunk_count=len(chunks))
 
@@ -344,16 +344,16 @@ async def store_content_in_vector_db(
                 chunk_metadata,
                 collection_name
             )
-        
+
         logger.info("Content stored in vector database successfully",
                    chunk_count=len(chunks),
                    chunk_size=chunk_size,
                    chunk_overlap=chunk_overlap,
                    point_ids_count=len(point_ids),
                    collection=collection_name)
-        
+
         return point_ids
-        
+
     except Exception as e:
         logger.error("Failed to store content in vector database", error=str(e))
         raise
@@ -447,7 +447,7 @@ def ingest_file_task(self, file_path: str, content_type: Optional[str] = None, t
 
             # Process the file
             result = await api.process_file(file_path, content_type, options)
-            
+
             if not result.success:
                 raise Exception(f"Processing failed: {result.error_message}")
 
@@ -500,15 +500,15 @@ def ingest_file_task(self, file_path: str, content_type: Optional[str] = None, t
                 # Maintain backward compatibility
                 if ingestion_result.get('database_results', {}).get('qdrant'):
                     result.metadata['vector_point_ids'] = ingestion_result['database_results']['qdrant'].get('point_ids', [])
-            
+
             self.update_state(state='PROGRESS', meta={'stage': 'completing', 'progress': 0.9})
-            
+
             # Send webhook notification if requested
             webhook_url = options.get('webhook_url')
             if webhook_url:
                 send_webhook_notification(
-                    webhook_url, 
-                    self.request.id, 
+                    webhook_url,
+                    self.request.id,
                     'SUCCESS',
                     {
                         'chunks_processed': len(result.metadata.get('vector_point_ids', [])),
@@ -516,15 +516,15 @@ def ingest_file_task(self, file_path: str, content_type: Optional[str] = None, t
                         'metadata': result.metadata
                     }
                 )
-            
+
             # Clean up temporary file
             try:
                 Path(file_path).unlink(missing_ok=True)
                 logger.debug("Cleaned up temporary file", file_path=file_path)
             except Exception as e:
-                logger.warning("Failed to clean up temporary file", 
+                logger.warning("Failed to clean up temporary file",
                              file_path=file_path, error=str(e))
-            
+
             return {
                 'success': result.success,
                 'content': result.text_content or "",
@@ -532,7 +532,7 @@ def ingest_file_task(self, file_path: str, content_type: Optional[str] = None, t
                 'processing_time': result.processing_time,
                 'error_message': result.error_message
             }
-            
+
         except Exception as e:
             # Add specific context for file not found errors
             if isinstance(e, FileNotFoundError):
@@ -582,7 +582,7 @@ def ingest_file_task(self, file_path: str, content_type: Optional[str] = None, t
                 except:
                     # Fallback to generic exception if reconstruction fails
                     raise Exception(str(e))
-    
+
     return run_async(_ingest())
 
 
@@ -592,13 +592,13 @@ def ingest_url_task(self, url: str, content_type: Optional[str] = None, task_opt
     async def _ingest():
         api = get_morag_api()
         options = task_options or {}
-        
+
         try:
             self.update_state(state='PROGRESS', meta={'stage': 'processing', 'progress': 0.1})
-            
+
             # Process the URL
             result = await api.process_url(url, content_type, options)
-            
+
             if not result.success:
                 raise Exception(f"Processing failed: {result.error_message}")
 
@@ -651,15 +651,15 @@ def ingest_url_task(self, url: str, content_type: Optional[str] = None, task_opt
                 # Maintain backward compatibility
                 if ingestion_result.get('database_results', {}).get('qdrant'):
                     result.metadata['vector_point_ids'] = ingestion_result['database_results']['qdrant'].get('point_ids', [])
-            
+
             self.update_state(state='PROGRESS', meta={'stage': 'completing', 'progress': 0.9})
-            
+
             # Send webhook notification if requested
             webhook_url = options.get('webhook_url')
             if webhook_url:
                 send_webhook_notification(
-                    webhook_url, 
-                    self.request.id, 
+                    webhook_url,
+                    self.request.id,
                     'SUCCESS',
                     {
                         'chunks_processed': len(result.metadata.get('vector_point_ids', [])),
@@ -667,7 +667,7 @@ def ingest_url_task(self, url: str, content_type: Optional[str] = None, task_opt
                         'metadata': result.metadata
                     }
                 )
-            
+
             return {
                 'success': result.success,
                 'content': result.text_content or "",
@@ -675,7 +675,7 @@ def ingest_url_task(self, url: str, content_type: Optional[str] = None, task_opt
                 'processing_time': result.processing_time,
                 'error_message': result.error_message
             }
-            
+
         except Exception as e:
             logger.error("URL ingestion task failed", url=url, error=str(e))
 

@@ -81,8 +81,8 @@ texts = [
 
 # Batch entity extraction
 results = await batch_text_analysis(
-    llm_client, 
-    texts, 
+    llm_client,
+    texts,
     analysis_type="entity_extraction"
 )
 
@@ -106,7 +106,7 @@ chunks = [
         "document_id": "doc_1"
     },
     {
-        "id": "chunk_2", 
+        "id": "chunk_2",
         "text": "The iPhone is Apple's flagship smartphone...",
         "document_id": "doc_1"
     }
@@ -235,9 +235,9 @@ for chunk in chunks:
 **After:**
 ```python
 results = await batch_llm_calls(
-    llm_client, 
-    chunks, 
-    create_prompt, 
+    llm_client,
+    chunks,
+    create_prompt,
     parse_response
 )
 ```

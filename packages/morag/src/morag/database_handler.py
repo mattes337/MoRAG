@@ -311,7 +311,7 @@ class DatabaseHandler:
 
             # Get graph data
             graph_data = ingest_data.get('graph_data', {})
-            
+
             entities_stored = 0
             relations_stored = 0
             facts_stored = 0

@@ -1,16 +1,15 @@
 """Recursive fact retrieval service implementing the graph-based RAG system."""
 
 import uuid
-import json
 import structlog
 from datetime import datetime
 from collections import deque
-from typing import List, Set, Dict, Any, Optional, Tuple
+from typing import List, Optional, Tuple
 
 from morag_reasoning.llm import LLMClient
 from morag_reasoning.recursive_fact_models import (
     RecursiveFactRetrievalRequest, RecursiveFactRetrievalResponse,
-    RawFact, ScoredFact, FinalFact, TraversalStep
+    RawFact, FinalFact, TraversalStep
 )
 from morag_reasoning.graph_traversal_agent import GraphTraversalAgent
 from morag_reasoning.fact_critic_agent import FactCriticAgent
@@ -23,7 +22,7 @@ from morag_services.embedding import GeminiEmbeddingService
 
 class RecursiveFactRetrievalService:
     """Service implementing the complete recursive fact retrieval system."""
-    
+
     def __init__(
         self,
         llm_client: LLMClient,
@@ -47,41 +46,41 @@ class RecursiveFactRetrievalService:
         self.embedding_service = embedding_service
         self.stronger_llm_client = stronger_llm_client or llm_client
         self.logger = structlog.get_logger(__name__)
-        
+
         # Note: EntityIdentificationService and GraphTraversalAgent will be created per request
         # with proper language and max_facts_per_node parameters
         self.entity_service = None
         self.graph_traversal_agent = None
 
         self.fact_critic_agent = FactCriticAgent(llm_client=llm_client)
-    
+
     async def retrieve_facts_recursively(
         self,
         request: RecursiveFactRetrievalRequest
     ) -> RecursiveFactRetrievalResponse:
         """Perform recursive fact retrieval using the graph-based RAG system.
-        
+
         Args:
             request: Recursive fact retrieval request
-            
+
         Returns:
             Response with extracted facts and final answer
         """
         start_time = datetime.now()
         query_id = str(uuid.uuid4())
-        
+
         # Initialize counters
         gta_llm_calls = 0
         fca_llm_calls = 0
         final_llm_calls = 0
-        
+
         self.logger.info(
             "Starting recursive fact retrieval",
             query_id=query_id,
             query=request.user_query,
             max_depth=request.max_depth
         )
-        
+
         try:
             # Initialize request-specific services with language parameter and embedding support
             self.entity_service = EntityIdentificationService(
@@ -117,20 +116,20 @@ class RecursiveFactRetrievalService:
                     query_id, request, start_time,
                     "Could not identify key entities in your query to start graph traversal."
                 )
-            
+
             # Step 2: Perform graph traversal and fact extraction using entities directly
             self.logger.info("Step 2: Performing graph traversal with entities")
             all_raw_facts, traversal_steps, max_depth_reached = await self._perform_graph_traversal(
                 request, initial_entities
             )
             gta_llm_calls = len(traversal_steps)  # One LLM call per traversal step
-            
+
             if not all_raw_facts:
                 return self._create_error_response(
                     query_id, request, start_time,
                     "No relevant facts could be extracted from the knowledge graph."
                 )
-            
+
             # Step 4: Evaluate and score facts (unless skip_fact_evaluation is true)
             scored_facts = []  # Initialize scored_facts for both code paths
             if request.skip_fact_evaluation:
@@ -175,7 +174,7 @@ class RecursiveFactRetrievalService:
 
                 # Limit total facts
                 final_facts = final_facts[:request.max_total_facts]
-            
+
             # Step 6: Generate final answer (unless facts_only is requested)
             final_answer = None
             confidence_score = 0.0
@@ -192,11 +191,11 @@ class RecursiveFactRetrievalService:
                     avg_score = sum(fact.final_decayed_score for fact in final_facts) / len(final_facts)
                     confidence_score = min(1.0, avg_score * (len(final_facts) / 10))
                 final_llm_calls = 0
-            
+
             # Calculate processing time
             end_time = datetime.now()
             processing_time_ms = (end_time - start_time).total_seconds() * 1000
-            
+
             # Create response
             response = RecursiveFactRetrievalResponse(
                 query_id=query_id,
@@ -215,16 +214,16 @@ class RecursiveFactRetrievalService:
                 final_answer=final_answer,
                 confidence_score=confidence_score
             )
-            
+
             self.logger.info(
                 "Recursive fact retrieval completed",
                 query_id=query_id,
                 total_facts=len(final_facts),
                 processing_time_ms=processing_time_ms
             )
-            
+
             return response
-            
+
         except Exception as e:
             self.logger.error(
                 "Error in recursive fact retrieval",
@@ -235,7 +234,7 @@ class RecursiveFactRetrievalService:
                 query_id, request, start_time,
                 f"An error occurred during fact retrieval: {str(e)}"
             )
-    
+
     async def _extract_initial_entities(self, user_query: str) -> List[str]:
         """Extract initial entities from the user query."""
         try:
@@ -244,7 +243,7 @@ class RecursiveFactRetrievalService:
         except Exception as e:
             self.logger.error("Failed to extract initial entities", error=str(e))
             return []
-    
+
     async def _map_entities_to_nodes(self, entities: List[str]) -> List[str]:
         """Map entity names to graph node IDs."""
         node_ids = []
@@ -259,7 +258,7 @@ class RecursiveFactRetrievalService:
                 self.logger.warning("Failed to map entity to node", entity=entity, error=str(e))
 
         return node_ids
-    
+
     async def _perform_graph_traversal(
         self,
         request: RecursiveFactRetrievalRequest,
@@ -338,7 +337,7 @@ class RecursiveFactRetrievalService:
                 )
 
         return all_raw_facts, traversal_steps, max_depth_reached
-    
+
     async def _get_node_name(self, node_id: str) -> str:
         """Get human-readable name for a node."""
         try:
@@ -373,7 +372,7 @@ class RecursiveFactRetrievalService:
         except Exception as e:
             self.logger.warning("Failed to parse next nodes", next_nodes_str=next_nodes_str, error=str(e))
             return []
-    
+
     async def _generate_final_answer(
         self,
         user_query: str,
@@ -482,7 +481,7 @@ Please synthesize these facts into a coherent, well-structured answer. Focus on 
 
 MANDATORY: Your response must end with exactly this references section:
 {references_section}"""
-        
+
         try:
             # Use the stronger LLM for final synthesis
             response = await self.stronger_llm_client.generate(prompt)
@@ -495,7 +494,7 @@ MANDATORY: Your response must end with exactly this references section:
             confidence_score = min(1.0, avg_score * (len(final_facts) / 10))  # Boost confidence with more facts
 
             return response, confidence_score
-            
+
         except Exception as e:
             self.logger.error("Failed to generate final answer", error=str(e))
             return f"An error occurred while generating the final answer: {str(e)}", 0.0
@@ -576,7 +575,7 @@ MANDATORY: Your response must end with exactly this references section:
                 response += additional_section
 
         return response
-    
+
     def _create_error_response(
         self,
         query_id: str,
@@ -587,7 +586,7 @@ MANDATORY: Your response must end with exactly this references section:
         """Create an error response."""
         end_time = datetime.now()
         processing_time_ms = (end_time - start_time).total_seconds() * 1000
-        
+
         return RecursiveFactRetrievalResponse(
             query_id=query_id,
             user_query=request.user_query,

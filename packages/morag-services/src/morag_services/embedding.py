@@ -129,7 +129,7 @@ class GeminiEmbeddingService(BaseEmbeddingService):
                 "embedding_model": self.embedding_model,
                 "generation_model": self.generation_model
             }
-    
+
     async def generate_embedding(
         self,
         text: str,
@@ -346,7 +346,7 @@ class GeminiEmbeddingService(BaseEmbeddingService):
                     else:
                         logger.error("Failed to generate embedding after retries", error=error_str)
                         raise ExternalServiceError(f"Embedding generation failed: {error_str}", "gemini")
-    
+
     async def generate_embeddings_batch_native(
         self,
         texts: List[str],
@@ -546,7 +546,7 @@ class GeminiEmbeddingService(BaseEmbeddingService):
                     ))
 
         return all_results
-    
+
     async def generate_summary(
         self,
         text: str,
@@ -584,11 +584,11 @@ class GeminiEmbeddingService(BaseEmbeddingService):
                 token_count=len(result.split()),
                 model=self.generation_model
             )
-            
+
         except Exception as e:
             logger.error("Failed to generate summary", error=str(e))
             raise ExternalServiceError(f"Summary generation failed: {str(e)}", "gemini")
-    
+
     def _generate_text_sync(self, prompt: str) -> str:
         """Synchronous text generation with indefinite retry logic for rate limits."""
         from morag_core.config import settings
@@ -698,11 +698,11 @@ class GeminiEmbeddingService(BaseEmbeddingService):
                        model=self.generation_model)
 
             return result
-            
+
         except Exception as e:
             logger.error("Failed to generate text from prompt", error=str(e))
             raise ExternalServiceError(f"Text generation failed: {str(e)}", "gemini")
-    
+
     def _build_summary_prompt(self, text: str, max_length: int, style: str, language: Optional[str] = None) -> str:
         """Build prompt for summary generation."""
         style_instructions = {
@@ -803,7 +803,7 @@ Summary:
 
 class EmbeddingServiceFactory:
     """Factory for creating embedding services."""
-    
+
     @staticmethod
     def create_gemini_service(
         api_key: str,
@@ -812,7 +812,7 @@ class EmbeddingServiceFactory:
     ) -> GeminiEmbeddingService:
         """Create a Gemini embedding service."""
         return GeminiEmbeddingService(api_key, embedding_model, generation_model)
-    
+
     @staticmethod
     def create_service(
         provider: str,

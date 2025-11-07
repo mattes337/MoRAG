@@ -106,29 +106,29 @@ class ResolutionResult:
 
 class MoRAGPipelineAgent:
     """Unified agent for orchestrating complete MoRAG workflows."""
-    
+
     def __init__(
         self,
         config: Optional[ServiceConfig] = None,
         intermediate_dir: Optional[Path] = None
     ):
         """Initialize the MoRAG pipeline agent.
-        
+
         Args:
             config: Service configuration
             intermediate_dir: Directory for intermediate files
         """
         self.config = config or ServiceConfig()
         self.settings = get_settings()
-        
+
         # Initialize core components
         self.orchestrator = MoRAGOrchestrator(self.config)
         self.services = self.orchestrator.services
-        
+
         # Initialize enhanced components if available
         self.enhanced_graph_builder = None
         self.fact_retrieval_service = None
-        
+
         if ENHANCED_COMPONENTS_AVAILABLE:
             try:
                 # Initialize enhanced graph builder
@@ -136,45 +136,45 @@ class MoRAGPipelineAgent:
                     storage=self.services.graph_storage,
                     llm_config=self.config.llm_config
                 )
-                
+
                 # Initialize fact retrieval service
                 self.fact_retrieval_service = RecursiveFactRetrievalService()
-                
+
                 logger.info("Enhanced components initialized successfully")
             except Exception as e:
                 logger.warning(f"Failed to initialize enhanced components: {e}")
-        
+
         # Set up intermediate file management
         self.intermediate_dir = intermediate_dir or Path("intermediate_files")
         self.intermediate_dir.mkdir(exist_ok=True)
-        
+
         # Performance tracking
         self.stage_timings = {}
         self.total_processing_time = 0.0
-        
+
         logger.info(
             "MoRAG Pipeline Agent initialized",
             enhanced_components=ENHANCED_COMPONENTS_AVAILABLE,
             intermediate_dir=str(self.intermediate_dir)
         )
-    
+
     async def process_ingestion(
         self,
         source: Union[str, Path],
         options: IngestionOptions
     ) -> IngestionResult:
         """Process complete ingestion pipeline from source to knowledge graph.
-        
+
         Args:
             source: Source content (file path, URL, or text)
             options: Ingestion options
-            
+
         Returns:
             Ingestion result with metrics and intermediate files
         """
         start_time = time.time()
         intermediate_files = []
-        
+
         try:
             logger.info(
                 "Starting ingestion pipeline",
@@ -182,7 +182,7 @@ class MoRAGPipelineAgent:
                 content_type=options.content_type.value,
                 enhanced_components=ENHANCED_COMPONENTS_AVAILABLE
             )
-            
+
             # Stage 1: Content Conversion
             stage_start = time.time()
             processing_result = await self.orchestrator.process_content(
@@ -190,12 +190,12 @@ class MoRAGPipelineAgent:
                 content_type=options.content_type,
                 options=options.metadata or {}
             )
-            
+
             if not processing_result.success:
                 raise ProcessingError(f"Content conversion failed: {processing_result.error_message}")
-            
+
             self.stage_timings[ProcessingStage.CONTENT_CONVERSION] = time.time() - stage_start
-            
+
             # Save intermediate file
             if options.generate_intermediate_files:
                 conversion_file = await self._save_stage_output(
@@ -204,7 +204,7 @@ class MoRAGPipelineAgent:
                     source
                 )
                 intermediate_files.append(conversion_file)
-            
+
             # Stage 2-5: Enhanced Graph Building (if available)
             if self.enhanced_graph_builder and ENHANCED_COMPONENTS_AVAILABLE:
                 result = await self._process_enhanced_ingestion(
@@ -214,10 +214,10 @@ class MoRAGPipelineAgent:
                 result = await self._process_basic_ingestion(
                     processing_result, options, intermediate_files
                 )
-            
+
             total_time = time.time() - start_time
             self.total_processing_time = total_time
-            
+
             logger.info(
                 "Ingestion pipeline completed successfully",
                 document_id=result.document_id,
@@ -225,13 +225,13 @@ class MoRAGPipelineAgent:
                 relations_extracted=result.relations_extracted,
                 processing_time=total_time
             )
-            
+
             return result
-            
+
         except Exception as e:
             total_time = time.time() - start_time
             logger.error(f"Ingestion pipeline failed: {e}")
-            
+
             return IngestionResult(
                 success=False,
                 document_id="",
@@ -243,24 +243,24 @@ class MoRAGPipelineAgent:
                 validation_results={},
                 error_message=str(e)
             )
-    
+
     async def process_resolution(
         self,
         query: str,
         options: ResolutionOptions
     ) -> ResolutionResult:
         """Process complete resolution pipeline from query to final response.
-        
+
         Args:
             query: User query
             options: Resolution options
-            
+
         Returns:
             Resolution result with response and metadata
         """
         start_time = time.time()
         intermediate_files = []
-        
+
         try:
             logger.info(
                 "Starting resolution pipeline",
@@ -268,7 +268,7 @@ class MoRAGPipelineAgent:
                 max_depth=options.max_depth,
                 enhanced_components=ENHANCED_COMPONENTS_AVAILABLE
             )
-            
+
             # Enhanced resolution if components are available
             if self.fact_retrieval_service and ENHANCED_COMPONENTS_AVAILABLE:
                 result = await self._process_enhanced_resolution(
@@ -278,9 +278,9 @@ class MoRAGPipelineAgent:
                 result = await self._process_basic_resolution(
                     query, options, intermediate_files
                 )
-            
+
             total_time = time.time() - start_time
-            
+
             logger.info(
                 "Resolution pipeline completed successfully",
                 query=query,
@@ -288,13 +288,13 @@ class MoRAGPipelineAgent:
                 confidence_score=result.confidence_score,
                 processing_time=total_time
             )
-            
+
             return result
-            
+
         except Exception as e:
             total_time = time.time() - start_time
             logger.error(f"Resolution pipeline failed: {e}")
-            
+
             return ResolutionResult(
                 success=False,
                 query=query,
@@ -306,7 +306,7 @@ class MoRAGPipelineAgent:
                 intermediate_files=intermediate_files,
                 error_message=str(e)
             )
-    
+
     async def _process_enhanced_ingestion(
         self,
         processing_result: ProcessingResult,
@@ -321,7 +321,7 @@ class MoRAGPipelineAgent:
             content=processing_result.content,
             metadata=processing_result.metadata
         )
-        
+
         # Enhanced graph building
         stage_start = time.time()
         graph_result = await self.enhanced_graph_builder.build_graph(
@@ -329,9 +329,9 @@ class MoRAGPipelineAgent:
             content=processing_result.content,
             metadata=processing_result.metadata
         )
-        
+
         self.stage_timings[ProcessingStage.GRAPH_BUILDING] = time.time() - stage_start
-        
+
         # Save intermediate files
         if options.generate_intermediate_files:
             graph_file = await self._save_stage_output(
@@ -340,7 +340,7 @@ class MoRAGPipelineAgent:
                 document.id
             )
             intermediate_files.append(graph_file)
-        
+
         return IngestionResult(
             success=True,
             document_id=document.id,
@@ -352,7 +352,7 @@ class MoRAGPipelineAgent:
             validation_results=graph_result.metadata.get('validation', {}),
             metadata=graph_result.metadata
         )
-    
+
     async def _process_basic_ingestion(
         self,
         processing_result: ProcessingResult,
@@ -362,12 +362,12 @@ class MoRAGPipelineAgent:
         """Process ingestion using basic components."""
         # Basic ingestion using existing services
         document_id = f"doc_{int(time.time())}"
-        
+
         # Simulate basic processing
         entities_count = len(processing_result.content.split()) // 10  # Rough estimate
         relations_count = entities_count // 2
         chunks_count = len(processing_result.content) // 1000
-        
+
         return IngestionResult(
             success=True,
             document_id=document_id,
@@ -379,7 +379,7 @@ class MoRAGPipelineAgent:
             validation_results={'basic_validation': True},
             metadata={'processing_mode': 'basic'}
         )
-    
+
     async def _process_enhanced_resolution(
         self,
         query: str,
@@ -388,19 +388,19 @@ class MoRAGPipelineAgent:
     ) -> ResolutionResult:
         """Process resolution using enhanced components."""
         from morag_reasoning.recursive_fact_models import RecursiveFactRetrievalRequest
-        
+
         # Create request for enhanced fact retrieval
         request = RecursiveFactRetrievalRequest(
             user_query=query,
             max_depth=options.max_depth,
             max_total_facts=options.max_facts
         )
-        
+
         # Enhanced fact retrieval
         stage_start = time.time()
         fact_result = await self.fact_retrieval_service.retrieve_facts_recursively(request)
         self.stage_timings[ProcessingStage.FACT_GATHERING] = time.time() - stage_start
-        
+
         # Save intermediate files
         if options.generate_intermediate_files:
             facts_file = await self._save_stage_output(
@@ -409,7 +409,7 @@ class MoRAGPipelineAgent:
                 query
             )
             intermediate_files.append(facts_file)
-        
+
         # Extract citations
         citations = []
         for fact in fact_result.final_facts:
@@ -418,7 +418,7 @@ class MoRAGPipelineAgent:
                 'source': fact.source_description,
                 'confidence': fact.score
             })
-        
+
         return ResolutionResult(
             success=True,
             query=query,
@@ -430,7 +430,7 @@ class MoRAGPipelineAgent:
             intermediate_files=intermediate_files,
             metadata={'processing_mode': 'enhanced'}
         )
-    
+
     async def _process_basic_resolution(
         self,
         query: str,
@@ -440,7 +440,7 @@ class MoRAGPipelineAgent:
         """Process resolution using basic components."""
         # Basic resolution using existing services
         response = f"Basic response for query: {query}"
-        
+
         return ResolutionResult(
             success=True,
             query=query,
@@ -452,7 +452,7 @@ class MoRAGPipelineAgent:
             intermediate_files=intermediate_files,
             metadata={'processing_mode': 'basic'}
         )
-    
+
     async def _save_stage_output(
         self,
         stage: ProcessingStage,
@@ -461,12 +461,12 @@ class MoRAGPipelineAgent:
     ) -> Path:
         """Save intermediate output for a processing stage."""
         import json
-        
+
         # Create filename
         safe_id = str(identifier).replace('/', '_').replace('\\', '_')
         filename = f"{safe_id}_{stage.value}.json"
         filepath = self.intermediate_dir / filename
-        
+
         # Prepare data for serialization
         if hasattr(data, '__dict__'):
             serializable_data = data.__dict__
@@ -474,14 +474,14 @@ class MoRAGPipelineAgent:
             serializable_data = data.dict()
         else:
             serializable_data = str(data)
-        
+
         # Save to file
         with open(filepath, 'w', encoding='utf-8') as f:
             json.dump(serializable_data, f, indent=2, default=str)
-        
+
         logger.debug(f"Saved intermediate file: {filepath}")
         return filepath
-    
+
     def get_performance_metrics(self) -> Dict[str, Any]:
         """Get performance metrics for the last pipeline execution."""
         return {

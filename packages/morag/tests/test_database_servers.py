@@ -13,7 +13,7 @@ from morag_graph import DatabaseServerConfig, DatabaseType
 
 class TestDatabaseConnectionFactory:
     """Test database connection factory functionality."""
-    
+
     def test_parse_database_servers_valid(self):
         """Test parsing valid database server configurations."""
         server_data = [
@@ -33,9 +33,9 @@ class TestDatabaseConnectionFactory:
                 "database_name": "test_collection"
             }
         ]
-        
+
         configs = parse_database_servers(server_data)
-        
+
         assert len(configs) == 2
         assert configs[0].type == DatabaseType.NEO4J
         assert configs[0].hostname == "localhost"
@@ -43,7 +43,7 @@ class TestDatabaseConnectionFactory:
         assert configs[1].type == DatabaseType.QDRANT
         assert configs[1].hostname == "localhost"
         assert configs[1].port == 6333
-    
+
     def test_parse_database_servers_invalid(self):
         """Test parsing invalid database server configurations."""
         server_data = [
@@ -57,21 +57,21 @@ class TestDatabaseConnectionFactory:
                 "port": 7687
             }
         ]
-        
+
         configs = parse_database_servers(server_data)
-        
+
         # Should skip invalid config and return only valid one
         assert len(configs) == 1
         assert configs[0].type == DatabaseType.NEO4J
-    
+
     def test_parse_database_servers_empty(self):
         """Test parsing empty database server configurations."""
         configs = parse_database_servers(None)
         assert configs == []
-        
+
         configs = parse_database_servers([])
         assert configs == []
-    
+
     @patch('morag.database_factory.Neo4jStorage')
     async def test_create_neo4j_storage(self, mock_neo4j_storage):
         """Test creating Neo4j storage from configuration."""
@@ -93,7 +93,7 @@ class TestDatabaseConnectionFactory:
         mock_neo4j_storage.assert_called_once()
         mock_storage_instance.connect.assert_called_once()
         assert storage is not None
-    
+
     @patch('morag.database_factory.QdrantStorage')
     def test_create_qdrant_storage(self, mock_qdrant_storage):
         """Test creating Qdrant storage from configuration."""
@@ -104,22 +104,22 @@ class TestDatabaseConnectionFactory:
             password="api_key",
             database_name="test_collection"
         )
-        
+
         factory = DatabaseConnectionFactory()
         storage = factory.create_qdrant_storage(config)
-        
+
         mock_qdrant_storage.assert_called_once()
         assert storage is not None
-    
+
     def test_create_storage_invalid_type(self):
         """Test creating storage with invalid type."""
         config = DatabaseServerConfig(
             type=DatabaseType.NEO4J,
             hostname="localhost"
         )
-        
+
         factory = DatabaseConnectionFactory()
-        
+
         # Test wrong type for Qdrant creation
         with pytest.raises(ValueError):
             factory.create_qdrant_storage(config)
@@ -127,14 +127,14 @@ class TestDatabaseConnectionFactory:
 
 class TestDatabaseServerIntegration:
     """Test database server integration with API endpoints."""
-    
+
     @pytest.fixture
     def mock_app(self):
         """Create a mock FastAPI app for testing."""
         from morag.server import create_app
         app = create_app()
         return TestClient(app)
-    
+
     def test_search_with_database_servers(self, mock_app):
         """Test search endpoint with custom database servers."""
         request_data = {
@@ -149,12 +149,12 @@ class TestDatabaseServerIntegration:
                 }
             ]
         }
-        
+
         # This will likely fail due to missing dependencies, but tests the structure
         response = mock_app.post("/search", json=request_data)
         # We expect either success or a specific error, not a validation error
         assert response.status_code in [200, 500, 503]
-    
+
     def test_enhanced_query_with_database_servers(self, mock_app):
         """Test enhanced query endpoint with custom database servers."""
         request_data = {
@@ -170,11 +170,11 @@ class TestDatabaseServerIntegration:
                 }
             ]
         }
-        
+
         response = mock_app.post("/api/v2/query", json=request_data)
         # We expect either success or a specific error, not a validation error
         assert response.status_code in [200, 500, 503]
-    
+
     def test_graph_analytics_with_database_servers(self, mock_app):
         """Test graph analytics endpoint with custom database servers."""
         request_data = {
@@ -189,7 +189,7 @@ class TestDatabaseServerIntegration:
                 }
             ]
         }
-        
+
         response = mock_app.post("/api/v2/graph/analytics", json=request_data)
         # We expect either success or a specific error, not a validation error
         assert response.status_code in [200, 500, 503]
@@ -197,7 +197,7 @@ class TestDatabaseServerIntegration:
 
 class TestDatabaseServerConfig:
     """Test database server configuration models."""
-    
+
     def test_database_server_config_creation(self):
         """Test creating database server configuration."""
         config = DatabaseServerConfig(
@@ -208,14 +208,14 @@ class TestDatabaseServerConfig:
             password="password",
             database_name="test_db"
         )
-        
+
         assert config.type == DatabaseType.NEO4J
         assert config.hostname == "localhost"
         assert config.port == 7687
         assert config.username == "neo4j"
         assert config.password == "password"
         assert config.database_name == "test_db"
-    
+
     def test_database_server_config_connection_key(self):
         """Test database server configuration connection key generation."""
         config = DatabaseServerConfig(
@@ -225,17 +225,17 @@ class TestDatabaseServerConfig:
             username="neo4j",
             database_name="test_db"
         )
-        
+
         key = config.get_connection_key()
         expected = "neo4j:localhost:7687:neo4j:test_db"
         assert key == expected
-    
+
     def test_database_server_config_is_default(self):
         """Test checking if configuration is default."""
         # Default config
         config = DatabaseServerConfig(type=DatabaseType.NEO4J)
         assert config.is_default_config()
-        
+
         # Non-default config
         config = DatabaseServerConfig(
             type=DatabaseType.NEO4J,

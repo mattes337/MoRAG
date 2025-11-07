@@ -13,10 +13,10 @@ The `morag-image` package provides a command-line interface (CLI) for processing
    ```bash
    # On Linux/macOS
    export GOOGLE_API_KEY="your-api-key"
-   
+
    # On Windows (Command Prompt)
    set GOOGLE_API_KEY=your-api-key
-   
+
    # On Windows (PowerShell)
    $env:GOOGLE_API_KEY="your-api-key"
    ```

@@ -21,7 +21,7 @@ class FileUploadError(Exception):
 
 class FileUploadConfig:
     """Configuration for file upload handling."""
-    
+
     def __init__(
         self,
         max_file_size: int = 100 * 1024 * 1024,  # 100MB default
@@ -68,7 +68,7 @@ class FileUploadConfig:
 
 class FileUploadHandler:
     """Handles file uploads with validation, security, and cleanup."""
-    
+
     def __init__(self, config: Optional[FileUploadConfig] = None):
         self.config = config or FileUploadConfig()
 
@@ -139,7 +139,7 @@ class FileUploadHandler:
             logger.debug("Failed to create directory or test write permissions",
                         dir_path=str(dir_path), error=str(e))
             return False
-    
+
     async def save_upload(self, file: UploadFile, allow_intermediate: bool = False) -> Path:
         """Save uploaded file to temporary location with validation.
 
@@ -156,30 +156,30 @@ class FileUploadHandler:
         try:
             # Validate file
             await self._validate_file(file, allow_intermediate=allow_intermediate)
-            
+
             # Generate unique filename
             unique_filename = self._generate_unique_filename(file.filename)
             temp_path = self.temp_dir / unique_filename
-            
+
             # Ensure temp directory exists
             self.temp_dir.mkdir(parents=True, exist_ok=True)
-            
+
             # Save file asynchronously
-            logger.info("Saving uploaded file", 
+            logger.info("Saving uploaded file",
                        filename=file.filename,
                        temp_path=str(temp_path),
                        content_type=file.content_type)
-            
+
             async with aiofiles.open(temp_path, 'wb') as f:
                 # Read file in chunks to handle large files efficiently
                 chunk_size = 8192  # 8KB chunks
                 total_size = 0
-                
+
                 while True:
                     chunk = await file.read(chunk_size)
                     if not chunk:
                         break
-                    
+
                     total_size += len(chunk)
                     if total_size > self.config.max_file_size:
                         # Clean up partial file
@@ -189,27 +189,27 @@ class FileUploadHandler:
                             f"File size exceeds maximum allowed size of "
                             f"{self.config.max_file_size} bytes"
                         )
-                    
+
                     await f.write(chunk)
-            
+
             # NOTE: No longer scheduling individual file cleanup to prevent race conditions
             # Files will be cleaned up by periodic cleanup process based on age and disk space
-            
-            logger.info("File uploaded successfully", 
+
+            logger.info("File uploaded successfully",
                        filename=file.filename,
                        temp_path=str(temp_path),
                        file_size=total_size)
-            
+
             return temp_path
-            
+
         except Exception as e:
-            logger.error("File upload failed", 
+            logger.error("File upload failed",
                         filename=getattr(file, 'filename', 'unknown'),
                         error=str(e))
             if isinstance(e, FileUploadError):
                 raise
             raise FileUploadError(f"File upload failed: {str(e)}") from e
-    
+
     async def _validate_file(self, file: UploadFile, allow_intermediate: bool = False) -> None:
         """Validate uploaded file.
 
@@ -223,12 +223,12 @@ class FileUploadHandler:
         # Check filename
         if not file.filename:
             raise FileUploadError("No filename provided")
-        
+
         # Sanitize and validate filename
         sanitized_filename = self._sanitize_filename(file.filename)
         if not sanitized_filename:
             raise FileUploadError("Invalid filename")
-        
+
         # Check file extension
         file_ext = Path(sanitized_filename).suffix.lower()
         allowed_extensions = self.config.allowed_extensions
@@ -240,7 +240,7 @@ class FileUploadHandler:
                 f"File extension '{file_ext}' not allowed. "
                 f"Allowed extensions: {', '.join(sorted(allowed_extensions))}"
             )
-        
+
         # Check MIME type if provided
         if file.content_type:
             allowed_mime_types = self.config.allowed_mime_types
@@ -254,7 +254,7 @@ class FileUploadHandler:
                     raise FileUploadError(
                         f"MIME type '{file.content_type}' not allowed"
                     )
-        
+
         # Check file size (initial check)
         if hasattr(file, 'size') and file.size:
             if file.size > self.config.max_file_size:
@@ -262,58 +262,58 @@ class FileUploadHandler:
                     f"File size {file.size} exceeds maximum allowed size of "
                     f"{self.config.max_file_size} bytes"
                 )
-    
+
     def _sanitize_filename(self, filename: str) -> str:
         """Sanitize filename to prevent path traversal and other issues.
-        
+
         Args:
             filename: Original filename
-            
+
         Returns:
             Sanitized filename
         """
         if not filename:
             return ""
-        
+
         # Remove path components
         filename = Path(filename).name
-        
+
         # Remove or replace dangerous characters
         dangerous_chars = '<>:"/\\|?*'
         for char in dangerous_chars:
             filename = filename.replace(char, '_')
-        
+
         # Remove leading/trailing dots and spaces
         filename = filename.strip('. ')
-        
+
         # Ensure filename is not empty and not too long
         if not filename:
             return ""
-        
+
         if len(filename) > 255:
             # Keep extension but truncate name
             stem = Path(filename).stem[:200]
             suffix = Path(filename).suffix
             filename = f"{stem}{suffix}"
-        
+
         return filename
-    
+
     def _generate_unique_filename(self, original_filename: str) -> str:
         """Generate unique filename to prevent conflicts.
-        
+
         Args:
             original_filename: Original filename
-            
+
         Returns:
             Unique filename with UUID prefix
         """
         sanitized = self._sanitize_filename(original_filename)
         if not sanitized:
             sanitized = "uploaded_file"
-        
+
         unique_id = str(uuid.uuid4())[:8]
         return f"{unique_id}_{sanitized}"
-    
+
     def cleanup_old_files(self, max_age_hours: int = 24, max_disk_usage_mb: int = 10000) -> int:
         """Clean up old temporary files based on age and disk usage.
 
@@ -399,7 +399,7 @@ class FileUploadHandler:
                         error=str(e))
 
         return deleted_count
-    
+
     def cleanup_temp_dir(self) -> None:
         """Clean up temporary directory and all files."""
         try:
@@ -408,9 +408,9 @@ class FileUploadHandler:
                 shutil.rmtree(self.temp_dir, ignore_errors=True)
                 logger.info("Cleaned up temporary directory", temp_dir=str(self.temp_dir))
         except Exception as e:
-            logger.warning("Failed to clean up temporary directory", 
+            logger.warning("Failed to clean up temporary directory",
                          temp_dir=str(self.temp_dir), error=str(e))
-    
+
     def __del__(self):
         """Cleanup on object destruction."""
         # NOTE: Removed aggressive temp directory cleanup to prevent race conditions

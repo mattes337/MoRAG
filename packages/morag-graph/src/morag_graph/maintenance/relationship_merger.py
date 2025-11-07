@@ -493,7 +493,7 @@ class RelationshipMerger(MaintenanceJobBase):
         # Combine metadata
         merged_metadata = primary.metadata.copy()
         merged_metadata.update(duplicate.metadata)
-        
+
         # Add merge tracking
         if "merged_from" not in merged_metadata:
             merged_metadata["merged_from"] = []

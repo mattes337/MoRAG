@@ -37,7 +37,7 @@ def llm_config():
 def mock_llm_client(llm_config):
     """Create a mock LLM client."""
     client = LLMClient(llm_config)
-    
+
     # Mock the generate method
     async def mock_generate(prompt, **kwargs) -> str:
         # Handle both string prompts and message lists
@@ -85,7 +85,7 @@ def mock_llm_client(llm_config):
             '''
         else:
             return "Mock LLM response"
-    
+
     client.generate = AsyncMock(side_effect=mock_generate)
     client.generate_from_messages = AsyncMock(side_effect=mock_generate)
     return client
@@ -139,7 +139,7 @@ def sample_graph_paths(sample_entities, sample_relations):
 def mock_graph_engine():
     """Create a mock graph engine."""
     engine = MagicMock()
-    
+
     # Mock async methods
     engine.get_entity = AsyncMock(return_value=None)
     engine.get_entity_details = AsyncMock(return_value={"type": "ORG", "name": "Test Entity"})
@@ -147,7 +147,7 @@ def mock_graph_engine():
     engine.find_neighbors = AsyncMock(return_value=[])
     engine.find_shortest_path = AsyncMock(return_value=None)
     engine.traverse = AsyncMock(return_value={"paths": []})
-    
+
     return engine
 
 
@@ -155,7 +155,7 @@ def mock_graph_engine():
 def mock_vector_retriever():
     """Create a mock vector retriever."""
     retriever = MagicMock()
-    
+
     # Mock async methods
     retriever.search = AsyncMock(return_value=[
         {"id": "doc1", "content": "Sample document content", "score": 0.8},
@@ -164,7 +164,7 @@ def mock_vector_retriever():
     retriever.retrieve = AsyncMock(return_value=[
         {"id": "doc1", "content": "Sample document content", "score": 0.8}
     ])
-    
+
     return retriever
 
 

@@ -27,23 +27,23 @@ graph TD
     B --> C{Content Type}
     C -->|Audio/Video| D[Create Remote Job]
     C -->|Document/Other| E[Process Locally]
-    
+
     D --> F[Store Job in Database]
     F --> G[Return Task ID to Client]
-    
+
     H[Remote Worker] --> I[Poll for Jobs]
     I --> J{Job Available?}
     J -->|Yes| K[Download Source File]
     J -->|No| L[Wait & Retry]
-    
+
     K --> M[Process with MoRAG Components]
     M --> N[Upload Results]
     N --> O[Update Job Status]
     O --> P[Continue Ingestion Pipeline]
-    
+
     P --> Q[Store in Vector Database]
     Q --> R[Send Webhook Notification]
-    
+
     L --> I
 ```
 

@@ -6,7 +6,7 @@ from typing import List, Optional
 from morag_core.utils.logging import get_logger
 
 from morag_reasoning.llm import LLMClient, LLMConfig
-from ..models.fact import Fact, FactRelation
+from ..models.fact import Fact
 from ..models.graph import Graph
 from .fact_graph_operations import FactGraphOperations
 from .graph_utilities import GraphUtilities
@@ -14,7 +14,7 @@ from .graph_utilities import GraphUtilities
 
 class FactGraphBuilder:
     """Build knowledge graph from extracted facts."""
-    
+
     def __init__(
         self,
         model_id: str = "gemini-2.0-flash",
@@ -40,9 +40,9 @@ class FactGraphBuilder:
         self.max_relations_per_fact = max_relations_per_fact
         self.language = language
         self.processing_timeout = processing_timeout
-        
+
         self.logger = get_logger(__name__)
-        
+
         # Initialize LLM client
         self.llm_config = LLMConfig(
             provider="gemini",
@@ -52,11 +52,11 @@ class FactGraphBuilder:
             max_tokens=2000
         )
         self.llm_client = LLMClient(self.llm_config)
-        
+
         # Initialize helper components
         self.operations = FactGraphOperations(self.llm_client, self.logger)
         self.utilities = GraphUtilities()
-    
+
     async def build_fact_graph(self, facts: List[Fact]) -> Graph:
         """Build knowledge graph with proper resource management."""
         if not facts:
@@ -93,7 +93,6 @@ class FactGraphBuilder:
     async def _index_facts(self, facts: List[Fact]):
         """Index facts for efficient retrieval (placeholder for now)."""
         # TODO: Implement fact indexing if needed
-        pass
 
     async def close(self):
         """Close the graph builder and clean up resources."""

@@ -35,17 +35,17 @@ class SimpleTestResult(BaseModel):
 
 class SimpleTestAgent(MoRAGBaseAgent[SimpleTestResult]):
     """Simple test agent for testing the foundation."""
-    
+
     def get_result_type(self) -> Type[SimpleTestResult]:
         return SimpleTestResult
-    
+
     def get_system_prompt(self) -> str:
         return "You are a test agent. Always respond with a simple message and confidence score."
 
 
 class TestProviderConfig:
     """Test provider configuration."""
-    
+
     def test_provider_config_creation(self):
         """Test creating provider configuration."""
         config = ProviderConfig(
@@ -53,17 +53,17 @@ class TestProviderConfig:
             timeout=60,
             max_retries=5
         )
-        
+
         assert config.api_key == "test-key"
         assert config.timeout == 60
         assert config.max_retries == 5
         assert config.extra_headers == {}
         assert config.extra_params == {}
-    
+
     def test_provider_config_defaults(self):
         """Test provider configuration defaults."""
         config = ProviderConfig()
-        
+
         assert config.api_key is None
         assert config.timeout == 30
         assert config.max_retries == 3
@@ -73,7 +73,7 @@ class TestProviderConfig:
 
 class TestAgentConfig:
     """Test agent configuration."""
-    
+
     def test_agent_config_creation(self):
         """Test creating agent configuration."""
         config = AgentConfig(
@@ -83,17 +83,17 @@ class TestAgentConfig:
             temperature=0.5,
             max_tokens=1000
         )
-        
+
         assert config.model == "google-gla:gemini-1.5-pro"
         assert config.timeout == 60
         assert config.max_retries == 5
         assert config.temperature == 0.5
         assert config.max_tokens == 1000
-    
+
     def test_agent_config_defaults(self):
         """Test agent configuration defaults."""
         config = AgentConfig()
-        
+
         assert config.model == "google-gla:gemini-1.5-flash"
         assert config.timeout == 30
         assert config.max_retries == 3
@@ -103,36 +103,36 @@ class TestAgentConfig:
 
 class TestGeminiProvider:
     """Test Gemini provider."""
-    
+
     def test_provider_creation(self):
         """Test creating Gemini provider."""
         config = ProviderConfig(api_key="test-key")
         provider = GeminiProvider(config)
-        
+
         assert provider.config.api_key == "test-key"
         assert provider.api_key == "test-key"
-    
+
     def test_provider_without_config(self):
         """Test creating provider without config."""
         provider = GeminiProvider()
-        
+
         assert provider.config is not None
         assert isinstance(provider.config, ProviderConfig)
-    
+
     def test_model_name_handling(self):
         """Test model name handling."""
         provider = GeminiProvider()
-        
+
         # Test different model name formats
         assert provider.get_model_name("google-gla:gemini-1.5-flash") == "google-gla:gemini-1.5-flash"
         assert provider.get_model_name("gemini-1.5-pro") == "google-gla:gemini-1.5-pro"
         assert provider.get_model_name("unknown-model") == "google-gla:gemini-1.5-flash"
-    
+
     def test_provider_info(self):
         """Test getting provider information."""
         provider = GeminiProvider()
         info = provider.get_provider_info()
-        
+
         assert info["name"] == "gemini"
         assert "available" in info
         assert "api_key_configured" in info
@@ -141,38 +141,38 @@ class TestGeminiProvider:
 
 class TestMoRAGBaseAgent:
     """Test base agent functionality."""
-    
+
     def test_agent_creation(self):
         """Test creating a base agent."""
         config = AgentConfig(model="google-gla:gemini-1.5-flash")
         provider = GeminiProvider()
         agent = SimpleTestAgent(config=config, provider=provider)
-        
+
         assert agent.config.model == "google-gla:gemini-1.5-flash"
         assert agent.provider is not None
         assert agent.get_result_type() == SimpleTestResult
         assert "test agent" in agent.get_system_prompt().lower()
-    
+
     def test_agent_with_defaults(self):
         """Test creating agent with default configuration."""
         agent = SimpleTestAgent()
-        
+
         assert agent.config is not None
         assert agent.provider is not None
         assert isinstance(agent.config, AgentConfig)
         assert isinstance(agent.provider, GeminiProvider)
-    
+
     def test_result_validation(self):
         """Test result validation."""
         agent = SimpleTestAgent()
-        
+
         # Test valid result
         valid_result = {"message": "test", "confidence": 0.8}
         validated = agent._validate_result(valid_result)
         assert isinstance(validated, SimpleTestResult)
         assert validated.message == "test"
         assert validated.confidence == 0.8
-        
+
         # Test invalid result
         invalid_result = {"message": "test", "confidence": 1.5}  # confidence > 1.0
         with pytest.raises(ValidationError):
@@ -181,29 +181,29 @@ class TestMoRAGBaseAgent:
 
 class TestAgentFactory:
     """Test agent factory."""
-    
+
     def test_factory_creation(self):
         """Test creating agent factory."""
         factory = AgentFactory()
         assert factory.default_config is not None
         assert isinstance(factory.default_config, AgentConfig)
-    
+
     def test_factory_with_config(self):
         """Test factory with custom default config."""
         config = AgentConfig(model="google-gla:gemini-1.5-pro")
         factory = AgentFactory(default_config=config)
-        
+
         assert factory.default_config.model == "google-gla:gemini-1.5-pro"
-    
+
     def test_create_agent(self):
         """Test creating agent with factory."""
         factory = AgentFactory()
         agent = factory.create_agent(SimpleTestAgent)
-        
+
         assert isinstance(agent, SimpleTestAgent)
         assert agent.config is not None
         assert agent.provider is not None
-    
+
     def test_create_agent_with_config(self):
         """Test creating agent with inline configuration."""
         factory = AgentFactory()
@@ -213,18 +213,18 @@ class TestAgentFactory:
             timeout=60,
             temperature=0.5
         )
-        
+
         assert isinstance(agent, SimpleTestAgent)
         assert agent.config.model == "google-gla:gemini-1.5-pro"
         assert agent.config.timeout == 60
         assert agent.config.temperature == 0.5
-    
+
     def test_get_agent_info(self):
         """Test getting agent information."""
         factory = AgentFactory()
         agent = factory.create_agent(SimpleTestAgent)
         info = factory.get_agent_info(agent)
-        
+
         assert info["class"] == "SimpleTestAgent"
         assert "config" in info
         assert "provider" in info
@@ -234,15 +234,15 @@ class TestAgentFactory:
 
 class TestConvenienceFunctions:
     """Test convenience functions."""
-    
+
     def test_create_agent_function(self):
         """Test create_agent convenience function."""
         agent = create_agent(SimpleTestAgent)
-        
+
         assert isinstance(agent, SimpleTestAgent)
         assert agent.config is not None
         assert agent.provider is not None
-    
+
     def test_create_agent_with_config_function(self):
         """Test create_agent_with_config convenience function."""
         agent = create_agent_with_config(
@@ -250,7 +250,7 @@ class TestConvenienceFunctions:
             model="google-gla:gemini-1.5-pro",
             timeout=45
         )
-        
+
         assert isinstance(agent, SimpleTestAgent)
         assert agent.config.model == "google-gla:gemini-1.5-pro"
         assert agent.config.timeout == 45
@@ -258,7 +258,7 @@ class TestConvenienceFunctions:
 
 class TestStructuredModels:
     """Test structured response models."""
-    
+
     def test_entity_model(self):
         """Test Entity model."""
         entity = Entity(
@@ -276,20 +276,20 @@ class TestStructuredModels:
         assert entity.start_pos == 0
         assert entity.end_pos == 10
         assert "technology company" in entity.context
-    
+
     def test_entity_extraction_result(self):
         """Test EntityExtractionResult model."""
         entities = [
             Entity(name="Apple", type="ORGANIZATION", confidence=0.9),
             Entity(name="iPhone", type="PRODUCT", confidence=0.8)
         ]
-        
+
         result = EntityExtractionResult(
             entities=entities,
             confidence=ConfidenceLevel.HIGH,
             processing_time=1.5
         )
-        
+
         assert len(result.entities) == 2
         assert result.confidence == ConfidenceLevel.HIGH
         assert result.processing_time == 1.5

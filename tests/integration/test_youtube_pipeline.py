@@ -21,10 +21,10 @@ class TestYouTubeIntegration:
         tmp_path
     ):
         """Test YouTube processor with mocked external services."""
-        
+
         processor = YouTubeProcessor()
         config = YouTubeConfig(extract_metadata_only=True)
-        
+
         # Mock yt-dlp to return metadata
         mock_info = {
             'id': 'test_video_123',
@@ -43,18 +43,18 @@ class TestYouTubeIntegration:
             'channel_id': 'UC_test_channel',
             'channel_url': 'https://youtube.com/channel/UC_test_channel'
         }
-        
+
         with patch('yt_dlp.YoutubeDL') as mock_yt_dlp:
             mock_ydl = MagicMock()
             mock_ydl.extract_info.return_value = mock_info
             mock_yt_dlp.return_value.__enter__.return_value = mock_ydl
-            
+
             with patch('asyncio.to_thread', return_value=mock_info):
                 result = await processor.process_url(
                     "https://youtube.com/watch?v=test_video_123",
                     config
                 )
-                
+
                 # Verify metadata extraction
                 assert result.metadata.id == "test_video_123"
                 assert result.metadata.title == "Test Video Title"
@@ -73,15 +73,15 @@ class TestYouTubeIntegration:
         tmp_path
     ):
         """Test YouTube task with embedding generation and storage."""
-        
+
         # Create mock files
         video_file = tmp_path / "test_video.mp4"
         audio_file = tmp_path / "test_audio.mp3"
         video_file.write_text("mock video content")
         audio_file.write_text("mock audio content")
-        
+
         from morag_youtube import YouTubeDownloadResult
-        
+
         mock_result = YouTubeDownloadResult(
             video_path=video_file,
             audio_path=audio_file,
@@ -92,14 +92,14 @@ class TestYouTubeIntegration:
             file_size=1024000,
             temp_files=[]
         )
-        
+
         with patch('morag.tasks.youtube_tasks.youtube_processor') as mock_processor, \
              patch('morag.tasks.youtube_tasks.gemini_service', mock_gemini_service), \
              patch('morag.tasks.youtube_tasks.qdrant_service', mock_qdrant_service):
-            
+
             mock_processor.process_url.return_value = mock_result
             mock_processor.cleanup_temp_files.return_value = None
-            
+
             # Simulate task execution
             result = {
                 "metadata": {"id": mock_result.metadata.id},
@@ -109,11 +109,11 @@ class TestYouTubeIntegration:
                 },
                 "embeddings_stored": 1
             }
-            
+
             # Simulate embedding generation and storage
             await mock_gemini_service.generate_embedding("test text")
             await mock_qdrant_service.store_embedding([0.1] * 768, "test text", {})
-            
+
             # Verify result structure
             assert result["embeddings_stored"] == 1
             assert result["metadata"]["id"] == "test_video_123"
@@ -130,16 +130,16 @@ class TestYouTubeIntegration:
         tmp_path
     ):
         """Test YouTube playlist processing integration."""
-        
+
         from morag_youtube import YouTubeDownloadResult
         from morag_youtube.tasks import process_youtube_playlist
-        
+
         # Create mock results for multiple videos
         mock_results = []
         for i in range(3):
             video_file = tmp_path / f"video_{i}.mp4"
             video_file.write_text(f"mock video {i}")
-            
+
             mock_results.append(YouTubeDownloadResult(
                 video_path=video_file,
                 audio_path=None,
@@ -150,14 +150,14 @@ class TestYouTubeIntegration:
                 file_size=500000,
                 temp_files=[]
             ))
-        
+
         with patch('morag.tasks.youtube_tasks.youtube_processor') as mock_processor, \
              patch('morag.tasks.youtube_tasks.gemini_service', mock_gemini_service), \
              patch('morag.tasks.youtube_tasks.qdrant_service', mock_qdrant_service):
-            
+
             mock_processor.process_playlist.return_value = mock_results
             mock_processor.cleanup_temp_files.return_value = None
-            
+
             # Simulate playlist processing
             result = {
                 "total_videos": 3,
@@ -171,13 +171,13 @@ class TestYouTubeIntegration:
                     for i in range(3)
                 ]
             }
-            
+
             # Verify playlist processing
             assert result["total_videos"] == 3
             assert result["successful_downloads"] == 3
             assert result["embeddings_stored"] == 3
             assert len(result["videos"]) == 3
-            
+
             # Verify each video was processed
             for i, video in enumerate(result["videos"]):
                 assert video["metadata"]["id"] == "test_video_123"
@@ -190,7 +190,7 @@ class TestYouTubeIntegration:
         tmp_path
     ):
         """Test YouTube processing error handling."""
-        
+
         # Simulate error handling
         with pytest.raises(Exception, match="Network error"):
             raise Exception("Network error")
@@ -210,13 +210,13 @@ class TestYouTubeIntegration:
         tmp_path
     ):
         """Test different YouTube configuration options."""
-        
+
         from morag_youtube import YouTubeDownloadResult
-        
+
         # Test audio-only configuration
         audio_file = tmp_path / "test_audio.mp3"
         audio_file.write_text("mock audio")
-        
+
         mock_result = YouTubeDownloadResult(
             video_path=None,
             audio_path=audio_file,
@@ -227,7 +227,7 @@ class TestYouTubeIntegration:
             file_size=2048000,
             temp_files=[]
         )
-        
+
         # Simulate audio download task
         result = {
             "audio_path": str(audio_file),
@@ -235,7 +235,7 @@ class TestYouTubeIntegration:
             "download_time": 3.0,
             "file_size": 2048000
         }
-            
+
         # Verify audio-only result
         assert result["audio_path"] == str(audio_file)
         assert result["metadata"]["id"] == "test_video_123"
@@ -247,10 +247,10 @@ class TestYouTubeIntegration:
         mock_youtube_metadata
     ):
         """Test metadata-only extraction."""
-        
+
         from morag_youtube import YouTubeDownloadResult
         from morag_youtube.tasks import extract_youtube_metadata
-        
+
         mock_result = YouTubeDownloadResult(
             video_path=None,
             audio_path=None,
@@ -261,7 +261,7 @@ class TestYouTubeIntegration:
             file_size=0,
             temp_files=[]
         )
-        
+
         # Simulate metadata extraction
         result = {
             "metadata": {
@@ -275,7 +275,7 @@ class TestYouTubeIntegration:
             },
             "extraction_time": 1.0
         }
-            
+
         # Verify metadata extraction
         assert result["metadata"]["id"] == "test_video_123"
         assert result["metadata"]["title"] == "Test Video Title"

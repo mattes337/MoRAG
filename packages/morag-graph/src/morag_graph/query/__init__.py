@@ -5,7 +5,7 @@ from .intent_analyzer import QueryIntentAnalyzer
 
 __all__ = [
     "QueryEntityExtractor",
-    "QueryEntity", 
+    "QueryEntity",
     "QueryAnalysis",
     "QueryIntentAnalyzer",
 ]

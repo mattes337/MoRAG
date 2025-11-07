@@ -115,7 +115,7 @@ class VideoProcessor:
 
     def __init__(self, config: Optional[VideoConfig] = None):
         """Initialize video processor.
-        
+
         Args:
             config: Configuration for video processing
         """
@@ -210,7 +210,7 @@ class VideoProcessor:
             if progress_callback:
                 progress_callback(0.2, "Extracting video metadata")
             metadata = await self._extract_metadata(file_path)
-            
+
             # Initialize result
             result = VideoProcessingResult(
                 audio_path=None,
@@ -220,7 +220,7 @@ class VideoProcessor:
                 processing_time=0.0,
                 temp_files=[]
             )
-            
+
             # Extract audio if requested
             if self.config.extract_audio and metadata.has_audio:
                 if progress_callback:
@@ -261,7 +261,7 @@ class VideoProcessor:
                                      error=str(e))
                         # Continue without enhanced audio processing
                         result.audio_processing_result = None
-            
+
             # Generate thumbnails if requested
             if self.config.generate_thumbnails:
                 if progress_callback:
@@ -274,7 +274,7 @@ class VideoProcessor:
                 )
                 result.thumbnails = thumbnails
                 result.temp_files.extend(thumbnails)
-            
+
             # Extract keyframes if requested
             if self.config.extract_keyframes:
                 if progress_callback:
@@ -300,7 +300,7 @@ class VideoProcessor:
                         logger.warning("OCR processing failed",
                                      error=str(e))
                         result.ocr_results = None
-            
+
             processing_time = time.time() - start_time
             result.processing_time = processing_time
 
@@ -316,39 +316,39 @@ class VideoProcessor:
                        ocr_performed=result.ocr_results is not None)
 
             return result
-            
+
         except Exception as e:
-            logger.error("Video processing failed", 
+            logger.error("Video processing failed",
                         file_path=str(file_path),
                         error=str(e))
             if isinstance(e, VideoProcessingError):
                 raise
             raise VideoProcessingError(f"Video processing failed: {str(e)}")
-    
+
     async def _extract_metadata(self, file_path: Path) -> VideoMetadata:
         """Extract comprehensive video metadata."""
         try:
             # Use ffmpeg_probe to get metadata
             probe = await asyncio.to_thread(ffmpeg_probe, str(file_path))
-            
+
             # Find video stream
             video_stream = next(
                 (stream for stream in probe['streams'] if stream['codec_type'] == 'video'),
                 None
             )
-            
+
             if not video_stream:
                 raise VideoProcessingError("No video stream found in file")
-            
+
             # Find audio stream
             audio_stream = next(
                 (stream for stream in probe['streams'] if stream['codec_type'] == 'audio'),
                 None
             )
-            
+
             # Extract format information
             format_info = probe.get('format', {})
-            
+
             # Calculate fps from frame rate fraction
             fps_fraction = video_stream.get('r_frame_rate', '0/1')
             try:
@@ -359,7 +359,7 @@ class VideoProcessor:
                     fps = float(fps_fraction)
             except (ValueError, ZeroDivisionError):
                 fps = 0
-            
+
             metadata = VideoMetadata(
                 duration=float(format_info.get('duration', 0)),
                 width=int(video_stream.get('width', 0)),
@@ -373,21 +373,21 @@ class VideoProcessor:
                 audio_codec=audio_stream.get('codec_name') if audio_stream else None,
                 creation_time=format_info.get('tags', {}).get('creation_time')
             )
-            
+
             logger.debug("Video metadata extracted",
                         duration=metadata.duration,
                         resolution=f"{metadata.width}x{metadata.height}",
                         fps=metadata.fps,
                         has_audio=metadata.has_audio)
-            
+
             return metadata
-            
+
         except Exception as e:
-            logger.error("Metadata extraction failed", 
+            logger.error("Metadata extraction failed",
                         file_path=str(file_path),
                         error=str(e))
             raise ExternalServiceError(f"Metadata extraction failed: {str(e)}", "ffmpeg")
-    
+
     async def _extract_audio(self, file_path: Path, audio_format: str = "mp3") -> Path:
         """Extract audio track from video file with minimal processing overhead."""
         try:
@@ -461,19 +461,19 @@ class VideoProcessor:
 
             if not audio_path.exists():
                 raise VideoProcessingError("Audio extraction failed - output file not created")
-            
+
             logger.debug("Audio extraction completed",
                         audio_path=str(audio_path),
                         file_size=audio_path.stat().st_size)
-            
+
             return audio_path
-            
+
         except Exception as e:
             logger.error("Audio extraction failed",
                         file_path=str(file_path),
                         error=str(e))
             raise ExternalServiceError(f"Audio extraction failed: {str(e)}", "ffmpeg")
-    
+
     async def _generate_thumbnails(
         self,
         file_path: Path,
@@ -651,39 +651,39 @@ class VideoProcessor:
                 import scenedetect
                 from scenedetect import VideoManager, SceneManager
                 from scenedetect.detectors import ContentDetector
-                
+
                 logger.info("Using PySceneDetect for keyframe extraction")
-                
+
                 # Create video manager and scene manager
                 video_manager = VideoManager([str(file_path)])
                 scene_manager = SceneManager()
                 scene_manager.add_detector(ContentDetector(threshold=threshold))
-                
+
                 # Improve performance with downscale and limited analysis
                 video_manager.set_downscale_factor()
-                
+
                 # Start video manager
                 video_manager.start()
-                
+
                 # Detect scenes
                 scene_manager.detect_scenes(frame_source=video_manager)
-                
+
                 # Get scene list and frame timestamps
                 scene_list = scene_manager.get_scene_list()
-                
+
                 # Get frame rate for timestamp calculation
                 fps = video_manager.get_framerate()
-                
+
                 # Extract keyframes at scene changes
                 for i, scene in enumerate(scene_list[:max_frames]):
                     # Get timestamp of first frame in scene
                     frame_num = scene[0]
                     timestamp = frame_num / fps
-                    
+
                     # Generate keyframe using ffmpeg
                     unique_id = int(time.time() * 1000000)  # Microsecond precision
                     keyframe_path = self.temp_dir / f"keyframe_{unique_id}_{i}.{format}"
-                    
+
                     def generate_keyframe():
                         try:
                             input_stream = ffmpeg_input(str(file_path), ss=timestamp)
@@ -692,22 +692,22 @@ class VideoProcessor:
                             ffmpeg_run(output_stream, overwrite_output=True, quiet=True)
                         except Exception as e:
                             logger.warning("Keyframe generation failed", error=str(e))
-                    
+
                     await asyncio.to_thread(generate_keyframe)
-                    
+
                     if keyframe_path.exists() and keyframe_path.stat().st_size > 0:
                         keyframes.append(keyframe_path)
                         logger.debug("Keyframe generated successfully",
                                    keyframe_path=str(keyframe_path),
                                    timestamp=timestamp)
-                
+
                 # If we got keyframes, return them
                 if keyframes:
                     return keyframes
-                
+
                 # Otherwise fall back to OpenCV method
                 logger.warning("PySceneDetect didn't find any keyframes, falling back to OpenCV")
-                
+
             except ImportError:
                 logger.info("PySceneDetect not available, using OpenCV for keyframe extraction")
             except Exception as e:
@@ -828,9 +828,9 @@ class VideoProcessor:
             ocr_engine = self._get_ocr_engine()
             if not ocr_engine:
                 raise VideoProcessingError("OCR engine not available")
-                
+
             results = {}
-            
+
             for image_path in image_paths:
                 try:
                     if self.config.ocr_engine == "tesseract":
@@ -847,7 +847,7 @@ class VideoProcessor:
                 except Exception as e:
                     logger.warning(f"OCR failed for {image_path}", error=str(e))
                     results[str(image_path)] = f"OCR failed: {str(e)}"
-            
+
             return results
         except Exception as e:
             logger.error("OCR processing failed", error=str(e))

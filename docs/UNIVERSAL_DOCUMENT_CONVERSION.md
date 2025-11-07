@@ -81,12 +81,12 @@ format_specific:
     use_docling: true
     use_ocr: true
     extract_tables: true
-  
+
   audio:
     enable_diarization: false
     include_timestamps: true
     confidence_threshold: 0.8
-  
+
   video:
     extract_keyframes: true
     include_audio: true
@@ -96,7 +96,7 @@ format_specific:
 
 - **PAGE**: One chunk per page (default for documents)
 - **SENTENCE**: Sentence-based chunking
-- **PARAGRAPH**: Paragraph-based chunking  
+- **PARAGRAPH**: Paragraph-based chunking
 - **SEMANTIC**: AI-powered semantic chunking
 
 ## Quality Assessment
@@ -276,10 +276,10 @@ class CustomConverter(BaseConverter):
     def __init__(self):
         super().__init__("Custom Converter")
         self.supported_formats = ['custom']
-    
+
     def supports_format(self, format_type: str) -> bool:
         return format_type.lower() in self.supported_formats
-    
+
     async def convert(self, file_path, options):
         # Implementation here
         return ConversionResult(...)

@@ -38,104 +38,104 @@ class StorageObject:
 
 class BaseStorage(ABC):
     """Base class for storage implementations."""
-    
+
     @abstractmethod
     async def initialize(self) -> bool:
         """Initialize the storage.
-        
+
         Returns:
             True if initialization was successful, False otherwise
         """
         pass
-    
+
     @abstractmethod
     async def shutdown(self) -> None:
         """Shutdown the storage and release resources."""
         pass
-    
+
     @abstractmethod
     async def health_check(self) -> Dict[str, Any]:
         """Check storage health.
-        
+
         Returns:
             Dictionary with health status information
         """
         pass
-    
+
     @abstractmethod
     async def put_object(
-        self, 
-        key: str, 
-        data: Union[bytes, str, Dict[str, Any]], 
+        self,
+        key: str,
+        data: Union[bytes, str, Dict[str, Any]],
         metadata: Optional[Dict[str, Any]] = None
     ) -> StorageObject:
         """Store an object.
-        
+
         Args:
             key: Object key/identifier
             data: Object data
             metadata: Optional metadata
-            
+
         Returns:
             Storage object information
         """
         pass
-    
+
     @abstractmethod
     async def get_object(self, key: str) -> Union[bytes, Dict[str, Any]]:
         """Retrieve an object.
-        
+
         Args:
             key: Object key/identifier
-            
+
         Returns:
             Object data
         """
         pass
-    
+
     @abstractmethod
     async def delete_object(self, key: str) -> bool:
         """Delete an object.
-        
+
         Args:
             key: Object key/identifier
-            
+
         Returns:
             True if deletion was successful, False otherwise
         """
         pass
-    
+
     @abstractmethod
     async def list_objects(self, prefix: str = "") -> List[StorageObject]:
         """List objects with prefix.
-        
+
         Args:
             prefix: Key prefix
-            
+
         Returns:
             List of storage objects
         """
         pass
-    
+
     @abstractmethod
     async def get_object_metadata(self, key: str) -> StorageMetadata:
         """Get object metadata.
-        
+
         Args:
             key: Object key/identifier
-            
+
         Returns:
             Object metadata
         """
         pass
-    
+
     @abstractmethod
     async def object_exists(self, key: str) -> bool:
         """Check if object exists.
-        
+
         Args:
             key: Object key/identifier
-            
+
         Returns:
             True if object exists, False otherwise
         """
@@ -144,71 +144,71 @@ class BaseStorage(ABC):
 
 class VectorStorage(BaseStorage):
     """Base class for vector storage implementations."""
-    
+
     @abstractmethod
     async def add_vectors(
-        self, 
-        vectors: List[List[float]], 
-        metadata: List[Dict[str, Any]], 
+        self,
+        vectors: List[List[float]],
+        metadata: List[Dict[str, Any]],
         ids: Optional[List[str]] = None
     ) -> List[str]:
         """Add vectors to storage.
-        
+
         Args:
             vectors: List of vectors
             metadata: List of metadata dictionaries
             ids: Optional list of IDs
-            
+
         Returns:
             List of assigned IDs
         """
         pass
-    
+
     @abstractmethod
     async def search_vectors(
-        self, 
-        query_vector: List[float], 
-        limit: int = 10, 
+        self,
+        query_vector: List[float],
+        limit: int = 10,
         filter_expr: Optional[Dict[str, Any]] = None
     ) -> List[Dict[str, Any]]:
         """Search for similar vectors.
-        
+
         Args:
             query_vector: Query vector
             limit: Maximum number of results
             filter_expr: Optional filter expression
-            
+
         Returns:
             List of search results with scores and metadata
         """
         pass
-    
+
     @abstractmethod
     async def delete_vectors(self, ids: List[str]) -> bool:
         """Delete vectors by ID.
-        
+
         Args:
             ids: List of vector IDs
-            
+
         Returns:
             True if deletion was successful, False otherwise
         """
         pass
-    
+
     @abstractmethod
     async def update_vector_metadata(
-        self, 
-        id: str, 
-        metadata: Dict[str, Any], 
+        self,
+        id: str,
+        metadata: Dict[str, Any],
         upsert: bool = False
     ) -> bool:
         """Update vector metadata.
-        
+
         Args:
             id: Vector ID
             metadata: New metadata
             upsert: Whether to insert if not exists
-            
+
         Returns:
             True if update was successful, False otherwise
         """

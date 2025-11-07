@@ -12,31 +12,31 @@ from ..models.fact import Fact, FactRelation, FactRelationType
 
 class FactGraphOperations:
     """Handle core fact graph operations and LLM interactions."""
-    
+
     def __init__(self, llm_client: LLMClient, logger: Optional[structlog.BoundLogger] = None):
         """Initialize operations handler."""
         self.llm_client = llm_client
         self.logger = logger or structlog.get_logger(__name__)
-    
+
     async def create_fact_relationships(
-        self, 
-        facts: List[Fact], 
+        self,
+        facts: List[Fact],
         min_confidence: float,
         max_relations_per_fact: int
     ) -> List[FactRelation]:
         """Create semantic relationships between facts.
-        
+
         Args:
             facts: List of facts to analyze for relationships
             min_confidence: Minimum confidence threshold
             max_relations_per_fact: Maximum relationships per fact
-            
+
         Returns:
             List of FactRelation objects
         """
         if len(facts) < 2:
             return []
-        
+
         relationships = []
         failed_batches = 0
         max_failed_batches = 3  # Allow up to 3 failed batches before giving up
@@ -84,8 +84,8 @@ class FactGraphOperations:
         return relationships
 
     async def _extract_relationships_for_batch(
-        self, 
-        facts: List[Fact], 
+        self,
+        facts: List[Fact],
         min_confidence: float,
         max_relations_per_fact: int
     ) -> List[FactRelation]:
@@ -143,7 +143,7 @@ class FactGraphOperations:
     def _create_relationship_prompt(self, facts: List[Dict[str, Any]], max_relations: int) -> str:
         """Create prompt for relationship extraction."""
         facts_text = json.dumps(facts, indent=2)
-        
+
         return f"""Analyze the following facts and identify semantic relationships between them.
 
 FACTS:
@@ -172,20 +172,20 @@ RESPONSE (JSON only, no other text):"""
         try:
             # Clean and fix common JSON issues
             cleaned_response = self._fix_common_json_issues(response)
-            
+
             # Parse JSON
             relationships = json.loads(cleaned_response)
-            
+
             # Ensure we have a list
             if not isinstance(relationships, list):
                 self.logger.warning("Response is not a list, wrapping in array")
                 relationships = [relationships] if relationships else []
-            
+
             # Validate and clean relationships
             validated_relationships = self._validate_relationships(relationships)
-            
+
             return validated_relationships
-            
+
         except json.JSONDecodeError as e:
             self.logger.error(f"Failed to parse relationship JSON: {e}")
             self.logger.debug(f"Raw response: {response[:500]}...")
@@ -199,50 +199,50 @@ RESPONSE (JSON only, no other text):"""
         # Remove markdown code blocks
         response = re.sub(r'```(?:json)?\s*', '', response)
         response = re.sub(r'\s*```', '', response)
-        
+
         # Remove any leading/trailing non-JSON content
         response = response.strip()
-        
+
         # Find the first '[' and last ']' to extract JSON array
         start = response.find('[')
         end = response.rfind(']')
-        
+
         if start >= 0 and end > start:
             response = response[start:end+1]
-        
+
         # Fix common JSON issues
         response = self._preprocess_malformed_keys(response)
-        
+
         return response
 
     def _preprocess_malformed_keys(self, response: str) -> str:
         """Fix malformed JSON keys."""
         # Fix unquoted keys (basic cases)
         response = re.sub(r'(\w+):', r'"\1":', response)
-        
+
         # Fix single quotes to double quotes
         response = response.replace("'", '"')
-        
+
         # Remove trailing commas
         response = re.sub(r',\s*}', '}', response)
         response = re.sub(r',\s*]', ']', response)
-        
+
         return response
 
     def _validate_relationships(self, relationships: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Validate and clean relationship objects."""
         validated = []
-        
+
         for rel in relationships:
             if not isinstance(rel, dict):
                 continue
-                
+
             if self._is_valid_relationship_object(rel):
                 normalized = self._normalize_relationship_object(rel)
                 validated.append(normalized)
             else:
                 self.logger.debug(f"Invalid relationship object: {rel}")
-        
+
         return validated
 
     def _is_valid_relationship_object(self, obj: Dict[str, Any]) -> bool:
@@ -275,33 +275,33 @@ RESPONSE (JSON only, no other text):"""
     ) -> List[FactRelation]:
         """Create FactRelation objects from parsed relationship data."""
         fact_relations = []
-        
+
         for rel_data in relationships:
             try:
                 source_id = rel_data["source_fact_id"]
                 target_id = rel_data["target_fact_id"]
                 confidence = rel_data["confidence"]
-                
+
                 # Check confidence threshold
                 if confidence < min_confidence:
                     continue
-                
+
                 # Validate fact IDs
                 if source_id >= len(facts) or target_id >= len(facts):
                     self.logger.warning(f"Invalid fact IDs: source={source_id}, target={target_id}, max={len(facts)-1}")
                     continue
-                
+
                 if source_id == target_id:
                     continue  # Skip self-references
-                
+
                 # Map relation type string to enum
                 relation_type_str = rel_data["relation_type"]
                 relation_type = self._map_relation_type(relation_type_str)
-                
+
                 if relation_type is None:
                     self.logger.warning(f"Unknown relation type: {relation_type_str}")
                     continue
-                
+
                 # Create FactRelation object
                 fact_relation = FactRelation(
                     source_fact=facts[source_id],
@@ -311,13 +311,13 @@ RESPONSE (JSON only, no other text):"""
                     explanation=rel_data.get("explanation", ""),
                     context={}
                 )
-                
+
                 fact_relations.append(fact_relation)
-                
+
             except (KeyError, ValueError, TypeError) as e:
                 self.logger.warning(f"Error creating fact relation: {e}, data: {rel_data}")
                 continue
-        
+
         return fact_relations
 
     def _map_relation_type(self, relation_type_str: str) -> Optional[FactRelationType]:
@@ -331,5 +331,5 @@ RESPONSE (JSON only, no other text):"""
             "temporal_before": FactRelationType.TEMPORAL,
             "part_of": FactRelationType.HIERARCHICAL
         }
-        
+
         return type_mapping.get(relation_type_str.lower())

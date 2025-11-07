@@ -60,7 +60,7 @@ class Fact(BaseModel):
     id: FactId = Field(default="", description="Unique fact identifier")
     fact_text: str = Field(..., description="Complete, self-contained fact statement with full context")
     structured_metadata: StructuredMetadata = Field(default_factory=StructuredMetadata, description="Structured metadata for graph building")
-    
+
     # Provenance
     source_chunk_id: str = Field(..., description="Source document chunk ID")
     source_document_id: str = Field(..., description="Source document ID")
@@ -92,10 +92,10 @@ class Fact(BaseModel):
     # Metadata
     created_at: datetime = Field(default_factory=datetime.utcnow, description="Extraction timestamp")
     language: str = Field(default="en", description="Language of the fact")
-    
+
     # Class variables for Neo4j integration
     _neo4j_label: ClassVar[str] = "Fact"
-    
+
     def __init__(self, **data):
         """Initialize fact with auto-generated ID if not provided."""
         if 'id' not in data or not data['id']:
@@ -106,7 +106,7 @@ class Fact(BaseModel):
             content_hash = hashlib.md5(content_for_hash.encode()).hexdigest()[:12]
             data['id'] = f"fact_{content_hash}"
         super().__init__(**data)
-    
+
     def get_neo4j_properties(self) -> Dict[str, Any]:
         """Get properties for Neo4j storage.
 
@@ -140,7 +140,7 @@ class Fact(BaseModel):
             "speaker_label": self.speaker_label,
             "source_text_excerpt": self.source_text_excerpt
         }
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert fact to dictionary representation.
 
@@ -172,7 +172,7 @@ class Fact(BaseModel):
             "speaker_label": self.speaker_label,
             "source_text_excerpt": self.source_text_excerpt
         }
-    
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'Fact':
         """Create fact from dictionary representation.
@@ -192,7 +192,7 @@ class Fact(BaseModel):
             data['structured_metadata'] = StructuredMetadata(**data['structured_metadata'])
 
         return cls(**data)
-    
+
     def get_display_text(self) -> str:
         """Get human-readable display text for the fact.
 
@@ -323,11 +323,11 @@ class Fact(BaseModel):
 
 class FactRelation(BaseModel):
     """Relationship between two facts.
-    
+
     Represents semantic relationships between facts such as support,
     contradiction, elaboration, or sequence.
     """
-    
+
     id: str = Field(..., description="Unique relation identifier")
     source_fact_id: FactId = Field(..., description="Source fact ID")
     target_fact_id: FactId = Field(..., description="Target fact ID")
@@ -340,10 +340,10 @@ class FactRelation(BaseModel):
     relationship_strength: Optional[str] = Field(default=None, description="Relationship strength: direct|inferred|contextual")
     evidence_quality: Optional[str] = Field(default=None, description="Evidence quality: explicit|implicit|speculative")
     source_evidence: Optional[str] = Field(default=None, description="Text span supporting this relationship")
-    
+
     # Class variables for Neo4j integration
     _neo4j_label: ClassVar[str] = "FACT_RELATION"
-    
+
     def __init__(self, **data):
         """Initialize relation with auto-generated ID if not provided."""
         try:
@@ -375,10 +375,10 @@ class FactRelation(BaseModel):
                 error_type=type(e).__name__
             )
             raise
-    
+
     def get_neo4j_properties(self) -> Dict[str, Any]:
         """Get properties for Neo4j relationship storage.
-        
+
         Returns:
             Dictionary of properties suitable for Neo4j relationship creation
         """
@@ -394,7 +394,7 @@ class FactRelation(BaseModel):
 # Fact type constants
 class FactType:
     """Constants for fact types."""
-    
+
     RESEARCH = "research"
     PROCESS = "process"
     DEFINITION = "definition"
@@ -403,7 +403,7 @@ class FactType:
     TEMPORAL = "temporal"
     STATISTICAL = "statistical"
     METHODOLOGICAL = "methodological"
-    
+
     @classmethod
     def all_types(cls) -> List[str]:
         """Get all available fact types."""
@@ -416,7 +416,7 @@ class FactType:
 # Fact relation type constants
 class FactRelationType:
     """Constants for fact relationship types."""
-    
+
     SUPPORTS = "SUPPORTS"
     CONTRADICTS = "CONTRADICTS"
     ELABORATES = "ELABORATES"

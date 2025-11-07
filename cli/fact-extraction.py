@@ -78,7 +78,7 @@ async def extract_facts_from_file(
     verbose: bool = False
 ) -> Dict[str, Any]:
     """Extract facts from a file.
-    
+
     Args:
         input_file: Path to input file
         domain: Domain context for extraction
@@ -87,7 +87,7 @@ async def extract_facts_from_file(
         model: LLM model to use
         api_key: API key for LLM service
         verbose: Show detailed output
-        
+
     Returns:
         Dictionary containing extraction results
     """
@@ -97,14 +97,14 @@ async def extract_facts_from_file(
     except Exception as e:
         logger.error("Failed to read input file", file=str(input_file), error=str(e))
         return {}
-    
+
     if verbose:
         print(f"📄 Processing file: {input_file.name}")
         print(f"📝 Content length: {len(content)} characters")
         print(f"🎯 Domain: {domain}")
         print(f"🎚️ Min confidence: {min_confidence}")
         print(f"📊 Max facts: {max_facts}")
-    
+
     # Initialize fact extractor
     fact_extractor = FactExtractor(
         model_id=model,
@@ -113,11 +113,11 @@ async def extract_facts_from_file(
         max_facts_per_chunk=max_facts,
         domain=domain
     )
-    
+
     # Create document chunk
     document_id = f"doc_{input_file.stem}"
     chunk_id = f"{document_id}_chunk_0"
-    
+
     # Extract facts
     try:
         facts = await fact_extractor.extract_facts(
@@ -131,14 +131,14 @@ async def extract_facts_from_file(
                 'source_file_name': input_file.name
             }
         )
-        
+
         if verbose:
             print(f"✅ Extracted {len(facts)} facts")
             for fact in facts:
                 entities = fact.structured_metadata.primary_entities if fact.structured_metadata and fact.structured_metadata.primary_entities else ["N/A"]
                 entities_str = ", ".join(entities[:2])  # Show first 2 entities
                 print(f"  • {fact.fact_text[:50]}... ({fact.fact_type}) - entities: {entities_str} - confidence: {fact.extraction_confidence:.2f}")
-        
+
         # Extract relationships if we have multiple facts
         relationships = []
         if len(facts) > 1:
@@ -147,19 +147,19 @@ async def extract_facts_from_file(
                     model_id=model,
                     api_key=api_key or os.getenv('GEMINI_API_KEY')
                 )
-                
+
                 fact_graph = await fact_graph_builder.build_fact_graph(facts)
                 if hasattr(fact_graph, 'relationships'):
                     relationships = fact_graph.relationships
-                
+
                 if verbose:
                     print(f"✅ Extracted {len(relationships)} relationships")
                     for rel in relationships:
                         print(f"  • {rel.source_fact_id} --[{rel.relationship_type}]--> {rel.target_fact_id}")
-                        
+
             except Exception as e:
                 logger.warning("Failed to extract relationships", error=str(e))
-        
+
         # Convert to serializable format
         facts_data = [fact.to_dict() for fact in facts]
         relationships_data = [
@@ -174,7 +174,7 @@ async def extract_facts_from_file(
             }
             for rel in relationships
         ]
-        
+
         return {
             'source_file': str(input_file),
             'document_id': document_id,
@@ -190,7 +190,7 @@ async def extract_facts_from_file(
                 'fact_types': {}
             }
         }
-        
+
     except Exception as e:
         logger.error("Fact extraction failed", error=str(e))
         if verbose:
@@ -208,7 +208,7 @@ async def store_in_neo4j(
     verbose: bool = False
 ) -> bool:
     """Store facts and relationships in Neo4j.
-    
+
     Args:
         facts: List of facts to store
         relationships: List of relationships to store
@@ -216,7 +216,7 @@ async def store_in_neo4j(
         neo4j_user: Neo4j username
         neo4j_password: Neo4j password
         verbose: Show detailed output
-        
+
     Returns:
         True if successful, False otherwise
     """
@@ -226,19 +226,19 @@ async def store_in_neo4j(
             username=neo4j_user,
             password=neo4j_password
         )
-        
+
         storage = Neo4jStorage(config)
         await storage.connect()
-        
+
         if verbose:
             print("✅ Connected to Neo4j")
-        
+
         # Store facts and relationships using fact extraction service
         fact_service = FactExtractionService(
             neo4j_storage=storage,
             enable_vector_storage=False
         )
-        
+
         # Create document chunks for the facts
         chunks = []
         for fact in facts:
@@ -250,18 +250,18 @@ async def store_in_neo4j(
                 metadata={}
             )
             chunks.append(chunk)
-        
+
         # Store using the service
         result = await fact_service.extract_and_store_facts(chunks)
-        
+
         if verbose:
             stats = result.get('statistics', {})
             print(f"✅ Stored {stats.get('facts_stored', 0)} facts")
             print(f"✅ Stored {stats.get('relationships_created', 0)} relationships")
-        
+
         await storage.disconnect()
         return True
-        
+
     except Exception as e:
         logger.error("Failed to store in Neo4j", error=str(e))
         if verbose:
@@ -278,14 +278,14 @@ async def store_in_qdrant(
     verbose: bool = False
 ) -> bool:
     """Store facts in Qdrant vector database.
-    
+
     Args:
         facts: List of facts to store
         qdrant_url: Qdrant connection URL
         qdrant_api_key: Qdrant API key (optional)
         collection_name: Collection name
         verbose: Show detailed output
-        
+
     Returns:
         True if successful, False otherwise
     """
@@ -295,34 +295,34 @@ async def store_in_qdrant(
             api_key=qdrant_api_key,
             collection_name=collection_name
         )
-        
+
         storage = QdrantStorage(config)
         await storage.connect()
-        
+
         if verbose:
             print("✅ Connected to Qdrant")
-        
+
         # Initialize embedding service
         embedding_service = GeminiEmbeddingService(
             api_key=os.getenv('GEMINI_API_KEY')
         )
-        
+
         # Initialize fact vector operations
         fact_vector_ops = FactVectorOperations(
             client=storage.client,
             collection_name=f"{collection_name}_facts",
             embedding_service=embedding_service
         )
-        
+
         # Store facts as vectors
         point_ids = await fact_vector_ops.store_facts_batch(facts)
-        
+
         if verbose:
             print(f"✅ Stored {len(point_ids)} fact vectors")
-        
+
         await storage.disconnect()
         return True
-        
+
     except Exception as e:
         logger.error("Failed to store in Qdrant", error=str(e))
         if verbose:
@@ -333,28 +333,28 @@ async def store_in_qdrant(
 
 def save_results(results: Dict[str, Any], output_file: Path, verbose: bool = False) -> bool:
     """Save extraction results to JSON file.
-    
+
     Args:
         results: Extraction results
         output_file: Output file path
         verbose: Show detailed output
-        
+
     Returns:
         True if successful, False otherwise
     """
     try:
         with open(output_file, 'w', encoding='utf-8') as f:
             json.dump(results, f, indent=2, ensure_ascii=False)
-        
+
         if verbose:
             print(f"💾 Results saved to: {output_file}")
             stats = results.get('statistics', {})
             print(f"📊 Statistics:")
             print(f"   • Facts: {stats.get('facts_extracted', 0)}")
             print(f"   • Relationships: {stats.get('relationships_created', 0)}")
-        
+
         return True
-        
+
     except Exception as e:
         logger.error("Failed to save results", file=str(output_file), error=str(e))
         return False

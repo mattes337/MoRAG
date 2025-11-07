@@ -37,20 +37,20 @@ import os
 async def process_image():
     # Get API key from environment
     api_key = os.environ.get("GOOGLE_API_KEY")
-    
+
     # Create processor with API key
     processor = ImageProcessor(api_key=api_key)
-    
+
     # Configure processing options
     config = ImageConfig(
         extract_metadata=True,
         extract_text=True,
         generate_caption=True
     )
-    
+
     # Process image
     result = await processor.process_image("path/to/image.jpg", config)
-    
+
     # Print results
     print(f"Caption: {result.caption}")
     print(f"Extracted text: {result.text}")

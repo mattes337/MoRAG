@@ -16,7 +16,7 @@ class TestRemoteJob:
             content_type="audio",
             task_options={"webhook_url": "http://example.com/webhook"}
         )
-        
+
         assert job.id is not None
         assert job.ingestion_task_id == "test-task-123"
         assert job.source_file_path == "/tmp/test.mp3"
@@ -36,10 +36,10 @@ class TestRemoteJob:
             content_type="audio",
             task_options={"webhook_url": "http://example.com/webhook"}
         )
-        
+
         # Convert to dict
         job_dict = original_job.to_dict()
-        
+
         # Verify dict structure
         assert job_dict["id"] == original_job.id
         assert job_dict["ingestion_task_id"] == "test-task-123"
@@ -47,10 +47,10 @@ class TestRemoteJob:
         assert job_dict["content_type"] == "audio"
         assert job_dict["status"] == "pending"
         assert isinstance(job_dict["created_at"], str)  # Should be ISO string
-        
+
         # Convert back to object
         restored_job = RemoteJob.from_dict(job_dict)
-        
+
         # Verify restoration
         assert restored_job.id == original_job.id
         assert restored_job.ingestion_task_id == original_job.ingestion_task_id
@@ -67,18 +67,18 @@ class TestRemoteJob:
             content_type="audio",
             task_options={}
         )
-        
+
         # Initially can't retry (not failed)
         assert not job.can_retry()
-        
+
         # After failure, can retry
         job.status = "failed"
         assert job.can_retry()
-        
+
         # After max retries, can't retry
         job.retry_count = 3
         assert not job.can_retry()
-        
+
         # Timeout status can be retried
         job.retry_count = 0
         job.status = "timeout"
@@ -92,14 +92,14 @@ class TestRemoteJob:
             content_type="audio",
             task_options={}
         )
-        
+
         # No timeout set
         assert not job.is_expired
-        
+
         # Future timeout
         job.timeout_at = datetime.utcnow() + timedelta(hours=1)
         assert not job.is_expired
-        
+
         # Past timeout
         job.timeout_at = datetime.utcnow() - timedelta(hours=1)
         assert job.is_expired
@@ -112,15 +112,15 @@ class TestRemoteJob:
             content_type="audio",
             task_options={}
         )
-        
+
         # No start time
         assert job.processing_duration == 0.0
-        
+
         # With start time, no end time (ongoing)
         job.started_at = datetime.utcnow() - timedelta(seconds=30)
         duration = job.processing_duration
         assert 25 <= duration <= 35  # Allow some variance
-        
+
         # With both start and end time
         job.completed_at = job.started_at + timedelta(seconds=60)
         assert job.processing_duration == 60.0

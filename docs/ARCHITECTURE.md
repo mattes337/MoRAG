@@ -105,24 +105,24 @@ MoRAG (Modular Retrieval-Augmented Generation) is a modular document processing 
 graph TD
     A[Input Document] --> B[Document Converter Registry]
     B --> C{Document Type}
-    
+
     C -->|Audio| D[morag-audio]
     C -->|Video| E[morag-video]
     C -->|Web| F[morag-web]
     C -->|PDF/Office| G[morag-document]
     C -->|Image| H[morag-image]
     C -->|YouTube| I[morag-youtube]
-    
+
     D --> J[morag-services]
     E --> J
     F --> J
     G --> J
     H --> J
     I --> J
-    
+
     J --> K[Vector Storage]
     J --> L[AI Services]
-    
+
     K --> M[Processed Document]
     L --> M
 ```
@@ -141,7 +141,7 @@ class BaseProcessor(ABC):
     async def process(self, input_data: Any, options: Optional[dict] = None) -> Document:
         """Process input data and return a Document."""
         pass
-    
+
     @abstractmethod
     def supports(self, input_type: str) -> bool:
         """Check if processor supports the input type."""
@@ -160,7 +160,7 @@ class BaseConverter(ABC):
     async def convert(self, file_path: Path, options: ConversionOptions) -> ConversionResult:
         """Convert file to markdown format."""
         pass
-    
+
     @abstractmethod
     def get_supported_formats(self) -> list[str]:
         """Get list of supported file formats."""
@@ -180,7 +180,7 @@ graph TB
     Image[morag-image]
     YouTube[morag-youtube]
     Main[morag]
-    
+
     Services --> Core
     Audio --> Core
     Audio --> Services

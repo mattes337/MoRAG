@@ -42,7 +42,7 @@ The production deployment includes:
 - **API Server**: FastAPI application with monitoring middleware
 - **Workers**: Celery workers for different task types
   - Document processing workers (2 concurrent)
-  - Media processing workers (1 concurrent) 
+  - Media processing workers (1 concurrent)
   - Web processing workers (2 concurrent)
 - **Redis**: Task queue and caching
 - **Qdrant**: Vector database for embeddings

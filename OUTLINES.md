@@ -42,7 +42,7 @@ def parse_json_response(response: str) -> Any:
         return json.loads(response.strip())
     except json.JSONDecodeError:
         pass
-    
+
     # Try markdown code blocks
     json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', response, re.DOTALL)
     # ... 50+ more lines of fallback logic
@@ -74,12 +74,12 @@ class OutlinesProvider:
     def __init__(self, provider_config: ProviderConfig):
         self.config = provider_config
         self._model = None
-    
+
     def get_generator(self, output_type: Type[T]) -> Generator:
         if self._model is None:
             self._model = self._create_model()
         return Generator(self._model, output_type)
-    
+
     def _create_model(self):
         if self.config.provider == "openai":
             client = openai.OpenAI(api_key=self.config.api_key)
@@ -124,7 +124,7 @@ class EntityExtractionAgent(OutlinesEnabledAgent[EntityExtractionResult]):
         return """Extract entities from the given text. Return a JSON object with:
         - entities: list of extracted entities with name, type, confidence
         - metadata: extraction metadata"""
-    
+
     # Outlines automatically ensures valid EntityExtractionResult structure
 ```
 
@@ -133,7 +133,7 @@ Replace complex parsing in `packages/morag-stages/src/morag_stages/stages/fact_g
 
 ```python
 # Before: 50+ lines of JSON parsing logic
-# After: 
+# After:
 generator = self.outlines_provider.get_generator(FactExtractionResult)
 result = generator(prompt)  # Guaranteed valid structure
 ```
@@ -221,7 +221,7 @@ None (Outlines complements existing stack)
 
 ### Week 2: Core Agents
 - [ ] Migrate EntityExtractionAgent
-- [ ] Migrate FactGenerationAgent  
+- [ ] Migrate FactGenerationAgent
 - [ ] Migrate RelationExtractionAgent
 - [ ] Test backward compatibility
 
@@ -264,7 +264,7 @@ None (Outlines complements existing stack)
 
 Outlines integration offers significant benefits for MoRAG:
 - **Eliminates** JSON parsing complexity
-- **Guarantees** structured output validity  
+- **Guarantees** structured output validity
 - **Reduces** API costs through fewer retries
 - **Improves** development velocity
 - **Enhances** system reliability

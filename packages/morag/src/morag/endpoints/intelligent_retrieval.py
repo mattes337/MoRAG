@@ -323,7 +323,7 @@ async def health_check():
         llm_client = get_llm_client()
         neo4j_storage = get_default_neo4j_storage()
         qdrant_storage = get_default_qdrant_storage()
-        
+
         status = {
             "status": "healthy",
             "services": {
@@ -332,14 +332,14 @@ async def health_check():
                 "qdrant_storage": qdrant_storage is not None
             }
         }
-        
+
         # Check if all required services are available
         all_healthy = all(status["services"].values())
         if not all_healthy:
             status["status"] = "degraded"
-        
+
         return status
-        
+
     except Exception as e:
         logger.error("Health check failed", error=str(e))
         return {

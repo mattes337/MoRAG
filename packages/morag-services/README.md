@@ -29,16 +29,16 @@ from morag_services import MoRAGServices
 async def main():
     # Initialize the services with default configuration
     services = MoRAGServices()
-    
+
     # Process a document
     document_result = await services.process_document("path/to/document.pdf")
-    
+
     # Process a web page
     web_result = await services.process_url("https://example.com")
-    
+
     # Process an image
     image_result = await services.process_image("path/to/image.jpg")
-    
+
     # Process multiple items concurrently
     results = await services.process_batch([
         "path/to/document.pdf",
@@ -47,7 +47,7 @@ async def main():
         "path/to/audio.mp3",
         "https://www.youtube.com/watch?v=example"
     ])
-    
+
     # Access results
     for item, result in results.items():
         print(f"Processed {item}: {result.success}")

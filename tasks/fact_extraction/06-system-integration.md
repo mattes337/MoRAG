@@ -24,7 +24,7 @@ Document → Formatter → Analyzer → Chunker → Fact Extractor → Fact Grap
 ```python
 class HybridProcessor:
     """Process documents using both entity and fact extraction."""
-    
+
     def __init__(
         self,
         entity_extractor: Optional[EntityExtractor] = None,
@@ -34,16 +34,16 @@ class HybridProcessor:
         self.entity_extractor = entity_extractor
         self.fact_extractor = fact_extractor
         self.processing_mode = processing_mode
-        
+
     async def process_document(self, document: Document) -> ProcessingResult:
         """Process document using configured extraction methods."""
-        
+
     async def _process_with_entities(self, chunks: List[DocumentChunk]) -> EntityResult:
         """Process using entity extraction."""
-        
+
     async def _process_with_facts(self, chunks: List[DocumentChunk]) -> FactResult:
         """Process using fact extraction."""
-        
+
     async def _process_hybrid(self, chunks: List[DocumentChunk]) -> HybridResult:
         """Process using both entity and fact extraction."""
 ```
@@ -55,24 +55,24 @@ class HybridProcessor:
 ```python
 class ExtractionConfig(BaseModel):
     """Configuration for extraction pipeline."""
-    
+
     # Processing mode
     extraction_mode: str = Field(default="hybrid", description="entity|fact|hybrid")
-    
+
     # Entity extraction settings
     enable_entity_extraction: bool = Field(default=True)
     entity_min_confidence: float = Field(default=0.6)
     entity_max_per_chunk: int = Field(default=20)
-    
+
     # Fact extraction settings
     enable_fact_extraction: bool = Field(default=True)
     fact_min_confidence: float = Field(default=0.7)
     fact_max_per_chunk: int = Field(default=10)
-    
+
     # Hybrid mode settings
     prefer_facts_over_entities: bool = Field(default=True)
     fact_entity_overlap_threshold: float = Field(default=0.8)
-    
+
     # Performance settings
     parallel_processing: bool = Field(default=True)
     max_workers: int = Field(default=10)
@@ -90,7 +90,7 @@ async def extract_facts_from_text(
     extraction_service: FactExtractionService = Depends()
 ) -> FactExtractionResponse:
     """Extract facts from provided text."""
-    
+
 @router.get("/facts/search")
 async def search_facts(
     query: str,
@@ -100,7 +100,7 @@ async def search_facts(
     fact_service: FactService = Depends()
 ) -> FactSearchResponse:
     """Search for facts using various criteria."""
-    
+
 @router.get("/facts/{fact_id}/related")
 async def get_related_facts(
     fact_id: str,
@@ -109,7 +109,7 @@ async def get_related_facts(
     fact_service: FactService = Depends()
 ) -> RelatedFactsResponse:
     """Get facts related to a specific fact."""
-    
+
 @router.get("/facts/{fact_id}/chain/{target_fact_id}")
 async def get_fact_chain(
     fact_id: str,
@@ -126,7 +126,7 @@ async def get_fact_chain(
 ```python
 class EntityToFactMigrator:
     """Migrate existing entity-based graphs to fact-based approach."""
-    
+
     def __init__(
         self,
         entity_storage: EntityStorage,
@@ -136,16 +136,16 @@ class EntityToFactMigrator:
         self.entity_storage = entity_storage
         self.fact_storage = fact_storage
         self.migration_strategy = migration_strategy
-        
+
     async def migrate_document(self, document_id: str) -> MigrationResult:
         """Migrate a single document from entity to fact representation."""
-        
+
     async def migrate_all_documents(self, batch_size: int = 100) -> MigrationSummary:
         """Migrate all documents in batches."""
-        
+
     async def _convert_entities_to_facts(self, entities: List[Entity], relations: List[Relation]) -> List[Fact]:
         """Convert entity-relation pairs to structured facts."""
-        
+
     async def validate_migration(self, document_id: str) -> ValidationResult:
         """Validate that migration preserved important information."""
 ```
@@ -238,16 +238,16 @@ class RelatedFact(BaseModel):
 ```python
 class TestFactIntegration:
     """Test fact extraction integration with existing system."""
-    
+
     async def test_hybrid_processing(self):
         """Test processing document with both entity and fact extraction."""
-        
+
     async def test_api_endpoints(self):
         """Test new fact-based API endpoints."""
-        
+
     async def test_migration_process(self):
         """Test migration from entity to fact representation."""
-        
+
     async def test_performance_comparison(self):
         """Compare performance of entity vs fact approaches."""
 ```

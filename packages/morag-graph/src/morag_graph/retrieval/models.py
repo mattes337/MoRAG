@@ -57,14 +57,14 @@ class RetrievalError(Exception):
 
 class VectorRetriever:
     """Mock interface for vector retriever - to be replaced with actual implementation."""
-    
+
     async def search(self, query: str, limit: int = 10) -> List[Dict[str, Any]]:
         """Search for documents using vector similarity.
-        
+
         Args:
             query: Search query
             limit: Maximum number of results
-            
+
         Returns:
             List of document results with content, score, and metadata
         """

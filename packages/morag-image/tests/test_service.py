@@ -46,7 +46,7 @@ def mock_processing_result():
         camera_make=None,
         camera_model=None
     )
-    
+
     return ImageProcessingResult(
         caption="A test image caption",
         extracted_text="Sample text from image",
@@ -60,12 +60,12 @@ def mock_processing_result():
 async def test_process_image(image_service, test_image_path, mock_processing_result):
     """Test processing a single image."""
     # Mock the processor's process_image method
-    with patch.object(image_service.processor, "process_image", 
+    with patch.object(image_service.processor, "process_image",
                      return_value=mock_processing_result):
-        
+
         # Process image with default config
         result = await image_service.process_image(test_image_path)
-    
+
     # Check result
     assert isinstance(result, dict)
     assert result["caption"] == "A test image caption"
@@ -80,9 +80,9 @@ async def test_process_image(image_service, test_image_path, mock_processing_res
 async def test_process_image_with_config(image_service, test_image_path, mock_processing_result):
     """Test processing a single image with custom configuration."""
     # Mock the processor's process_image method
-    with patch.object(image_service.processor, "process_image", 
+    with patch.object(image_service.processor, "process_image",
                      return_value=mock_processing_result) as mock_process:
-        
+
         # Process image with custom config
         config = {
             "generate_caption": True,
@@ -90,9 +90,9 @@ async def test_process_image_with_config(image_service, test_image_path, mock_pr
             "ocr_engine": "easyocr",
             "resize_max_dimension": 800
         }
-        
+
         result = await image_service.process_image(test_image_path, config)
-    
+
     # Check that processor was called with correct config
     args, kwargs = mock_process.call_args
     assert args[0] == test_image_path
@@ -112,18 +112,18 @@ async def test_process_batch(image_service, mock_processing_result):
         Path("/path/to/image2.jpg"),
         Path("/path/to/image3.jpg")
     ]
-    
+
     # Mock the processor's process_images method
-    with patch.object(image_service.processor, "process_images", 
+    with patch.object(image_service.processor, "process_images",
                      return_value=[mock_processing_result] * 3):
-        
+
         # Process images
         results = await image_service.process_batch(test_paths)
-    
+
     # Check results
     assert isinstance(results, list)
     assert len(results) == 3
-    
+
     for result in results:
         assert isinstance(result, dict)
         assert result["caption"] == "A test image caption"
@@ -134,13 +134,13 @@ async def test_process_batch(image_service, mock_processing_result):
 async def test_error_handling(image_service, test_image_path):
     """Test error handling in the service."""
     # Mock the processor's process_image method to raise an exception
-    with patch.object(image_service.processor, "process_image", 
+    with patch.object(image_service.processor, "process_image",
                      side_effect=Exception("Test error")):
-        
+
         # Process image should raise ProcessingError
         with pytest.raises(ProcessingError) as excinfo:
             await image_service.process_image(test_image_path)
-        
+
         # Check error message
         assert "Image processing failed: Test error" in str(excinfo.value)
 
@@ -149,7 +149,7 @@ def test_result_to_dict(image_service, mock_processing_result):
     """Test conversion of ImageProcessingResult to dictionary."""
     # Convert result to dictionary
     result_dict = image_service._result_to_dict(mock_processing_result)
-    
+
     # Check dictionary structure
     assert isinstance(result_dict, dict)
     assert "caption" in result_dict
@@ -157,7 +157,7 @@ def test_result_to_dict(image_service, mock_processing_result):
     assert "metadata" in result_dict
     assert "processing_time" in result_dict
     assert "confidence_scores" in result_dict
-    
+
     # Check metadata conversion
     metadata = result_dict["metadata"]
     assert metadata["width"] == 800

@@ -33,7 +33,7 @@ Quick improvements that can be done immediately:
 
 ### Phase 2: File Splitting (8-12 hours)
 **File**: `02-file-splitting.md`
-**Priority**: HIGH  
+**Priority**: HIGH
 **Dependencies**: Quick fixes completed
 
 Systematic splitting of oversized files:
@@ -48,7 +48,7 @@ Systematic splitting of oversized files:
 
 Create unified base classes:
 - BaseStorage for 27 storage classes
-- BaseProcessor for 34 processor classes  
+- BaseProcessor for 34 processor classes
 - BaseService for service classes
 - Eliminate ~2,300 lines of duplicate code
 
@@ -112,7 +112,7 @@ python scripts/analyze_dependencies.py > baseline_metrics.txt
 - [ ] **Phase 1: Quick Fixes** (`01-quick-fixes.md`)
   - [ ] Standardize HTTP client to httpx
   - [ ] Make ML dependencies optional
-  - [ ] Standardize logger initialization  
+  - [ ] Standardize logger initialization
   - [ ] Split top 3 largest files
   - [ ] All tests pass
 
@@ -138,7 +138,7 @@ python scripts/analyze_dependencies.py > baseline_metrics.txt
 
 - [ ] **Phase 5: Testing** (`05-testing-strategy.md`)
   - [ ] Create comprehensive unit tests
-  - [ ] Add integration tests  
+  - [ ] Add integration tests
   - [ ] Add performance tests
   - [ ] Achieve >80% coverage
   - [ ] Fast test execution (<5 minutes)
@@ -159,7 +159,7 @@ git checkout -b refactor/testing-strategy
 ```bash
 # After each major change:
 python check_syntax.py --verbose           # No syntax errors
-pytest tests/ -v                          # All tests pass  
+pytest tests/ -v                          # All tests pass
 python tests/cli/test-simple.py          # Basic functionality works
 python debug_morag.py                     # System health check
 ```
@@ -180,7 +180,7 @@ After each phase, run:
 # File size check
 find packages/ -name "*.py" -exec wc -l {} + | awk '$1 > 1000 {print $1, $2}'
 
-# Dependency analysis  
+# Dependency analysis
 pip list | wc -l  # Should decrease over phases
 
 # Test coverage
@@ -193,7 +193,7 @@ time python -c "import morag"  # Should be <1 second after optimization
 ### Final Success Criteria
 - [ ] No Python files >1000 lines
 - [ ] >80% test coverage with >300 unit tests
-- [ ] Core installation <300MB 
+- [ ] Core installation <300MB
 - [ ] All functionality preserved
 - [ ] Import time <1 second
 - [ ] Documentation updated
@@ -202,7 +202,7 @@ time python -c "import morag"  # Should be <1 second after optimization
 
 ### Conservative Timeline (40-50 hours)
 - **Week 1**: Quick fixes + File splitting (12-16 hours)
-- **Week 2**: Deduplication + Dependencies (10-16 hours) 
+- **Week 2**: Deduplication + Dependencies (10-16 hours)
 - **Week 3**: Testing strategy (10-15 hours)
 - **Week 4**: Documentation + polish (5-8 hours)
 
@@ -234,7 +234,7 @@ Each task file includes:
 - Reduced cognitive load with smaller files
 - Clear separation of concerns
 
-### Operations Benefits  
+### Operations Benefits
 - Lighter Docker images
 - Faster deployments
 - Optional feature installation

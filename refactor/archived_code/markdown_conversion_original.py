@@ -109,16 +109,16 @@ class MarkdownConversionStage(Stage):
 
         # Initialize processor registry for delegation
         self.processor_registry = ProcessorRegistry()
-    
+
     async def execute(self,
                      input_files: List[Union[Path, 'URLPath']],
                      context: StageContext) -> StageResult:
         """Execute markdown conversion on input files.
-        
+
         Args:
             input_files: List of input file paths
             context: Stage execution context
-            
+
         Returns:
             Stage execution result
         """
@@ -150,13 +150,13 @@ class MarkdownConversionStage(Stage):
                    config=config)
 
         try:
-            
+
             # Generate output filename
             output_filename = self._generate_output_filename(input_file, content_type)
             output_file = context.output_dir / output_filename
 
             context.output_dir.mkdir(parents=True, exist_ok=True)
-            
+
             # Check if we should use MarkItDown for better quality
             if self._should_use_markitdown(input_file, content_type):
                 logger.info("Using MarkItDown for high-quality conversion",
@@ -201,17 +201,17 @@ class MarkdownConversionStage(Stage):
                 metadata=metadata,
                 data=result_data
             )
-            
+
         except Exception as e:
-            logger.error("Markdown conversion failed", 
-                        input_file=str(input_file), 
+            logger.error("Markdown conversion failed",
+                        input_file=str(input_file),
                         error=str(e))
             raise StageExecutionError(
                 f"Markdown conversion failed: {e}",
                 stage_type=self.stage_type.value,
                 original_error=e
             )
-    
+
     def validate_inputs(self, input_files: List[Union[Path, 'URLPath']]) -> bool:
         """Validate input files for markdown conversion.
 
@@ -343,12 +343,12 @@ class MarkdownConversionStage(Stage):
 
     def get_dependencies(self) -> List[StageType]:
         """Get stage dependencies.
-        
+
         Returns:
             Empty list - this is the first stage
         """
         return []
-    
+
     def get_expected_outputs(self, input_files: List[Union[Path, 'URLPath']], context: StageContext) -> List[Path]:
         """Get expected output file paths.
 
@@ -367,7 +367,7 @@ class MarkdownConversionStage(Stage):
         output_filename = self._generate_output_filename(input_file, content_type)
         output_file = context.output_dir / output_filename
         return [output_file]
-    
+
 
 
     def _is_content_type(self, content_type, expected_type: str) -> bool:
@@ -815,20 +815,20 @@ class MarkdownConversionStage(Stage):
 
             logger.error(f"MarkItDown processing failed: {e}", input_file=str(input_file))
             raise ProcessingError(f"MarkItDown processing failed for {input_file}: {e}")
-    
+
     async def _process_video(self, input_file: Union[Path, 'URLPath'], output_file: Path, config: Dict[str, Any]) -> Dict[str, Any]:
         """Process video file to markdown.
-        
+
         Args:
             input_file: Input video file
             output_file: Output markdown file
             config: Stage configuration
-            
+
         Returns:
             Processing result data
         """
         logger.info("Processing video file", input_file=str(input_file))
-        
+
         # Prepare options for video service
         options = {
             'include_timestamps': config.get('include_timestamps', True),

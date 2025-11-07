@@ -116,7 +116,7 @@ class RecursiveFactRetrievalTester:
         self.stronger_gemini_model = stronger_gemini_model or os.getenv("MORAG_STRONGER_GEMINI_MODEL", "gemini-1.5-pro")
 
         self.service = None
-    
+
     async def initialize(self) -> bool:
         """Initialize the recursive fact retrieval service.
 
@@ -232,7 +232,7 @@ class RecursiveFactRetrievalTester:
             health["error"] = str(e)
 
         return health
-    
+
     async def test_recursive_fact_retrieval(
         self,
         user_query: str,
@@ -308,10 +308,10 @@ class RecursiveFactRetrievalTester:
                     await self.service.qdrant_storage.close()
             except Exception as e:
                 logger.warning("Error during cleanup", error=str(e))
-    
+
     def print_results(self, results: Dict[str, Any], verbose: bool = False):
         """Print test results in a formatted way.
-        
+
         Args:
             results: Results from the test
             verbose: Whether to print verbose output
@@ -321,7 +321,7 @@ class RecursiveFactRetrievalTester:
             if "status_code" in results:
                 print(f"   Status code: {results['status_code']}")
             return
-        
+
         data = results["data"]
         print(f"[OK] Test successful!")
         print(f"   Query ID: {data['query_id']}")
@@ -335,7 +335,7 @@ class RecursiveFactRetrievalTester:
         print(f"   Final facts: {len(data['final_facts'])}")
         print(f"   LLM calls - GTA: {data['gta_llm_calls']}, FCA: {data['fca_llm_calls']}, Final: {data['final_llm_calls']}")
         print(f"   Confidence score: {data['confidence_score']:.2f}")
-        
+
         # Print traversal steps
         if data['traversal_steps'] and verbose:
             print("\n[PROCESSING] Traversal Steps:")
@@ -346,7 +346,7 @@ class RecursiveFactRetrievalTester:
                 if step['reasoning']:
                     print(f"     Reasoning: {step['reasoning'][:100]}...")
                 print()
-        
+
         # Print final facts
         if data['final_facts']:
             print("\n[INFO] Final Facts:")
@@ -356,7 +356,7 @@ class RecursiveFactRetrievalTester:
                 print(f"      Depth: {fact['extracted_from_depth']}")
                 print(f"      Source: {fact['source_description']}")
                 print()
-        
+
         # Print final answer
         print(f"\n💡 Final Answer:")
         print(f"   {data['final_answer']}")

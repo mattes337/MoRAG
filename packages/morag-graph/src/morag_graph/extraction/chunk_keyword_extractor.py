@@ -2,7 +2,7 @@
 
 import hashlib
 import re
-from typing import List, Dict, Any, Tuple, Optional, Set
+from typing import List, Tuple, Optional, Set
 import structlog
 
 from ..models.entity import Entity
@@ -11,7 +11,7 @@ from ..models.relation import Relation
 
 class ChunkKeywordExtractor:
     """Extract keywords from document chunks and create keyword entities."""
-    
+
     def __init__(self, domain: str = "general"):
         """Initialize the extractor.
 
@@ -26,53 +26,53 @@ class ChunkKeywordExtractor:
         self.agent_registry = AgentRegistry()
         self.keyword_agent = self.agent_registry.get_agent('keyword_extraction')
 
-    
+
     def extract_keywords_from_chunk(
-        self, 
-        chunk_text: str, 
-        chunk_id: str, 
+        self,
+        chunk_text: str,
+        chunk_id: str,
         document_id: str,
         domain: Optional[str] = None
     ) -> Tuple[List[Entity], List[Relation]]:
         """Extract keywords from a document chunk and create entities/relationships.
-        
+
         Args:
             chunk_text: Text content of the chunk
             chunk_id: ID of the chunk
             document_id: ID of the source document
             domain: Domain context (optional)
-            
+
         Returns:
             Tuple of (keyword entities, relationships to chunk)
         """
         effective_domain = domain or self.domain
-        
+
         # Extract domain-specific keywords
         keywords = self._extract_domain_keywords(chunk_text, effective_domain)
-        
+
         if not keywords:
             return [], []
-        
+
         entities = []
         relationships = []
-        
+
         self.logger.info(f"Extracted {len(keywords)} keywords from chunk {chunk_id}")
-        
+
         for keyword in keywords:
             # Create keyword entity
             keyword_entity = self._create_keyword_entity(
                 keyword, chunk_id, document_id, effective_domain
             )
             entities.append(keyword_entity)
-            
+
             # Create relationship: Keyword -> DESCRIBES -> Chunk
             relationship = self._create_keyword_chunk_relationship(
                 keyword_entity.id, chunk_id, keyword
             )
             relationships.append(relationship)
-        
+
         return entities, relationships
-    
+
     def _extract_domain_keywords(self, text: str, domain: str) -> List[str]:
         """Extract domain-specific keywords from text using LLM.
 
@@ -133,18 +133,18 @@ class ChunkKeywordExtractor:
 
         # Remove duplicates and return top 10
         return list(set(keywords))[:10]
-    
+
     def _extract_medical_keywords(self, text: str) -> Set[str]:
         """Extract medical/health-specific keywords.
-        
+
         Args:
             text: Lowercase text
-            
+
         Returns:
             Set of medical keywords
         """
         keywords = set()
-        
+
         # Medical substances and compounds
         medical_terms = [
             # Supplements and herbs (English and German)
@@ -188,7 +188,7 @@ class ChunkKeywordExtractor:
             'wechselwirkung', 'kontraindikation', 'sicherheit', 'qualität',
             'flavonglykoside', 'terpenlactone', 'ginsenoside', 'rosavine', 'salidrosid'
         ]
-        
+
         for term in medical_terms:
             if term in text:
                 keywords.add(term)
@@ -197,7 +197,7 @@ class ChunkKeywordExtractor:
                     for word in term.split():
                         if len(word) >= 3:
                             keywords.add(word)
-        
+
         # Extract dosage-related terms
         dosage_patterns = [
             r'(\d+(?:\.\d+)?)\s*(?:mg|g|ml|mcg|iu|units?)',
@@ -205,7 +205,7 @@ class ChunkKeywordExtractor:
             r'standardized\s+extract',
             r'(\d+)%\s*(?:extract|concentration)',
         ]
-        
+
         for pattern in dosage_patterns:
             matches = re.findall(pattern, text, re.IGNORECASE)
             for match in matches:
@@ -213,33 +213,33 @@ class ChunkKeywordExtractor:
                     keywords.update(match)
                 else:
                     keywords.add(match)
-        
+
         return keywords
-    
+
     def _extract_technical_keywords(self, text: str) -> Set[str]:
         """Extract technical keywords.
-        
+
         Args:
             text: Lowercase text
-            
+
         Returns:
             Set of technical keywords
         """
         keywords = set()
-        
+
         technical_terms = [
             'algorithm', 'database', 'server', 'network', 'api', 'framework',
             'software', 'hardware', 'programming', 'code', 'system', 'application',
             'interface', 'protocol', 'security', 'encryption', 'authentication',
             'authorization', 'scalability', 'performance', 'optimization'
         ]
-        
+
         for term in technical_terms:
             if term in text:
                 keywords.add(term)
-        
+
         return keywords
-    
+
     def _extract_general_keywords(self, text: str) -> Set[str]:
         """Extract general keywords using enhanced analysis for German and English.
 
@@ -309,22 +309,22 @@ class ChunkKeywordExtractor:
                 filtered_keywords.add(keyword)
 
         return filtered_keywords
-    
+
     def _create_keyword_entity(
-        self, 
-        keyword: str, 
-        chunk_id: str, 
-        document_id: str, 
+        self,
+        keyword: str,
+        chunk_id: str,
+        document_id: str,
         domain: str
     ) -> Entity:
         """Create a keyword entity.
-        
+
         Args:
             keyword: Keyword text
             chunk_id: Source chunk ID
             document_id: Source document ID
             domain: Domain context
-            
+
         Returns:
             Keyword entity
         """
@@ -332,7 +332,7 @@ class ChunkKeywordExtractor:
         normalized_keyword = keyword.lower().strip()
         content_hash = hashlib.md5(normalized_keyword.encode()).hexdigest()[:12]
         entity_id = f"ent_{content_hash}"
-        
+
         return Entity(
             id=entity_id,
             name=keyword,
@@ -347,20 +347,20 @@ class ChunkKeywordExtractor:
                 "original_type": "KEYWORD"  # Keep original semantic type for reference
             }
         )
-    
+
     def _create_keyword_chunk_relationship(
-        self, 
-        keyword_entity_id: str, 
-        chunk_id: str, 
+        self,
+        keyword_entity_id: str,
+        chunk_id: str,
         keyword: str
     ) -> Relation:
         """Create a relationship between keyword entity and chunk.
-        
+
         Args:
             keyword_entity_id: Keyword entity ID
             chunk_id: Chunk ID
             keyword: Keyword text
-            
+
         Returns:
             Relation object
         """
@@ -368,7 +368,7 @@ class ChunkKeywordExtractor:
         content_for_hash = f"{keyword_entity_id}_DESCRIBES_{chunk_id}"
         content_hash = hashlib.md5(content_for_hash.encode()).hexdigest()[:12]
         rel_id = f"rel_{content_hash}"
-        
+
         return Relation(
             id=rel_id,
             source_entity_id=keyword_entity_id,

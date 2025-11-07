@@ -24,7 +24,7 @@ from typing import Optional, Dict, Any
 
 class EnhancedIngestionRequest(BaseModel):
     """Enhanced ingestion request with remote processing support."""
-    
+
     source_type: Optional[str] = Field(None, description="Content type (auto-detected if not provided)")
     webhook_url: Optional[str] = Field(None, description="Webhook URL for completion notification")
     metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata")
@@ -34,7 +34,7 @@ class EnhancedIngestionRequest(BaseModel):
     chunking_strategy: Optional[str] = Field(None, description="Chunking strategy")
     document_id: Optional[str] = Field(None, description="Document identifier for replacement")
     replace_existing: Optional[bool] = Field(False, description="Replace existing document")
-    
+
     # New remote processing parameters
     remote: Optional[bool] = Field(False, description="Use remote processing workers")
     remote_timeout: Optional[int] = Field(None, description="Remote processing timeout in seconds")
@@ -42,7 +42,7 @@ class EnhancedIngestionRequest(BaseModel):
 
 class RemoteJobCreationRequest(BaseModel):
     """Request for creating a remote conversion job."""
-    
+
     source_file_path: str = Field(..., description="Path to source file")
     content_type: str = Field(..., description="Content type")
     task_options: Dict[str, Any] = Field(default_factory=dict, description="Processing options")
@@ -68,7 +68,7 @@ logger = structlog.get_logger(__name__)
 
 class RemoteJobCreator:
     """Service for creating and managing remote conversion jobs."""
-    
+
     def __init__(self):
         self.api_base_url = os.getenv('MORAG_API_BASE_URL', 'http://localhost:8000')
         self.timeout_config = {
@@ -79,17 +79,17 @@ class RemoteJobCreator:
             'web': int(os.getenv('MORAG_REMOTE_TIMEOUT_WEB', '600')),  # 10 minutes
             'youtube': int(os.getenv('MORAG_REMOTE_TIMEOUT_YOUTUBE', '1800'))  # 30 minutes
         }
-    
+
     def should_use_remote_processing(self, content_type: str, remote_requested: bool) -> bool:
         """Determine if remote processing should be used."""
         if not remote_requested:
             return False
-        
+
         # Check if remote processing is enabled globally
         if not os.getenv('MORAG_REMOTE_CONVERSION_ENABLED', 'false').lower() == 'true':
             logger.warning("Remote conversion requested but not enabled globally")
             return False
-        
+
         # Check if content type supports remote processing
         supported_types = ['audio', 'video', 'youtube']  # Start with media types
         if content_type not in supported_types:
@@ -97,9 +97,9 @@ class RemoteJobCreator:
                        content_type=content_type,
                        supported_types=supported_types)
             return False
-        
+
         return True
-    
+
     def create_remote_job(self, request: RemoteJobCreationRequest) -> Optional[str]:
         """Create a remote conversion job and return job ID."""
         try:
@@ -107,7 +107,7 @@ class RemoteJobCreator:
             timeout_seconds = request.timeout_seconds
             if not timeout_seconds:
                 timeout_seconds = self.timeout_config.get(request.content_type, 1800)
-            
+
             # Prepare job creation payload
             payload = {
                 'source_file_path': request.source_file_path,
@@ -115,41 +115,41 @@ class RemoteJobCreator:
                 'task_options': request.task_options,
                 'ingestion_task_id': request.ingestion_task_id
             }
-            
+
             # Make API call to create remote job
             response = requests.post(
                 f"{self.api_base_url}/api/v1/remote-jobs/",
                 json=payload,
                 timeout=30
             )
-            
+
             if response.status_code == 200:
                 job_data = response.json()
                 job_id = job_data.get('job_id')
-                
+
                 logger.info("Remote job created successfully",
                            job_id=job_id,
                            content_type=request.content_type,
                            ingestion_task_id=request.ingestion_task_id)
-                
+
                 return job_id
             else:
                 logger.error("Failed to create remote job",
                            status_code=response.status_code,
                            response=response.text)
                 return None
-                
+
         except Exception as e:
             logger.error("Exception creating remote job", error=str(e))
             return None
-    
+
     def wait_for_remote_job_completion(self, job_id: str, timeout_seconds: int = 1800) -> Optional[Dict[str, Any]]:
         """Wait for remote job completion and return result."""
         import time
-        
+
         start_time = time.time()
         poll_interval = 10  # Poll every 10 seconds
-        
+
         while time.time() - start_time < timeout_seconds:
             try:
                 # Check job status
@@ -157,11 +157,11 @@ class RemoteJobCreator:
                     f"{self.api_base_url}/api/v1/remote-jobs/{job_id}/status",
                     timeout=10
                 )
-                
+
                 if response.status_code == 200:
                     job_status = response.json()
                     status = job_status.get('status')
-                    
+
                     if status == 'completed':
                         logger.info("Remote job completed successfully", job_id=job_id)
                         return job_status
@@ -176,18 +176,18 @@ class RemoteJobCreator:
                         logger.debug("Remote job still processing",
                                    job_id=job_id,
                                    status=status)
-                
+
                 time.sleep(poll_interval)
-                
+
             except Exception as e:
                 logger.error("Error checking remote job status",
                            job_id=job_id,
                            error=str(e))
                 time.sleep(poll_interval)
-        
+
         logger.error("Remote job timed out", job_id=job_id, timeout=timeout_seconds)
         return None
-    
+
     def get_remote_job_result(self, job_id: str) -> Optional[Dict[str, Any]]:
         """Get the result data from a completed remote job."""
         try:
@@ -195,16 +195,16 @@ class RemoteJobCreator:
                 f"{self.api_base_url}/api/v1/remote-jobs/{job_id}/status",
                 timeout=10
             )
-            
+
             if response.status_code == 200:
                 job_data = response.json()
                 if job_data.get('status') == 'completed':
                     # Extract result data from the job
                     # This would need to be implemented based on how results are stored
                     return job_data
-            
+
             return None
-            
+
         except Exception as e:
             logger.error("Error getting remote job result", job_id=job_id, error=str(e))
             return None
@@ -231,32 +231,32 @@ logger = structlog.get_logger(__name__)
 @celery_app.task(bind=True)
 def enhanced_ingest_file_task(self, file_path: str, content_type: Optional[str] = None, task_options: Optional[Dict[str, Any]] = None):
     """Enhanced file ingestion task with remote processing support."""
-    
+
     async def _ingest():
         api = get_morag_api()
         options = task_options or {}
-        
+
         try:
             self.update_state(state='PROGRESS', meta={'stage': 'initializing', 'progress': 0.1})
-            
+
             # Check if remote processing is requested
             remote_requested = options.get('remote', False)
             fallback_to_local = options.get('fallback_to_local', True)
-            
+
             logger.info("Starting file ingestion",
                        file_path=file_path,
                        content_type=content_type,
                        remote_requested=remote_requested,
                        task_id=self.request.id)
-            
+
             # Determine if we should use remote processing
             remote_creator = RemoteJobCreator()
             use_remote = remote_creator.should_use_remote_processing(content_type, remote_requested)
-            
+
             if use_remote:
                 logger.info("Using remote processing", file_path=file_path, content_type=content_type)
                 result = await _process_remotely(self, file_path, content_type, options, remote_creator)
-                
+
                 # If remote processing failed and fallback is enabled, try local processing
                 if result is None and fallback_to_local:
                     logger.warning("Remote processing failed, falling back to local processing",
@@ -265,25 +265,25 @@ def enhanced_ingest_file_task(self, file_path: str, content_type: Optional[str] 
             else:
                 logger.info("Using local processing", file_path=file_path, content_type=content_type)
                 result = await _process_locally(self, api, file_path, content_type, options)
-            
+
             if result is None:
                 raise Exception("Both remote and local processing failed")
-            
+
             # Continue with vector storage (same as before)
             return await _complete_ingestion(self, result, options)
-            
+
         except Exception as e:
             logger.error("File ingestion task failed", file_path=file_path, error=str(e))
             self.update_state(state='FAILURE', meta={'error': str(e)})
             raise
-    
+
     return asyncio.run(_ingest())
 
 async def _process_remotely(task, file_path: str, content_type: str, options: Dict[str, Any], remote_creator: RemoteJobCreator) -> Optional[ProcessingResult]:
     """Process file using remote workers."""
     try:
         task.update_state(state='PROGRESS', meta={'stage': 'creating_remote_job', 'progress': 0.2})
-        
+
         # Create remote job using repository
         from morag_core.models.remote_job import RemoteJob
 
@@ -307,13 +307,13 @@ async def _process_remotely(task, file_path: str, content_type: str, options: Di
         if not job_id:
             logger.error("Failed to create remote job")
             return None
-        
+
         task.update_state(state='PROGRESS', meta={
             'stage': 'waiting_for_remote_completion',
             'progress': 0.3,
             'remote_job_id': job_id
         })
-        
+
         # Wait for remote job completion by polling storage
         timeout_seconds = options.get('remote_timeout', 1800)
         start_time = time.time()
@@ -352,7 +352,7 @@ async def _process_remotely(task, file_path: str, content_type: str, options: Di
         # Timeout reached
         logger.error("Remote job timed out", job_id=job_id, timeout=timeout_seconds)
         return None
-        
+
     except Exception as e:
         logger.error("Remote processing failed", error=str(e))
         return None
@@ -361,15 +361,15 @@ async def _process_locally(task, api, file_path: str, content_type: str, options
     """Process file using local workers (existing logic)."""
     try:
         task.update_state(state='PROGRESS', meta={'stage': 'local_processing', 'progress': 0.4})
-        
+
         # Use existing local processing logic
         result = await api.process_file(file_path, content_type, options)
-        
+
         if not result.success:
             raise Exception(f"Local processing failed: {result.error_message}")
-        
+
         return result
-        
+
     except Exception as e:
         logger.error("Local processing failed", error=str(e))
         return None
@@ -378,23 +378,23 @@ async def _complete_ingestion(task, result: ProcessingResult, options: Dict[str,
     """Complete the ingestion process with vector storage."""
     try:
         task.update_state(state='PROGRESS', meta={'stage': 'storing', 'progress': 0.7})
-        
+
         # Ensure metadata is always a dictionary
         if result.metadata is None:
             result.metadata = {}
-        
+
         # Store in vector database (existing logic)
         from morag_services import MoRAGServices
         from morag_services.storage import QdrantVectorStorage
         from morag_services.embedding import GeminiEmbeddingService
-        
+
         services = MoRAGServices()
         storage = QdrantVectorStorage()
         embedding_service = GeminiEmbeddingService()
-        
+
         # Prepare content for vector storage
         content_for_storage = result.text_content or ""
-        
+
         # Generate document chunks
         from morag_core.utils.chunking import create_document_chunks
         chunks = create_document_chunks(
@@ -403,13 +403,13 @@ async def _complete_ingestion(task, result: ProcessingResult, options: Dict[str,
             chunk_overlap=options.get('chunk_overlap', 200),
             strategy=options.get('chunking_strategy', 'sentence')
         )
-        
+
         # Store chunks in vector database
         stored_count = 0
         for chunk in chunks:
             try:
                 embedding = await embedding_service.generate_embedding(chunk.content)
-                
+
                 vector_metadata = {
                     **result.metadata,
                     'chunk_index': chunk.index,
@@ -418,23 +418,23 @@ async def _complete_ingestion(task, result: ProcessingResult, options: Dict[str,
                     'source_type': options.get('source_type', 'unknown'),
                     'processing_method': 'remote' if options.get('remote') else 'local'
                 }
-                
+
                 await storage.store_vector(
                     vector=embedding,
                     metadata=vector_metadata,
                     content=chunk.content
                 )
                 stored_count += 1
-                
+
             except Exception as e:
                 logger.error("Failed to store chunk", chunk_index=chunk.index, error=str(e))
-        
+
         task.update_state(state='PROGRESS', meta={'stage': 'completed', 'progress': 1.0})
-        
+
         logger.info("Ingestion completed successfully",
                    chunks_stored=stored_count,
                    processing_time=result.processing_time)
-        
+
         return {
             'success': True,
             'chunks_stored': stored_count,
@@ -442,7 +442,7 @@ async def _complete_ingestion(task, result: ProcessingResult, options: Dict[str,
             'metadata': result.metadata,
             'processing_method': 'remote' if options.get('remote') else 'local'
         }
-        
+
     except Exception as e:
         logger.error("Failed to complete ingestion", error=str(e))
         raise
@@ -479,11 +479,11 @@ async def enhanced_ingest_file(
         # Validate file upload
         if not file.filename:
             raise HTTPException(status_code=400, detail="No file provided")
-        
+
         # Save uploaded file
         upload_handler = get_upload_handler()
         temp_path = await upload_handler.save_upload(file)
-        
+
         # Parse metadata if provided
         parsed_metadata = {}
         if metadata:
@@ -491,14 +491,14 @@ async def enhanced_ingest_file(
                 parsed_metadata = json.loads(metadata)
             except json.JSONDecodeError:
                 raise HTTPException(status_code=400, detail="Invalid metadata JSON")
-        
+
         # Auto-detect source type if not provided
         if not source_type:
             source_type = get_morag_api()._detect_content_type(str(temp_path))
             logger.info("Auto-detected content type for file",
                        filename=file.filename,
                        detected_type=source_type)
-        
+
         # Create enhanced task options
         options = {
             "document_id": document_id,
@@ -515,7 +515,7 @@ async def enhanced_ingest_file(
             "remote_timeout": remote_timeout,
             "fallback_to_local": fallback_to_local
         }
-        
+
         # Submit to enhanced ingestion task
         from morag.ingest_tasks_enhanced import enhanced_ingest_file_task
         task = enhanced_ingest_file_task.delay(
@@ -523,19 +523,19 @@ async def enhanced_ingest_file(
             source_type,
             options
         )
-        
+
         logger.info("Enhanced file ingestion task created",
                    task_id=task.id,
                    filename=file.filename,
                    source_type=source_type,
                    remote_requested=remote)
-        
+
         return IngestResponse(
             task_id=task.id,
             status="pending",
             message=f"File '{file.filename}' queued for {'remote' if remote else 'local'} processing and ingestion"
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -590,19 +590,19 @@ class TestWorkerModifications:
     def test_should_use_remote_processing(self):
         # Test remote processing decision logic
         pass
-    
+
     def test_create_remote_job_success(self):
         # Test successful remote job creation
         pass
-    
+
     def test_create_remote_job_failure(self):
         # Test remote job creation failure
         pass
-    
+
     def test_fallback_to_local_processing(self):
         # Test fallback when remote processing fails
         pass
-    
+
     def test_enhanced_ingestion_task(self):
         # Test enhanced ingestion task with remote processing
         pass

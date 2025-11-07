@@ -233,7 +233,7 @@ Here are some example multi-hop reasoning queries to test:
 
 A successful multi-hop reasoning test should show:
 
-1. **Path Selection**: 
+1. **Path Selection**:
    - Multiple relevant paths found (>0)
    - Reasonable relevance scores (>5.0)
    - Logical reasoning explanations

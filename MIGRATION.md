@@ -11,8 +11,8 @@
 The entire API has been redesigned. Previous endpoints are **completely removed**:
 
 ❌ **REMOVED ENDPOINTS** (no fallback):
-- `/api/v1/process` - REMOVED 
-- `/api/v1/ingest/file` - REMOVED 
+- `/api/v1/process` - REMOVED
+- `/api/v1/ingest/file` - REMOVED
 - `/api/v1/query` - REMOVED
 - `/api/v1/extract` - REMOVED
 - All legacy processing endpoints
@@ -155,7 +155,7 @@ python test_integration.py
 ```bash
 # NEW TESTING STRUCTURE
 pytest                              # All tests
-pytest tests/unit/                 # Unit tests  
+pytest tests/unit/                 # Unit tests
 pytest tests/integration/          # Integration tests
 python tests/cli/test-simple.py   # Quick validation
 ```

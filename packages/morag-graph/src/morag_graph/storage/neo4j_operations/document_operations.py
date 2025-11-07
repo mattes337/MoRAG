@@ -13,13 +13,13 @@ logger = logging.getLogger(__name__)
 
 class DocumentOperations(BaseOperations):
     """Handles document and chunk storage/retrieval operations."""
-    
+
     async def store_document_with_unified_id(self, document: Document) -> str:
         """Store document with unified ID format.
-        
+
         Args:
             document: Document instance with unified ID
-            
+
         Returns:
             Document ID
         """
@@ -57,15 +57,15 @@ class DocumentOperations(BaseOperations):
                 "metadata": json.dumps(document.metadata) if document.metadata else "{}"
             }
         )
-        
+
         return result[0]['document_id']
-    
+
     async def store_chunk_with_unified_id(self, chunk: DocumentChunk) -> str:
         """Store document chunk with unified ID format.
-        
+
         Args:
             chunk: DocumentChunk instance with unified ID
-            
+
         Returns:
             Chunk ID
         """
@@ -95,15 +95,15 @@ class DocumentOperations(BaseOperations):
                 "metadata": json.dumps(chunk.metadata) if chunk.metadata else "{}"
             }
         )
-        
+
         return result[0]['chunk_id']
-    
+
     async def get_document_by_unified_id(self, document_id: str) -> Optional[Document]:
         """Retrieve document by unified ID.
-        
+
         Args:
             document_id: Unified document ID
-            
+
         Returns:
             Document instance or None if not found
         """
@@ -111,12 +111,12 @@ class DocumentOperations(BaseOperations):
         MATCH (d:Document {id: $document_id})
         RETURN d
         """
-        
+
         result = await self._execute_query(query, {"document_id": document_id})
-        
+
         if not result:
             return None
-        
+
         doc_data = result[0]['d']
         return Document(
             id=doc_data['id'],
@@ -128,13 +128,13 @@ class DocumentOperations(BaseOperations):
             ingestion_timestamp=datetime.fromisoformat(doc_data['ingestion_timestamp']),
             metadata=doc_data['metadata']
         )
-    
+
     async def get_chunks_by_document_id(self, document_id: str) -> List[DocumentChunk]:
         """Get all chunks for a document by unified ID.
-        
+
         Args:
             document_id: Unified document ID
-            
+
         Returns:
             List of DocumentChunk instances
         """
@@ -143,9 +143,9 @@ class DocumentOperations(BaseOperations):
         RETURN c
         ORDER BY c.chunk_index
         """
-        
+
         result = await self._execute_query(query, {"document_id": document_id})
-        
+
         chunks = []
         for record in result:
             chunk_data = record['c']
@@ -156,15 +156,15 @@ class DocumentOperations(BaseOperations):
                 text=chunk_data['text'],
                 metadata=chunk_data['metadata']
             ))
-        
+
         return chunks
-    
+
     async def store_document(self, document: Document) -> str:
         """Store a document in Neo4J.
-        
+
         Args:
             document: Document to store
-            
+
         Returns:
             Document ID
         """
@@ -198,16 +198,16 @@ class DocumentOperations(BaseOperations):
             "summary": document.summary,
             "metadata": json.dumps(document.metadata) if document.metadata else "{}"
         }
-        
+
         result = await self._execute_query(query, parameters)
         return result[0]["id"] if result else document.id
-    
+
     async def store_document_chunk(self, chunk: DocumentChunk) -> str:
         """Store a document chunk in Neo4J.
-        
+
         Args:
             chunk: DocumentChunk to store
-            
+
         Returns:
             Chunk ID
         """
@@ -233,7 +233,7 @@ class DocumentOperations(BaseOperations):
             "chunk_type": chunk.chunk_type,
             "metadata": json.dumps(chunk.metadata) if chunk.metadata else "{}"
         }
-        
+
         result = await self._execute_query(query, parameters)
         return result[0]["id"] if result else chunk.id
 
@@ -269,7 +269,7 @@ class DocumentOperations(BaseOperations):
 
     async def create_document_contains_chunk_relation(self, document_id: str, chunk_id: str) -> None:
         """Create a CONTAINS relationship between a document and a chunk.
-        
+
         Args:
             document_id: ID of the document
             chunk_id: ID of the chunk
@@ -282,13 +282,13 @@ class DocumentOperations(BaseOperations):
             "document_id": document_id,
             "chunk_id": chunk_id
         })
-    
+
     async def get_document_checksum(self, document_id: str) -> Optional[str]:
         """Get stored checksum for a document.
-        
+
         Args:
             document_id: Document identifier
-            
+
         Returns:
             Stored checksum or None if not found
         """
@@ -296,13 +296,13 @@ class DocumentOperations(BaseOperations):
         MATCH (d:Document {id: $document_id})
         RETURN d.checksum as checksum
         """
-        
+
         result = await self._execute_query(query, {"document_id": document_id})
         return result[0]["checksum"] if result and result[0]["checksum"] else None
-    
+
     async def store_document_checksum(self, document_id: str, checksum: str) -> None:
         """Store document checksum.
-        
+
         Args:
             document_id: Document identifier
             checksum: Document checksum to store
@@ -315,10 +315,10 @@ class DocumentOperations(BaseOperations):
             "document_id": document_id,
             "checksum": checksum
         })
-    
+
     async def delete_document_checksum(self, document_id: str) -> None:
         """Remove stored checksum for a document.
-        
+
         Args:
             document_id: Document identifier
         """
@@ -326,12 +326,12 @@ class DocumentOperations(BaseOperations):
         MATCH (d:Document {id: $document_id})
         REMOVE d.checksum, d.checksum_updated
         """
-        
+
         await self._execute_query(query, {"document_id": document_id})
-    
+
     async def validate_id_consistency(self) -> Dict[str, Any]:
         """Validate ID consistency across the database.
-        
+
         Returns:
             Validation report
         """
@@ -342,7 +342,7 @@ class DocumentOperations(BaseOperations):
         WHERE count > 1
         RETURN count(doc_id) as duplicate_documents, collect(doc_id)[0..5] as sample_ids
         """
-        
+
         # Check for orphaned chunks
         orphan_chunks_query = """
         MATCH (c:DocumentChunk)
@@ -351,10 +351,10 @@ class DocumentOperations(BaseOperations):
         }
         RETURN count(c) as orphaned_chunks, collect(c.id)[0..5] as sample_ids
         """
-        
+
         duplicate_result = await self._execute_query(duplicate_docs_query)
         orphan_result = await self._execute_query(orphan_chunks_query)
-        
+
         return {
             "duplicate_documents": {
                 "count": duplicate_result[0]['duplicate_documents'],

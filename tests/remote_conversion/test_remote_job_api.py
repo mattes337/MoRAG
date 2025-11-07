@@ -50,7 +50,7 @@ class TestRemoteJobAPI:
             task_options={"webhook_url": "http://example.com/webhook"}
         )
         override_service.create_job.return_value = mock_job
-        
+
         # Make request
         response = client.post("/api/v1/remote-jobs/", json={
             "source_file_path": "/tmp/test.mp3",
@@ -58,7 +58,7 @@ class TestRemoteJobAPI:
             "task_options": {"webhook_url": "http://example.com/webhook"},
             "ingestion_task_id": "test-task-123"
         })
-        
+
         # Verify response
         assert response.status_code == 200
         data = response.json()
@@ -70,7 +70,7 @@ class TestRemoteJobAPI:
         """Test creating a remote job with error."""
         # Setup mock to raise exception
         override_service.create_job.side_effect = Exception("Database error")
-        
+
         # Make request
         response = client.post("/api/v1/remote-jobs/", json={
             "source_file_path": "/tmp/test.mp3",
@@ -78,7 +78,7 @@ class TestRemoteJobAPI:
             "task_options": {},
             "ingestion_task_id": "test-task-123"
         })
-        
+
         # Verify error response
         assert response.status_code == 500
         assert "Failed to create remote job" in response.json()["detail"]
@@ -93,14 +93,14 @@ class TestRemoteJobAPI:
             task_options={"webhook_url": "http://example.com/webhook"}
         )
         override_service.poll_available_jobs.return_value = [mock_job]
-        
+
         # Make request
         response = client.get("/api/v1/remote-jobs/poll", params={
             "worker_id": "worker-1",
             "content_types": "audio,video",
             "max_jobs": 1
         })
-        
+
         # Verify response
         assert response.status_code == 200
         data = response.json()
@@ -113,14 +113,14 @@ class TestRemoteJobAPI:
         """Test polling for jobs when no jobs are available."""
         # Setup mock
         override_service.poll_available_jobs.return_value = []
-        
+
         # Make request
         response = client.get("/api/v1/remote-jobs/poll", params={
             "worker_id": "worker-1",
             "content_types": "audio,video",
             "max_jobs": 1
         })
-        
+
         # Verify response
         assert response.status_code == 200
         data = response.json()
@@ -142,7 +142,7 @@ class TestRemoteJobAPI:
         mock_job.status = "completed"
         override_service.submit_result.return_value = mock_job
         mock_continue.return_value = True
-        
+
         # Make request
         response = client.put("/api/v1/remote-jobs/job-123/result", json={
             "success": True,
@@ -150,13 +150,13 @@ class TestRemoteJobAPI:
             "metadata": {"duration": 120.5},
             "processing_time": 45.2
         })
-        
+
         # Verify response
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "completed"
         assert data["ingestion_continued"] == True
-        
+
         # Verify continuation was called
         mock_continue.assert_called_once_with(
             "job-123",
@@ -176,13 +176,13 @@ class TestRemoteJobAPI:
         )
         mock_job.status = "failed"
         override_service.submit_result.return_value = mock_job
-        
+
         # Make request
         response = client.put("/api/v1/remote-jobs/job-123/result", json={
             "success": False,
             "error_message": "Processing failed"
         })
-        
+
         # Verify response
         assert response.status_code == 200
         data = response.json()
@@ -193,13 +193,13 @@ class TestRemoteJobAPI:
         """Test submitting result for non-existent job."""
         # Setup mock
         override_service.submit_result.return_value = None
-        
+
         # Make request
         response = client.put("/api/v1/remote-jobs/nonexistent/result", json={
             "success": True,
             "content": "Processed content"
         })
-        
+
         # Verify error response
         assert response.status_code == 404
         assert "not found" in response.json()["detail"]
@@ -217,10 +217,10 @@ class TestRemoteJobAPI:
         mock_job.worker_id = "worker-1"
         mock_job.started_at = datetime.utcnow()
         override_service.get_job_status.return_value = mock_job
-        
+
         # Make request
         response = client.get("/api/v1/remote-jobs/job-123/status")
-        
+
         # Verify response
         assert response.status_code == 200
         data = response.json()
@@ -234,10 +234,10 @@ class TestRemoteJobAPI:
         """Test getting status for non-existent job."""
         # Setup mock
         override_service.get_job_status.return_value = None
-        
+
         # Make request
         response = client.get("/api/v1/remote-jobs/nonexistent/status")
-        
+
         # Verify error response
         assert response.status_code == 404
         assert "not found" in response.json()["detail"]
@@ -254,16 +254,16 @@ class TestRemoteJobAPI:
         )
         mock_job.status = "processing"
         override_service.get_job_status.return_value = mock_job
-        
+
         # Mock file existence
         mock_file = Mock()
         mock_file.exists.return_value = True
         mock_file.name = "test.mp3"
         mock_path.return_value = mock_file
-        
+
         # Make request
         response = client.get("/api/v1/remote-jobs/job-123/download")
-        
+
         # Verify response (would be file download in real scenario)
         # In test, we just verify the endpoint doesn't error
         assert response.status_code in [200, 404, 500]  # May fail due to file mocking
@@ -279,10 +279,10 @@ class TestRemoteJobAPI:
         )
         mock_job.status = "pending"  # Not processing
         override_service.get_job_status.return_value = mock_job
-        
+
         # Make request
         response = client.get("/api/v1/remote-jobs/job-123/download")
-        
+
         # Verify error response
         assert response.status_code == 403
         assert "not in processing state" in response.json()["detail"]

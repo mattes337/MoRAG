@@ -25,7 +25,7 @@ class EntityOperations(BaseOperations):
         """
         super().__init__(driver, database)
         self.logger = logger
-    
+
     def _is_generic_entity_name(self, name: str) -> bool:
         """Check if entity name is generic and should be avoided.
 
@@ -194,45 +194,45 @@ class EntityOperations(BaseOperations):
         await self.store_entity(entity)
         logger.info(f"Created missing entity: {entity.id} (name: {entity_name})")
         return entity.id  # Return the valid entity ID, not the original invalid one
-    
+
     async def store_entities(self, entities: List[Entity]) -> List[EntityId]:
         """Store multiple entities in Neo4J.
-        
+
         Uses MERGE based on name and type to prevent duplicate entities.
         Falls back to individual entity storage for proper deduplication.
-        
+
         Args:
             entities: List of entities to store
-            
+
         Returns:
             List of entity IDs
         """
         if not entities:
             return []
-        
+
         # Use individual store_entity calls to ensure proper MERGE logic
         # This is more reliable than batch operations for deduplication
         return [await self.store_entity(entity) for entity in entities]
-    
+
     async def store_entity_with_chunk_references(self, entity: Entity, chunk_ids: List[str]) -> EntityId:
         """Store entity with references to chunks where it's mentioned.
-        
+
         Args:
             entity: Entity instance
             chunk_ids: List of chunk IDs where entity is mentioned
-            
+
         Returns:
             Entity ID
         """
         # First store the entity
         entity_id = await self.store_entity(entity)
-        
+
         # Then create relationships to chunks
         for chunk_id in chunk_ids:
             await self._create_entity_chunk_relationship(entity_id, chunk_id)
-        
+
         return entity_id
-    
+
     async def _create_entity_chunk_relationship(self, entity_id: EntityId, chunk_id: str) -> None:
         """Create MENTIONS relationship between chunk and entity (chunk -> entity).
 
@@ -267,7 +267,7 @@ class EntityOperations(BaseOperations):
         """
         logger.info("fix_unconnected_entities called but is deprecated with chunk-based extraction")
         return 0
-    
+
     async def get_entities_by_chunk_id(self, chunk_id: str) -> List[Entity]:
         """Get all entities mentioned in a specific chunk.
 
@@ -290,7 +290,7 @@ class EntityOperations(BaseOperations):
             entities.append(Entity.from_neo4j_node(entity_data))
 
         return entities
-    
+
     async def get_chunks_by_entity_id(self, entity_id: EntityId) -> List[str]:
         """Get all chunk IDs where an entity is mentioned.
 
@@ -431,7 +431,7 @@ class EntityOperations(BaseOperations):
 
         self.logger.debug(f"Found {len(unique_chunks)} unique chunks for entities: {entity_names}")
         return unique_chunks
-    
+
     async def update_entity_chunk_references(self, entity_id: EntityId, chunk_ids: List[str]) -> None:
         """Update entity's chunk references by replacing all existing relationships.
 

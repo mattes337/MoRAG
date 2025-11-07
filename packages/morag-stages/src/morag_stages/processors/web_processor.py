@@ -19,12 +19,12 @@ except ImportError:
 
 class WebStageProcessor(StageProcessor):
     """Stage processor for web content using morag_web package."""
-    
+
     def __init__(self):
         """Initialize web stage processor."""
         self._web_processor = None
         self._services = None
-    
+
     def _get_web_processor(self):
         """Get or create web processor instance."""
         if self._web_processor is None:
@@ -34,7 +34,7 @@ class WebStageProcessor(StageProcessor):
             except ImportError as e:
                 raise ProcessingError(f"Web processor not available: {e}")
         return self._web_processor
-    
+
     def _get_services(self):
         """Get MoRAG services for web processing."""
         if self._services is None:
@@ -44,15 +44,15 @@ class WebStageProcessor(StageProcessor):
             except ImportError as e:
                 raise ProcessingError(f"MoRAG services not available: {e}")
         return self._services
-    
+
     def supports_content_type(self, content_type: str) -> bool:
         """Check if this processor supports the given content type."""
         return content_type.upper() == "WEB"
-    
+
     async def process(
-        self, 
-        input_file: Path, 
-        output_file: Path, 
+        self,
+        input_file: Path,
+        output_file: Path,
         config: Dict[str, Any]
     ) -> ProcessorResult:
         """Process web URL to markdown."""
@@ -86,14 +86,14 @@ class WebStageProcessor(StageProcessor):
             if ('www.' in url or '.com' in url or '.org' in url or '.net' in url) and not url.startswith(('http://', 'https://')):
                 # Default to https for security
                 url = 'https://' + url
-        
+
         logger.info("Processing web URL", url=url)
-        
+
         try:
             # Try using morag_web processor first
             try:
                 processor = self._get_web_processor()
-                
+
                 # Convert config to WebConfig
                 from morag_web import WebConfig
                 web_config = WebConfig(
@@ -104,9 +104,9 @@ class WebStageProcessor(StageProcessor):
                     convert_to_markdown=config.get('convert_to_markdown', True),
                     timeout=config.get('timeout', 30)
                 )
-                
+
                 result = await processor.process_url(url, web_config)
-                
+
                 metadata = {
                     "title": result.content.title,
                     "source": url,
@@ -118,13 +118,13 @@ class WebStageProcessor(StageProcessor):
                     "created_at": datetime.now().isoformat(),
                     **result.content.metadata
                 }
-                
+
                 # Use markdown content if available, otherwise plain content
                 content = result.content.markdown_content or result.content.content
-                
+
                 markdown_content = self.create_markdown_with_metadata(content, metadata)
                 output_file.write_text(markdown_content, encoding='utf-8')
-                
+
                 return ProcessorResult(
                     content=content,
                     metadata=metadata,
@@ -135,13 +135,13 @@ class WebStageProcessor(StageProcessor):
                     },
                     final_output_file=output_file
                 )
-                
+
             except Exception as web_error:
                 logger.warning("morag_web processor failed, trying MoRAG services", error=str(web_error))
-                
+
                 # Fallback to MoRAG services
                 services = self._get_services()
-                
+
                 # Prepare options for web service
                 options = {
                     'extract_links': config.get('extract_links', False),
@@ -149,10 +149,10 @@ class WebStageProcessor(StageProcessor):
                     'max_depth': config.get('max_depth', 1),
                     'timeout': config.get('timeout', 30)
                 }
-                
+
                 # Use web service
                 result = await services.process_web(url, options)
-                
+
                 metadata = {
                     "title": result.metadata.get('title', "Web Content"),
                     "source": url,
@@ -161,11 +161,11 @@ class WebStageProcessor(StageProcessor):
                     "created_at": datetime.now().isoformat(),
                     **result.metadata
                 }
-                
+
                 content = result.text_content or ""
                 markdown_content = self.create_markdown_with_metadata(content, metadata)
                 output_file.write_text(markdown_content, encoding='utf-8')
-                
+
                 return ProcessorResult(
                     content=content,
                     metadata=metadata,
@@ -176,7 +176,7 @@ class WebStageProcessor(StageProcessor):
                     },
                     final_output_file=output_file
                 )
-                
+
         except Exception as e:
             logger.error("Web processing failed", url=url, error=str(e))
             raise ProcessingError(f"Web processing failed for {url}: {e}")

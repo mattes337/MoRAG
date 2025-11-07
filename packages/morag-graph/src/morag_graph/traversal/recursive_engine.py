@@ -103,7 +103,7 @@ class CycleDetectionStrategy(Enum):
 
 class RecursiveTraversalEngine:
     """Intelligent recursive graph traversal engine."""
-    
+
     def __init__(
         self,
         graph_traversal: GraphTraversal,
@@ -111,7 +111,7 @@ class RecursiveTraversalEngine:
         config: Optional[Dict[str, Any]] = None
     ):
         """Initialize the recursive traversal engine.
-        
+
         Args:
             graph_traversal: Graph traversal operations
             path_selector: Optional LLM path selector
@@ -121,28 +121,28 @@ class RecursiveTraversalEngine:
         self.path_selector = path_selector or LLMPathSelector()
         self.config = config or {}
         self.settings = get_settings()
-        
+
         # Traversal parameters
         self.max_depth = self.config.get('max_depth', 4)
         self.max_paths = self.config.get('max_paths', 100)
         self.max_entities_per_level = self.config.get('max_entities_per_level', 20)
         self.max_traversal_time = self.config.get('max_traversal_time', 30.0)  # seconds
-        
+
         # Cycle detection
         self.cycle_detection = CycleDetectionStrategy(
             self.config.get('cycle_detection', 'smart')
         )
         self.allow_entity_revisit_depth = self.config.get('allow_entity_revisit_depth', 2)
-        
+
         # Performance settings
         self.enable_parallel_traversal = self.config.get('enable_parallel_traversal', True)
         self.batch_size = self.config.get('batch_size', 10)
         self.enable_early_termination = self.config.get('enable_early_termination', True)
-        
+
         # Scoring and filtering
         self.min_path_score = self.config.get('min_path_score', 0.2)
         self.score_decay_factor = self.config.get('score_decay_factor', 0.9)
-        
+
         logger.info(
             "Recursive traversal engine initialized",
             max_depth=self.max_depth,
@@ -150,7 +150,7 @@ class RecursiveTraversalEngine:
             cycle_detection=self.cycle_detection.value,
             enable_parallel_traversal=self.enable_parallel_traversal
         )
-    
+
     async def traverse(
         self,
         starting_entities: List[Entity],
@@ -159,13 +159,13 @@ class RecursiveTraversalEngine:
         max_depth: Optional[int] = None
     ) -> TraversalResult:
         """Perform recursive graph traversal.
-        
+
         Args:
             starting_entities: Starting entities for traversal
             query_context: Query context for guided traversal
             strategy: Traversal strategy to use
             max_depth: Optional override for maximum depth
-            
+
         Returns:
             TraversalResult with discovered paths and metadata
         """
@@ -179,10 +179,10 @@ class RecursiveTraversalEngine:
                 query_context=query_context,
                 metadata={'error': 'No starting entities provided'}
             )
-        
+
         start_time = time.time()
         max_depth = max_depth or self.max_depth
-        
+
         try:
             logger.info(
                 "Starting recursive traversal",
@@ -191,12 +191,12 @@ class RecursiveTraversalEngine:
                 strategy=strategy.value,
                 max_depth=max_depth
             )
-            
+
             # Initialize traversal state
             all_discovered_paths = []
             total_entities_visited = 0
             total_relations_traversed = 0
-            
+
             # Choose traversal method based on strategy
             if strategy == TraversalStrategy.BREADTH_FIRST:
                 paths, stats = await self._traverse_breadth_first(
@@ -214,11 +214,11 @@ class RecursiveTraversalEngine:
                 paths, stats = await self._traverse_adaptive(
                     starting_entities, query_context, max_depth
                 )
-            
+
             all_discovered_paths.extend(paths)
             total_entities_visited += stats['entities_visited']
             total_relations_traversed += stats['relations_traversed']
-            
+
             # Score and filter paths
             if all_discovered_paths:
                 scored_paths = await self.path_selector.select_paths(
@@ -230,9 +230,9 @@ class RecursiveTraversalEngine:
                 )
             else:
                 scored_paths = []
-            
+
             traversal_time = time.time() - start_time
-            
+
             logger.info(
                 "Recursive traversal completed",
                 discovered_paths=len(all_discovered_paths),
@@ -241,7 +241,7 @@ class RecursiveTraversalEngine:
                 relations_traversed=total_relations_traversed,
                 traversal_time=traversal_time
             )
-            
+
             return TraversalResult(
                 discovered_paths=scored_paths,
                 total_entities_visited=total_entities_visited,
@@ -255,7 +255,7 @@ class RecursiveTraversalEngine:
                     'early_termination_used': self.enable_early_termination
                 }
             )
-            
+
         except Exception as e:
             logger.error(f"Recursive traversal failed: {e}")
             return TraversalResult(
@@ -267,7 +267,7 @@ class RecursiveTraversalEngine:
                 query_context=query_context,
                 metadata={'error': str(e)}
             )
-    
+
     async def _traverse_breadth_first(
         self,
         starting_entities: List[Entity],
@@ -278,7 +278,7 @@ class RecursiveTraversalEngine:
         discovered_paths = []
         entities_visited = 0
         relations_traversed = 0
-        
+
         # Initialize queue with starting states
         queue = deque()
         for entity in starting_entities:
@@ -297,16 +297,16 @@ class RecursiveTraversalEngine:
                 source_documents=set()
             )
             queue.append(initial_state)
-        
+
         while queue and len(discovered_paths) < self.max_paths:
             # Check time limit
             if time.time() - time.time() > self.max_traversal_time:
                 logger.warning("Traversal time limit exceeded")
                 break
-            
+
             current_state = queue.popleft()
             entities_visited += 1
-            
+
             # Check depth limit
             if current_state.depth >= max_depth:
                 # Create path from current state
@@ -334,41 +334,41 @@ class RecursiveTraversalEngine:
                     )
                     discovered_paths.append(path_score)
                 continue
-            
+
             # Get neighbors
             try:
                 neighbors = await self.graph_traversal.find_neighbors(
                     current_state.current_entity.id,
                     max_distance=1
                 )
-                
+
                 # Limit neighbors per level
                 neighbors = neighbors[:self.max_entities_per_level]
-                
+
                 for neighbor in neighbors:
                     # Check cycle detection
                     if not self._should_visit_entity(neighbor, current_state):
                         continue
-                    
+
                     # Get relation between current entity and neighbor
                     relations = await self._get_relations_between(
                         current_state.current_entity, neighbor
                     )
-                    
+
                     for relation in relations:
                         relations_traversed += 1
-                        
+
                         # Calculate new score
                         new_score = current_state.accumulated_score * self.score_decay_factor
-                        
+
                         # Skip if score too low
                         if new_score < self.min_path_score:
                             continue
-                        
+
                         # Create new state
                         new_visited = current_state.visited_entities.copy()
                         new_visited.add(neighbor.id)
-                        
+
                         new_state = TraversalState(
                             current_entity=neighbor,
                             visited_entities=new_visited,
@@ -378,18 +378,18 @@ class RecursiveTraversalEngine:
                             accumulated_score=new_score,
                             metadata={}
                         )
-                        
+
                         queue.append(new_state)
-                        
+
             except Exception as e:
                 logger.warning(f"Failed to get neighbors for {current_state.current_entity.id}: {e}")
                 continue
-        
+
         return discovered_paths, {
             'entities_visited': entities_visited,
             'relations_traversed': relations_traversed
         }
-    
+
     async def _traverse_depth_first(
         self,
         starting_entities: List[Entity],
@@ -400,7 +400,7 @@ class RecursiveTraversalEngine:
         discovered_paths = []
         entities_visited = 0
         relations_traversed = 0
-        
+
         async def dfs_recursive(
             current_entity: Entity,
             visited: Set[str],
@@ -410,14 +410,14 @@ class RecursiveTraversalEngine:
             accumulated_score: float
         ):
             nonlocal entities_visited, relations_traversed
-            
+
             entities_visited += 1
-            
+
             # Check limits
-            if (depth >= max_depth or 
+            if (depth >= max_depth or
                 len(discovered_paths) >= self.max_paths or
                 accumulated_score < self.min_path_score):
-                
+
                 # Create path if valid
                 if len(path_entities) > 1:
                     path = GraphPath(entities=path_entities, relations=path_relations)
@@ -430,27 +430,27 @@ class RecursiveTraversalEngine:
                     )
                     discovered_paths.append(path_score)
                 return
-            
+
             # Get neighbors
             try:
                 neighbors = await self.graph_traversal.find_neighbors(
                     current_entity.id, max_distance=1
                 )
-                
+
                 for neighbor in neighbors[:self.max_entities_per_level]:
                     if neighbor.id in visited:
                         continue
-                    
+
                     # Get relations
                     relations = await self._get_relations_between(current_entity, neighbor)
-                    
+
                     for relation in relations:
                         relations_traversed += 1
-                        
+
                         new_score = accumulated_score * self.score_decay_factor
                         new_visited = visited.copy()
                         new_visited.add(neighbor.id)
-                        
+
                         await dfs_recursive(
                             neighbor,
                             new_visited,
@@ -459,21 +459,21 @@ class RecursiveTraversalEngine:
                             depth + 1,
                             new_score
                         )
-                        
+
             except Exception as e:
                 logger.warning(f"DFS failed for {current_entity.id}: {e}")
-        
+
         # Start DFS from each starting entity
         for entity in starting_entities:
             await dfs_recursive(
                 entity, {entity.id}, [entity], [], 0, 1.0
             )
-        
+
         return discovered_paths, {
             'entities_visited': entities_visited,
             'relations_traversed': relations_traversed
         }
-    
+
     async def _traverse_relevance_guided(
         self,
         starting_entities: List[Entity],
@@ -613,7 +613,7 @@ class RecursiveTraversalEngine:
         except Exception as e:
             logger.warning(f"Failed to calculate query alignment: {e}")
             return 0.5
-    
+
     async def _traverse_adaptive(
         self,
         starting_entities: List[Entity],
@@ -626,26 +626,26 @@ class RecursiveTraversalEngine:
             return await self._traverse_breadth_first(starting_entities, query_context, max_depth)
         else:
             return await self._traverse_depth_first(starting_entities, query_context, max_depth)
-    
+
     def _should_visit_entity(self, entity: Entity, current_state: TraversalState) -> bool:
         """Determine if an entity should be visited based on cycle detection strategy."""
         if self.cycle_detection == CycleDetectionStrategy.STRICT:
             return entity.id not in current_state.visited_entities
-        
+
         elif self.cycle_detection == CycleDetectionStrategy.RELAXED:
             # Allow revisiting if we're at a different depth
-            return (entity.id not in current_state.visited_entities or 
+            return (entity.id not in current_state.visited_entities or
                     current_state.depth >= self.allow_entity_revisit_depth)
-        
+
         else:  # SMART
             # Use heuristics: allow revisiting important entities
             if entity.id not in current_state.visited_entities:
                 return True
-            
+
             # Allow revisiting if entity appears in query
             query_lower = current_state.metadata.get('query', '').lower()
             return entity.name.lower() in query_lower
-    
+
     async def _get_relations_between(
         self,
         entity1: Entity,

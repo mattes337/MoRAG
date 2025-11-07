@@ -28,10 +28,10 @@ class TestMarkitdownService:
         """Test service initialization."""
         assert service._markitdown is None
         assert not service._initialized
-        
+
         # Initialize service
         await service._initialize()
-        
+
         assert service._initialized
         assert service._markitdown is not None
 
@@ -39,7 +39,7 @@ class TestMarkitdownService:
     async def test_get_supported_formats(self, service):
         """Test getting supported formats."""
         formats = await service.get_supported_formats()
-        
+
         assert isinstance(formats, list)
         assert len(formats) > 0
         assert 'pdf' in formats
@@ -54,7 +54,7 @@ class TestMarkitdownService:
         assert await service.supports_format('pdf')
         assert await service.supports_format('docx')
         assert await service.supports_format('xlsx')
-        
+
         # Test unsupported format
         assert not await service.supports_format('unknown')
 
@@ -64,10 +64,10 @@ class TestMarkitdownService:
         # Create test file
         test_file = tmp_path / "test.txt"
         test_file.write_text("Test content")
-        
+
         with patch.object(service, '_convert_sync', return_value=mock_markitdown_result):
             result = await service.convert_file(test_file)
-            
+
             assert result == "# Test Document\n\nThis is test content."
 
     @pytest.mark.asyncio
@@ -82,7 +82,7 @@ class TestMarkitdownService:
         # Create empty file
         test_file = tmp_path / "empty.txt"
         test_file.touch()
-        
+
         with pytest.raises(ConversionError, match="Empty file"):
             await service.convert_file(test_file)
 
@@ -98,11 +98,11 @@ class TestMarkitdownService:
         # Create test file
         test_file = tmp_path / "test.txt"
         test_file.write_text("Test content")
-        
+
         # Mock empty result
         empty_result = Mock()
         empty_result.text_content = ""
-        
+
         with patch.object(service, '_convert_sync', return_value=empty_result):
             with pytest.raises(ConversionError, match="empty content"):
                 await service.convert_file(test_file)
@@ -114,9 +114,9 @@ class TestMarkitdownService:
             mock_instance = Mock()
             mock_instance.convert.side_effect = Exception("Format not supported")
             mock_markitdown_class.return_value = mock_instance
-            
+
             service._markitdown = mock_instance
-            
+
             with pytest.raises(UnsupportedFormatError):
                 service._convert_sync("test.unknown", {})
 
@@ -126,9 +126,9 @@ class TestMarkitdownService:
         # Create test file
         test_file = tmp_path / "test.pdf"
         test_file.write_text("Test content")
-        
+
         info = await service.get_conversion_info(test_file)
-        
+
         assert info['file_path'] == str(test_file)
         assert info['format'] == 'pdf'
         assert info['supported'] is True
@@ -148,9 +148,9 @@ class TestMarkitdownService:
         mock_settings = Mock()
         mock_settings.markitdown_use_azure_doc_intel = True
         mock_settings.markitdown_azure_endpoint = "https://test.cognitiveservices.azure.com/"
-        
+
         service.settings = mock_settings
-        
+
         # Test configuration (should not raise errors)
         await service._configure_markitdown()
 
@@ -160,9 +160,9 @@ class TestMarkitdownService:
         # Mock settings with LLM image description enabled
         mock_settings = Mock()
         mock_settings.markitdown_use_llm_image_description = True
-        
+
         service.settings = mock_settings
-        
+
         # Test configuration (should not raise errors)
         await service._configure_markitdown()
 
@@ -178,6 +178,6 @@ class TestMarkitdownService:
         """Test conversion options mapping."""
         options = {"test_option": "test_value"}
         markitdown_options = service._get_markitdown_options(Mock())
-        
+
         # Currently returns empty dict, but structure is in place
         assert isinstance(markitdown_options, dict)

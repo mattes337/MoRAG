@@ -16,6 +16,9 @@ __all__ = ["MarkitdownConverter", "BaseMarkitdownConverter", "ChunkingProcessor"
 
 # Note: The rest of this file contains the original implementation
 # and will be removed in a future version. Use the split files instead.
+
+
+class BaseMarkitdownConverter:
     """Base markitdown-based document converter implementation."""
 
     def __init__(self):
@@ -201,18 +204,18 @@ __all__ = ["MarkitdownConverter", "BaseMarkitdownConverter", "ChunkingProcessor"
 
     def _get_markitdown_options(self, options: ConversionOptions) -> Dict[str, Any]:
         """Convert MoRAG conversion options to markitdown options.
-        
+
         Args:
             options: MoRAG conversion options
-            
+
         Returns:
             Dictionary of markitdown options
         """
         markitdown_options = {}
-        
+
         # Map relevant options to markitdown format
         # Note: Specific option mapping will be refined as we implement each converter
-        
+
         return markitdown_options
 
     async def supports_format(self, format_type: str) -> bool:

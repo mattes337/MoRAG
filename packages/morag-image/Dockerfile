@@ -43,7 +43,7 @@ CMD ["python", "-m", "morag_image.cli", "--help"]
 
 # Usage instructions as comments
 # Build: docker build -t morag-image .
-# Run with a single image: 
+# Run with a single image:
 #   docker run -v /path/to/local/dir:/data -e GOOGLE_API_KEY=your-key morag-image python -m morag_image.cli /data/image.jpg -o /data/output.json --caption --ocr
 # Run with a directory of images:
 #   docker run -v /path/to/local/dir:/data -e GOOGLE_API_KEY=your-key morag-image python -m morag_image.cli /data/images -o /data/output.json --caption --ocr

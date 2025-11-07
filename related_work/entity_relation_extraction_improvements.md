@@ -57,24 +57,24 @@ class EnhancedEntityExtractor:
     ) -> List[Entity]:
         """Extract entities with iterative gleaning."""
         all_entities = []
-        
+
         for round_num in range(max_rounds):
             # Extract entities for this round
             round_entities = await self._extract_round(text, round_num, all_entities)
-            
+
             if not round_entities:
                 break
-                
+
             # Check if we missed entities using LLM assessment
             missed_entities = await self._assess_missed_entities(
                 text, all_entities + round_entities
             )
-            
+
             if not missed_entities:
                 break
-                
+
             all_entities.extend(round_entities)
-        
+
         return self._deduplicate_entities(all_entities)
 ```
 
@@ -87,18 +87,18 @@ class SystematicDeduplicator:
         entities_by_chunk: Dict[str, List[Entity]]
     ) -> Dict[str, List[Entity]]:
         """Systematically deduplicate entities across all chunks."""
-        
+
         # Step 1: Build similarity matrix
         all_entities = []
         for chunk_entities in entities_by_chunk.values():
             all_entities.extend(chunk_entities)
-        
+
         # Step 2: Find merge candidates using embedding similarity
         merge_candidates = await self._find_merge_candidates(all_entities)
-        
+
         # Step 3: LLM-based merge confirmation
         confirmed_merges = await self._confirm_merges_with_llm(merge_candidates)
-        
+
         # Step 4: Apply merges and update references
         return await self._apply_merges(entities_by_chunk, confirmed_merges)
 ```
@@ -115,14 +115,14 @@ class EntityProfiler:
         context_chunks: List[str]
     ) -> EntityProfile:
         """Create comprehensive entity profile."""
-        
+
         profile_prompt = f"""
         Create a comprehensive profile for entity: {entity.name}
         Type: {entity.type}
-        
+
         Context from documents:
         {self._format_context_chunks(context_chunks)}
-        
+
         Generate:
         1. Descriptive summary (2-3 sentences)
         2. Key attributes and characteristics
@@ -130,7 +130,7 @@ class EntityProfiler:
         4. Relevant context snippets
         5. Searchable keywords
         """
-        
+
         response = await self.llm_client.generate(profile_prompt)
         return self._parse_entity_profile(response, entity)
 
@@ -141,15 +141,15 @@ class RelationProfiler:
         context_chunks: List[str]
     ) -> RelationProfile:
         """Create comprehensive relation profile."""
-        
+
         profile_prompt = f"""
         Create a profile for relationship:
         Source: {relation.source_entity}
         Target: {relation.target_entity}
         Type: {relation.relation_type}
-        
+
         Context: {relation.description}
-        
+
         Generate:
         1. Relationship summary
         2. Strength and nature of connection
@@ -157,7 +157,7 @@ class RelationProfiler:
         4. Temporal aspects (if any)
         5. Confidence assessment
         """
-        
+
         response = await self.llm_client.generate(profile_prompt)
         return self._parse_relation_profile(response, relation)
 ```
@@ -170,24 +170,24 @@ class RelationProfiler:
 class QueryClassifier:
     async def classify_query_type(self, query: str) -> QueryType:
         """Classify query as specific (entity-focused) or abstract (theme-focused)."""
-        
+
         classification_prompt = f"""
         Analyze this query and classify it:
         Query: "{query}"
-        
+
         Classification criteria:
         - SPECIFIC: Asks about particular entities, people, places, or concrete facts
         - ABSTRACT: Asks about themes, patterns, trends, or high-level concepts
-        
+
         Examples:
         - "What is the capital of France?" → SPECIFIC
         - "What are the main themes in climate change research?" → ABSTRACT
         - "How does John Smith relate to the project?" → SPECIFIC
         - "What patterns emerge from the data?" → ABSTRACT
-        
+
         Respond with: SPECIFIC or ABSTRACT
         """
-        
+
         response = await self.llm_client.generate(classification_prompt)
         return QueryType.SPECIFIC if "SPECIFIC" in response else QueryType.ABSTRACT
 ```
@@ -202,38 +202,38 @@ class DualLevelRetriever:
         max_entities: int = 10
     ) -> List[RetrievalResult]:
         """Retrieve for entity-focused queries."""
-        
+
         # 1. Extract entities from query
         query_entities = await self.entity_extractor.extract_from_query(query)
-        
+
         # 2. Find matching entities in graph
         matched_entities = await self.graph_storage.find_similar_entities(
             query_entities, similarity_threshold=0.8
         )
-        
+
         # 3. Expand to 1-hop neighbors
         expanded_entities = await self.graph_storage.get_neighbors(
             matched_entities, max_depth=1
         )
-        
+
         # 4. Retrieve associated facts and chunks
         return await self._retrieve_entity_context(expanded_entities)
-    
+
     async def retrieve_for_abstract_query(
         self,
         query: str,
         max_communities: int = 5
     ) -> List[RetrievalResult]:
         """Retrieve for theme-focused queries."""
-        
+
         # 1. Find relevant communities using vector similarity
         relevant_communities = await self.community_detector.find_relevant_communities(
             query, max_communities
         )
-        
+
         # 2. Retrieve community summaries
         community_summaries = await self._get_community_summaries(relevant_communities)
-        
+
         # 3. Rank by relevance to query
         return await self._rank_community_results(query, community_summaries)
 ```
@@ -247,55 +247,55 @@ class CommunityDetector:
     def __init__(self):
         self.leiden_algorithm = LeidenAlgorithm()
         self.community_cache = {}
-    
+
     async def detect_communities(
         self,
         graph: NetworkXGraph,
         max_levels: int = 4
     ) -> HierarchicalCommunities:
         """Detect hierarchical community structure."""
-        
+
         communities = {}
         current_graph = graph
-        
+
         for level in range(max_levels):
             # Apply Leiden algorithm
             partition = self.leiden_algorithm.find_partition(
                 current_graph,
                 resolution_parameter=1.0 / (level + 1)
             )
-            
+
             communities[level] = partition
-            
+
             # Create next level graph from communities
             if len(partition) <= 1:
                 break
-                
+
             current_graph = self._create_community_graph(current_graph, partition)
-        
+
         return HierarchicalCommunities(communities)
-    
+
     async def generate_community_summaries(
         self,
         communities: HierarchicalCommunities,
         level: int = 0
     ) -> Dict[str, CommunitySummary]:
         """Generate summaries for communities at specified level."""
-        
+
         summaries = {}
-        
+
         for community_id, entities in communities.get_level(level).items():
             # Get all entities and relations in community
             community_entities = await self._get_community_entities(entities)
             community_relations = await self._get_community_relations(entities)
-            
+
             # Generate summary using LLM
             summary = await self._generate_community_summary(
                 community_entities, community_relations, community_id
             )
-            
+
             summaries[community_id] = summary
-        
+
         return summaries
 ```
 
@@ -311,21 +311,21 @@ class UnifiedExtractionPipeline:
         self.deduplicator = SystematicDeduplicator()
         self.profiler = EntityRelationProfiler()
         self.community_detector = CommunityDetector()
-    
+
     async def process_document(
         self,
         document: Document,
         chunk_size: int = 1200
     ) -> ProcessingResult:
         """Process document with enhanced extraction pipeline."""
-        
+
         # Step 1: Chunk document
         chunks = await self._chunk_document(document, chunk_size)
-        
+
         # Step 2: Extract entities and relations with gleaning
         entities_by_chunk = {}
         relations_by_chunk = {}
-        
+
         for chunk in chunks:
             chunk_entities = await self.entity_extractor.extract_with_gleaning(
                 chunk.content, max_rounds=3
@@ -333,10 +333,10 @@ class UnifiedExtractionPipeline:
             chunk_relations = await self.relation_extractor.extract_with_gleaning(
                 chunk.content, chunk_entities, max_rounds=2
             )
-            
+
             entities_by_chunk[chunk.id] = chunk_entities
             relations_by_chunk[chunk.id] = chunk_relations
-        
+
         # Step 3: Cross-chunk deduplication
         deduplicated_entities = await self.deduplicator.deduplicate_across_chunks(
             entities_by_chunk
@@ -344,7 +344,7 @@ class UnifiedExtractionPipeline:
         deduplicated_relations = await self.deduplicator.deduplicate_relations(
             relations_by_chunk, deduplicated_entities
         )
-        
+
         # Step 4: Create entity and relation profiles
         entity_profiles = await self.profiler.create_entity_profiles(
             deduplicated_entities, chunks
@@ -352,14 +352,14 @@ class UnifiedExtractionPipeline:
         relation_profiles = await self.profiler.create_relation_profiles(
             deduplicated_relations, chunks
         )
-        
+
         # Step 5: Build graph and detect communities
         graph = await self._build_graph(entity_profiles, relation_profiles)
         communities = await self.community_detector.detect_communities(graph)
         community_summaries = await self.community_detector.generate_community_summaries(
             communities
         )
-        
+
         return ProcessingResult(
             entities=entity_profiles,
             relations=relation_profiles,

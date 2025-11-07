@@ -2,8 +2,8 @@
 
 ## Overview
 
-**Priority**: 🔄 **Maintenance** (1 week, Low Impact, Low ROI)  
-**Source**: General system flexibility principles  
+**Priority**: 🔄 **Maintenance** (1 week, Low Impact, Low ROI)
+**Source**: General system flexibility principles
 **Expected Impact**: Easier optimization for different domains and use cases
 
 ## Problem Statement
@@ -68,22 +68,22 @@ class ConfigManager:
         self.sections = {}
         self.overrides = {}
         self.environment_configs = {}
-        
+
         # Load configuration schema
         self._load_config_schema()
-        
+
         # Load base configurations
         self._load_base_configs()
-        
+
         # Apply environment-specific overrides
         self._load_environment_overrides()
 
     def get(self, section: str, parameter: str, scope_context: Dict[str, str] = None) -> Any:
         """Get configuration value with scope-aware resolution."""
-        
+
         # Build lookup key with scope context
         lookup_keys = [f"{section}.{parameter}"]
-        
+
         if scope_context:
             # Add scoped lookup keys in priority order
             if 'session_id' in scope_context:
@@ -92,37 +92,37 @@ class ConfigManager:
                 lookup_keys.insert(0, f"user.{scope_context['user_id']}.{section}.{parameter}")
             if 'collection_name' in scope_context:
                 lookup_keys.insert(0, f"collection.{scope_context['collection_name']}.{section}.{parameter}")
-        
+
         # Try each lookup key in priority order
         for key in lookup_keys:
             if key in self.overrides:
                 return self.overrides[key]
-        
+
         # Fall back to base configuration
         if section in self.sections and parameter in self.sections[section].parameters:
             return self.sections[section].parameters[parameter].value
-        
+
         # Return default if available
         if section in self.sections and parameter in self.sections[section].parameters:
             return self.sections[section].parameters[parameter].default_value
-        
+
         raise KeyError(f"Configuration parameter {section}.{parameter} not found")
 
-    def set(self, section: str, parameter: str, value: Any, 
+    def set(self, section: str, parameter: str, value: Any,
             scope_context: Dict[str, str] = None, validate: bool = True) -> bool:
         """Set configuration value with validation."""
-        
+
         # Validate parameter exists
         if section not in self.sections or parameter not in self.sections[section].parameters:
             raise KeyError(f"Configuration parameter {section}.{parameter} not found")
-        
+
         param_config = self.sections[section].parameters[parameter]
-        
+
         # Validate value if requested
         if validate:
             if not self._validate_value(param_config, value):
                 raise ValueError(f"Invalid value {value} for parameter {section}.{parameter}")
-        
+
         # Build override key
         if scope_context:
             if 'session_id' in scope_context:
@@ -135,29 +135,29 @@ class ConfigManager:
                 key = f"{section}.{parameter}"
         else:
             key = f"{section}.{parameter}"
-        
+
         # Set override
         self.overrides[key] = value
-        
+
         return not param_config.requires_restart
 
     def get_section(self, section_name: str, scope_context: Dict[str, str] = None) -> Dict[str, Any]:
         """Get all parameters in a section."""
         if section_name not in self.sections:
             raise KeyError(f"Configuration section {section_name} not found")
-        
+
         result = {}
         for param_name in self.sections[section_name].parameters:
             result[param_name] = self.get(section_name, param_name, scope_context)
-        
+
         return result
 
     def list_parameters(self, section: str = None) -> Dict[str, Dict[str, Any]]:
         """List all available parameters with their metadata."""
         result = {}
-        
+
         sections_to_process = [section] if section else self.sections.keys()
-        
+
         for section_name in sections_to_process:
             if section_name in self.sections:
                 result[section_name] = {}
@@ -173,14 +173,14 @@ class ConfigManager:
                         'scope': param_config.scope.value,
                         'requires_restart': param_config.requires_restart
                     }
-        
+
         return result
 
     def save_overrides(self, file_path: str = None):
         """Save current overrides to file."""
         if not file_path:
             file_path = self.config_dir / "overrides.yaml"
-        
+
         with open(file_path, 'w') as f:
             yaml.dump(self.overrides, f, default_flow_style=False)
 
@@ -208,13 +208,13 @@ class ConfigManager:
 
     def _load_config_schema(self):
         """Load configuration schema defining all available parameters."""
-        
+
         # Entity Extraction Configuration
         entity_section = ConfigSection(
             name="entity_extraction",
             description="Entity extraction and normalization parameters"
         )
-        
+
         entity_section.parameters["confidence_threshold"] = ConfigParameter(
             name="confidence_threshold",
             value=0.4,
@@ -225,7 +225,7 @@ class ConfigManager:
             max_value=1.0,
             scope=ConfigScope.COLLECTION
         )
-        
+
         entity_section.parameters["max_entities_per_chunk"] = ConfigParameter(
             name="max_entities_per_chunk",
             value=50,
@@ -236,7 +236,7 @@ class ConfigManager:
             max_value=200,
             scope=ConfigScope.COLLECTION
         )
-        
+
         entity_section.parameters["normalization_enabled"] = ConfigParameter(
             name="normalization_enabled",
             value=True,
@@ -245,15 +245,15 @@ class ConfigManager:
             data_type=bool,
             scope=ConfigScope.COLLECTION
         )
-        
+
         self.sections["entity_extraction"] = entity_section
-        
+
         # Graph Traversal Configuration
         graph_section = ConfigSection(
             name="graph_traversal",
             description="Graph traversal and reasoning parameters"
         )
-        
+
         graph_section.parameters["max_hops"] = ConfigParameter(
             name="max_hops",
             value=3,
@@ -264,7 +264,7 @@ class ConfigManager:
             max_value=10,
             scope=ConfigScope.COLLECTION
         )
-        
+
         graph_section.parameters["similarity_threshold"] = ConfigParameter(
             name="similarity_threshold",
             value=0.7,
@@ -275,7 +275,7 @@ class ConfigManager:
             max_value=1.0,
             scope=ConfigScope.COLLECTION
         )
-        
+
         graph_section.parameters["max_results"] = ConfigParameter(
             name="max_results",
             value=10,
@@ -286,15 +286,15 @@ class ConfigManager:
             max_value=100,
             scope=ConfigScope.SESSION
         )
-        
+
         self.sections["graph_traversal"] = graph_section
-        
+
         # Query Processing Configuration
         query_section = ConfigSection(
             name="query_processing",
             description="Query processing and response generation parameters"
         )
-        
+
         query_section.parameters["timeout_seconds"] = ConfigParameter(
             name="timeout_seconds",
             value=30,
@@ -305,7 +305,7 @@ class ConfigManager:
             max_value=300,
             scope=ConfigScope.GLOBAL
         )
-        
+
         query_section.parameters["max_context_tokens"] = ConfigParameter(
             name="max_context_tokens",
             value=4000,
@@ -316,7 +316,7 @@ class ConfigManager:
             max_value=32000,
             scope=ConfigScope.COLLECTION
         )
-        
+
         query_section.parameters["enable_caching"] = ConfigParameter(
             name="enable_caching",
             value=True,
@@ -325,15 +325,15 @@ class ConfigManager:
             data_type=bool,
             scope=ConfigScope.GLOBAL
         )
-        
+
         self.sections["query_processing"] = query_section
-        
+
         # Performance Configuration
         perf_section = ConfigSection(
             name="performance",
             description="Performance and optimization parameters"
         )
-        
+
         perf_section.parameters["batch_size"] = ConfigParameter(
             name="batch_size",
             value=32,
@@ -345,7 +345,7 @@ class ConfigManager:
             scope=ConfigScope.GLOBAL,
             requires_restart=True
         )
-        
+
         perf_section.parameters["worker_threads"] = ConfigParameter(
             name="worker_threads",
             value=4,
@@ -357,18 +357,18 @@ class ConfigManager:
             scope=ConfigScope.GLOBAL,
             requires_restart=True
         )
-        
+
         self.sections["performance"] = perf_section
 
     def _load_base_configs(self):
         """Load base configuration files."""
         config_files = [
             "entity_extraction.yml",
-            "graph_traversal.yml", 
+            "graph_traversal.yml",
             "query_processing.yml",
             "performance.yml"
         ]
-        
+
         for config_file in config_files:
             file_path = self.config_dir / config_file
             if file_path.exists():
@@ -380,7 +380,7 @@ class ConfigManager:
         """Load environment-specific configuration overrides."""
         env = os.getenv('MORAG_ENV', 'development')
         env_file = self.config_dir / f"{env}.yml"
-        
+
         if env_file.exists():
             with open(env_file, 'r') as f:
                 env_config = yaml.safe_load(f)
@@ -396,24 +396,24 @@ class ConfigManager:
 
     def _validate_value(self, param_config: ConfigParameter, value: Any) -> bool:
         """Validate a configuration value."""
-        
+
         # Type check
         if not isinstance(value, param_config.data_type):
             try:
                 value = param_config.data_type(value)
             except (ValueError, TypeError):
                 return False
-        
+
         # Range check for numeric values
         if param_config.min_value is not None and value < param_config.min_value:
             return False
         if param_config.max_value is not None and value > param_config.max_value:
             return False
-        
+
         # Allowed values check
         if param_config.allowed_values is not None and value not in param_config.allowed_values:
             return False
-        
+
         return True
 ```
 
@@ -443,18 +443,18 @@ async def list_sections():
     return list(config_manager.sections.keys())
 
 @router.get("/sections/{section_name}")
-async def get_section(section_name: str, 
+async def get_section(section_name: str,
                      collection_name: Optional[str] = Query(None),
                      user_id: Optional[str] = Query(None)):
     """Get all parameters in a configuration section."""
     config_manager = ConfigManager()
-    
+
     scope_context = {}
     if collection_name:
         scope_context['collection_name'] = collection_name
     if user_id:
         scope_context['user_id'] = user_id
-    
+
     try:
         return config_manager.get_section(section_name, scope_context)
     except KeyError as e:
@@ -467,19 +467,19 @@ async def list_all_parameters():
     return config_manager.list_parameters()
 
 @router.get("/parameters/{section_name}/{parameter_name}")
-async def get_parameter(section_name: str, 
+async def get_parameter(section_name: str,
                        parameter_name: str,
                        collection_name: Optional[str] = Query(None),
                        user_id: Optional[str] = Query(None)):
     """Get a specific configuration parameter."""
     config_manager = ConfigManager()
-    
+
     scope_context = {}
     if collection_name:
         scope_context['collection_name'] = collection_name
     if user_id:
         scope_context['user_id'] = user_id
-    
+
     try:
         value = config_manager.get(section_name, parameter_name, scope_context)
         return {"value": value}
@@ -490,21 +490,21 @@ async def get_parameter(section_name: str,
 async def update_parameter(request: ConfigUpdateRequest):
     """Update a configuration parameter."""
     config_manager = ConfigManager()
-    
+
     scope_context = {}
     if request.collection_name:
         scope_context['collection_name'] = request.collection_name
     if request.user_id:
         scope_context['user_id'] = request.user_id
-    
+
     try:
         can_apply_immediately = config_manager.set(
-            request.section, 
-            request.parameter, 
-            request.value, 
+            request.section,
+            request.parameter,
+            request.value,
             scope_context
         )
-        
+
         return {
             "success": True,
             "requires_restart": not can_apply_immediately,
@@ -514,12 +514,12 @@ async def update_parameter(request: ConfigUpdateRequest):
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.post("/reset")
-async def reset_configuration(section: Optional[str] = None, 
+async def reset_configuration(section: Optional[str] = None,
                             parameter: Optional[str] = None):
     """Reset configuration to defaults."""
     config_manager = ConfigManager()
     config_manager.reset_to_defaults(section, parameter)
-    
+
     return {"success": True, "message": "Configuration reset to defaults"}
 
 @router.post("/save")
@@ -527,7 +527,7 @@ async def save_configuration():
     """Save current configuration overrides."""
     config_manager = ConfigManager()
     config_manager.save_overrides()
-    
+
     return {"success": True, "message": "Configuration saved"}
 ```
 
@@ -544,40 +544,40 @@ from morag_core.config.config_manager import ConfigManager
 def main():
     parser = argparse.ArgumentParser(description='MoRAG Configuration Manager')
     subparsers = parser.add_subparsers(dest='command', help='Available commands')
-    
+
     # List command
     list_parser = subparsers.add_parser('list', help='List configuration parameters')
     list_parser.add_argument('--section', help='Specific section to list')
-    
+
     # Get command
     get_parser = subparsers.add_parser('get', help='Get configuration value')
     get_parser.add_argument('section', help='Configuration section')
     get_parser.add_argument('parameter', help='Parameter name')
     get_parser.add_argument('--collection', help='Collection context')
-    
+
     # Set command
     set_parser = subparsers.add_parser('set', help='Set configuration value')
     set_parser.add_argument('section', help='Configuration section')
     set_parser.add_argument('parameter', help='Parameter name')
     set_parser.add_argument('value', help='Parameter value')
     set_parser.add_argument('--collection', help='Collection context')
-    
+
     # Reset command
     reset_parser = subparsers.add_parser('reset', help='Reset to defaults')
     reset_parser.add_argument('--section', help='Section to reset')
     reset_parser.add_argument('--parameter', help='Parameter to reset')
-    
+
     # Validate command
     validate_parser = subparsers.add_parser('validate', help='Validate configuration')
-    
+
     args = parser.parse_args()
-    
+
     config_manager = ConfigManager()
-    
+
     if args.command == 'list':
         parameters = config_manager.list_parameters(args.section)
         print(yaml.dump(parameters, default_flow_style=False))
-        
+
     elif args.command == 'get':
         scope_context = {'collection_name': args.collection} if args.collection else None
         try:
@@ -585,7 +585,7 @@ def main():
             print(f"{args.section}.{args.parameter} = {value}")
         except KeyError as e:
             print(f"Error: {e}")
-            
+
     elif args.command == 'set':
         scope_context = {'collection_name': args.collection} if args.collection else None
         try:
@@ -597,22 +597,22 @@ def main():
                 value = int(value)
             elif '.' in value and value.replace('.', '').isdigit():
                 value = float(value)
-            
+
             can_apply = config_manager.set(args.section, args.parameter, value, scope_context)
             print(f"Set {args.section}.{args.parameter} = {value}")
             if not can_apply:
                 print("Warning: This change requires a system restart to take effect")
         except (KeyError, ValueError) as e:
             print(f"Error: {e}")
-            
+
     elif args.command == 'reset':
         config_manager.reset_to_defaults(args.section, args.parameter)
         print("Configuration reset to defaults")
-        
+
     elif args.command == 'validate':
         # Validate current configuration
         print("Configuration validation not yet implemented")
-        
+
     else:
         parser.print_help()
 
@@ -632,23 +632,23 @@ from morag_core.config.config_manager import ConfigManager
 class EntityExtractor:
     def __init__(self, config_manager: ConfigManager = None):
         self.config = config_manager or ConfigManager()
-    
+
     async def extract_entities(self, text: str, collection_name: str = None) -> List[Dict[str, Any]]:
         """Extract entities using configurable parameters."""
-        
+
         scope_context = {'collection_name': collection_name} if collection_name else None
-        
+
         # Get configuration values
         confidence_threshold = self.config.get('entity_extraction', 'confidence_threshold', scope_context)
         max_entities = self.config.get('entity_extraction', 'max_entities_per_chunk', scope_context)
         normalization_enabled = self.config.get('entity_extraction', 'normalization_enabled', scope_context)
-        
+
         # Use configuration in extraction logic
         entities = await self._extract_entities_internal(text, confidence_threshold, max_entities)
-        
+
         if normalization_enabled:
             entities = await self._normalize_entities(entities)
-        
+
         return entities
 ```
 
@@ -664,7 +664,7 @@ entity_extraction:
   normalization_enabled: true
   extraction_timeout: 30
 
-# configs/graph_traversal.yml  
+# configs/graph_traversal.yml
 graph_traversal:
   max_hops: 3
   similarity_threshold: 0.7
@@ -709,13 +709,13 @@ class TestConfigManager:
 
     def test_scope_context(self):
         # Test collection-specific configuration
-        self.config.set('entity_extraction', 'confidence_threshold', 0.9, 
+        self.config.set('entity_extraction', 'confidence_threshold', 0.9,
                        {'collection_name': 'test_collection'})
-        
+
         # Global value should be unchanged
         global_value = self.config.get('entity_extraction', 'confidence_threshold')
         assert global_value != 0.9
-        
+
         # Collection-specific value should be set
         collection_value = self.config.get('entity_extraction', 'confidence_threshold',
                                          {'collection_name': 'test_collection'})

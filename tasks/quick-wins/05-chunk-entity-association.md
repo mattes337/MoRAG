@@ -2,8 +2,8 @@
 
 ## Overview
 
-**Priority**: 📋 **Planned** (1 week, Medium Impact, Medium ROI)  
-**Source**: KG2RAG chunk-KG association patterns  
+**Priority**: 📋 **Planned** (1 week, Medium Impact, Medium ROI)
+**Source**: KG2RAG chunk-KG association patterns
 **Expected Impact**: Better retrieval precision, more reliable entity-based queries
 
 ## Problem Statement
@@ -73,57 +73,57 @@ class EntityAssociationManager:
     def __init__(self):
         self.confidence_threshold = 0.5
         self.context_window = 50  # characters around entity mention
-        
-    def create_entity_associations(self, 
-                                 chunk_id: str, 
-                                 chunk_text: str, 
+
+    def create_entity_associations(self,
+                                 chunk_id: str,
+                                 chunk_text: str,
                                  extracted_entities: List[Dict[str, any]]) -> List[EntityAssociation]:
         """Create enhanced entity associations for a chunk."""
-        
+
         associations = []
         entity_mentions = defaultdict(list)
-        
+
         # Group mentions by entity
         for entity_data in extracted_entities:
             entity_name = entity_data['name']
             normalized_name = entity_data.get('normalized_name', entity_name)
-            
+
             # Find all mentions of this entity in the text
             mentions = self._find_entity_mentions(
-                chunk_text, 
-                entity_name, 
+                chunk_text,
+                entity_name,
                 entity_data.get('confidence', 0.5),
                 entity_data.get('extraction_method', 'unknown'),
                 normalized_name
             )
-            
+
             entity_mentions[normalized_name].extend(mentions)
-        
+
         # Create associations
         for entity_name, mentions in entity_mentions.items():
             if not mentions:
                 continue
-                
+
             # Calculate statistics
             frequency = len(mentions)
             confidences = [m.confidence for m in mentions]
             confidence_avg = sum(confidences) / len(confidences)
             confidence_min = min(confidences)
             confidence_max = max(confidences)
-            
+
             # Calculate importance score
             importance_score = self._calculate_importance_score(
                 mentions, chunk_text, frequency
             )
-            
+
             # Get context snippets
             context_snippets = [m.context_snippet for m in mentions]
-            
+
             # Find co-occurring entities
             co_occurring = self._find_co_occurring_entities(
                 entity_name, entity_mentions, chunk_text
             )
-            
+
             association = EntityAssociation(
                 chunk_id=chunk_id,
                 entity_name=entity_name,
@@ -140,32 +140,32 @@ class EntityAssociationManager:
                     'entity_positions': [(m.start_position, m.end_position) for m in mentions]
                 }
             )
-            
+
             associations.append(association)
-        
+
         return associations
 
-    def _find_entity_mentions(self, 
-                            text: str, 
-                            entity_name: str, 
+    def _find_entity_mentions(self,
+                            text: str,
+                            entity_name: str,
                             confidence: float,
                             extraction_method: str,
                             normalized_name: str) -> List[EntityMention]:
         """Find all mentions of an entity in text."""
         mentions = []
-        
+
         # Create pattern for entity (case-insensitive, word boundaries)
         pattern = rf'\b{re.escape(entity_name)}\b'
-        
+
         for match in re.finditer(pattern, text, re.IGNORECASE):
             start_pos = match.start()
             end_pos = match.end()
-            
+
             # Extract context snippet
             context_start = max(0, start_pos - self.context_window)
             context_end = min(len(text), end_pos + self.context_window)
             context_snippet = text[context_start:context_end].strip()
-            
+
             mention = EntityMention(
                 entity_name=entity_name,
                 start_position=start_pos,
@@ -175,24 +175,24 @@ class EntityAssociationManager:
                 extraction_method=extraction_method,
                 normalized_form=normalized_name
             )
-            
+
             mentions.append(mention)
-        
+
         return mentions
 
-    def _calculate_importance_score(self, 
-                                  mentions: List[EntityMention], 
-                                  chunk_text: str, 
+    def _calculate_importance_score(self,
+                                  mentions: List[EntityMention],
+                                  chunk_text: str,
                                   frequency: int) -> float:
         """Calculate importance score for entity in chunk."""
-        
+
         # Base score from frequency
         chunk_words = len(chunk_text.split())
         frequency_score = min(frequency / max(chunk_words / 100, 1), 1.0)
-        
+
         # Confidence score
         avg_confidence = sum(m.confidence for m in mentions) / len(mentions)
-        
+
         # Position score (entities mentioned early are often more important)
         position_scores = []
         for mention in mentions:
@@ -200,50 +200,50 @@ class EntityAssociationManager:
             # Higher score for earlier positions
             position_score = 1.0 - (relative_position * 0.5)
             position_scores.append(position_score)
-        
+
         avg_position_score = sum(position_scores) / len(position_scores)
-        
+
         # Combined importance score
         importance = (
             0.4 * frequency_score +
             0.4 * avg_confidence +
             0.2 * avg_position_score
         )
-        
+
         return min(importance, 1.0)
 
-    def _find_co_occurring_entities(self, 
-                                  target_entity: str, 
-                                  all_entity_mentions: Dict[str, List[EntityMention]], 
+    def _find_co_occurring_entities(self,
+                                  target_entity: str,
+                                  all_entity_mentions: Dict[str, List[EntityMention]],
                                   chunk_text: str) -> Set[str]:
         """Find entities that co-occur with target entity."""
         co_occurring = set()
-        
+
         target_mentions = all_entity_mentions.get(target_entity, [])
-        
+
         for target_mention in target_mentions:
             # Define co-occurrence window around target mention
             window_start = max(0, target_mention.start_position - 200)
             window_end = min(len(chunk_text), target_mention.end_position + 200)
-            
+
             # Check other entities in this window
             for other_entity, other_mentions in all_entity_mentions.items():
                 if other_entity == target_entity:
                     continue
-                    
+
                 for other_mention in other_mentions:
                     if (window_start <= other_mention.start_position <= window_end or
                         window_start <= other_mention.end_position <= window_end):
                         co_occurring.add(other_entity)
-        
+
         return co_occurring
 
-    def create_chunk_profile(self, 
-                           chunk_id: str, 
-                           chunk_text: str, 
+    def create_chunk_profile(self,
+                           chunk_id: str,
+                           chunk_text: str,
                            associations: List[EntityAssociation]) -> ChunkEntityProfile:
         """Create comprehensive profile for chunk's entity content."""
-        
+
         if not associations:
             return ChunkEntityProfile(
                 chunk_id=chunk_id,
@@ -255,30 +255,30 @@ class EntityAssociationManager:
                 entity_relationships=[],
                 extraction_timestamp=datetime.now()
             )
-        
+
         # Calculate statistics
         total_entities = sum(assoc.frequency for assoc in associations)
         unique_entities = len(associations)
-        
+
         chunk_words = len(chunk_text.split())
         entity_density = (total_entities / chunk_words) * 100 if chunk_words > 0 else 0
-        
+
         # Calculate extraction quality score
         avg_confidence = sum(assoc.confidence_avg for assoc in associations) / len(associations)
         confidence_variance = self._calculate_confidence_variance(associations)
         quality_score = avg_confidence * (1 - confidence_variance)  # Penalize high variance
-        
+
         # Find dominant entities
         dominant_entities = sorted(
-            associations, 
-            key=lambda a: a.importance_score, 
+            associations,
+            key=lambda a: a.importance_score,
             reverse=True
         )[:5]
         dominant_entity_names = [assoc.entity_name for assoc in dominant_entities]
-        
+
         # Extract entity relationships (simple co-occurrence based)
         entity_relationships = self._extract_entity_relationships(associations, chunk_text)
-        
+
         return ChunkEntityProfile(
             chunk_id=chunk_id,
             total_entities=total_entities,
@@ -294,19 +294,19 @@ class EntityAssociationManager:
         """Calculate variance in confidence scores."""
         if len(associations) <= 1:
             return 0.0
-            
+
         confidences = [assoc.confidence_avg for assoc in associations]
         mean_confidence = sum(confidences) / len(confidences)
-        
+
         variance = sum((c - mean_confidence) ** 2 for c in confidences) / len(confidences)
         return min(variance, 1.0)  # Normalize to 0-1
 
-    def _extract_entity_relationships(self, 
-                                    associations: List[EntityAssociation], 
+    def _extract_entity_relationships(self,
+                                    associations: List[EntityAssociation],
                                     chunk_text: str) -> List[Tuple[str, str, str]]:
         """Extract simple entity relationships from co-occurrence patterns."""
         relationships = []
-        
+
         # Simple pattern-based relationship extraction
         relationship_patterns = [
             (r'(\w+)\s+(?:is|was)\s+(?:a|an|the)?\s*(\w+)', 'is_a'),
@@ -315,21 +315,21 @@ class EntityAssociationManager:
             (r'(\w+)\s+(?:owns|acquired)\s+(\w+)', 'owns'),
             (r'(\w+)\s+(?:and|with)\s+(\w+)', 'associated_with')
         ]
-        
+
         entity_names = {assoc.entity_name for assoc in associations}
-        
+
         for pattern, relation_type in relationship_patterns:
             for match in re.finditer(pattern, chunk_text, re.IGNORECASE):
                 entity1, entity2 = match.groups()
-                
+
                 # Check if both entities are in our extracted entities
                 if entity1 in entity_names and entity2 in entity_names:
                     relationships.append((entity1, relation_type, entity2))
-        
+
         return relationships[:10]  # Limit to top 10 relationships
 
-    def filter_associations_by_quality(self, 
-                                     associations: List[EntityAssociation], 
+    def filter_associations_by_quality(self,
+                                     associations: List[EntityAssociation],
                                      min_confidence: float = 0.5,
                                      min_importance: float = 0.3) -> List[EntityAssociation]:
         """Filter associations by quality thresholds."""
@@ -338,13 +338,13 @@ class EntityAssociationManager:
             if assoc.confidence_avg >= min_confidence and assoc.importance_score >= min_importance
         ]
 
-    def get_top_entities_by_importance(self, 
-                                     associations: List[EntityAssociation], 
+    def get_top_entities_by_importance(self,
+                                     associations: List[EntityAssociation],
                                      top_k: int = 10) -> List[EntityAssociation]:
         """Get top entities by importance score."""
         return sorted(
-            associations, 
-            key=lambda a: a.importance_score, 
+            associations,
+            key=lambda a: a.importance_score,
             reverse=True
         )[:top_k]
 ```
@@ -389,30 +389,30 @@ class EntityExtractor:
     def __init__(self):
         # ... existing initialization
         self.association_manager = EntityAssociationManager()
-    
-    async def extract_and_associate_entities(self, 
-                                           chunk_id: str, 
+
+    async def extract_and_associate_entities(self,
+                                           chunk_id: str,
                                            chunk_text: str) -> Dict[str, any]:
         """Extract entities and create enhanced associations."""
-        
+
         # Extract entities using existing methods
         extracted_entities = await self._extract_entities_raw(chunk_text)
-        
+
         # Create enhanced associations
         associations = self.association_manager.create_entity_associations(
             chunk_id, chunk_text, extracted_entities
         )
-        
+
         # Create chunk profile
         chunk_profile = self.association_manager.create_chunk_profile(
             chunk_id, chunk_text, associations
         )
-        
+
         # Filter by quality
         high_quality_associations = self.association_manager.filter_associations_by_quality(
             associations, min_confidence=0.6, min_importance=0.4
         )
-        
+
         return {
             'all_associations': associations,
             'high_quality_associations': high_quality_associations,
@@ -437,16 +437,16 @@ class EntityBasedRetriever:
     def __init__(self, neo4j_service, association_manager):
         self.neo4j = neo4j_service
         self.association_manager = association_manager
-    
-    async def retrieve_by_entity_importance(self, 
-                                          entities: List[str], 
+
+    async def retrieve_by_entity_importance(self,
+                                          entities: List[str],
                                           collection: str,
                                           top_k: int = 10) -> List[Dict[str, any]]:
         """Retrieve chunks based on entity importance scores."""
-        
+
         query = """
         MATCH (e:Entity)-[r:MENTIONED_IN]->(c:Chunk)
-        WHERE e.name IN $entities 
+        WHERE e.name IN $entities
           AND c.collection_name = $collection
         RETURN c.id as chunk_id,
                c.content as content,
@@ -458,24 +458,24 @@ class EntityBasedRetriever:
         ORDER BY r.importance_score DESC, r.confidence_avg DESC
         LIMIT $top_k
         """
-        
+
         results = await self.neo4j.execute_query(query, {
             'entities': entities,
             'collection': collection,
             'top_k': top_k
         })
-        
+
         return results
 
-    async def retrieve_by_entity_co_occurrence(self, 
-                                             entities: List[str], 
+    async def retrieve_by_entity_co_occurrence(self,
+                                             entities: List[str],
                                              collection: str) -> List[Dict[str, any]]:
         """Retrieve chunks where multiple entities co-occur."""
-        
+
         query = """
         MATCH (e1:Entity)-[r1:MENTIONED_IN]->(c:Chunk)<-[r2:MENTIONED_IN]-(e2:Entity)
-        WHERE e1.name IN $entities 
-          AND e2.name IN $entities 
+        WHERE e1.name IN $entities
+          AND e2.name IN $entities
           AND e1 <> e2
           AND c.collection_name = $collection
         RETURN c.id as chunk_id,
@@ -485,12 +485,12 @@ class EntityBasedRetriever:
                avg(r1.confidence_avg + r2.confidence_avg) as combined_confidence
         ORDER BY combined_importance DESC
         """
-        
+
         results = await self.neo4j.execute_query(query, {
             'entities': entities,
             'collection': collection
         })
-        
+
         return results
 ```
 
@@ -500,28 +500,28 @@ class EntityBasedRetriever:
 # entity_association.yml
 entity_association:
   enabled: true
-  
+
   confidence_thresholds:
     minimum: 0.5
     high_quality: 0.7
-    
+
   importance_scoring:
     frequency_weight: 0.4
     confidence_weight: 0.4
     position_weight: 0.2
-    
+
   context_extraction:
     window_size: 50  # characters around mention
     max_snippets_per_entity: 5
-    
+
   co_occurrence:
     window_size: 200  # characters for co-occurrence detection
-    
+
   quality_filtering:
     min_confidence: 0.6
     min_importance: 0.4
     max_entities_per_chunk: 50
-    
+
   relationship_extraction:
     enabled: true
     max_relationships_per_chunk: 10

@@ -33,15 +33,15 @@ class StageStatus(Enum):
 
 class Stage(ABC):
     """Abstract base class for all processing stages."""
-    
+
     def __init__(self, stage_type: StageType):
         """Initialize stage with its type.
-        
+
         Args:
             stage_type: The type of this stage
         """
         self.stage_type = stage_type
-        
+
     @abstractmethod
     async def execute(self,
                      input_files: List[Path],
@@ -61,61 +61,61 @@ class Stage(ABC):
             StageExecutionError: If stage execution fails
         """
         pass
-        
+
     @abstractmethod
     def validate_inputs(self, input_files: List[Path]) -> bool:
         """Validate that input files are suitable for this stage.
-        
+
         Args:
             input_files: List of input file paths to validate
-            
+
         Returns:
             True if inputs are valid, False otherwise
         """
         pass
-        
+
     @abstractmethod
     def get_dependencies(self) -> List[StageType]:
         """Return list of stages that must complete before this stage.
-        
+
         Returns:
             List of required stage types
         """
         pass
-        
+
     @abstractmethod
     def get_expected_outputs(self, input_files: List[Path], context: "StageContext") -> List[Path]:
         """Get expected output file paths for given inputs.
-        
+
         Args:
             input_files: List of input file paths
             context: Stage execution context
-            
+
         Returns:
             List of expected output file paths
         """
         pass
-        
+
     def get_stage_name(self) -> str:
         """Get the canonical name of this stage.
-        
+
         Returns:
             Stage name as string
         """
         return self.stage_type.value
-        
+
     def is_optional(self) -> bool:
         """Check if this stage is optional in the pipeline.
-        
+
         Returns:
             True if stage is optional, False if required
         """
         # Only markdown-optimizer is optional by default
         return self.stage_type == StageType.MARKDOWN_OPTIMIZER
-        
+
     def get_config_schema(self) -> dict:
         """Get configuration schema for this stage.
-        
+
         Returns:
             JSON schema for stage configuration
         """

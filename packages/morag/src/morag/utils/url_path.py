@@ -13,27 +13,27 @@ logger = structlog.get_logger(__name__)
 class URLPath:
     """
     A path-like object that preserves URL format without corruption.
-    
+
     This class prevents URLs from being mangled when passed through pathlib.Path(),
     which normalizes paths and can corrupt URLs by removing slashes.
     """
-    
+
     def __init__(self, url_str: str):
         """Initialize with URL string."""
         self.url_str = url_str
-    
+
     def __str__(self) -> str:
         """Return the original URL string."""
         return self.url_str
-    
+
     def __fspath__(self) -> str:
         """Return the URL string for os.fspath() compatibility."""
         return self.url_str
-    
+
     def __repr__(self) -> str:
         """Return a representation of the URLPath."""
         return f"URLPath('{self.url_str}')"
-    
+
     @property
     def name(self) -> str:
         """Return a filename-like name from the URL."""
@@ -43,7 +43,7 @@ class URLPath:
             name = parts[-1]
             if name and not name.startswith('?'):
                 return name
-        
+
         # Fallback to domain name or generic name
         if 'youtube.com' in self.url_str or 'youtu.be' in self.url_str:
             return 'youtube_video'
@@ -51,7 +51,7 @@ class URLPath:
             return 'web_content'
         else:
             return 'url_content'
-    
+
     def exists(self) -> bool:
         """URLs are assumed to exist for processing purposes."""
         return True
@@ -118,16 +118,16 @@ def create_path_from_string(path_str: str) -> Union[Path, URLPath]:
 def is_url(path_like) -> bool:
     """
     Check if a path-like object represents a URL.
-    
+
     Args:
         path_like: Path, URLPath, or string to check
-        
+
     Returns:
         True if it's a URL, False otherwise
     """
     if isinstance(path_like, URLPath):
         return True
-    
+
     path_str = str(path_like)
     return path_str.startswith(('http://', 'https://'))
 
@@ -135,21 +135,21 @@ def is_url(path_like) -> bool:
 def get_url_string(path_like) -> str:
     """
     Get the URL string from a path-like object.
-    
+
     Args:
         path_like: URLPath or string representing a URL
-        
+
     Returns:
         The URL string
-        
+
     Raises:
         ValueError: If the path_like object is not a URL
     """
     if isinstance(path_like, URLPath):
         return path_like.url_str
-    
+
     path_str = str(path_like)
     if path_str.startswith(('http://', 'https://')):
         return path_str
-    
+
     raise ValueError(f"Not a URL: {path_like}")

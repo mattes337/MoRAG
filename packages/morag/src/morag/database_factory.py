@@ -14,7 +14,7 @@ logger = structlog.get_logger(__name__)
 
 class DatabaseConnectionFactory:
     """Factory for creating database connections from server configurations."""
-    
+
     @staticmethod
     async def create_neo4j_storage(server_config: DatabaseServerConfig) -> Neo4jStorage:
         """Create Neo4j storage from server configuration."""
@@ -55,7 +55,7 @@ class DatabaseConnectionFactory:
         storage = Neo4jStorage(neo4j_config)
         await storage.connect()
         return storage
-    
+
     @staticmethod
     async def create_qdrant_storage(server_config: DatabaseServerConfig) -> QdrantStorage:
         """Create Qdrant storage from server configuration."""
@@ -88,7 +88,7 @@ class DatabaseConnectionFactory:
         storage = QdrantStorage(qdrant_config)
         await storage.connect()
         return storage
-    
+
     @staticmethod
     async def create_storage_from_config(server_config: DatabaseServerConfig) -> Union[Neo4jStorage, QdrantStorage]:
         """Create appropriate storage instance from server configuration."""
@@ -104,18 +104,18 @@ def parse_database_servers(database_servers: Optional[List[Dict[str, Any]]]) -> 
     """Parse database server configurations from request data."""
     if not database_servers:
         return []
-    
+
     configs = []
     for server_data in database_servers:
         try:
             config = DatabaseServerConfig(**server_data)
             configs.append(config)
         except Exception as e:
-            logger.warning("Invalid database server configuration", 
+            logger.warning("Invalid database server configuration",
                           server_data=server_data, error=str(e))
             # Skip invalid configurations rather than failing the entire request
             continue
-    
+
     return configs
 
 

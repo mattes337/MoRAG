@@ -108,7 +108,7 @@ class GraphProcessingConfig(BaseModel):
             openie_enable_entity_linking=os.getenv('MORAG_GRAPH_OPENIE_ENTITY_LINKING', 'true').lower() == 'true',
             openie_enable_predicate_normalization=os.getenv('MORAG_GRAPH_OPENIE_PREDICATE_NORM', 'true').lower() == 'true',
         )
-    
+
     @classmethod
     def from_env(cls) -> "GraphProcessingConfig":
         """Create configuration from environment variables."""
@@ -153,10 +153,10 @@ class GraphProcessingResult(BaseModel):
 
 class GraphProcessor:
     """Processor for extracting entities and relations from documents."""
-    
+
     def __init__(self, config: Optional[GraphProcessingConfig] = None, data_output_dir: Optional[str] = None):
         """Initialize the graph processor.
-        
+
         Args:
             config: Graph processing configuration
             data_output_dir: Directory to write data files to before database operations
@@ -169,21 +169,21 @@ class GraphProcessor:
         self._file_ingestion = None
         self._llm_config = None
         self._llm_client = None
-        
+
         # Initialize data file writer if output directory is provided
         try:
             from .data_file_writer import DataFileWriter
             self._data_writer = DataFileWriter(data_output_dir) if data_output_dir else None
         except ImportError:
             self._data_writer = None
-        
+
         if not GRAPH_AVAILABLE:
             self.config.enabled = False
             return
-            
+
         if self.config.enabled:
             self._initialize_components()
-    
+
     def _initialize_components(self):
         """Initialize graph processing components."""
         try:
@@ -249,11 +249,11 @@ class GraphProcessor:
             else:
                 logger.warning("Neo4j configuration incomplete - graph processing disabled")
                 self.config.enabled = False
-                
+
         except Exception as e:
             logger.error("Failed to initialize graph processing components", error=str(e))
             self.config.enabled = False
-    
+
     def is_enabled(self) -> bool:
         """Check if graph processing is enabled and available."""
         return self.config.enabled and GRAPH_AVAILABLE and self._storage is not None
@@ -314,13 +314,13 @@ Provide only the intention summary (maximum {max_length} characters):
         except Exception as e:
             logger.warning(f"Failed to generate document intention: {e}")
             return None
-    
+
     def _create_storage_from_config(self, db_config: DatabaseConfig):
         """Create a storage instance from database configuration.
-        
+
         Args:
             db_config: Database configuration
-            
+
         Returns:
             Storage instance
         """
@@ -333,7 +333,7 @@ Provide only the intention summary (maximum {max_length} characters):
                 database=db_config.database_name or self.config.neo4j_database or "neo4j"
             )
             return Neo4jStorage(neo4j_config)
-            
+
         elif db_config.type == DatabaseType.QDRANT:
             # Use provided config or fall back to defaults
             host = db_config.hostname or "localhost"
@@ -363,10 +363,10 @@ Provide only the intention summary (maximum {max_length} characters):
                 verify_ssl=verify_ssl
             )
             return QdrantStorage(qdrant_config)
-            
+
         else:
             raise ValueError(f"Unsupported database type: {db_config.type}")
-    
+
     async def process_document_multi_db(
         self,
         content: str,
@@ -375,13 +375,13 @@ Provide only the intention summary (maximum {max_length} characters):
         metadata: Optional[Dict[str, Any]] = None
     ) -> GraphProcessingResult:
         """Process a document and store in multiple databases.
-        
+
         Args:
             content: Document content to process
             source_doc_id: Unique identifier for the source document
             database_configs: List of database configurations
             metadata: Optional metadata
-            
+
         Returns:
             GraphProcessingResult with results for each database
         """
@@ -390,7 +390,7 @@ Provide only the intention summary (maximum {max_length} characters):
                 success=False,
                 error_message="Graph processing not available - morag-graph package not installed"
             )
-        
+
         if not database_configs:
             # Fall back to single database processing if no configs provided
             if self.is_enabled():
@@ -400,13 +400,13 @@ Provide only the intention summary (maximum {max_length} characters):
                     success=False,
                     error_message="No database configurations provided and default graph processing not enabled"
                 )
-        
+
         start_time = asyncio.get_event_loop().time()
         database_results = []
         total_entities = 0
         total_relations = 0
         processed_databases = set()  # Track to prevent duplicates
-        
+
         try:
             # Generate document intention for context-aware extraction
             intention = await self.generate_document_intention(content)
@@ -416,7 +416,7 @@ Provide only the intention summary (maximum {max_length} characters):
             # Extract entities and relations once with intention context
             entities = await self._entity_extractor.extract_entities(content, source_doc_id, intention=intention)
             relations = await self._relation_extractor.extract_relations(content, entities, source_doc_id, intention=intention)
-            
+
             # Write data to file before database operations
             data_file_path = None
             if self._data_writer:
@@ -431,11 +431,11 @@ Provide only the intention summary (maximum {max_length} characters):
                     logger.info(f"Data file written before database operations: {data_file_path}")
                 except Exception as e:
                     logger.warning(f"Failed to write data file: {str(e)}")
-            
+
             # Process each database configuration
             for db_config in database_configs:
                 db_start_time = asyncio.get_event_loop().time()
-                
+
                 # Check for duplicate database configurations
                 connection_key = db_config.get_connection_key()
                 if connection_key in processed_databases:
@@ -450,23 +450,23 @@ Provide only the intention summary (maximum {max_length} characters):
                         "processing_time": 0.0
                     })
                     continue
-                
+
                 processed_databases.add(connection_key)
-                
+
                 try:
                     # Create storage instance for this database
                     storage = self._create_storage_from_config(db_config)
-                    
+
                     # Connect to database
                     await storage.connect()
-                    
+
                     try:
                         # Store entities and relations
                         entity_ids = await storage.store_entities(entities)
                         relation_ids = await storage.store_relations(relations)
-                        
+
                         db_processing_time = asyncio.get_event_loop().time() - db_start_time
-                        
+
                         database_results.append({
                             "database_type": db_config.type.value,
                             "connection_key": connection_key,
@@ -479,26 +479,26 @@ Provide only the intention summary (maximum {max_length} characters):
                                 "relation_ids": relation_ids[:10]
                             }
                         })
-                        
+
                         total_entities += len(entity_ids)
                         total_relations += len(relation_ids)
-                        
+
                         logger.info(
                             f"Successfully processed document in {db_config.type.value} database",
                             entities=len(entity_ids),
                             relations=len(relation_ids),
                             processing_time=db_processing_time
                         )
-                        
+
                     finally:
                         # Always disconnect
                         await storage.disconnect()
-                        
+
                 except Exception as e:
                     db_processing_time = asyncio.get_event_loop().time() - db_start_time
                     error_msg = f"Failed to process in {db_config.type.value} database: {str(e)}"
                     logger.error(error_msg)
-                    
+
                     database_results.append({
                         "database_type": db_config.type.value,
                         "connection_key": connection_key,
@@ -508,13 +508,13 @@ Provide only the intention summary (maximum {max_length} characters):
                         "relations_count": 0,
                         "processing_time": db_processing_time
                     })
-            
+
             total_processing_time = asyncio.get_event_loop().time() - start_time
-            
+
             # Determine overall success
             successful_dbs = sum(1 for result in database_results if result["success"])
             overall_success = successful_dbs > 0
-            
+
             return GraphProcessingResult(
                 success=overall_success,
                 entities_count=total_entities,
@@ -529,12 +529,12 @@ Provide only the intention summary (maximum {max_length} characters):
                     "processed_databases": list(processed_databases)
                 }
             )
-            
+
         except Exception as e:
             total_processing_time = asyncio.get_event_loop().time() - start_time
             error_msg = f"Graph processing failed: {str(e)}"
             logger.error(error_msg)
-            
+
             return GraphProcessingResult(
                 success=False,
                 processing_time=total_processing_time,
@@ -542,13 +542,13 @@ Provide only the intention summary (maximum {max_length} characters):
                 database_results=database_results,
                 data_file_path=str(data_file_path) if data_file_path else None
             )
-    
+
     def _chunk_by_structure(self, markdown_content: str) -> List[Tuple[str, Dict[str, Any]]]:
         """Chunk markdown content by structural elements.
-        
+
         Args:
             markdown_content: Markdown content to chunk
-            
+
         Returns:
             List of (chunk_content, metadata) tuples
         """
@@ -557,7 +557,7 @@ Provide only the intention summary (maximum {max_length} characters):
         current_chunk = []
         current_section = None
         current_subsection = None
-        
+
         for line in lines:
             # Detect headers
             if line.startswith('#'):
@@ -572,16 +572,16 @@ Provide only the intention summary (maximum {max_length} characters):
                         }
                         chunks.append((chunk_content, metadata))
                     current_chunk = []
-                
+
                 # Update section tracking
                 if line.startswith('# '):
                     current_section = line[2:].strip()
                     current_subsection = None
                 elif line.startswith('## '):
                     current_subsection = line[3:].strip()
-            
+
             current_chunk.append(line)
-            
+
             # Check if chunk is getting too large
             chunk_text = '\n'.join(current_chunk)
             if len(chunk_text) > self.config.max_chunk_size:
@@ -593,7 +593,7 @@ Provide only the intention summary (maximum {max_length} characters):
                 }
                 chunks.append((chunk_text.strip(), metadata))
                 current_chunk = []
-        
+
         # Save final chunk
         if current_chunk:
             chunk_content = '\n'.join(current_chunk).strip()
@@ -604,26 +604,26 @@ Provide only the intention summary (maximum {max_length} characters):
                     'chunk_type': 'structured'
                 }
                 chunks.append((chunk_content, metadata))
-        
+
         return chunks
-    
+
     def _chunk_by_size(self, markdown_content: str) -> List[Tuple[str, Dict[str, Any]]]:
         """Chunk markdown content by size.
-        
+
         Args:
             markdown_content: Markdown content to chunk
-            
+
         Returns:
             List of (chunk_content, metadata) tuples
         """
         chunks = []
         words = markdown_content.split()
         current_chunk = []
-        
+
         for word in words:
             current_chunk.append(word)
             chunk_text = ' '.join(current_chunk)
-            
+
             if len(chunk_text) > self.config.max_chunk_size:
                 # Remove last word and save chunk
                 current_chunk.pop()
@@ -631,18 +631,18 @@ Provide only the intention summary (maximum {max_length} characters):
                     chunk_content = ' '.join(current_chunk)
                     metadata = {'chunk_type': 'size_based'}
                     chunks.append((chunk_content, metadata))
-                
+
                 # Start new chunk with the word that exceeded the limit
                 current_chunk = [word]
-        
+
         # Save final chunk
         if current_chunk:
             chunk_content = ' '.join(current_chunk)
             metadata = {'chunk_type': 'size_based'}
             chunks.append((chunk_content, metadata))
-        
+
         return chunks
-    
+
     async def process_document(
         self,
         markdown_content: str,
@@ -650,12 +650,12 @@ Provide only the intention summary (maximum {max_length} characters):
         document_metadata: Optional[Dict[str, Any]] = None
     ) -> GraphProcessingResult:
         """Process a document for graph extraction.
-        
+
         Args:
             markdown_content: Document content in markdown format
             document_path: Optional path to the original document
             document_metadata: Optional metadata about the document
-            
+
         Returns:
             GraphProcessingResult with extraction results
         """
@@ -664,10 +664,10 @@ Provide only the intention summary (maximum {max_length} characters):
                 success=False,
                 error_message="Graph processing not enabled or available"
             )
-        
+
         import time
         start_time = time.time()
-        
+
         try:
             # Generate document intention for context-aware extraction
             intention = await self.generate_document_intention(markdown_content)
@@ -908,7 +908,7 @@ Provide only the intention summary (maximum {max_length} characters):
                         logger.info(f"Data file written before database operations: {data_file_path}")
                     except Exception as e:
                         logger.warning(f"Failed to write data file: {str(e)}")
-                
+
                 # Store in Neo4j
                 if all_entities or all_relations:
                     await self._storage.store_entities(all_entities)
@@ -924,9 +924,9 @@ Provide only the intention summary (maximum {max_length} characters):
                 openie_triplets_processed = 0
                 openie_entity_matches = 0
                 openie_normalized_predicates = 0
-            
+
             processing_time = time.time() - start_time
-            
+
             return GraphProcessingResult(
                 success=True,
                 entities_count=all_entities_count,
@@ -947,18 +947,18 @@ Provide only the intention summary (maximum {max_length} characters):
                     'openie_enabled': self._enhanced_builder is not None
                 }
             )
-            
+
         except Exception as e:
             processing_time = time.time() - start_time
             logger.error("Graph processing failed", error=str(e))
-            
+
             return GraphProcessingResult(
                 success=False,
                 processing_time=processing_time,
                 error_message=str(e),
                 data_file_path=str(data_file_path) if 'data_file_path' in locals() and data_file_path else None
             )
-    
+
     async def close(self):
         """Close graph processing components."""
         if self._storage:

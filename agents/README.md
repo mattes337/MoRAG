@@ -197,16 +197,16 @@ class CustomAgent(BaseAgent[CustomResult]):
             description="Custom agent description",
             prompt=PromptConfig(output_format="json")
         )
-    
+
     def _create_template(self) -> ConfigurablePromptTemplate:
         system_prompt = "You are a custom agent..."
         user_prompt = "Process: {{ input }}"
         return ConfigurablePromptTemplate(
-            self.config.prompt, 
-            system_prompt, 
+            self.config.prompt,
+            system_prompt,
             user_prompt
         )
-    
+
     def get_result_type(self) -> Type[CustomResult]:
         return CustomResult
 ```

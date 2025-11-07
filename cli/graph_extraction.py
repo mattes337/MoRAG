@@ -84,7 +84,7 @@ class FactExtractionService:
             model_id=self.model,
             api_key=self.api_key
         )
-    
+
     async def extract_facts_and_relationships(
         self,
         text: str,
@@ -133,7 +133,7 @@ class FactExtractionService:
                     relationships = fact_graph.relationships
 
             return facts, relationships
-            
+
         except Exception as e:
             print(f"[WARN] Warning: Fact extraction failed: {e}")
             return [], []
@@ -141,19 +141,19 @@ class FactExtractionService:
 
 class DatabaseIngestionService:
     """Service for ingesting content into Qdrant and Neo4j databases."""
-    
+
     def __init__(self):
         """Initialize the database ingestion service."""
         self.qdrant_storage = None
         self.neo4j_storage = None
         self.graph_builder = None
-    
+
     def initialize_qdrant(self, config: Optional[Dict[str, Any]] = None) -> bool:
         """Initialize Qdrant storage.
-        
+
         Args:
             config: Qdrant configuration (optional)
-            
+
         Returns:
             True if successful, False otherwise
         """
@@ -186,20 +186,20 @@ class DatabaseIngestionService:
                     collection_name=os.getenv('QDRANT_COLLECTION', 'morag_documents'),
                     verify_ssl=verify_ssl
                 )
-            
+
             self.qdrant_storage = QdrantStorage(qdrant_config)
             return True
-            
+
         except Exception as e:
             print(f"[WARN] Warning: Failed to initialize Qdrant: {e}")
             return False
-    
+
     def initialize_neo4j(self, config: Optional[Dict[str, Any]] = None) -> bool:
         """Initialize Neo4j storage.
-        
+
         Args:
             config: Neo4j configuration (optional)
-            
+
         Returns:
             True if successful, False otherwise
         """
@@ -216,40 +216,40 @@ class DatabaseIngestionService:
                     verify_ssl=os.getenv("NEO4J_VERIFY_SSL", "true").lower() == "true",
                     trust_all_certificates=os.getenv("NEO4J_TRUST_ALL_CERTIFICATES", "false").lower() == "true"
                 )
-            
+
             self.neo4j_storage = Neo4j_storage(neo4j_config)
             return True
-            
+
         except Exception as e:
             print(f"[WARN] Warning: Failed to initialize Neo4j: {e}")
             return False
-    
+
     def initialize_graph_builder(self) -> bool:
         """Initialize graph builder with available storages.
-        
+
         Returns:
             True if successful, False otherwise
         """
         try:
             storage_backends = []
-            
+
             if self.qdrant_storage:
                 storage_backends.append(self.qdrant_storage)
-            
+
             if self.neo4j_storage:
                 storage_backends.append(self.neo4j_storage)
-            
+
             if not storage_backends:
                 print("[WARN] Warning: No storage backends available for graph builder")
                 return False
-            
+
             self.graph_builder = GraphBuilder(storage_backends=storage_backends)
             return True
-            
+
         except Exception as e:
             print(f"[WARN] Warning: Failed to initialize graph builder: {e}")
             return False
-    
+
     async def ingest_to_qdrant(
         self,
         text_content: str,
@@ -258,19 +258,19 @@ class DatabaseIngestionService:
         chunk_overlap: int = 200
     ) -> List[str]:
         """Ingest text content to Qdrant vector database.
-        
+
         Args:
             text_content: Text content to ingest
             metadata: Metadata for the content
             chunk_size: Size of text chunks
             chunk_overlap: Overlap between chunks
-            
+
         Returns:
             List of point IDs created in Qdrant
         """
         if not self.qdrant_storage:
             raise ValueError("Qdrant storage not initialized")
-        
+
         try:
             # For now, use a simple chunking strategy
             # In a real implementation, you'd use a proper text splitter
@@ -282,18 +282,18 @@ class DatabaseIngestionService:
                         'text': chunk,
                         'metadata': {**metadata, 'chunk_index': len(chunks)}
                     })
-            
+
             # Store chunks (this is a simplified implementation)
             # In practice, you'd use the actual Qdrant storage API
             point_ids = [f"point_{i}" for i in range(len(chunks))]
-            
+
             print(f"[OK] Stored {len(chunks)} chunks in Qdrant")
             return point_ids
-            
+
         except Exception as e:
             print(f"[FAIL] Error ingesting to Qdrant: {e}")
             raise
-    
+
     async def ingest_to_neo4j(
         self,
         entities: List[Entity],
@@ -301,18 +301,18 @@ class DatabaseIngestionService:
         doc_metadata: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Ingest entities and relations to Neo4j graph database.
-        
+
         Args:
             entities: List of extracted entities
             relations: List of extracted relations
             doc_metadata: Document metadata
-            
+
         Returns:
             Dictionary with ingestion results
         """
         if not self.neo4j_storage:
             raise ValueError("Neo4j storage not initialized")
-        
+
         try:
             # Convert back to graph entities and relations for storage
             graph_entities = []
@@ -326,7 +326,7 @@ class DatabaseIngestionService:
                     attributes=getattr(entity, 'attributes', {}) or {}
                 )
                 graph_entities.append(graph_entity)
-            
+
             graph_relations = []
             for relation in relations:
                 # Create graph relation (simplified)
@@ -339,7 +339,7 @@ class DatabaseIngestionService:
                     attributes=getattr(relation, 'attributes', {}) or {}
                 )
                 graph_relations.append(graph_relation)
-            
+
             # Store in Neo4j (this is a simplified implementation)
             # In practice, you'd use the actual Neo4j storage API
             result = {
@@ -347,10 +347,10 @@ class DatabaseIngestionService:
                 'relations_stored': len(graph_relations),
                 'document_metadata': doc_metadata
             }
-            
+
             print(f"[OK] Stored {len(graph_entities)} entities and {len(graph_relations)} relations in Neo4j")
             return result
-            
+
         except Exception as e:
             print(f"[FAIL] Error ingesting to Neo4j: {e}")
             raise
@@ -367,7 +367,7 @@ async def extract_and_ingest(
     metadata: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     """Extract entities/relations and ingest to databases.
-    
+
     Args:
         text_content: Text content to process
         doc_id: Document identifier
@@ -377,7 +377,7 @@ async def extract_and_ingest(
         qdrant_config: Qdrant configuration
         neo4j_config: Neo4j configuration
         metadata: Additional metadata
-        
+
     Returns:
         Dictionary with extraction and ingestion results
     """
@@ -385,7 +385,7 @@ async def extract_and_ingest(
         'extraction': {'entities': [], 'relations': []},
         'ingestion': {'qdrant': None, 'neo4j': None}
     }
-    
+
     try:
         # Extract entities and relations
         extraction_service = GraphExtractionService()
@@ -394,15 +394,15 @@ async def extract_and_ingest(
             doc_id=doc_id,
             context=context
         )
-        
+
         results['extraction']['entities'] = entities
         results['extraction']['relations'] = relations
-        
+
         print(f"[OK] Extracted {len(entities)} entities and {len(relations)} relations")
-        
+
         # Initialize ingestion service
         ingestion_service = DatabaseIngestionService()
-        
+
         # Ingest to Qdrant if requested
         if use_qdrant:
             if ingestion_service.initialize_qdrant(qdrant_config):
@@ -426,7 +426,7 @@ async def extract_and_ingest(
                     'success': False,
                     'error': 'Failed to initialize Qdrant storage'
                 }
-        
+
         # Ingest to Neo4j if requested
         if use_neo4j:
             if ingestion_service.initialize_neo4j(neo4j_config):
@@ -450,9 +450,9 @@ async def extract_and_ingest(
                     'success': False,
                     'error': 'Failed to initialize Neo4j storage'
                 }
-        
+
         return results
-        
+
     except Exception as e:
         print(f"[FAIL] Error in extract_and_ingest: {e}")
         results['error'] = str(e)

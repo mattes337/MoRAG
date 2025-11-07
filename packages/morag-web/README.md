@@ -29,7 +29,7 @@ from morag_web import WebProcessor, WebScrapingConfig
 async def scrape_website():
     # Create processor
     processor = WebProcessor()
-    
+
     # Configure scraping
     config = WebScrapingConfig(
         timeout=10,
@@ -39,10 +39,10 @@ async def scrape_website():
         convert_to_markdown=True,
         clean_content=True
     )
-    
+
     # Process URL
     result = await processor.process_url("https://example.com", config)
-    
+
     if result.success:
         content = result.content
         print(f"Title: {content.title}")

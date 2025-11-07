@@ -1,12 +1,11 @@
 """Batch processing utilities for LLM operations."""
 
-import asyncio
 import logging
 from typing import List, Dict, Any, Optional, Callable, TypeVar, Generic
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
 
-from .llm import LLMClient, LLMConfig
+from .llm import LLMClient
 
 logger = logging.getLogger(__name__)
 
@@ -34,10 +33,10 @@ class BatchResult(Generic[T, R]):
 
 class BatchProcessor(ABC, Generic[T, R]):
     """Abstract base class for batch processing with LLM."""
-    
+
     def __init__(self, llm_client: LLMClient, batch_size: Optional[int] = None):
         """Initialize batch processor.
-        
+
         Args:
             llm_client: LLM client for processing
             batch_size: Override default batch size
@@ -45,32 +44,30 @@ class BatchProcessor(ABC, Generic[T, R]):
         self.llm_client = llm_client
         self.batch_size = batch_size or llm_client.config.batch_size
         self.logger = logger
-    
+
     @abstractmethod
     def create_prompt(self, item: T) -> str:
         """Create a prompt for processing an item.
-        
+
         Args:
             item: Item to create prompt for
-            
+
         Returns:
             Prompt string
         """
-        pass
-    
+
     @abstractmethod
     def parse_response(self, response: str, item: T) -> R:
         """Parse LLM response for an item.
-        
+
         Args:
             response: LLM response
             item: Original item
-            
+
         Returns:
             Parsed result
         """
-        pass
-    
+
     async def process_batch(
         self,
         items: List[T],
@@ -222,10 +219,10 @@ class BatchProcessor(ABC, Generic[T, R]):
 
 class TextAnalysisBatchProcessor(BatchProcessor[str, Dict[str, Any]]):
     """Batch processor for text analysis tasks."""
-    
+
     def __init__(self, llm_client: LLMClient, analysis_type: str = "general", batch_size: Optional[int] = None):
         """Initialize text analysis batch processor.
-        
+
         Args:
             llm_client: LLM client for processing
             analysis_type: Type of analysis (entity_extraction, relation_extraction, summarization, etc.)
@@ -233,7 +230,7 @@ class TextAnalysisBatchProcessor(BatchProcessor[str, Dict[str, Any]]):
         """
         super().__init__(llm_client, batch_size)
         self.analysis_type = analysis_type
-    
+
     def create_prompt(self, text: str) -> str:
         """Create analysis prompt for text."""
         if self.analysis_type == "entity_extraction":
@@ -242,28 +239,28 @@ class TextAnalysisBatchProcessor(BatchProcessor[str, Dict[str, Any]]):
 Text: {text}
 
 Return format: [{{"name": "entity_name", "type": "ENTITY_TYPE", "confidence": 0.9}}]"""
-        
+
         elif self.analysis_type == "relation_extraction":
             return f"""Extract relations from the following text. Return a JSON list of relations:
 
 Text: {text}
 
 Return format: [{{"source": "entity1", "target": "entity2", "relation": "RELATION_TYPE", "confidence": 0.9}}]"""
-        
+
         elif self.analysis_type == "summarization":
             return f"""Provide a concise summary of the following text:
 
 Text: {text}
 
 Summary:"""
-        
+
         else:
             return f"""Analyze the following text for {self.analysis_type}:
 
 Text: {text}
 
 Analysis:"""
-    
+
     def parse_response(self, response: str, text: str) -> Dict[str, Any]:
         """Parse analysis response."""
         try:
@@ -280,10 +277,10 @@ Analysis:"""
 
 class DocumentChunkBatchProcessor(BatchProcessor[Dict[str, Any], Dict[str, Any]]):
     """Batch processor for document chunks."""
-    
+
     def __init__(self, llm_client: LLMClient, processing_type: str = "extraction", batch_size: Optional[int] = None):
         """Initialize document chunk batch processor.
-        
+
         Args:
             llm_client: LLM client for processing
             processing_type: Type of processing (extraction, analysis, summarization)
@@ -291,13 +288,13 @@ class DocumentChunkBatchProcessor(BatchProcessor[Dict[str, Any], Dict[str, Any]]
         """
         super().__init__(llm_client, batch_size)
         self.processing_type = processing_type
-    
+
     def create_prompt(self, chunk: Dict[str, Any]) -> str:
         """Create processing prompt for document chunk."""
         text = chunk.get("text", "")
         chunk_id = chunk.get("id", "unknown")
         document_id = chunk.get("document_id", "unknown")
-        
+
         if self.processing_type == "extraction":
             return f"""Extract entities and relations from this document chunk:
 
@@ -307,7 +304,7 @@ Text: {text}
 
 Return JSON with entities and relations:
 {{"entities": [{{"name": "...", "type": "...", "confidence": 0.9}}], "relations": [{{"source": "...", "target": "...", "relation": "...", "confidence": 0.9}}]}}"""
-        
+
         elif self.processing_type == "summarization":
             return f"""Summarize this document chunk:
 
@@ -316,7 +313,7 @@ Chunk ID: {chunk_id}
 Text: {text}
 
 Summary:"""
-        
+
         else:
             return f"""Analyze this document chunk for {self.processing_type}:
 
@@ -325,7 +322,7 @@ Chunk ID: {chunk_id}
 Text: {text}
 
 Analysis:"""
-    
+
     def parse_response(self, response: str, chunk: Dict[str, Any]) -> Dict[str, Any]:
         """Parse chunk processing response."""
         try:

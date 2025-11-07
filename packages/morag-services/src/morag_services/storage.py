@@ -274,7 +274,7 @@ class QdrantVectorStorage(BaseVectorStorage):
                         port=self.port,
                         error=str(e))
             raise StorageError(f"Failed to connect to Qdrant: {str(e)}")
-    
+
     async def disconnect(self) -> None:
         """Close connection to Qdrant."""
         if self.client:
@@ -312,25 +312,25 @@ class QdrantVectorStorage(BaseVectorStorage):
                         collection=self.collection_name,
                         error=str(e))
             raise StorageError(f"Failed to ensure collection exists: {str(e)}")
-    
+
     async def create_collection(
-        self, 
-        collection_name: str, 
-        vector_size: int = 768, 
+        self,
+        collection_name: str,
+        vector_size: int = 768,
         force_recreate: bool = False
     ) -> None:
         """Create or recreate a collection."""
         if not self.client:
             await self.connect()
-        
+
         try:
             # Check if collection exists
             collections = await asyncio.to_thread(self.client.get_collections)
             collection_exists = any(
-                col.name == collection_name 
+                col.name == collection_name
                 for col in collections.collections
             )
-            
+
             if collection_exists:
                 if force_recreate:
                     logger.info("Deleting existing collection", collection=collection_name)
@@ -341,7 +341,7 @@ class QdrantVectorStorage(BaseVectorStorage):
                 else:
                     logger.info("Collection already exists", collection=collection_name)
                     return
-            
+
             # Create collection
             logger.info("Creating collection", collection=collection_name, vector_size=vector_size)
             await asyncio.to_thread(
@@ -352,13 +352,13 @@ class QdrantVectorStorage(BaseVectorStorage):
                     distance=Distance.COSINE
                 )
             )
-            
+
             logger.info("Collection created successfully", collection=collection_name)
-            
+
         except Exception as e:
             logger.error("Failed to create collection", error=str(e))
             raise StorageError(f"Failed to create collection: {str(e)}")
-    
+
     async def store_vectors(
         self,
         vectors: List[List[float]],
@@ -368,36 +368,36 @@ class QdrantVectorStorage(BaseVectorStorage):
         """Store vectors with metadata."""
         if not self.client:
             await self.connect()
-        
+
         if len(vectors) != len(metadata):
             raise StorageError("Number of vectors must match number of metadata entries")
-        
+
         target_collection = collection_name or self.collection_name
-        
+
         try:
             # Ensure collection exists
             if vectors:
                 await self.create_collection(target_collection, len(vectors[0]))
-            
+
             points = []
             point_ids = []
-            
+
             for vector, meta in zip(vectors, metadata):
                 point_id = str(uuid.uuid4())
                 point_ids.append(point_id)
-                
+
                 # Prepare payload
                 payload = {
                     "created_at": datetime.now(timezone.utc).isoformat(),
                     **meta
                 }
-                
+
                 points.append(PointStruct(
                     id=point_id,
                     vector=vector,
                     payload=payload
                 ))
-            
+
             # Store points in batches
             batch_size = 100
             for i in range(0, len(points), batch_size):
@@ -407,16 +407,16 @@ class QdrantVectorStorage(BaseVectorStorage):
                     collection_name=target_collection,
                     points=batch
                 )
-            
-            logger.info("Stored vectors successfully", 
-                       count=len(vectors), 
+
+            logger.info("Stored vectors successfully",
+                       count=len(vectors),
                        collection=target_collection)
             return point_ids
-            
+
         except Exception as e:
             logger.error("Failed to store vectors", error=str(e))
             raise StorageError(f"Failed to store vectors: {str(e)}")
-    
+
     async def search_similar(
         self,
         query_vector: List[float],
@@ -428,9 +428,9 @@ class QdrantVectorStorage(BaseVectorStorage):
         """Search for similar vectors."""
         if not self.client:
             await self.connect()
-        
+
         target_collection = collection_name or self.collection_name
-        
+
         try:
             # Build filter if provided
             search_filter = None
@@ -443,7 +443,7 @@ class QdrantVectorStorage(BaseVectorStorage):
                     ))
                 if conditions:
                     search_filter = Filter(must=conditions)
-            
+
             # Perform search
             results = await asyncio.to_thread(
                 self.client.search,
@@ -454,7 +454,7 @@ class QdrantVectorStorage(BaseVectorStorage):
                 query_filter=search_filter,
                 with_payload=True
             )
-            
+
             # Format results
             formatted_results = []
             for result in results:
@@ -463,12 +463,12 @@ class QdrantVectorStorage(BaseVectorStorage):
                     "score": result.score,
                     "metadata": result.payload
                 })
-            
-            logger.info("Search completed", 
+
+            logger.info("Search completed",
                        results_count=len(formatted_results),
                        collection=target_collection)
             return formatted_results
-            
+
         except Exception as e:
             logger.error("Search failed", error=str(e))
             raise StorageError(f"Search failed: {str(e)}")
@@ -534,7 +534,7 @@ class QdrantVectorStorage(BaseVectorStorage):
         except Exception as e:
             logger.error("Metadata search failed", error=str(e))
             raise StorageError(f"Metadata search failed: {str(e)}")
-    
+
     async def find_document_points(
         self,
         document_id: str,
@@ -717,15 +717,15 @@ class QdrantVectorStorage(BaseVectorStorage):
         """Get collection information."""
         if not self.client:
             await self.connect()
-        
+
         target_collection = collection_name or self.collection_name
-        
+
         try:
             info = await asyncio.to_thread(
                 self.client.get_collection,
                 collection_name=target_collection
             )
-            
+
             return {
                 "name": target_collection,
                 "vectors_count": info.vectors_count,
@@ -737,7 +737,7 @@ class QdrantVectorStorage(BaseVectorStorage):
                     "distance": info.config.params.vectors.distance.value
                 }
             }
-            
+
         except Exception as e:
             logger.error("Failed to get collection info", error=str(e))
             raise StorageError(f"Failed to get collection info: {str(e)}")
@@ -1098,7 +1098,7 @@ class QdrantVectorStorage(BaseVectorStorage):
 # Convenience class for backward compatibility
 class QdrantService(QdrantVectorStorage):
     """Legacy QdrantService for backward compatibility."""
-    
+
     def __init__(self):
         # Initialize with default settings - these would come from config
         super().__init__(

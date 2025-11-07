@@ -31,16 +31,16 @@ async def process_audio_file(file_path: str, output_dir: str = None, enable_diar
             vad_filter=True,  # Voice activity detection
             word_timestamps=True
         )
-        
+
         # Create service with output directory if specified
         if output_dir:
             output_path = Path(output_dir)
             service = AudioService(config=config, output_dir=output_path)
             logger.info("Processing audio file", file_path=file_path, output_dir=str(output_path))
-            
+
             # Process file and save results
             result = await service.process_file(file_path, save_output=True, output_format="markdown")
-            
+
             if result["success"]:
                 logger.info("Processing completed successfully")
                 logger.info("Output files:", files=result["output_files"])
@@ -50,13 +50,13 @@ async def process_audio_file(file_path: str, output_dir: str = None, enable_diar
             # Use processor directly without saving files
             processor = AudioProcessor(config=config)
             logger.info("Processing audio file", file_path=file_path)
-            
+
             result = await processor.process(file_path)
-            
+
             if result.success:
                 logger.info("Processing completed successfully")
                 print(f"\nTranscript:\n{result.transcript}\n")
-                
+
                 if enable_diarization:
                     print("\nSpeaker segments:")
                     for segment in result.segments:
@@ -64,7 +64,7 @@ async def process_audio_file(file_path: str, output_dir: str = None, enable_diar
                         print(f"[{segment.start:.2f} - {segment.end:.2f}] {speaker}: {segment.text}")
             else:
                 logger.error("Processing failed", error=result.error_message)
-    
+
     except Exception as e:
         logger.error("Error processing audio file", error=str(e))
 
@@ -75,9 +75,9 @@ def main():
     parser.add_argument("file_path", help="Path to the audio file to process")
     parser.add_argument("--output-dir", "-o", help="Directory to save output files")
     parser.add_argument("--diarization", "-d", action="store_true", help="Enable speaker diarization")
-    
+
     args = parser.parse_args()
-    
+
     # Run the async function
     asyncio.run(process_audio_file(
         file_path=args.file_path,

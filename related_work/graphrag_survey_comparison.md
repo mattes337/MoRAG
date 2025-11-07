@@ -193,7 +193,7 @@ class HybridGraphRAG:
         self.knowledge_graph = KnowledgeGraph()  # Entity-relation graph
         self.index_graph = ChunkIndexGraph()     # Topic-chunk index graph
         self.gnn_retriever = GNNRetriever()      # Neural retrieval enhancement
-    
+
     async def hybrid_retrieve(self, query: str) -> HybridRetrievalResult:
         # 1. Extract entities and concepts from query
         # 2. Retrieve structured knowledge from KG

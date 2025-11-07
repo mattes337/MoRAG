@@ -12,20 +12,20 @@ logger = logging.getLogger(__name__)
 
 class QueryOperations(BaseOperations):
     """Handles search, path finding, and query operations."""
-    
+
     async def get_neighbors(
-        self, 
+        self,
         entity_id: EntityId,
         relation_type: Optional[str] = None,
         max_depth: int = 1
     ) -> List[Entity]:
         """Get neighboring entities.
-        
+
         Args:
             entity_id: ID of the central entity
             relation_type: Optional relation type filter
             max_depth: Maximum depth to search
-            
+
         Returns:
             List of neighboring entities
         """
@@ -48,9 +48,9 @@ class QueryOperations(BaseOperations):
             RETURN DISTINCT neighbor
             """
             parameters = {"entity_id": entity_id}
-        
+
         result = await self._execute_query(query, parameters)
-        
+
         neighbors = []
         for record in result:
             try:
@@ -64,20 +64,20 @@ class QueryOperations(BaseOperations):
                 logger.warning(f"Failed to parse neighbor entity: {e}")
 
         return neighbors
-    
+
     async def find_path(
-        self, 
+        self,
         source_entity_id: EntityId,
         target_entity_id: EntityId,
         max_depth: int = 3
     ) -> List[List[EntityId]]:
         """Find paths between two entities.
-        
+
         Args:
             source_entity_id: Source entity ID
             target_entity_id: Target entity ID
             max_depth: Maximum path length
-            
+
         Returns:
             List of paths (each path is a list of entity IDs)
         """
@@ -87,14 +87,14 @@ class QueryOperations(BaseOperations):
         RETURN [node in nodes(path) | node.id] as path_ids
         LIMIT 10
         """
-        
+
         result = await self._execute_query(query, {
             "source_id": source_entity_id,
             "target_id": target_entity_id
         })
-        
+
         return [record["path_ids"] for record in result]
-    
+
     async def search_entities_by_content(
         self,
         search_term: str,
@@ -102,12 +102,12 @@ class QueryOperations(BaseOperations):
         limit: int = 10
     ) -> List[Entity]:
         """Search entities by content using full-text search.
-        
+
         Args:
             search_term: Term to search for
             entity_type: Optional entity type filter
             limit: Maximum number of results
-            
+
         Returns:
             List of matching entities
         """
@@ -118,33 +118,33 @@ class QueryOperations(BaseOperations):
         WHERE toLower(e.name) CONTAINS toLower($search_term)
         AND e.id IS NOT NULL
         """
-        
+
         parameters = {"search_term": search_term, "limit": limit}
-        
+
         if entity_type:
             base_query += " AND e.type = $entity_type"
             parameters["entity_type"] = entity_type
-        
+
         base_query += """
         RETURN e
-        ORDER BY 
+        ORDER BY
             CASE WHEN toLower(e.name) = toLower($search_term) THEN 0 ELSE 1 END,
             e.confidence DESC,
             e.name
         LIMIT $limit
         """
-        
+
         result = await self._execute_query(base_query, parameters)
-        
+
         entities = []
         for record in result:
             try:
                 entities.append(Entity.from_neo4j_node(record["e"]))
             except Exception as e:
                 logger.warning(f"Failed to parse entity from search: {e}")
-        
+
         return entities
-    
+
     async def find_related_entities(
         self,
         entity_id: EntityId,
@@ -153,13 +153,13 @@ class QueryOperations(BaseOperations):
         limit: int = 20
     ) -> List[Dict[str, Any]]:
         """Find entities related to a given entity with relationship context.
-        
+
         Args:
             entity_id: Central entity ID
             relation_types: Optional list of relation types to follow
             max_depth: Maximum relationship depth
             limit: Maximum number of results
-            
+
         Returns:
             List of related entities with relationship metadata
         """
@@ -167,7 +167,7 @@ class QueryOperations(BaseOperations):
             relation_filter = f"WHERE ALL(r in relationships(path) WHERE r.type IN {relation_types})"
         else:
             relation_filter = ""
-        
+
         query = f"""
         MATCH path = (start {{id: $entity_id}})-[r*1..{max_depth}]-(related)
         {relation_filter}
@@ -176,15 +176,15 @@ class QueryOperations(BaseOperations):
         WITH related, path, length(path) as distance
         ORDER BY distance, related.confidence DESC
         LIMIT $limit
-        RETURN related, distance, 
+        RETURN related, distance,
                [r in relationships(path) | {{type: r.type, confidence: r.confidence}}] as relationship_path
         """
-        
+
         result = await self._execute_query(query, {
             "entity_id": entity_id,
             "limit": limit
         })
-        
+
         related_entities = []
         for record in result:
             try:
@@ -196,20 +196,20 @@ class QueryOperations(BaseOperations):
                 })
             except Exception as e:
                 logger.warning(f"Failed to parse related entity: {e}")
-        
+
         return related_entities
-    
+
     async def get_entity_clusters(
         self,
         min_cluster_size: int = 3,
         max_clusters: int = 10
     ) -> List[Dict[str, Any]]:
         """Find clusters of highly connected entities.
-        
+
         Args:
             min_cluster_size: Minimum number of entities in a cluster
             max_clusters: Maximum number of clusters to return
-            
+
         Returns:
             List of entity clusters with metadata
         """
@@ -222,12 +222,12 @@ class QueryOperations(BaseOperations):
         LIMIT $max_clusters
         RETURN e as central_entity, connection_count, connections
         """
-        
+
         result = await self._execute_query(query, {
             "min_cluster_size": min_cluster_size,
             "max_clusters": max_clusters
         })
-        
+
         clusters = []
         for record in result:
             try:
@@ -238,7 +238,7 @@ class QueryOperations(BaseOperations):
                         connected_entities.append(Entity.from_neo4j_node(conn))
                     except Exception as e:
                         logger.warning(f"Failed to parse connected entity: {e}")
-                
+
                 clusters.append({
                     "central_entity": central_entity,
                     "connection_count": record["connection_count"],
@@ -246,9 +246,9 @@ class QueryOperations(BaseOperations):
                 })
             except Exception as e:
                 logger.warning(f"Failed to parse cluster: {e}")
-        
+
         return clusters
-    
+
     async def find_shortest_paths(
         self,
         source_entity_id: EntityId,
@@ -256,12 +256,12 @@ class QueryOperations(BaseOperations):
         max_depth: int = 5
     ) -> List[Dict[str, Any]]:
         """Find shortest paths between two entities with relationship details.
-        
+
         Args:
             source_entity_id: Source entity ID
             target_entity_id: Target entity ID
             max_depth: Maximum path length to consider
-            
+
         Returns:
             List of shortest paths with relationship details
         """
@@ -275,12 +275,12 @@ class QueryOperations(BaseOperations):
         ORDER BY path_length
         LIMIT 5
         """
-        
+
         result = await self._execute_query(query, {
             "source_id": source_entity_id,
             "target_id": target_entity_id
         })
-        
+
         paths = []
         for record in result:
             paths.append({
@@ -288,5 +288,5 @@ class QueryOperations(BaseOperations):
                 "entities": record["entities"],
                 "relationships": record["relationships"]
             })
-        
+
         return paths

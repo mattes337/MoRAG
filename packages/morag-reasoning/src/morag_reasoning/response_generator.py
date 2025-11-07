@@ -1,14 +1,12 @@
 """Response generation system for synthesizing facts into coherent responses."""
 
-import asyncio
 import time
-from typing import List, Dict, Any, Optional, NamedTuple
+from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 from enum import Enum
 import structlog
 
 from morag_core.config import get_settings
-from morag_core.exceptions import ProcessingError
 from .llm import LLMClient
 from .citation_manager import CitedFact, CitationFormat
 
@@ -74,7 +72,7 @@ class GeneratedResponse:
 
 class ResponseGenerator:
     """LLM-based response generation system."""
-    
+
     def __init__(
         self,
         llm_client: Optional[LLMClient] = None,
@@ -92,29 +90,29 @@ class ResponseGenerator:
         self.llm_client = llm_client  # Keep for backward compatibility
         self.config = config or {}
         self.settings = get_settings()
-        
+
         # Generation parameters
         self.default_max_length = self.config.get('default_max_length', 2000)
         self.min_facts_required = self.config.get('min_facts_required', 1)
         self.max_facts_to_use = self.config.get('max_facts_to_use', 10000)
-        
+
         # LLM configuration
         self.llm_enabled = self.config.get('llm_enabled', True) and GEMINI_AVAILABLE
         self.model_name = self.config.get('model_name', 'gemini-1.5-pro')
         self.temperature = self.config.get('temperature', 0.3)
         self.max_tokens = self.config.get('max_tokens', 4000)
-        
+
         # Quality settings
         self.enable_fact_verification = self.config.get('enable_fact_verification', True)
         self.enable_consistency_check = self.config.get('enable_consistency_check', True)
         self.enable_reasoning_explanation = self.config.get('enable_reasoning_explanation', True)
-        
 
-        
+
+
         # Initialize components
         self._llm_client = None
         self._cache = {} if self.enable_caching else None
-        
+
         logger.info(
             "Response generator initialized",
             llm_enabled=self.llm_enabled,
@@ -122,27 +120,27 @@ class ResponseGenerator:
             default_max_length=self.default_max_length,
             enable_fact_verification=self.enable_fact_verification
         )
-    
+
     async def initialize(self) -> None:
         """Initialize the LLM client."""
         if not self.llm_enabled:
             logger.info("LLM response generation disabled")
             return
-        
+
         if self._llm_client:
             return
-        
+
         try:
             # Configure Gemini
             genai.configure(api_key=self.settings.gemini_api_key)
             self._llm_client = genai.GenerativeModel(self.model_name)
-            
+
             logger.info("LLM client initialized for response generation")
-            
+
         except Exception as e:
             logger.error(f"Failed to initialize LLM client: {e}")
             self.llm_enabled = False
-    
+
     async def generate_response(
         self,
         facts: List[CitedFact],
@@ -150,21 +148,21 @@ class ResponseGenerator:
         options: Optional[ResponseOptions] = None
     ) -> GeneratedResponse:
         """Generate comprehensive response from gathered facts.
-        
+
         Args:
             facts: List of cited facts to synthesize
             query: Original user query
             options: Response generation options
-            
+
         Returns:
             Generated response with metadata
         """
         if not facts:
             return self._create_empty_response(query, "No facts available for response generation")
-        
+
         start_time = time.time()
         options = options or ResponseOptions()
-        
+
         try:
             logger.info(
                 "Starting response generation",
@@ -173,27 +171,27 @@ class ResponseGenerator:
                 format=options.format.value,
                 structure=options.structure.value
             )
-            
+
             # Initialize LLM if needed
             await self.initialize()
-            
+
             # Filter and prepare facts
             prepared_facts = self._prepare_facts(facts, options)
-            
+
             if len(prepared_facts) < self.min_facts_required:
                 return self._create_empty_response(
-                    query, 
+                    query,
                     f"Insufficient facts for response generation (need {self.min_facts_required}, got {len(prepared_facts)})"
                 )
-            
+
             # Generate response using LLM
             if self.llm_enabled:
                 response = await self._generate_with_llm(query, prepared_facts, options)
             else:
                 response = await self._generate_fallback(query, prepared_facts, options)
-            
+
             generation_time = time.time() - start_time
-            
+
             # Add metadata
             response.generation_time = generation_time
             response.facts_used = [fact.fact.fact_id for fact in prepared_facts]
@@ -204,7 +202,7 @@ class ResponseGenerator:
                 'query_length': len(query),
                 'response_length': len(response.content)
             }
-            
+
             logger.info(
                 "Response generation completed",
                 query=query,
@@ -212,13 +210,13 @@ class ResponseGenerator:
                 confidence_score=response.confidence_score,
                 generation_time=generation_time
             )
-            
+
             return response
-            
+
         except Exception as e:
             generation_time = time.time() - start_time
             logger.error(f"Response generation failed: {e}")
-            
+
             return GeneratedResponse(
                 content=f"Error generating response: {e}",
                 summary="Response generation failed",
@@ -230,7 +228,7 @@ class ResponseGenerator:
                 facts_used=[],
                 metadata={'error': str(e)}
             )
-    
+
     def _prepare_facts(
         self,
         facts: List[CitedFact],
@@ -239,16 +237,16 @@ class ResponseGenerator:
         """Prepare and filter facts for response generation."""
         # Sort facts by score (highest first)
         sorted_facts = sorted(facts, key=lambda f: f.score, reverse=True)
-        
+
         # Limit number of facts
         limited_facts = sorted_facts[:self.max_facts_to_use]
-        
+
         # Filter by minimum score if needed
         min_score = self.config.get('min_fact_score', 0.1)
         filtered_facts = [f for f in limited_facts if f.score >= min_score]
-        
+
         return filtered_facts
-    
+
     async def _generate_with_llm(
         self,
         query: str,
@@ -285,7 +283,7 @@ class ResponseGenerator:
                 'agent_confidence': result.confidence
             }
         )
-    
+
     # REMOVED: _create_generation_prompt - now using agents framework
 
     def _analyze_facts_for_synthesis(self, facts: List[CitedFact]) -> Dict[str, str]:
@@ -412,9 +410,9 @@ class ResponseGenerator:
                 return True
 
         return False
-    
+
     # REMOVED: _parse_llm_response - now using agents framework
-    
+
     async def _generate_fallback(
         self,
         query: str,
@@ -424,7 +422,7 @@ class ResponseGenerator:
         """Generate response using fallback method when LLM is not available."""
         # Simple fact concatenation with basic structure
         content_parts = [f"Response to: {query}\n"]
-        
+
         if options.format == ResponseFormat.SUMMARY:
             content_parts.append("Summary of findings:")
             for i, fact in enumerate(facts[:5], 1):
@@ -444,10 +442,10 @@ class ResponseGenerator:
 
         # Extract key points
         key_points = [fact.fact.fact_text for fact in facts[:3]]
-        
+
         # Calculate average confidence
         avg_confidence = sum(fact.score for fact in facts) / len(facts) if facts else 0.0
-        
+
         return GeneratedResponse(
             content=content,
             summary=f"Fallback response for: {query}",
@@ -459,7 +457,7 @@ class ResponseGenerator:
             facts_used=[],
             metadata={'generation_method': 'fallback'}
         )
-    
+
     def _create_empty_response(self, query: str, reason: str) -> GeneratedResponse:
         """Create empty response when generation is not possible."""
         return GeneratedResponse(

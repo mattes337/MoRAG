@@ -23,24 +23,24 @@ from agents.base.config import AgentConfig
 
 class TestFactExtractionAgent:
     """Test fact extraction agent."""
-    
+
     @pytest.fixture
     def fact_agent(self):
         """Create a fact extraction agent for testing."""
         config = AgentConfig(name="fact_extraction")
         return FactExtractionAgent(config)
-    
+
     def test_agent_initialization(self, fact_agent):
         """Test agent initialization."""
         assert fact_agent.config.name == "fact_extraction"
         assert fact_agent.config.model.provider == "gemini"
-    
+
     def test_config_update(self, fact_agent):
         """Test updating agent configuration."""
         fact_agent.update_config(agent_config={"max_facts": 15, "domain": "medical"})
         assert fact_agent.config.get_agent_config("max_facts") == 15
         assert fact_agent.config.get_agent_config("domain") == "medical"
-    
+
     @pytest.mark.asyncio
     async def test_fact_extraction_empty_text(self, fact_agent):
         """Test fact extraction with empty text."""
@@ -49,16 +49,16 @@ class TestFactExtractionAgent:
         assert len(result.facts) == 0
         assert result.total_facts == 0
         assert "error" in result.metadata
-    
+
     @pytest.mark.asyncio
     async def test_fact_extraction_medical_text(self, fact_agent):
         """Test fact extraction with medical text."""
         text = """
-        Dr. Smith prescribed aspirin to treat the patient's headache. 
+        Dr. Smith prescribed aspirin to treat the patient's headache.
         The medication was effective in reducing pain within 30 minutes.
         Vitamin D deficiency increases risk of respiratory infections.
         """
-        
+
         with patch.object(fact_agent, '_call_model') as mock_llm:
             mock_llm.return_value = """{
                 "facts": [
@@ -80,9 +80,9 @@ class TestFactExtractionAgent:
                 "domain": "medical",
                 "metadata": {}
             }"""
-            
+
             result = await fact_agent.extract_facts(text, domain="medical")
-            
+
             assert isinstance(result, FactExtractionResult)
             assert len(result.facts) == 1
             assert result.facts[0].subject == "Dr. Smith"
@@ -92,22 +92,22 @@ class TestFactExtractionAgent:
 
 class TestEntityExtractionAgent:
     """Test entity extraction agent."""
-    
+
     @pytest.fixture
     def entity_agent(self):
         """Create an entity extraction agent for testing."""
         config = AgentConfig(name="entity_extraction")
         return EntityExtractionAgent(config)
-    
+
     def test_agent_initialization(self, entity_agent):
         """Test agent initialization."""
         assert entity_agent.config.name == "entity_extraction"
-    
+
     @pytest.mark.asyncio
     async def test_entity_extraction(self, entity_agent):
         """Test entity extraction."""
         text = "Dr. John Smith works at Mayo Clinic in Rochester, Minnesota."
-        
+
         with patch.object(entity_agent, '_call_model') as mock_llm:
             mock_llm.return_value = """{
                 "entities": [
@@ -136,9 +136,9 @@ class TestEntityExtractionAgent:
                 "confidence": "high",
                 "metadata": {}
             }"""
-            
+
             result = await entity_agent.extract_entities(text)
-            
+
             assert isinstance(result, EntityExtractionResult)
             assert len(result.entities) == 2
             assert result.entities[0].name == "Dr. John Smith"
@@ -150,13 +150,13 @@ class TestEntityExtractionAgent:
 
 class TestRelationExtractionAgent:
     """Test relation extraction agent."""
-    
+
     @pytest.fixture
     def relation_agent(self):
         """Create a relation extraction agent for testing."""
         config = AgentConfig(name="relation_extraction")
         return RelationExtractionAgent(config)
-    
+
     @pytest.mark.asyncio
     async def test_relation_extraction(self, relation_agent):
         """Test relation extraction."""
@@ -179,7 +179,7 @@ class TestRelationExtractionAgent:
                 end_offset=30
             )
         ]
-        
+
         with patch.object(relation_agent, '_call_model') as mock_llm:
             mock_llm.return_value = """{
                 "relations": [
@@ -196,9 +196,9 @@ class TestRelationExtractionAgent:
                 "confidence": "high",
                 "metadata": {}
             }"""
-            
+
             result = await relation_agent.extract_relations(text, entities)
-            
+
             assert isinstance(result, RelationExtractionResult)
             assert len(result.relations) == 1
             assert result.relations[0].source_entity == "Dr. Smith"
@@ -209,13 +209,13 @@ class TestRelationExtractionAgent:
 
 class TestKeywordExtractionAgent:
     """Test keyword extraction agent."""
-    
+
     @pytest.fixture
     def keyword_agent(self):
         """Create a keyword extraction agent for testing."""
         config = AgentConfig(name="keyword_extraction")
         return KeywordExtractionAgent(config)
-    
+
     @pytest.mark.asyncio
     async def test_keyword_extraction(self, keyword_agent):
         """Test keyword extraction."""
@@ -223,7 +223,7 @@ class TestKeywordExtractionAgent:
         Machine learning algorithms are used for image classification.
         Deep neural networks achieve high accuracy on computer vision tasks.
         """
-        
+
         with patch.object(keyword_agent, '_call_model') as mock_llm:
             mock_llm.return_value = """{
                 "keywords": [
@@ -253,9 +253,9 @@ class TestKeywordExtractionAgent:
                 "confidence": "high",
                 "metadata": {}
             }"""
-            
+
             result = await keyword_agent.extract_keywords(text)
-            
+
             assert isinstance(result, KeywordExtractionResult)
             assert len(result.keywords) >= 3
             assert any(kw.keyword == "machine learning" for kw in result.keywords)
@@ -264,26 +264,26 @@ class TestKeywordExtractionAgent:
 
 class TestExtractionAgentsIntegration:
     """Test integration between extraction agents."""
-    
+
     @pytest.mark.asyncio
     async def test_extraction_pipeline(self):
         """Test complete extraction pipeline."""
         text = "Dr. Smith prescribed aspirin for headache treatment at Mayo Clinic."
-        
+
         # Initialize agents
         fact_config = AgentConfig(name="fact_extraction")
         entity_config = AgentConfig(name="entity_extraction")
         relation_config = AgentConfig(name="relation_extraction")
-        
+
         fact_agent = FactExtractionAgent(fact_config)
         entity_agent = EntityExtractionAgent(entity_config)
         relation_agent = RelationExtractionAgent(relation_config)
-        
+
         # Mock LLM responses
         with patch.object(entity_agent, '_call_model') as mock_entity_llm, \
              patch.object(fact_agent, '_call_model') as mock_fact_llm, \
              patch.object(relation_agent, '_call_model') as mock_relation_llm:
-            
+
             mock_entity_llm.return_value = """{
                 "entities": [
                     {
@@ -321,26 +321,26 @@ class TestExtractionAgentsIntegration:
                 "confidence": "high",
                 "metadata": {}
             }"""
-            
+
             mock_relation_llm.return_value = """{
                 "relations": [],
                 "total_relations": 0,
                 "confidence": "high",
                 "metadata": {}
             }"""
-            
+
             # Extract entities
             entity_result = await entity_agent.extract_entities(text)
             assert len(entity_result.entities) == 1
-            
+
             # Extract facts
             fact_result = await fact_agent.extract_facts(text, domain="medical")
             assert len(fact_result.facts) == 1
-            
+
             # Extract relations
             relation_result = await relation_agent.extract_relations(text, entity_result.entities)
             assert isinstance(relation_result, RelationExtractionResult)
-            
+
             print("✅ Extraction pipeline test completed successfully")
 
 

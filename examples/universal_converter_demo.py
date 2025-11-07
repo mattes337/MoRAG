@@ -24,14 +24,14 @@ async def demo_basic_conversion():
     """Demonstrate basic document conversion."""
     print("🔄 Universal Document Converter Demo")
     print("=" * 50)
-    
+
     # Initialize the converter
     converter = DocumentConverter()
-    
+
     # Show supported formats
     print(f"📋 Supported formats: {', '.join(converter.list_supported_formats())}")
     print()
-    
+
     # Show registered converters
     print("🔧 Registered converters:")
     converter_info = converter.get_converter_info()
@@ -46,32 +46,32 @@ async def demo_pdf_conversion():
     """Demonstrate PDF conversion with different options."""
     print("📄 PDF Conversion Demo")
     print("-" * 30)
-    
+
     # Create a sample PDF file (placeholder)
     with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
         tmp.write(b"Sample PDF content")
         pdf_path = Path(tmp.name)
-    
+
     try:
         converter = DocumentConverter()
-        
+
         # Test format detection
         detected_format = converter.detect_format(pdf_path)
         print(f"Detected format: {detected_format}")
-        
+
         # Create conversion options
         options = ConversionOptions.for_format('pdf')
         options.chunking_strategy = ChunkingStrategy.PAGE
         options.include_metadata = True
         options.include_toc = True
-        
+
         print(f"Conversion options: {options.__dict__}")
         print()
-        
+
         # Note: This would fail in demo because we don't have actual PDF processing
         # but shows the API usage
         print("Note: Actual conversion would require proper PDF file and MoRAG processors")
-        
+
     finally:
         pdf_path.unlink()
 
@@ -106,24 +106,24 @@ async def demo_conversion_options():
     """Demonstrate different conversion options."""
     print("🎛️  Conversion Options Demo")
     print("-" * 30)
-    
+
     # Show different chunking strategies
     print("Available chunking strategies:")
     for strategy in ChunkingStrategy:
         print(f"  • {strategy.value}")
     print()
-    
+
     # Create options for different formats
     formats = ['pdf', 'audio', 'video', 'web']
-    
+
     for format_type in formats:
         print(f"{format_type.upper()} options:")
         options = ConversionOptions.for_format(format_type)
-        
+
         print(f"  • Chunking strategy: {options.chunking_strategy.value}")
         print(f"  • Quality threshold: {options.min_quality_threshold}")
         print(f"  • Enable fallback: {options.enable_fallback}")
-        
+
         if options.format_options:
             print("  • Format-specific options:")
             for key, value in options.format_options.items():
@@ -135,12 +135,12 @@ async def demo_quality_assessment():
     """Demonstrate quality assessment features."""
     print("📊 Quality Assessment Demo")
     print("-" * 30)
-    
+
     from src.morag.converters.quality import ConversionQualityValidator
     from morag_core.interfaces.converter import ConversionResult, QualityScore
-    
+
     validator = ConversionQualityValidator()
-    
+
     # Create a sample conversion result
     sample_content = """
 # Sample Document
@@ -164,7 +164,7 @@ of the universal document conversion system.
 The quality assessment system evaluates multiple factors
 to determine conversion quality.
 """
-    
+
     sample_result = ConversionResult(
         content=sample_content,
         metadata={
@@ -174,10 +174,10 @@ to determine conversion quality.
         },
         success=True
     )
-    
+
     # Assess quality
     quality_score = validator.validate_conversion("demo_file.txt", sample_result)
-    
+
     print("Quality assessment results:")
     print(f"  • Overall score: {quality_score.overall_score:.2f}")
     print(f"  • Completeness: {quality_score.completeness_score:.2f}")
@@ -185,7 +185,7 @@ to determine conversion quality.
     print(f"  • Structure: {quality_score.structure_score:.2f}")
     print(f"  • Metadata preservation: {quality_score.metadata_preservation:.2f}")
     print()
-    
+
     # Show quality interpretation
     if quality_score.overall_score >= 0.8:
         print("✅ High quality conversion")
@@ -200,14 +200,14 @@ async def main():
     print("🚀 Universal Document Conversion Framework Demo")
     print("=" * 60)
     print()
-    
+
     try:
         await demo_basic_conversion()
         await demo_pdf_conversion()
         await demo_configuration()
         await demo_conversion_options()
         await demo_quality_assessment()
-        
+
         print("✅ Demo completed successfully!")
         print()
         print("Next steps:")
@@ -215,7 +215,7 @@ async def main():
         print("2. Add real document processing capabilities")
         print("3. Integrate with MoRAG API endpoints")
         print("4. Add comprehensive testing")
-        
+
     except Exception as e:
         print(f"❌ Demo failed: {str(e)}")
         import traceback

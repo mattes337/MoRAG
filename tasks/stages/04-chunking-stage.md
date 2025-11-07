@@ -34,29 +34,29 @@ class ChunkerStage(Stage):
         self.embedding_service = embedding_service
         self.llm_service = llm_service
         self.chunking_service = chunking_service
-    
-    async def execute(self, 
-                     input_files: List[Path], 
+
+    async def execute(self,
+                     input_files: List[Path],
                      context: StageContext) -> StageResult:
         """Create chunks and embeddings from markdown content."""
         start_time = time.time()
-        
+
         try:
             if len(input_files) != 1:
                 raise ValueError("Stage 3 requires exactly one markdown input file")
-            
+
             input_file = input_files[0]
-            
+
             # Parse markdown and separate metadata from content
             content, metadata = self._parse_markdown_file(input_file)
-            
+
             # Generate document summary
             config = context.config.get('stage3', {})
             summary = await self._generate_summary(content, metadata, config)
-            
+
             # Create chunks (excluding metadata)
             chunks = await self._create_chunks(content, metadata, config)
-            
+
             # Generate contextual embeddings for chunks
             chunk_embeddings = await self._generate_chunk_embeddings(chunks, config)
 
@@ -67,19 +67,19 @@ class ChunkerStage(Stage):
             chunk_data = self._create_chunk_data(
                 chunks, chunk_embeddings, contextual_summaries, summary, metadata, input_file
             )
-            
+
             # Generate output file
             output_file = self._generate_chunks_output(
                 chunk_data, input_file, context
             )
-            
+
             # Create chunking report
             report_file = self._create_chunking_report(
                 chunk_data, input_file, context
             )
-            
+
             execution_time = time.time() - start_time
-            
+
             return StageResult(
                 stage_type=self.stage_type,
                 status=StageStatus.COMPLETED,
@@ -94,7 +94,7 @@ class ChunkerStage(Stage):
                 },
                 execution_time=execution_time
             )
-            
+
         except Exception as e:
             return StageResult(
                 stage_type=self.stage_type,
@@ -104,25 +104,25 @@ class ChunkerStage(Stage):
                 error_message=str(e),
                 execution_time=time.time() - start_time
             )
-    
+
     def validate_inputs(self, input_files: List[Path]) -> bool:
         """Validate input files for Stage 3."""
         if len(input_files) != 1:
             return False
-        
+
         input_file = input_files[0]
-        
+
         # Check if file exists and is markdown
         return input_file.exists() and input_file.suffix in ['.md']
-    
+
     def get_dependencies(self) -> List[StageType]:
         """chunker depends on markdown-conversion (can use optimized or original)."""
         return [StageType.MARKDOWN_CONVERSION]
-    
+
     def _parse_markdown_file(self, input_file: Path) -> tuple[str, Dict[str, Any]]:
         """Parse markdown file and separate metadata from content."""
         content = input_file.read_text(encoding='utf-8')
-        
+
         # Extract YAML frontmatter
         if content.startswith('---'):
             parts = content.split('---', 2)
@@ -133,29 +133,29 @@ class ChunkerStage(Stage):
                 metadata = {}
         else:
             metadata = {}
-        
+
         return content, metadata
-    
-    async def _generate_summary(self, 
-                               content: str, 
-                               metadata: Dict[str, Any], 
+
+    async def _generate_summary(self,
+                               content: str,
+                               metadata: Dict[str, Any],
                                config: Dict[str, Any]) -> Optional[str]:
         """Generate document summary using LLM."""
         if not config.get('generate_summary', True):
             return None
-        
+
         # Prepare summary prompt
-        prompt = f"""Please provide a comprehensive summary of the following content. 
+        prompt = f"""Please provide a comprehensive summary of the following content.
         Focus on the main topics, key points, and important information.
-        
+
         Content Type: {metadata.get('content_type', 'unknown')}
         Title: {metadata.get('title', 'Unknown')}
-        
+
         Content:
         {content[:8000]}  # Limit content for summary
-        
+
         Provide a summary that captures the essence and main points of this content."""
-        
+
         try:
             response = await self.llm_service.generate_text(
                 prompt=prompt,
@@ -167,20 +167,20 @@ class ChunkerStage(Stage):
         except Exception as e:
             logger.warning(f"Failed to generate summary: {e}")
             return None
-    
-    async def _create_chunks(self, 
-                            content: str, 
-                            metadata: Dict[str, Any], 
+
+    async def _create_chunks(self,
+                            content: str,
+                            metadata: Dict[str, Any],
                             config: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Create chunks from content using specified strategy."""
-        
+
         strategy = config.get('chunk_strategy', 'semantic')
         chunk_size = config.get('chunk_size', 4000)
         chunk_overlap = config.get('chunk_overlap', 200)
-        
+
         # Determine chunking strategy based on content type
         content_type = metadata.get('content_type', 'unknown')
-        
+
         if content_type in ['video', 'audio'] and strategy == 'semantic':
             # Use topic-based chunking for audio/video with timestamps
             return await self._chunk_by_topics(content, metadata, config)
@@ -190,32 +190,32 @@ class ChunkerStage(Stage):
         else:
             # Use semantic chunking for all other cases
             return await self._chunk_semantically(content, metadata, config)
-    
-    async def _chunk_by_topics(self, 
-                              content: str, 
-                              metadata: Dict[str, Any], 
+
+    async def _chunk_by_topics(self,
+                              content: str,
+                              metadata: Dict[str, Any],
                               config: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Chunk audio/video content by topics with timestamps."""
         chunks = []
-        
+
         # Split by timestamp patterns
         import re
         timestamp_pattern = r'\[(\d{2}:\d{2}(?::\d{2})?(?:\s*-\s*\d{2}:\d{2}(?::\d{2})?)?)\]'
-        
+
         # Find all timestamp sections
         sections = re.split(timestamp_pattern, content)
-        
+
         current_chunk = ""
         current_timestamp = None
         chunk_index = 0
-        
+
         for i, section in enumerate(sections):
             if i % 2 == 1:  # This is a timestamp
                 current_timestamp = section
             else:  # This is content
                 if section.strip():
                     chunk_content = f"[{current_timestamp}] {section.strip()}" if current_timestamp else section.strip()
-                    
+
                     if len(current_chunk) + len(chunk_content) > config.get('chunk_size', 4000):
                         # Save current chunk
                         if current_chunk:
@@ -226,28 +226,28 @@ class ChunkerStage(Stage):
                         current_chunk = chunk_content
                     else:
                         current_chunk += "\n\n" + chunk_content if current_chunk else chunk_content
-        
+
         # Add final chunk
         if current_chunk:
             chunks.append(self._create_chunk_object(
                 current_chunk, chunk_index, metadata, current_timestamp
             ))
-        
+
         return chunks
-    
-    async def _chunk_by_pages(self, 
-                             content: str, 
-                             metadata: Dict[str, Any], 
+
+    async def _chunk_by_pages(self,
+                             content: str,
+                             metadata: Dict[str, Any],
                              config: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Chunk document content by pages/chapters."""
         chunks = []
-        
+
         # Split by page/chapter markers
         import re
         page_pattern = r'(?:^|\n)(?:Page \d+|Chapter \d+|# .+)(?:\n|$)'
-        
+
         sections = re.split(page_pattern, content, flags=re.MULTILINE)
-        
+
         chunk_index = 0
         for section in sections:
             if section.strip():
@@ -264,36 +264,36 @@ class ChunkerStage(Stage):
                         section.strip(), chunk_index, metadata
                     ))
                     chunk_index += 1
-        
+
         return chunks
-    
-    async def _chunk_semantically(self, 
-                                 content: str, 
-                                 metadata: Dict[str, Any], 
+
+    async def _chunk_semantically(self,
+                                 content: str,
+                                 metadata: Dict[str, Any],
                                  config: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Chunk content semantically using the chunking service."""
-        
+
         # Use existing chunking service
         chunk_strategy = ChunkingStrategy(
             strategy=config.get('chunk_strategy', 'semantic'),
             chunk_size=config.get('chunk_size', 4000),
             chunk_overlap=config.get('chunk_overlap', 200)
         )
-        
+
         raw_chunks = await self.chunking_service.chunk_text(content, chunk_strategy)
-        
+
         chunks = []
         for i, chunk_text in enumerate(raw_chunks):
             chunks.append(self._create_chunk_object(
                 chunk_text, i, metadata
             ))
-        
+
         return chunks
-    
-    def _create_chunk_object(self, 
-                            content: str, 
-                            index: int, 
-                            metadata: Dict[str, Any], 
+
+    def _create_chunk_object(self,
+                            content: str,
+                            index: int,
+                            metadata: Dict[str, Any],
                             timestamp: Optional[str] = None) -> Dict[str, Any]:
         """Create standardized chunk object."""
         return {
@@ -309,7 +309,7 @@ class ChunkerStage(Stage):
                 'language': metadata.get('language')
             }
         }
-    
+
     async def _generate_chunk_embeddings(self,
                                         chunks: List[Dict[str, Any]],
                                         config: Dict[str, Any]) -> List[List[float]]:
@@ -411,7 +411,7 @@ Provide a concise 2-3 sentence summary."""
                 summaries.append("")
 
         return summaries
-    
+
     def _create_chunk_data(self,
                           chunks: List[Dict[str, Any]],
                           embeddings: List[List[float]],

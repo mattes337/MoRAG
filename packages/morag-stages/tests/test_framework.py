@@ -22,40 +22,40 @@ logger = structlog.get_logger(__name__)
 
 class StageTestFramework:
     """Test framework for stage-based processing."""
-    
+
     def __init__(self):
         self.temp_dir = None
         self.stage_manager = None
         self.test_data_dir = None
         self.output_dir = None
-    
+
     async def setup(self):
         """Set up test environment."""
         self.temp_dir = Path(tempfile.mkdtemp())
         self.stage_manager = StageManager()
-        
+
         # Create test data directory
         self.test_data_dir = self.temp_dir / "test_data"
         self.test_data_dir.mkdir()
-        
+
         # Create output directory
         self.output_dir = self.temp_dir / "output"
         self.output_dir.mkdir()
-        
+
         logger.info("Test framework setup complete", temp_dir=str(self.temp_dir))
-    
+
     async def teardown(self):
         """Clean up test environment."""
         if self.temp_dir and self.temp_dir.exists():
             shutil.rmtree(self.temp_dir)
             logger.info("Test framework cleanup complete")
-    
+
     def create_test_file(self, filename: str, content: str) -> Path:
         """Create a test file with given content."""
         file_path = self.test_data_dir / filename
         file_path.write_text(content, encoding='utf-8')
         return file_path
-    
+
     def create_test_markdown(self, filename: str = "test.md") -> Path:
         """Create a test markdown file."""
         content = """---
@@ -82,7 +82,7 @@ More content with different topics and concepts related to data science and natu
 This document contains various topics that can be used for testing fact extraction and entity recognition.
 """
         return self.create_test_file(filename, content)
-    
+
     def create_test_chunks_json(self, filename: str = "test.chunks.json") -> Path:
         """Create a test chunks JSON file."""
         chunks_data = {
@@ -127,11 +127,11 @@ This document contains various topics that can be used for testing fact extracti
                 }
             ]
         }
-        
+
         file_path = self.test_data_dir / filename
         file_path.write_text(json.dumps(chunks_data, indent=2), encoding='utf-8')
         return file_path
-    
+
     def create_test_facts_json(self, filename: str = "test.facts.json") -> Path:
         """Create a test facts JSON file."""
         facts_data = {
@@ -203,11 +203,11 @@ This document contains various topics that can be used for testing fact extracti
                 "fact extraction"
             ]
         }
-        
+
         file_path = self.test_data_dir / filename
         file_path.write_text(json.dumps(facts_data, indent=2), encoding='utf-8')
         return file_path
-    
+
     def create_context(self, source_file: Path, config: Optional[Dict[str, Any]] = None) -> StageContext:
         """Create a stage context for testing."""
         return StageContext(
@@ -215,51 +215,51 @@ This document contains various topics that can be used for testing fact extracti
             output_dir=self.output_dir,
             config=config or {}
         )
-    
-    async def execute_stage_test(self, 
+
+    async def execute_stage_test(self,
                                 stage_type: StageType,
                                 input_files: List[Path],
                                 config: Optional[Dict[str, Any]] = None):
         """Execute a stage for testing."""
-        
+
         context = self.create_context(input_files[0], config)
-        
+
         return await self.stage_manager.execute_stage(stage_type, input_files, context)
-    
+
     def assert_stage_success(self, result):
         """Assert that stage execution was successful."""
         assert result.status == StageStatus.COMPLETED, f"Stage failed with status: {result.status}, error: {result.error_message}"
         assert result.error_message is None, f"Stage had error: {result.error_message}"
         assert len(result.output_files) > 0, "Stage produced no output files"
         assert all(f.exists() for f in result.output_files), "Some output files do not exist"
-    
+
     def assert_stage_skipped(self, result):
         """Assert that stage execution was skipped."""
         assert result.status == StageStatus.SKIPPED, f"Expected stage to be skipped, got: {result.status}"
         assert len(result.output_files) > 0, "Skipped stage should still have output files"
-    
+
     def assert_file_content(self, file_path: Path, expected_content: Optional[str] = None, min_length: Optional[int] = None):
         """Assert file content meets expectations."""
         assert file_path.exists(), f"File {file_path} does not exist"
-        
+
         content = file_path.read_text(encoding='utf-8')
-        
+
         if expected_content:
             assert expected_content in content, f"Expected content '{expected_content}' not found in file"
-        
+
         if min_length:
             assert len(content) >= min_length, f"File content too short: {len(content)} < {min_length}"
-    
+
     def assert_json_structure(self, file_path: Path, required_keys: List[str]):
         """Assert JSON file has required structure."""
         assert file_path.exists(), f"JSON file {file_path} does not exist"
-        
+
         with open(file_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
-        
+
         for key in required_keys:
             assert key in data, f"Required key '{key}' not found in JSON file"
-    
+
     def get_file_by_extension(self, files: List[Path], extension: str) -> Path:
         """Get file with specific extension from list."""
         for file_path in files:

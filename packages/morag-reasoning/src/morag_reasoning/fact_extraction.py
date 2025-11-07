@@ -29,7 +29,7 @@ class SourceMappingResult(BaseModel):
 
 class FactExtractionService:
     """Service for extracting key facts from retrieved chunks."""
-    
+
     def __init__(
         self,
         llm_client: LLMClient,
@@ -37,7 +37,7 @@ class FactExtractionService:
         max_facts: int = 10000
     ):
         """Initialize the fact extraction service.
-        
+
         Args:
             llm_client: LLM client for fact extraction
             min_confidence: Minimum confidence threshold
@@ -47,7 +47,7 @@ class FactExtractionService:
         self.min_confidence = min_confidence
         self.max_facts = max_facts
         self.logger = structlog.get_logger(__name__)
-        
+
         # Create PydanticAI agent for fact extraction
         self.agent = Agent(
             model=llm_client.get_model(),
@@ -61,7 +61,7 @@ class FactExtractionService:
             result_type=SourceMappingResult,
             system_prompt=self._get_source_mapping_prompt()
         )
-    
+
     def _get_system_prompt(self) -> str:
         """Get the system prompt for fact extraction."""
         return """You are an expert fact extraction system. Your task is to extract key facts from document chunks that are relevant to answering a user's query.
@@ -94,7 +94,7 @@ Quality Criteria:
 - Completeness: Fact is self-contained and clear
 
 Return only the most relevant and well-supported facts."""
-    
+
     async def extract_facts(
         self,
         query: str,
@@ -103,34 +103,34 @@ Return only the most relevant and well-supported facts."""
         min_confidence: Optional[float] = None
     ) -> List[KeyFact]:
         """Extract key facts from retrieved chunks.
-        
+
         Args:
             query: Original user query
             chunks: Retrieved chunks with metadata
             max_facts: Maximum facts to extract (overrides instance default)
             min_confidence: Minimum confidence threshold (overrides instance default)
-            
+
         Returns:
             List of extracted key facts
         """
         if not chunks:
             return []
-        
+
         max_facts_limit = max_facts or self.max_facts
         confidence_threshold = min_confidence or self.min_confidence
-        
+
         self.logger.info(
             "Starting fact extraction",
             query=query,
             num_chunks=len(chunks),
             max_facts=max_facts_limit
         )
-        
+
         try:
             # Prepare chunks for processing
             chunk_texts = []
             chunk_metadata = []
-            
+
             for i, chunk in enumerate(chunks):
                 # Handle both string chunks and dict chunks
                 if isinstance(chunk, str):
@@ -149,18 +149,18 @@ Return only the most relevant and well-supported facts."""
                 if chunk_text:
                     chunk_texts.append(f"[Chunk {i+1}] {chunk_text}")
                     chunk_metadata.append(chunk_dict)
-            
+
             if not chunk_texts:
                 self.logger.warning("No valid chunk texts found")
                 return []
-            
+
             # Create extraction prompt
             prompt = self._create_extraction_prompt(query, chunk_texts)
-            
+
             # Extract facts using LLM
             result = await self.agent.run(prompt)
             extracted_facts = result.data.facts
-            
+
             # Process and enhance facts with source information
             enhanced_facts = []
             for fact in extracted_facts:
@@ -172,22 +172,22 @@ Return only the most relevant and well-supported facts."""
                 enhanced_facts = await self._map_facts_to_sources(
                     enhanced_facts, chunk_metadata, query
                 )
-            
+
             # Sort by relevance and confidence, then limit
             enhanced_facts.sort(
                 key=lambda f: (f.relevance_to_query, f.confidence),
                 reverse=True
             )
             enhanced_facts = enhanced_facts[:max_facts_limit]
-            
+
             self.logger.info(
                 "Fact extraction completed",
                 total_facts=len(enhanced_facts),
                 query=query
             )
-            
+
             return enhanced_facts
-            
+
         except Exception as e:
             self.logger.error(
                 "Fact extraction failed",
@@ -196,19 +196,19 @@ Return only the most relevant and well-supported facts."""
                 query=query
             )
             raise
-    
+
     def _create_extraction_prompt(self, query: str, chunk_texts: List[str]) -> str:
         """Create prompt for fact extraction.
-        
+
         Args:
             query: Original user query
             chunk_texts: List of chunk texts with identifiers
-            
+
         Returns:
             Extraction prompt for LLM
         """
         chunks_text = "\n\n".join(chunk_texts)
-        
+
         return f"""Extract key facts from the following document chunks that help answer the user's query.
 
 USER QUERY: "{query}"
@@ -344,16 +344,16 @@ Analyze which chunks support each fact. For each fact, identify the chunk indice
         chunk_metadata: List[Dict[str, Any]]
     ) -> List[SourceInfo]:
         """Create source information for a fact.
-        
+
         Args:
             fact: Extracted fact
             chunk_metadata: Metadata for all chunks
-            
+
         Returns:
             List of source information
         """
         sources = []
-        
+
         # For now, we'll associate the fact with all chunks
         # In a more sophisticated implementation, we could determine
         # which specific chunks support each fact
@@ -369,18 +369,18 @@ Analyze which chunks support each fact. For each fact, identify the chunk indice
                 metadata=chunk.get('metadata', {})
             )
             sources.append(source)
-        
+
         return sources
-    
+
     async def extract_facts_from_request(
         self,
         request: FactExtractionRequest
     ) -> List[KeyFact]:
         """Extract facts from a fact extraction request.
-        
+
         Args:
             request: Fact extraction request
-            
+
         Returns:
             List of extracted key facts
         """

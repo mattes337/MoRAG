@@ -28,14 +28,14 @@ def print_section(title: str):
 def test_content_type_normalization():
     """Test content type normalization fixes."""
     print_section("Testing Content Type Normalization")
-    
+
     try:
         from morag.api import MoRAGAPI
         from morag_services import ContentType
-        
+
         # Create API instance
         api = MoRAGAPI()
-        
+
         # Test cases for content type normalization
         test_cases = [
             ("pdf", "document"),
@@ -48,23 +48,23 @@ def test_content_type_normalization():
             ("document", "document"),  # Already valid
             ("unknown_format", "unknown"),  # Should default to unknown
         ]
-        
+
         print("Testing content type normalization:")
         for input_type, expected in test_cases:
             try:
                 normalized = api._normalize_content_type(input_type)
                 status = "✅" if normalized == expected else "❌"
                 print(f"{status} {input_type} -> {normalized} (expected: {expected})")
-                
+
                 # Test that normalized type can create ContentType enum
                 content_type_enum = ContentType(normalized)
                 print(f"   ✅ ContentType({normalized}) = {content_type_enum}")
-                
+
             except Exception as e:
                 print(f"❌ {input_type} -> Error: {e}")
-        
+
         print("\n✅ Content type normalization tests completed")
-        
+
     except Exception as e:
         print(f"❌ Content type normalization test failed: {e}")
         import traceback
@@ -73,10 +73,10 @@ def test_content_type_normalization():
 def test_processing_config_parameters():
     """Test ProcessingConfig parameter handling."""
     print_section("Testing ProcessingConfig Parameter Handling")
-    
+
     try:
         from morag_core.interfaces.processor import ProcessingConfig
-        
+
         # Test creating ProcessingConfig with additional parameters
         test_params = {
             "file_path": "/test/file.pdf",
@@ -89,7 +89,7 @@ def test_processing_config_parameters():
             "extract_metadata": True,
             "remote": False
         }
-        
+
         print("Testing ProcessingConfig with additional parameters:")
         try:
             config = ProcessingConfig(**test_params)
@@ -101,19 +101,19 @@ def test_processing_config_parameters():
             print(f"   store_in_vector_db: {config.store_in_vector_db}")
             print(f"   generate_embeddings: {config.generate_embeddings}")
             print(f"   remote: {config.remote}")
-            
+
         except Exception as e:
             print(f"❌ ProcessingConfig creation failed: {e}")
             import traceback
             traceback.print_exc()
             return
-        
+
         # Test with minimal parameters
         minimal_config = ProcessingConfig(file_path="/test/minimal.pdf")
         print("✅ ProcessingConfig creation successful with minimal parameters")
-        
+
         print("\n✅ ProcessingConfig parameter handling tests completed")
-        
+
     except Exception as e:
         print(f"❌ ProcessingConfig test failed: {e}")
         import traceback
@@ -122,13 +122,13 @@ def test_processing_config_parameters():
 def test_content_type_enum_validation():
     """Test ContentType enum validation."""
     print_section("Testing ContentType Enum Validation")
-    
+
     try:
         from morag_services import ContentType
-        
+
         # Test valid content types
         valid_types = ["document", "audio", "video", "image", "web", "youtube", "text", "unknown"]
-        
+
         print("Testing valid ContentType enum values:")
         for content_type in valid_types:
             try:
@@ -136,10 +136,10 @@ def test_content_type_enum_validation():
                 print(f"✅ ContentType('{content_type}') = {enum_value}")
             except Exception as e:
                 print(f"❌ ContentType('{content_type}') failed: {e}")
-        
+
         # Test invalid content types
         invalid_types = ["pdf", "doc", "mp3", "invalid"]
-        
+
         print("\nTesting invalid ContentType enum values (should fail):")
         for content_type in invalid_types:
             try:
@@ -149,9 +149,9 @@ def test_content_type_enum_validation():
                 print(f"✅ ContentType('{content_type}') correctly failed: {e}")
             except Exception as e:
                 print(f"❌ ContentType('{content_type}') failed with unexpected error: {e}")
-        
+
         print("\n✅ ContentType enum validation tests completed")
-        
+
     except Exception as e:
         print(f"❌ ContentType enum test failed: {e}")
         import traceback
@@ -160,13 +160,13 @@ def test_content_type_enum_validation():
 async def test_api_content_type_handling():
     """Test API content type handling with file processing."""
     print_section("Testing API Content Type Handling")
-    
+
     try:
         from morag.api import MoRAGAPI
-        
+
         # Create API instance
         api = MoRAGAPI()
-        
+
         # Test file content type detection
         test_files = [
             "test.pdf",
@@ -177,22 +177,22 @@ async def test_api_content_type_handling():
             "test.html",
             "test.unknown"
         ]
-        
+
         print("Testing file content type detection:")
         for filename in test_files:
             try:
                 detected_type = api._detect_content_type_from_file(Path(filename))
                 normalized_type = api._normalize_content_type(detected_type)
                 print(f"✅ {filename} -> detected: {detected_type}, normalized: {normalized_type}")
-                
+
                 # Verify normalized type can create ContentType enum
                 from morag_services import ContentType
                 content_type_enum = ContentType(normalized_type)
                 print(f"   ✅ ContentType({normalized_type}) = {content_type_enum}")
-                
+
             except Exception as e:
                 print(f"❌ {filename} -> Error: {e}")
-        
+
         print("\n✅ API content type handling tests completed")
 
     except Exception as e:

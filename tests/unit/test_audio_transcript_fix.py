@@ -7,8 +7,6 @@ the transcript section and properly formats the content.
 """
 
 import pytest
-from unittest.mock import Mock, AsyncMock
-from pathlib import Path
 
 from morag_audio import AudioConverter
 from morag_services import ConversionOptions, ChunkingStrategy
@@ -66,9 +64,9 @@ class TestAudioTranscriptFix:
 
     @pytest.mark.asyncio
     async def test_enhanced_markdown_includes_transcript(
-        self, 
-        audio_converter, 
-        mock_audio_result, 
+        self,
+        audio_converter,
+        mock_audio_result,
         conversion_options
     ):
         """Test that enhanced markdown includes transcript section."""
@@ -84,7 +82,7 @@ class TestAudioTranscriptFix:
 
         # Generate markdown
         markdown = await audio_converter._create_enhanced_structured_markdown(
-            enhanced_result, 
+            enhanced_result,
             conversion_options
         )
 
@@ -96,8 +94,8 @@ class TestAudioTranscriptFix:
 
     @pytest.mark.asyncio
     async def test_enhanced_markdown_with_multiple_segments(
-        self, 
-        audio_converter, 
+        self,
+        audio_converter,
         conversion_options
     ):
         """Test enhanced markdown with multiple audio segments."""
@@ -128,7 +126,7 @@ class TestAudioTranscriptFix:
 
         # Generate markdown
         markdown = await audio_converter._create_enhanced_structured_markdown(
-            enhanced_result, 
+            enhanced_result,
             conversion_options
         )
 
@@ -140,8 +138,8 @@ class TestAudioTranscriptFix:
 
     @pytest.mark.asyncio
     async def test_enhanced_markdown_without_segments(
-        self, 
-        audio_converter, 
+        self,
+        audio_converter,
         conversion_options
     ):
         """Test enhanced markdown fallback when no segments available."""
@@ -157,7 +155,7 @@ class TestAudioTranscriptFix:
 
         # Generate markdown
         markdown = await audio_converter._create_enhanced_structured_markdown(
-            enhanced_result, 
+            enhanced_result,
             conversion_options
         )
 
@@ -169,9 +167,9 @@ class TestAudioTranscriptFix:
 
     @pytest.mark.asyncio
     async def test_enhanced_markdown_with_topics(
-        self, 
-        audio_converter, 
-        mock_audio_result, 
+        self,
+        audio_converter,
+        mock_audio_result,
         conversion_options
     ):
         """Test enhanced markdown with topic segmentation."""
@@ -195,7 +193,7 @@ class TestAudioTranscriptFix:
 
         # Generate markdown
         markdown = await audio_converter._create_enhanced_structured_markdown(
-            enhanced_result, 
+            enhanced_result,
             conversion_options
         )
 
@@ -215,15 +213,15 @@ class TestAudioTranscriptFix:
 
     @pytest.mark.asyncio
     async def test_regular_markdown_still_works(
-        self, 
-        audio_converter, 
-        mock_audio_result, 
+        self,
+        audio_converter,
+        mock_audio_result,
         conversion_options
     ):
         """Test that regular markdown creation still works correctly."""
         # Generate regular markdown
         markdown = await audio_converter._create_structured_markdown(
-            mock_audio_result, 
+            mock_audio_result,
             conversion_options
         )
 

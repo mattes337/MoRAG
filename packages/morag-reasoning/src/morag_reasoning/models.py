@@ -95,7 +95,7 @@ class ReasoningContext:
     documents: List[Dict[str, Any]] = field(default_factory=list)
     paths: List[Any] = field(default_factory=list)  # GraphPath objects
     metadata: Dict[str, Any] = field(default_factory=dict)
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary representation."""
         return {
@@ -105,19 +105,19 @@ class ReasoningContext:
             "paths": [path.to_dict() if hasattr(path, 'to_dict') else str(path) for path in self.paths],
             "metadata": self.metadata
         }
-    
+
     def entity_count(self) -> int:
         """Get number of entities in context."""
         return len(self.entities)
-    
+
     def relation_count(self) -> int:
         """Get number of relations in context."""
         return len(self.relations)
-    
+
     def document_count(self) -> int:
         """Get number of documents in context."""
         return len(self.documents)
-    
+
     def path_count(self) -> int:
         """Get number of paths in context."""
         return len(self.paths)

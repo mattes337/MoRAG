@@ -18,7 +18,7 @@ from morag_graph.models.database_config import DatabaseServerConfig, DatabaseTyp
 
 def create_custom_neo4j_config(
     hostname: str = "neo4j://localhost:7687",
-    username: str = "neo4j", 
+    username: str = "neo4j",
     password: str = "password",
     database: str = "neo4j"
 ) -> DatabaseServerConfig:
@@ -59,7 +59,7 @@ def create_custom_qdrant_config(
 
 def create_test_request_with_custom_databases() -> IntelligentRetrievalRequest:
     """Create a test request with custom database configurations."""
-    
+
     # Custom Neo4j configuration (example with external server)
     neo4j_config = create_custom_neo4j_config(
         hostname="https://graph.adhs.morag.drydev.de",
@@ -67,7 +67,7 @@ def create_test_request_with_custom_databases() -> IntelligentRetrievalRequest:
         password="your-password-here",
         database="neo4j"
     )
-    
+
     # Custom Qdrant configuration (example with external server)
     qdrant_config = create_custom_qdrant_config(
         hostname="your-qdrant-server.com",
@@ -76,7 +76,7 @@ def create_test_request_with_custom_databases() -> IntelligentRetrievalRequest:
         collection="custom_collection",
         https=True
     )
-    
+
     return IntelligentRetrievalRequest(
         query="What are the main symptoms of ADHD?",
         max_iterations=3,
@@ -127,16 +127,16 @@ def create_test_request_with_named_databases() -> IntelligentRetrievalRequest:
 async def test_rest_api_with_custom_databases():
     """Test the REST API with custom database configurations."""
     import aiohttp
-    
+
     # Create request with custom database configurations
     request = create_test_request_with_custom_databases()
-    
+
     # Convert to JSON for API call
     request_data = request.model_dump()
-    
+
     print("Testing REST API with custom database configurations...")
     print(f"Request data: {json.dumps(request_data, indent=2)}")
-    
+
     try:
         async with aiohttp.ClientSession() as session:
             async with session.post(
@@ -151,22 +151,22 @@ async def test_rest_api_with_custom_databases():
                 else:
                     error_text = await response.text()
                     print(f"Error {response.status}: {error_text}")
-                    
+
     except Exception as e:
         print(f"Failed to connect to API: {e}")
 
 
 def print_example_configurations():
     """Print example configurations for different scenarios."""
-    
+
     print("=== Example 1: Custom Neo4j and Qdrant servers ===")
     request1 = create_test_request_with_custom_databases()
     print(json.dumps(request1.model_dump(), indent=2))
-    
+
     print("\n=== Example 2: Server default configurations ===")
     request2 = create_test_request_with_default_databases()
     print(json.dumps(request2.model_dump(), indent=2))
-    
+
     print("\n=== Example 3: Named database configurations ===")
     request3 = create_test_request_with_named_databases()
     print(json.dumps(request3.model_dump(), indent=2))
@@ -174,15 +174,15 @@ def print_example_configurations():
 
 def main():
     """Main function to demonstrate custom database configurations."""
-    
+
     if len(sys.argv) > 1 and sys.argv[1] == "examples":
         print_example_configurations()
         return
-    
+
     if len(sys.argv) > 1 and sys.argv[1] == "test-api":
         asyncio.run(test_rest_api_with_custom_databases())
         return
-    
+
     print("Custom Database Configuration Test Script")
     print("========================================")
     print()

@@ -13,9 +13,9 @@ class WebFormatter:
     """Formats web content according to LLM documentation specifications."""
 
     def format_web_content(
-        self, 
-        raw_content: str, 
-        url: str, 
+        self,
+        raw_content: str,
+        url: str,
         metadata: Dict[str, Any]
     ) -> str:
         """Format web content according to LLM documentation format.
@@ -33,24 +33,24 @@ class WebFormatter:
         if not page_title:
             parsed_url = urlparse(url)
             page_title = parsed_url.netloc or 'Unknown Page'
-        
+
         # Build formatted content
         formatted_parts = []
-        
+
         # Header Section: "Web Page: page-title"
         formatted_parts.append(f"# Web Page: {page_title}")
         formatted_parts.append("")
-        
+
         # Page Information Section
         formatted_parts.append("## Page Information")
-        
+
         # Extract metadata for information section
         author = metadata.get('author', 'Unknown')
         publication_date = metadata.get('publication_date', metadata.get('date', 'Unknown'))
         word_count = metadata.get('word_count', self._count_words(raw_content))
         language = metadata.get('language', 'Unknown')
         last_modified = metadata.get('last_modified', 'Unknown')
-        
+
         formatted_parts.extend([
             f"- **URL**: {url}",
             f"- **Title**: {page_title}",
@@ -61,10 +61,10 @@ class WebFormatter:
             f"- **Last Modified**: {last_modified}",
             ""
         ])
-        
+
         # Parse content sections
         sections = self._parse_web_content(raw_content)
-        
+
         # Main Content Section
         main_content = sections.get('main_content', '')
         if main_content:
@@ -72,7 +72,7 @@ class WebFormatter:
             formatted_parts.append("")
             formatted_parts.append(main_content.strip())
             formatted_parts.append("")
-        
+
         # Subsections (if any)
         subsections = sections.get('subsections', [])
         for subsection in subsections:
@@ -86,12 +86,12 @@ class WebFormatter:
                     level = len(title) - len(title.lstrip('#'))
                     if level < 3:
                         title = f"### {title.lstrip('#').strip()}"
-                
+
                 formatted_parts.append(title)
                 formatted_parts.append("")
                 formatted_parts.append(subsection['content'].strip())
                 formatted_parts.append("")
-        
+
         # Links Section
         links = sections.get('links', [])
         if links:
@@ -105,7 +105,7 @@ class WebFormatter:
                 else:
                     formatted_parts.append(f"- {link}")
             formatted_parts.append("")
-        
+
         # Additional Metadata Section (if available)
         additional_metadata = self._extract_additional_metadata(metadata)
         if additional_metadata:
@@ -114,9 +114,9 @@ class WebFormatter:
             for key, value in additional_metadata.items():
                 formatted_parts.append(f"- **{key}**: {value}")
             formatted_parts.append("")
-        
+
         return "\n".join(formatted_parts).rstrip() + "\n"
-    
+
     def _extract_title_from_content(self, content: str) -> Optional[str]:
         """Extract title from content if not in metadata.
 
@@ -130,7 +130,7 @@ class WebFormatter:
         h1_match = re.search(r'^#\s+(.+)$', content, re.MULTILINE)
         if h1_match:
             return h1_match.group(1).strip()
-        
+
         # Look for title-like patterns
         title_match = re.search(r'^(.{10,100})$', content, re.MULTILINE)
         if title_match:
@@ -138,9 +138,9 @@ class WebFormatter:
             # Check if it looks like a title (not too long, no special chars)
             if len(title) < 100 and not re.search(r'[.!?]{2,}', title):
                 return title
-        
+
         return None
-    
+
     def _count_words(self, content: str) -> int:
         """Count words in content.
 
@@ -154,7 +154,7 @@ class WebFormatter:
         clean_content = re.sub(r'[#*_`\[\]()]', '', content)
         words = re.findall(r'\b\w+\b', clean_content)
         return len(words)
-    
+
     def _parse_web_content(self, content: str) -> Dict[str, Any]:
         """Parse web content into structured sections.
 
@@ -169,23 +169,23 @@ class WebFormatter:
             'subsections': [],
             'links': []
         }
-        
+
         if not content.strip():
             return sections
-        
+
         # Split content by headers to identify sections
         lines = content.split('\n')
         current_section: Dict[str, Any] = {'title': '', 'content': '', 'level': 0}
         main_content_lines: List[str] = []
         subsections: List[Dict[str, str]] = []
-        
+
         for line in lines:
             # Check for headers
             header_match = re.match(r'^(#{1,6})\s+(.+)$', line)
             if header_match:
                 level = len(header_match.group(1))
                 title = header_match.group(2).strip()
-                
+
                 # Save previous section
                 if current_section['content'].strip():
                     if current_section['level'] <= 2:
@@ -197,7 +197,7 @@ class WebFormatter:
                             'title': current_section['title'],
                             'content': current_section['content'].strip()
                         })
-                
+
                 # Start new section
                 current_section = {'title': title, 'content': '', 'level': level}
             else:
@@ -206,7 +206,7 @@ class WebFormatter:
                     current_section['content'] += f"\n{line}"
                 else:
                     current_section['content'] = line
-        
+
         # Save final section
         if current_section['content'].strip():
             if current_section['level'] <= 2:
@@ -216,16 +216,16 @@ class WebFormatter:
                     'title': current_section['title'],
                     'content': current_section['content'].strip()
                 })
-        
+
         # Clean up main content
         sections['main_content'] = '\n'.join(main_content_lines).strip()
         sections['subsections'] = subsections
-        
+
         # Extract links
         sections['links'] = self._extract_links(content)
-        
+
         return sections
-    
+
     def _extract_links(self, content: str) -> List[Dict[str, str]]:
         """Extract links from content.
 
@@ -236,19 +236,19 @@ class WebFormatter:
             List of link dictionaries
         """
         links = []
-        
+
         # Find markdown links
         link_pattern = r'\[([^\]]+)\]\(([^)]+)\)'
         matches = re.findall(link_pattern, content)
-        
+
         for text, href in matches:
             # Skip internal anchors and common non-content links
             if not href.startswith('#') and not any(skip in href.lower() for skip in ['javascript:', 'mailto:', 'tel:']):
                 links.append({'text': text.strip(), 'href': href.strip()})
-        
+
         # Limit to most important links (avoid overwhelming output)
         return links[:10]
-    
+
     def _extract_additional_metadata(self, metadata: Dict[str, Any]) -> Dict[str, str]:
         """Extract additional metadata for the metadata section.
 
@@ -269,7 +269,7 @@ class WebFormatter:
             'twitter_card': 'Twitter Card',
             'canonical_url': 'Canonical URL'
         }
-        
+
         additional_metadata = {}
         for key, display_name in additional_fields.items():
             if key in metadata and metadata[key]:
@@ -277,9 +277,9 @@ class WebFormatter:
                 if isinstance(value, list):
                     value = ', '.join(str(v) for v in value)
                 additional_metadata[display_name] = str(value)
-        
+
         return additional_metadata
-    
+
     def clean_web_content(self, content: str) -> str:
         """Clean up web content by removing navigation and ads.
 
@@ -291,15 +291,15 @@ class WebFormatter:
         """
         # Remove common navigation and advertisement patterns
         content = re.sub(r'(?i)(advertisement|sponsored|related articles?|you may also like)', '', content)
-        
+
         # Remove excessive whitespace
         content = re.sub(r'\n{3,}', '\n\n', content)
-        
+
         # Remove leading/trailing whitespace
         content = content.strip()
-        
+
         return content
-    
+
     def extract_web_metadata(self, url: str, content: str) -> Dict[str, Any]:
         """Extract metadata from web content and URL.
 
@@ -311,20 +311,20 @@ class WebFormatter:
             Dictionary containing web metadata
         """
         metadata = {}
-        
+
         # Basic URL info
         parsed_url = urlparse(url)
         metadata['domain'] = parsed_url.netloc
         metadata['path'] = parsed_url.path
-        
+
         # Extract title
         title_match = re.search(r'^#\s+(.+)$', content, re.MULTILINE)
         if title_match:
             metadata['title'] = title_match.group(1).strip()
-        
+
         # Count words
         metadata['word_count'] = self._count_words(content)
-        
+
         # Extract language (basic detection)
         try:
             from langdetect import detect
@@ -332,5 +332,5 @@ class WebFormatter:
             metadata['language'] = detected_lang.upper()
         except:
             metadata['language'] = 'Unknown'
-        
+
         return metadata

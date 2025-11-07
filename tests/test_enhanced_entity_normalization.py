@@ -24,7 +24,7 @@ def mock_neo4j_storage():
 def mock_entity_normalizer():
     """Mock entity normalizer."""
     normalizer = AsyncMock()
-    
+
     # Define normalization mappings
     normalization_map = {
         "Silizium Pur": "Silizium",
@@ -36,7 +36,7 @@ def mock_entity_normalizer():
         "ADHD": "ADHD",
         "Stress": "Stress"
     }
-    
+
     async def normalize_side_effect(entity_name):
         normalized = normalization_map.get(entity_name, entity_name)
         return EntityVariation(
@@ -45,7 +45,7 @@ def mock_entity_normalizer():
             confidence=0.9,
             rule_applied="test_normalization"
         )
-    
+
     normalizer.normalize_entity.side_effect = normalize_side_effect
     return normalizer
 
@@ -94,28 +94,28 @@ async def test_entity_normalization_and_uniqueness(enhanced_service, mock_neo4j_
             language="en"
         )
     ]
-    
+
     # Process facts
     result = await enhanced_service.process_facts_with_entities(
         facts=facts,
         create_keyword_entities=False,
         create_mandatory_relations=True
     )
-    
+
     # Verify entities were created
     assert mock_neo4j_storage.store_entity.called
-    
+
     # Get all stored entities
     stored_entities = []
     for call in mock_neo4j_storage.store_entity.call_args_list:
         entity = call[0][0]  # First argument of the call
         stored_entities.append(entity)
-    
+
     # Check that entities use generic ENTITY label
     for entity in stored_entities:
         assert entity.type == "ENTITY"
         assert entity.get_neo4j_label() == "ENTITY"
-    
+
     # Check that entity names are normalized
     entity_names = [entity.name for entity in stored_entities]
     assert "Silizium" in entity_names  # Normalized from "Silizium Pur"
@@ -123,7 +123,7 @@ async def test_entity_normalization_and_uniqueness(enhanced_service, mock_neo4j_
     assert "Metal" in entity_names     # Normalized from "heavy metals"
     assert "ADHD" in entity_names      # Already normalized
     assert "Stress" in entity_names    # Already normalized
-    
+
     # Check that duplicate entities are not created (Silizium appears in fact1 and fact3)
     silizium_entities = [e for e in stored_entities if e.name == "Silizium"]
     assert len(silizium_entities) == 1  # Should only be one Silizium entity
@@ -170,27 +170,27 @@ async def test_semantic_relationship_types(enhanced_service, mock_neo4j_storage)
             language="en"
         )
     ]
-    
+
     # Process facts with relationships
     result = await enhanced_service.process_facts_with_entities(
         facts=facts,
         create_keyword_entities=False,
         create_mandatory_relations=True
     )
-    
+
     # Verify relationships were created with semantic types
     assert mock_neo4j_storage._connection_ops._execute_query.called
-    
+
     # Check the relationship creation calls
     relation_calls = mock_neo4j_storage._connection_ops._execute_query.call_args_list
-    
+
     # Extract relation types from the calls
     relation_types = []
     for call in relation_calls:
         args, kwargs = call
         if len(args) > 1 and isinstance(args[1], dict) and 'relation_type' in args[1]:
             relation_types.append(args[1]['relation_type'])
-    
+
     # Verify semantic relationship types are used
     assert 'TREATS' in relation_types  # Engelwurz treats ADHD
     assert 'CAUSES' in relation_types  # Stress causes hormonal imbalances
@@ -214,26 +214,26 @@ async def test_keyword_entity_normalization(enhanced_service, mock_neo4j_storage
             language="en"
         )
     ]
-    
+
     # Process facts with keyword entities
     result = await enhanced_service.process_facts_with_entities(
         facts=facts,
         create_keyword_entities=True,
         create_mandatory_relations=True
     )
-    
+
     # Get all stored entities
     stored_entities = []
     for call in mock_neo4j_storage.store_entity.call_args_list:
         entity = call[0][0]
         stored_entities.append(entity)
-    
+
     # Check that keyword entities are normalized
     entity_names = [entity.name for entity in stored_entities]
     assert "Vitamin" in entity_names   # Normalized from "natural vitamins"
     assert "Metal" in entity_names     # Normalized from "heavy metals"
     assert "Engelwurz" in entity_names # Normalized from "Engelwurz (Wurzel)"
-    
+
     # Check that all entities use generic ENTITY label
     for entity in stored_entities:
         assert entity.type == "ENTITY"
@@ -246,12 +246,12 @@ def test_entity_model_generic_label():
     entity1 = Entity(name="Test Entity", type="SUBJECT", confidence=0.9)
     entity2 = Entity(name="Another Entity", type="OBJECT", confidence=0.8)
     entity3 = Entity(name="Keyword Entity", type="KEYWORD", confidence=0.7)
-    
+
     # All should return generic ENTITY label
     assert entity1.get_neo4j_label() == "ENTITY"
     assert entity2.get_neo4j_label() == "ENTITY"
     assert entity3.get_neo4j_label() == "ENTITY"
-    
+
     # But preserve original type in the type field
     assert entity1.type == "SUBJECT"
     assert entity2.type == "OBJECT"

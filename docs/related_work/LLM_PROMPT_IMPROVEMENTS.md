@@ -15,7 +15,7 @@ You are a knowledge extraction expert. Extract structured facts from the followi
 Extract facts with this structure:
 {
   "subject": "specific substance/entity",
-  "object": "specific condition/problem/target", 
+  "object": "specific condition/problem/target",
   "approach": "exact method/dosage/procedure with specific details",
   "solution": "specific outcome/benefit/result",
   "condition": "question/precondition/situation when this applies",

@@ -31,7 +31,7 @@ async def test_audio_transcription_fixes():
     """Test audio transcription fixes."""
     print("🎵 Testing Audio Transcription Fixes")
     print("=" * 50)
-    
+
     # Test configuration
     print("📋 Configuration:")
     print(f"  - Whisper Model: {settings.whisper_model_size}")
@@ -39,23 +39,23 @@ async def test_audio_transcription_fixes():
     print(f"  - Topic Segmentation: {settings.enable_topic_segmentation}")
     print(f"  - Topic Summarization: {settings.use_llm_topic_summarization}")
     print()
-    
+
     # Create test audio processor with enhanced settings
     audio_config = AudioConfig(
         model_size="large-v3",  # Use best quality model
         enable_diarization=True,
         language=None  # Auto-detect
     )
-    
+
     audio_processor = AudioProcessor(config=audio_config)
     audio_converter = AudioConverter()
-    
+
     print("✅ Audio processor and converter initialized")
     print()
-    
+
     # Test with a sample audio file (if available)
     test_audio_path = project_root / "test_data" / "sample_audio.mp3"
-    
+
     if not test_audio_path.exists():
         print("⚠️  No test audio file found. Creating mock test...")
         await test_mock_audio_processing()
@@ -67,12 +67,12 @@ async def test_audio_transcription_fixes():
 async def test_mock_audio_processing():
     """Test with mock audio processing result."""
     print("🔧 Testing with mock audio processing result...")
-    
+
     # Create mock audio processing result
     from src.morag.processors.audio import AudioProcessingResult, AudioTranscriptSegment
     from src.morag.services.speaker_diarization import DiarizationResult, SpeakerInfo, SpeakerSegment
     from src.morag.services.topic_segmentation import TopicSegmentationResult, TopicSegment
-    
+
     # Mock transcript segments
     segments = [
         AudioTranscriptSegment("Hello, welcome to our discussion.", 0.0, 3.0, 0.95, "en"),
@@ -80,20 +80,20 @@ async def test_mock_audio_processing():
         AudioTranscriptSegment("Let's talk about the main topic.", 6.5, 9.0, 0.88, "en"),
         AudioTranscriptSegment("That sounds like a great idea.", 9.5, 12.0, 0.90, "en"),
     ]
-    
+
     # Mock speaker diarization
     speakers = [
         SpeakerInfo("SPEAKER_00", 15.0, 2, 15.0, [0.95, 0.88], 0.0, 15.0),
         SpeakerInfo("SPEAKER_01", 9.0, 2, 9.0, [0.92, 0.90], 3.5, 12.0)
     ]
-    
+
     speaker_segments = [
         SpeakerSegment("SPEAKER_00", 0.0, 3.0, 3.0, 0.95),
         SpeakerSegment("SPEAKER_01", 3.5, 6.0, 2.5, 0.92),
         SpeakerSegment("SPEAKER_00", 6.5, 9.0, 2.5, 0.88),
         SpeakerSegment("SPEAKER_01", 9.5, 12.0, 2.5, 0.90)
     ]
-    
+
     diarization_result = DiarizationResult(
         speakers=speakers,
         segments=speaker_segments,
@@ -104,7 +104,7 @@ async def test_mock_audio_processing():
         model_used="pyannote/speaker-diarization-3.1",
         confidence_threshold=0.5
     )
-    
+
     # Mock topic segmentation
     topics = [
         TopicSegment(
@@ -132,7 +132,7 @@ async def test_mock_audio_processing():
             speaker_distribution={"SPEAKER_00": 45.5, "SPEAKER_01": 54.5}
         )
     ]
-    
+
     topic_result = TopicSegmentationResult(
         topics=topics,
         total_topics=2,
@@ -141,7 +141,7 @@ async def test_mock_audio_processing():
         similarity_threshold=0.7,
         segmentation_method="semantic_embedding"
     )
-    
+
     # Mock audio processing result
     audio_result = AudioProcessingResult(
         text="Hello, welcome to our discussion. Thank you for having me here today. Let's talk about the main topic. That sounds like a great idea.",
@@ -159,7 +159,7 @@ async def test_mock_audio_processing():
         speaker_diarization=diarization_result,
         topic_segmentation=topic_result
     )
-    
+
     # Test conversion
     from src.morag.converters.audio import AudioConverter
     converter = AudioConverter()
@@ -175,22 +175,22 @@ async def test_mock_audio_processing():
 
         # Test enhanced markdown creation
         markdown = await converter._create_enhanced_structured_markdown(enhanced_result, options)
-        
+
         print("📝 Generated Markdown:")
         print("-" * 60)
         print(markdown)
         print("-" * 60)
         print()
-        
+
         # Verify fixes
         print("🔍 Verification Results:")
-        
+
         # Check 1: Topic timestamps show single start seconds
         if "# Introduction [0]" in markdown:
             print("✅ Topic timestamps show single start seconds")
         else:
             print("❌ Topic timestamps not in correct format")
-        
+
         # Check 2: Speaker IDs are shown correctly
         if "SPEAKER_00:" in markdown and "SPEAKER_01:" in markdown:
             print("✅ Speaker IDs are shown correctly")
@@ -198,22 +198,22 @@ async def test_mock_audio_processing():
             print("❌ Still showing generic SPEAKER instead of IDs")
         else:
             print("⚠️  Speaker format unclear")
-        
+
         # Check 3: No topic summaries
         if "summary" not in markdown.lower() or markdown.count("*") < 4:
             print("✅ Topic summaries removed")
         else:
             print("❌ Topic summaries still present")
-        
+
         # Check 4: Model configuration
         if "large-v3" in str(settings.whisper_model_size):
             print("✅ Using large-v3 model for better quality")
         else:
             print("❌ Not using large-v3 model")
-        
+
         print()
         print("🎉 Mock test completed!")
-        
+
     finally:
         # Clean up
         if tmp_path.exists():
@@ -223,7 +223,7 @@ async def test_mock_audio_processing():
 async def test_real_audio_processing(audio_path: Path, converter: AudioConverter):
     """Test with real audio file."""
     print(f"🎵 Processing real audio file: {audio_path}")
-    
+
     try:
         options = ConversionOptions(
             include_metadata=True,
@@ -235,17 +235,17 @@ async def test_real_audio_processing(audio_path: Path, converter: AudioConverter
                 }
             }
         )
-        
+
         result = await converter.convert(audio_path, options)
-        
+
         print("📝 Generated Markdown:")
         print("-" * 60)
         print(result.content[:1000] + "..." if len(result.content) > 1000 else result.content)
         print("-" * 60)
         print()
-        
+
         print("✅ Real audio processing completed!")
-        
+
     except Exception as e:
         print(f"❌ Error processing real audio: {e}")
 
@@ -254,7 +254,7 @@ async def test_video_transcription_fixes():
     """Test video transcription fixes."""
     print("\n🎬 Testing Video Transcription Fixes")
     print("=" * 50)
-    
+
     # Similar tests for video converter
     print("✅ Video transcription fixes use the same underlying audio processing")
     print("✅ Video converter will inherit all audio transcription improvements")
@@ -264,10 +264,10 @@ if __name__ == "__main__":
     print("🚀 Audio/Video Transcription Fixes Test")
     print("=" * 60)
     print()
-    
+
     asyncio.run(test_audio_transcription_fixes())
     asyncio.run(test_video_transcription_fixes())
-    
+
     print("\n🎯 Summary of Fixes Applied:")
     print("1. ✅ Topic timestamps now show single start seconds: # Discussion Topic 2 [123]")
     print("2. ✅ Speaker diarization shows actual speaker IDs (SPEAKER_00, SPEAKER_01)")

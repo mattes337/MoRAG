@@ -176,7 +176,7 @@ class FactGeneratorStage(Stage):
             input_files: List of chunk.json files to process
             context: Stage execution context
             output_dir: Optional output directory override
-            
+
         Returns:
             StageResult with fact generation results
         """
@@ -198,7 +198,7 @@ class FactGeneratorStage(Stage):
         try:
             # Initialize services using dependency injection
             await self._initialize_services()
-            
+
             # Validate inputs
             if not self.validate_inputs(input_files):
                 return StageResult(
@@ -209,14 +209,14 @@ class FactGeneratorStage(Stage):
 
             # Create output directory
             output_dir.mkdir(parents=True, exist_ok=True)
-            
+
             # Process each chunk file
             results = []
             errors = []
             total_facts = 0
             total_entities = 0
             total_relations = 0
-            
+
             for input_file in input_files:
                 try:
                     logger.info("Processing chunk file", file=str(input_file))
@@ -237,19 +237,19 @@ class FactGeneratorStage(Stage):
                     # Load chunks from JSON file
                     with open(sanitized_input, 'r', encoding='utf-8') as f:
                         data = json.load(f)
-                    
+
                     chunks = data.get('chunks', [])
                     if not chunks:
                         logger.warning("No chunks found in file", file=str(input_file))
                         continue
-                    
+
                     # Generate output filename
                     output_filename = input_file.stem + ".facts.json"
                     output_file = output_dir / output_filename
-                    
+
                     # Extract facts from chunks
                     extracted_results = await self.extraction_engine.extract_from_chunks(chunks, config)
-                    
+
                     # Compile results
                     file_results = {
                         'source_file': str(input_file),
@@ -263,48 +263,48 @@ class FactGeneratorStage(Stage):
                             'total_keywords': len(extracted_results.get('keywords', []))
                         }
                     }
-                    
+
                     # Write results to file
                     with open(output_file, 'w', encoding='utf-8') as f:
                         json.dump(file_results, f, indent=2, ensure_ascii=False)
-                    
+
                     # Update totals
                     total_facts += file_results['statistics']['total_facts']
                     total_entities += file_results['statistics']['total_entities']
                     total_relations += file_results['statistics']['total_relations']
-                    
+
                     results.append({
                         'input_file': str(input_file),
                         'output_file': str(output_file),
                         'statistics': file_results['statistics']
                     })
-                    
-                    logger.info("Chunk file processed successfully", 
+
+                    logger.info("Chunk file processed successfully",
                               file=str(input_file),
                               output=str(output_file),
                               facts=file_results['statistics']['total_facts'])
-                
+
                 except Exception as e:
                     error_msg = f"Failed to process {input_file}: {str(e)}"
                     errors.append({
                         'input_file': str(input_file),
                         'error': error_msg
                     })
-                    logger.error("Chunk file processing failed", 
+                    logger.error("Chunk file processing failed",
                                file=str(input_file),
                                error=str(e))
-            
+
             # Determine overall status
             total_files = len(input_files)
             successful_files = len(results)
-            
+
             if successful_files == total_files:
                 status = StageStatus.COMPLETED
             elif successful_files > 0:
                 status = StageStatus.PARTIAL
             else:
                 status = StageStatus.FAILED
-            
+
             # Update metadata
             stage_metadata.end_time = datetime.now()
             stage_metadata.output_count = successful_files
@@ -314,18 +314,18 @@ class FactGeneratorStage(Stage):
                 'total_entities_extracted': total_entities,
                 'total_relations_extracted': total_relations
             }
-            
+
             return StageResult(
                 status=status,
                 metadata=stage_metadata,
                 outputs=results,
                 errors=errors
             )
-            
+
         except Exception as e:
             stage_metadata.end_time = datetime.now()
             logger.error("Stage execution failed", error=str(e))
-            
+
             return StageResult(
                 status=StageStatus.FAILED,
                 metadata=stage_metadata,
@@ -338,16 +338,16 @@ class FactGeneratorStage(Stage):
         if not input_files:
             logger.error("No input files provided")
             return False
-        
+
         for input_file in input_files:
             if not input_file.exists():
                 logger.error("Input file does not exist", file=str(input_file))
                 return False
-            
+
             if not input_file.suffix == '.json':
                 logger.error("Input file is not a JSON file", file=str(input_file))
                 return False
-                
+
             # Validate file contains chunk data
             try:
                 # Sanitize input file path for security
@@ -361,15 +361,15 @@ class FactGeneratorStage(Stage):
 
                 with open(sanitized_input, 'r', encoding='utf-8') as f:
                     data = json.load(f)
-                
+
                 if 'chunks' not in data:
                     logger.error("Input file does not contain chunks", file=str(input_file))
                     return False
-                    
+
             except Exception as e:
                 logger.error("Error reading input file", file=str(input_file), error=str(e))
                 return False
-        
+
         return True
 
     def get_dependencies(self) -> List[StageType]:
@@ -380,11 +380,11 @@ class FactGeneratorStage(Stage):
         """Get expected output files."""
         output_dir = context.output_dir if context else Path.cwd()
         outputs = []
-        
+
         for input_file in input_files:
             output_filename = input_file.stem + ".facts.json"
             outputs.append(output_dir / output_filename)
-        
+
         return outputs
 
 

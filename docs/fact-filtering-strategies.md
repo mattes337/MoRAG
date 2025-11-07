@@ -51,14 +51,14 @@ def filter_by_keywords(fact, domain_keywords):
 async def score_fact_relevance(fact, document_topics, llm_client):
     prompt = f"""
     Document Topics: {', '.join(document_topics)}
-    
+
     Fact: {fact.subject} -> {fact.approach} -> {fact.solution}
-    
+
     Rate relevance (0-10) of this fact to the document topics.
     Consider: Does this fact provide actionable information related to the topics?
-    
+
     Score: """
-    
+
     response = await llm_client.generate(prompt)
     return float(response.strip())
 ```
@@ -88,19 +88,19 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 def filter_by_topic_similarity(facts, document_text, threshold=0.3):
     model = SentenceTransformer('all-MiniLM-L6-v2')
-    
+
     # Get document embedding
     doc_embedding = model.encode([document_text])
-    
+
     filtered_facts = []
     for fact in facts:
         fact_text = f"{fact.subject} {fact.approach} {fact.solution}"
         fact_embedding = model.encode([fact_text])
-        
+
         similarity = cosine_similarity(doc_embedding, fact_embedding)[0][0]
         if similarity >= threshold:
             filtered_facts.append(fact)
-    
+
     return filtered_facts
 ```
 
@@ -127,21 +127,21 @@ def filter_by_topic_similarity(facts, document_text, threshold=0.3):
 async def hybrid_fact_filter(facts, document_context, domain_config):
     # Stage 1: Quick keyword filter (eliminate obvious irrelevant facts)
     keyword_filtered = [f for f in facts if passes_keyword_filter(f, domain_config.keywords)]
-    
+
     # Stage 2: Topic similarity filter
     similarity_filtered = filter_by_topic_similarity(
-        keyword_filtered, 
-        document_context.text, 
+        keyword_filtered,
+        document_context.text,
         threshold=domain_config.similarity_threshold
     )
-    
+
     # Stage 3: LLM relevance scoring (for remaining facts)
     final_facts = []
     for fact in similarity_filtered:
         relevance_score = await score_fact_relevance(fact, document_context.topics)
         if relevance_score >= domain_config.relevance_threshold:
             final_facts.append(fact)
-    
+
     return final_facts
 ```
 
@@ -171,10 +171,10 @@ def calculate_domain_adjusted_confidence(fact, document_domain, base_confidence)
         "herbal": 1.3 if any(term in fact.keywords for term in ["herb", "plant", "natural"]) else 0.7,
         "adhd": 1.4 if any(term in fact.keywords for term in ["adhd", "attention", "focus"]) else 0.6
     }
-    
+
     multiplier = domain_relevance_multiplier.get(document_domain, 1.0)
     adjusted_confidence = min(1.0, base_confidence * multiplier)
-    
+
     return adjusted_confidence
 ```
 

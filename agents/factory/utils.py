@@ -67,7 +67,7 @@ def get_agent(
 
 def register_agent(agent_name: str, agent_class: Type[BaseAgent]) -> None:
     """Register an agent class.
-    
+
     Args:
         agent_name: Name to register under
         agent_class: Agent class to register
@@ -78,7 +78,7 @@ def register_agent(agent_name: str, agent_class: Type[BaseAgent]) -> None:
 
 def list_agents() -> dict:
     """List all available agents.
-    
+
     Returns:
         Dictionary of available agents
     """
@@ -88,7 +88,7 @@ def list_agents() -> dict:
 
 def clear_agent_cache(agent_name: Optional[str] = None) -> None:
     """Clear agent cache.
-    
+
     Args:
         agent_name: Optional specific agent to clear
     """
@@ -102,12 +102,12 @@ def create_agent_with_config(
     **config_overrides
 ) -> T:
     """Create an agent with a specific class and configuration.
-    
+
     Args:
         agent_class: Agent class to instantiate
         config: Optional configuration
         **config_overrides: Configuration overrides
-        
+
     Returns:
         Agent instance
     """

@@ -60,7 +60,7 @@ fact_extraction:
 
     {% if config.include_examples %}
     ## Examples
-    
+
     ### Example 1
     **Input:** Ginkgo biloba extract (120-240mg daily) has been shown to improve cognitive function in elderly patients with mild cognitive impairment.
     **Output:**

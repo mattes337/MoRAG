@@ -28,16 +28,16 @@ logger = structlog.get_logger(__name__)
 
 class MarkdownOptimizerStage(Stage):
     """Stage that optimizes markdown content using LLM."""
-    
+
     def __init__(self, stage_type: StageType = StageType.MARKDOWN_OPTIMIZER):
         """Initialize markdown optimizer stage."""
         super().__init__(stage_type)
-        
+
         if not LLM_AVAILABLE:
             logger.warning("LLM services not available for markdown optimization")
-        
+
         self.agent = None
-    
+
     @stage_error_handler("markdown_optimizer_execute")
     async def execute(self,
                      input_files: List[Path],
@@ -59,17 +59,17 @@ class MarkdownOptimizerStage(Stage):
                 stage_type=self.stage_type.value,
                 invalid_files=[str(f) for f in input_files]
             )
-        
+
         input_file = input_files[0]
 
         # Load configuration from environment variables with context overrides
         context_config = context.get_stage_config(self.stage_type)
         config = MarkdownOptimizerConfig.from_env_and_overrides(context_config)
-        
-        logger.info("Starting markdown optimization", 
+
+        logger.info("Starting markdown optimization",
                    input_file=str(input_file),
                    config=config)
-        
+
         try:
             # Get output directory from parameter or context
             effective_output_dir = output_dir or context.output_dir
@@ -77,13 +77,13 @@ class MarkdownOptimizerStage(Stage):
             # Generate output filename
             output_file = effective_output_dir / f"{input_file.stem}.opt.md"
             effective_output_dir.mkdir(parents=True, exist_ok=True)
-            
+
             # Read input markdown
             markdown_content = input_file.read_text(encoding='utf-8')
-            
+
             # Extract metadata and content
             metadata, content = self._extract_metadata_and_content(markdown_content)
-            
+
             # Optimize content if LLM is available and API key is configured
             api_key_available = self._check_api_key_available()
             if LLM_AVAILABLE and config.enabled and api_key_available:
@@ -98,13 +98,13 @@ class MarkdownOptimizerStage(Stage):
                 # Fallback: basic text cleanup
                 optimized_content = self._basic_text_cleanup(content)
                 optimization_applied = False
-            
+
             # Reconstruct markdown with metadata
             final_markdown = self._reconstruct_markdown(metadata, optimized_content)
-            
+
             # Write to file
             output_file.write_text(final_markdown, encoding='utf-8')
-            
+
             # Create metadata
             stage_metadata = StageMetadata(
                 execution_time=0.0,  # Will be set by manager
@@ -120,7 +120,7 @@ class MarkdownOptimizerStage(Stage):
                     "has_metadata": bool(metadata)
                 }
             )
-            
+
             return StageResult(
                 stage_type=self.stage_type,
                 status=StageStatus.COMPLETED,
@@ -132,17 +132,17 @@ class MarkdownOptimizerStage(Stage):
                     "optimized_length": len(optimized_content)
                 }
             )
-            
+
         except Exception as e:
-            logger.error("Markdown optimization failed", 
-                        input_file=str(input_file), 
+            logger.error("Markdown optimization failed",
+                        input_file=str(input_file),
                         error=str(e))
             raise StageExecutionError(
                 f"Markdown optimization failed: {e}",
                 stage_type=self.stage_type.value,
                 original_error=e
             )
-    
+
     @validation_error_handler("markdown_optimizer_validate_inputs")
     def validate_inputs(self, input_files: List[Path]) -> bool:
         """Validate input files for markdown optimization.
@@ -181,15 +181,15 @@ class MarkdownOptimizerStage(Stage):
         logger.debug("Input validation successful for markdown optimizer",
                     file_path=str(input_file))
         return True
-    
+
     def get_dependencies(self) -> List[StageType]:
         """Get stage dependencies.
-        
+
         Returns:
             List containing markdown-conversion stage
         """
         return [StageType.MARKDOWN_CONVERSION]
-    
+
     def get_expected_outputs(self, input_files: List[Path], context: StageContext) -> List[Path]:
         """Get expected output file paths.
 
@@ -208,7 +208,7 @@ class MarkdownOptimizerStage(Stage):
         sanitized_name = sanitize_filename(input_file.stem)
         output_file = context.output_dir / f"{sanitized_name}.opt.md"
         return [output_file]
-    
+
     def is_optional(self) -> bool:
         """Check if this stage is optional.
 
@@ -225,7 +225,7 @@ class MarkdownOptimizerStage(Stage):
         """
         import os
         return bool(os.environ.get('GEMINI_API_KEY') or os.environ.get('GOOGLE_API_KEY'))
-    
+
     def _extract_metadata_and_content(self, markdown: str) -> tuple[Dict[str, Any], str]:
         """Extract metadata and content from markdown (supports both YAML frontmatter and H1+H2 format).
 
@@ -285,7 +285,7 @@ class MarkdownOptimizerStage(Stage):
             return metadata, markdown
 
         return {}, markdown
-    
+
     def _reconstruct_markdown(self, metadata: Dict[str, Any], content: str) -> str:
         """Reconstruct markdown - return optimized content directly without adding structure.
 
@@ -309,7 +309,7 @@ class MarkdownOptimizerStage(Stage):
         return content
 
 
-    
+
     async def _optimize_with_llm(self, content: str, metadata: Dict[str, Any], config: MarkdownOptimizerConfig, context: StageContext = None) -> str:
         """Optimize content using LLM with text splitting for large files.
 
@@ -369,25 +369,25 @@ class MarkdownOptimizerStage(Stage):
         except Exception as e:
             logger.warning("LLM optimization failed, using basic cleanup", error=str(e))
             return self._basic_text_cleanup(content)
-    
+
     def _basic_text_cleanup(self, content: str) -> str:
         """Basic text cleanup without LLM.
-        
+
         Args:
             content: Content to clean up
-            
+
         Returns:
             Cleaned up content
         """
         # Remove excessive whitespace
         content = re.sub(r'\n\s*\n\s*\n', '\n\n', content)
-        
+
         # Fix common formatting issues
         content = re.sub(r'([.!?])\s*\n\s*([A-Z])', r'\1 \2', content)
-        
+
         # Normalize line endings
         content = content.replace('\r\n', '\n').replace('\r', '\n')
-        
+
         # Preserve formatting by only stripping leading/trailing whitespace, not internal formatting
         return content.strip(' \t')
 
@@ -593,7 +593,7 @@ PRESERVE EXACTLY:
             base_prompt += " This is a document. Maintain proper heading structure and formatting while removing document-specific clutter like page headers, footers, and navigation elements."
 
         return base_prompt
-    
+
     def _get_user_prompt(self, content: str, metadata: Dict[str, Any], config: MarkdownOptimizerConfig) -> str:
         """Get user prompt for optimization.
 

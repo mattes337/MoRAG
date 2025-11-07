@@ -15,10 +15,10 @@ class EmbeddingResult:
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     created_at: datetime = field(default_factory=datetime.now)
     metadata: Dict[str, Any] = field(default_factory=dict)
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary.
-        
+
         Returns:
             Dictionary representation
         """
@@ -40,10 +40,10 @@ class BatchEmbeddingResult:
     model: str
     created_at: datetime = field(default_factory=datetime.now)
     metadata: Dict[str, Any] = field(default_factory=dict)
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary.
-        
+
         Returns:
             Dictionary representation
         """
@@ -54,10 +54,10 @@ class BatchEmbeddingResult:
             "created_at": self.created_at.isoformat(),
             "metadata": self.metadata,
         }
-    
+
     def get_individual_results(self) -> List[EmbeddingResult]:
         """Get individual embedding results.
-        
+
         Returns:
             List of individual embedding results
         """
@@ -86,10 +86,10 @@ class SummaryResult:
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     created_at: datetime = field(default_factory=datetime.now)
     metadata: Dict[str, Any] = field(default_factory=dict)
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary.
-        
+
         Returns:
             Dictionary representation
         """

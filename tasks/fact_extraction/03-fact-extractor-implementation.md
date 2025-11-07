@@ -12,7 +12,7 @@ Implement the core fact extractor component that analyzes document chunks and ex
 ```python
 class FactExtractor:
     """Extract structured facts from document chunks."""
-    
+
     def __init__(
         self,
         model_id: str = "gemini-2.0-flash",
@@ -23,28 +23,28 @@ class FactExtractor:
         language: str = "en"
     ):
         """Initialize fact extractor with LLM and configuration."""
-        
+
     async def extract_facts(
-        self, 
-        chunk_text: str, 
+        self,
+        chunk_text: str,
         chunk_id: str,
         document_id: str,
         context: Optional[Dict[str, Any]] = None
     ) -> List[Fact]:
         """Extract structured facts from a document chunk."""
-        
+
     def _preprocess_chunk(self, text: str) -> str:
         """Clean and prepare text for fact extraction."""
-        
+
     async def _extract_fact_candidates(self, text: str, context: Dict) -> List[Dict]:
         """Use LLM to extract fact candidates from text."""
-        
+
     def _structure_facts(self, candidates: List[Dict], chunk_id: str, document_id: str) -> List[Fact]:
         """Convert LLM output to structured Fact objects."""
-        
+
     def _validate_fact(self, fact: Fact) -> bool:
         """Validate fact quality and completeness."""
-        
+
     def _generate_fact_keywords(self, fact: Fact) -> List[str]:
         """Generate keywords for fact indexing."""
 ```
@@ -60,28 +60,28 @@ from datetime import datetime
 
 class Fact(BaseModel):
     """Structured fact extracted from document content."""
-    
+
     id: str = Field(description="Unique fact identifier")
     subject: str = Field(description="What the fact is about")
     object: str = Field(description="What is being described or acted upon")
     approach: Optional[str] = Field(default=None, description="How something is done/achieved")
     solution: Optional[str] = Field(default=None, description="What solves a problem/achieves goal")
     remarks: Optional[str] = Field(default=None, description="Additional context/qualifications")
-    
+
     # Provenance
     source_chunk_id: str = Field(description="Source document chunk ID")
     source_document_id: str = Field(description="Source document ID")
     extraction_confidence: float = Field(ge=0.0, le=1.0, description="Confidence in extraction")
-    
+
     # Classification
     fact_type: str = Field(description="Type of fact (research, process, definition, etc.)")
     domain: Optional[str] = Field(default=None, description="Domain/topic area")
     keywords: List[str] = Field(default_factory=list, description="Key terms for indexing")
-    
+
     # Metadata
     created_at: datetime = Field(default_factory=datetime.utcnow)
     language: str = Field(default="en", description="Language of the fact")
-    
+
     def __init__(self, **data):
         """Initialize fact with auto-generated ID if not provided."""
         if 'id' not in data or not data['id']:
@@ -91,7 +91,7 @@ class Fact(BaseModel):
             ).hexdigest()[:12]
             data['id'] = f"fact_{content_hash}"
         super().__init__(**data)
-    
+
     def get_neo4j_properties(self) -> Dict[str, Any]:
         """Get properties for Neo4j storage."""
         return {
@@ -117,15 +117,15 @@ class Fact(BaseModel):
 ```python
 class FactExtractionPrompts:
     """Prompts for fact extraction using LLMs."""
-    
+
     @staticmethod
     def get_fact_extraction_prompt(domain: str = "general", language: str = "en") -> str:
         """Get the main fact extraction prompt."""
-        
+
     @staticmethod
     def get_fact_validation_prompt() -> str:
         """Get prompt for validating extracted facts."""
-        
+
     @staticmethod
     def get_fact_type_classification_prompt() -> str:
         """Get prompt for classifying fact types."""
@@ -138,19 +138,19 @@ class FactExtractionPrompts:
 ```python
 class FactValidator:
     """Validate quality and completeness of extracted facts."""
-    
+
     def __init__(self, min_confidence: float = 0.3):
         self.min_confidence = min_confidence
-        
+
     def validate_fact(self, fact: Fact) -> Tuple[bool, List[str]]:
         """Validate a fact and return validation result with issues."""
-        
+
     def _check_completeness(self, fact: Fact) -> List[str]:
         """Check if fact has required components."""
-        
+
     def _check_specificity(self, fact: Fact) -> List[str]:
         """Check if fact is specific enough to be useful."""
-        
+
     def _check_actionability(self, fact: Fact) -> List[str]:
         """Check if fact provides actionable information."""
 ```
@@ -195,7 +195,7 @@ You are a knowledge extraction expert. Extract structured facts from the followi
 
 A fact should contain:
 - Subject: The main entity or concept the fact is about
-- Object: What is being described, studied, or acted upon  
+- Object: What is being described, studied, or acted upon
 - Approach: The method, technique, or way something is done (optional)
 - Solution: The result, outcome, or answer provided (optional)
 - Remarks: Important context, limitations, or qualifications (optional)
@@ -216,7 +216,7 @@ Respond with JSON array of facts:
     "subject": "specific subject",
     "object": "what is being described",
     "approach": "how it's done (optional)",
-    "solution": "outcome/result (optional)", 
+    "solution": "outcome/result (optional)",
     "remarks": "context/limitations (optional)",
     "fact_type": "research|process|definition|causal|comparative|temporal",
     "confidence": 0.0-1.0,

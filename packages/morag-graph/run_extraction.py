@@ -52,7 +52,7 @@ except ImportError as e:
 
 def check_dependencies() -> bool:
     """Check if required dependencies are installed.
-    
+
     Returns:
         True if all dependencies are available, False otherwise
     """
@@ -64,15 +64,15 @@ def check_dependencies() -> bool:
         "python-dotenv": "dotenv",
         "aiofiles": "aiofiles"
     }
-    
+
     missing_packages = []
-    
+
     for package_name, import_name in required_packages.items():
         try:
             __import__(import_name)
         except ImportError:
             missing_packages.append(package_name)
-    
+
     if missing_packages:
         print("❌ Missing required packages:")
         for package in missing_packages:
@@ -80,37 +80,37 @@ def check_dependencies() -> bool:
         print("\n💡 Install missing packages with:")
         print(f"   pip install {' '.join(missing_packages)}")
         return False
-    
+
     return True
 
 
 def setup_environment(api_key: Optional[str] = None) -> bool:
     """Setup environment for extraction.
-    
+
     Args:
         api_key: Optional Gemini API key
-        
+
     Returns:
         True if environment is properly set up, False otherwise
     """
     # Check API key
     if not api_key:
         api_key = os.getenv("GEMINI_API_KEY")
-    
+
     if not api_key:
         print("❌ Gemini API key is required for extraction.")
         print("   Set it via --api-key argument or GEMINI_API_KEY environment variable.")
         return False
-    
+
     # Set environment variable
     os.environ["GEMINI_API_KEY"] = api_key
-    
+
     # Check if we're in the right directory
     current_dir = Path.cwd()
     if not (current_dir / "src" / "morag_graph").exists():
         print("❌ Please run this script from the morag-graph package root directory.")
         return False
-    
+
     return True
 
 
@@ -398,7 +398,7 @@ def save_results(results: Dict[str, Any], output_file: Path, verbose: bool = Fal
     try:
         with open(output_file, 'w', encoding='utf-8') as f:
             json.dump(results, f, indent=2, ensure_ascii=False, default=json_serializer)
-        
+
         if verbose:
             print(f"💾 Results saved to: {output_file}")
             print(f"📊 Statistics:")
@@ -406,9 +406,9 @@ def save_results(results: Dict[str, Any], output_file: Path, verbose: bool = Fal
             print(f"   • Facts: {stats.get('facts_extracted', 0)}")
             print(f"   • Relationships: {stats.get('relationships_created', 0)}")
             print(f"   • Chunks processed: {stats.get('chunks_processed', 0)}")
-        
+
         return True
-    
+
     except Exception as e:
         print(f"❌ Error saving results to {output_file}: {e}")
         return False
@@ -428,19 +428,19 @@ async def main():
   python run_extraction.py document.md --output result.json     # Custom output file
 """
     )
-    
+
     parser.add_argument(
         "input_file",
         type=str,
         help="Input markdown file to process"
     )
-    
+
     parser.add_argument(
         "--api-key",
         type=str,
         help="Gemini API key (can also be set via GEMINI_API_KEY environment variable)"
     )
-    
+
     parser.add_argument(
         "--domain",
         type=str,
@@ -468,21 +468,21 @@ async def main():
         default="gemini-2.0-flash",
         help="LLM model to use (default: gemini-2.0-flash)"
     )
-    
+
     parser.add_argument(
         "--verbose",
         action="store_true",
         help="Show detailed extraction output"
     )
-    
+
     parser.add_argument(
         "--output",
         type=str,
         help="Output JSON file (default: input_file.json)"
     )
-    
+
     args = parser.parse_args()
-    
+
     print("🧠 MoRAG Graph - Fact Extraction")
     print("" + "="*60)
 
@@ -518,7 +518,7 @@ async def main():
     if args.max_facts < 1:
         print("❌ Maximum facts must be at least 1")
         return 1
-    
+
     try:
         print(f"📄 Processing: {input_file.name}")
         print(f"🤖 Using model: {args.model}")
@@ -538,11 +538,11 @@ async def main():
             max_facts=args.max_facts,
             verbose=args.verbose
         )
-        
+
         if not results:
             print("❌ Extraction failed")
             return 1
-        
+
         # Save results
         if save_results(results, output_file, args.verbose):
             print("" + "="*60)
@@ -551,7 +551,7 @@ async def main():
             return 0
         else:
             return 1
-        
+
     except KeyboardInterrupt:
         print("\n⏹️  Extraction interrupted by user")
         return 1

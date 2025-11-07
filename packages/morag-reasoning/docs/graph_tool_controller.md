@@ -153,7 +153,7 @@ else:
 }
 ```
 
-**Limits**: 
+**Limits**:
 - Maximum depth limited by `max_hops`
 - Results limited by `max_neighbors_per_entity`
 
@@ -233,7 +233,7 @@ All operations return structured citations in the format:
 
 Only the five approved operations are allowed:
 - `extract_entities`
-- `match_entity` 
+- `match_entity`
 - `expand_neighbors`
 - `fetch_chunk`
 - `extract_facts`
@@ -321,9 +321,9 @@ async def handle_gemini_function_call(function_call):
         name=function_call.name,
         args=dict(function_call.args)
     )
-    
+
     result = await controller.handle_tool_call(tool_call)
-    
+
     if result.error:
         return {"error": result.error}
     else:
@@ -359,7 +359,7 @@ if match_result.result["entity_id"]:
         }
     )
     expand_result = await controller.handle_tool_call(expand_call)
-    
+
     # Return related entities with structured citations
     return expand_result.result["neighbors"]
 ```

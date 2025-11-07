@@ -54,7 +54,7 @@ domain_specific:
     - SIDE_EFFECT_OF
     - DOSAGE_FOR
     - SYMPTOM_OF
-    
+
   legal:
     - GOVERNS
     - REGULATES
@@ -71,7 +71,7 @@ domain_specific:
     - PROSECUTES
     - DEFENDS
     - JUDGES
-    
+
   technical:
     - IMPLEMENTS
     - EXTENDS
@@ -88,7 +88,7 @@ domain_specific:
     - BUILDS
     - COMPILES
     - EXECUTES
-    
+
   business:
     - EMPLOYS
     - REPORTS_TO
@@ -105,7 +105,7 @@ domain_specific:
     - SELLS_TO
     - DISTRIBUTES
     - LICENSES
-    
+
   academic:
     - RESEARCHES
     - PUBLISHES
@@ -132,35 +132,35 @@ categories:
     - REPORTS_TO
     - EMPLOYS
     - LEADS
-    
+
   spatial:
     - LOCATED_IN
     - CONTAINS
     - PART_OF
     - BELONGS_TO
     - SITUATED_IN
-    
+
   causal:
     - CAUSES
     - RESULTS_IN
     - LEADS_TO
     - TRIGGERS
     - PREVENTS
-    
+
   temporal:
     - PRECEDES
     - FOLLOWS
     - CONCURRENT_WITH
     - DURING
     - AFTER
-    
+
   functional:
     - USES
     - IMPLEMENTS
     - OPERATES
     - CONTROLS
     - PROCESSES
-    
+
   logical:
     - SUPPORTS
     - CONTRADICTS
@@ -199,7 +199,7 @@ agent_defaults:
     - CAUSES
     - MANAGES
     - COLLABORATES_WITH
-    
+
   content_analysis:
     - SUPPORTS
     - ELABORATES
@@ -208,7 +208,7 @@ agent_defaults:
     - INFLUENCES
     - PRECEDES
     - FOLLOWS
-    
+
   query_analysis:
     - RELATED_TO
     - PART_OF

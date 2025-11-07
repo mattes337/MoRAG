@@ -16,7 +16,7 @@ logger = structlog.get_logger(__name__)
 
 class GraphExtractor:
     """Unified graph extractor that combines entity and relation extraction."""
-    
+
     def __init__(self):
         """Initialize the graph extractor."""
         self.entity_extractor = None
@@ -45,9 +45,9 @@ class GraphExtractor:
             domain="general"
         )
         self._initialized = True
-        
+
         logger.info("Graph extractor initialized")
-        
+
     async def extract_entities_and_relations(
         self,
         content: str,
@@ -103,9 +103,9 @@ class GraphExtractor:
                 text=content,
                 source_doc_id=source_path
             )
-            
+
             logger.info("Entities extracted", count=len(entities))
-            
+
             # Extract relations using extract method to get missing entities
             logger.info("Extracting relations from content")
 
@@ -122,7 +122,7 @@ class GraphExtractor:
             if auto_created_entities:
                 logger.info("Found auto-created entities in relations", count=len(auto_created_entities))
                 entities.extend(auto_created_entities)
-            
+
             # Convert to serializable format
             entities_data = []
             for entity in entities:
@@ -136,7 +136,7 @@ class GraphExtractor:
                     'source_doc_id': entity.source_doc_id
                 }
                 entities_data.append(entity_data)
-                
+
             relations_data = []
             for relation in relations:
                 relation_data = {
@@ -151,7 +151,7 @@ class GraphExtractor:
                     'source_doc_id': relation.source_doc_id
                 }
                 relations_data.append(relation_data)
-                
+
             return {
                 'entities': entities_data,
                 'relations': relations_data,

@@ -14,18 +14,18 @@ logger = structlog.get_logger(__name__)
 
 def stage_error_handler(operation_name: str) -> Callable[[F], F]:
     """Decorator for consistent error handling in stage operations.
-    
+
     This decorator ensures that:
     1. StageValidationError and StageExecutionError are propagated as-is
     2. Other exceptions are wrapped in StageExecutionError with context
     3. All errors are logged with structured logging
-    
+
     Args:
         operation_name: Name of the operation being decorated (for logging)
-        
+
     Returns:
         Decorated function with consistent error handling
-        
+
     Example:
         @stage_error_handler("markdown_conversion")
         async def execute(self, input_files, context, output_dir=None):
@@ -141,13 +141,13 @@ def stage_error_handler(operation_name: str) -> Callable[[F], F]:
 
 def validation_error_handler(operation_name: str) -> Callable[[F], F]:
     """Decorator specifically for validation operations.
-    
+
     This is a specialized decorator for validation functions that should
     raise StageValidationError on failure.
-    
+
     Args:
         operation_name: Name of the validation operation
-        
+
     Returns:
         Decorated function that wraps exceptions in StageValidationError
     """
@@ -176,7 +176,7 @@ def validation_error_handler(operation_name: str) -> Callable[[F], F]:
                         'original_error_type': type(e).__name__
                     }
                 ) from e
-        
+
         return wrapper  # type: ignore
     return decorator
 

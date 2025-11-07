@@ -71,7 +71,7 @@ async def execute_markdown_conversion(
             execution_time=result.execution_time,
             error_message=result.error_message
         )
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -83,7 +83,7 @@ async def execute_markdown_optimizer(
     output_dir: Optional[str] = Form("./api_output")
 ):
     """Execute markdown-optimizer stage."""
-    
+
     try:
         # Validate file type
         if not markdown_file.filename.endswith('.md'):
@@ -116,7 +116,7 @@ async def execute_markdown_optimizer(
             execution_time=result.execution_time,
             error_message=result.error_message
         )
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -128,7 +128,7 @@ async def execute_chunker(
     output_dir: Optional[str] = Form("./api_output")
 ):
     """Execute chunker stage."""
-    
+
     try:
         # Validate file type
         if not markdown_file.filename.endswith('.md'):
@@ -161,7 +161,7 @@ async def execute_chunker(
             execution_time=result.execution_time,
             error_message=result.error_message
         )
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -173,7 +173,7 @@ async def execute_fact_generator(
     output_dir: Optional[str] = Form("./api_output")
 ):
     """Execute fact-generator stage."""
-    
+
     try:
         # Validate file type
         if not chunks_file.filename.endswith('.chunks.json'):
@@ -206,7 +206,7 @@ async def execute_fact_generator(
             execution_time=result.execution_time,
             error_message=result.error_message
         )
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -219,7 +219,7 @@ async def execute_ingestor(
     output_dir: Optional[str] = Form("./api_output")
 ):
     """Execute ingestor stage."""
-    
+
     try:
         # Validate file types
         if not chunks_file.filename.endswith('.chunks.json'):
@@ -255,18 +255,18 @@ async def execute_ingestor(
             execution_time=result.execution_time,
             error_message=result.error_message
         )
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/chain", response_model=StageChainResponse)
 async def execute_stage_chain(request: StageChainRequest):
     """Execute a chain of stages."""
-    
+
     try:
         # Parse stages
         stage_types = [StageType(s) for s in request.stages]
-        
+
         # Create context
         context = StageContext(
             source_path=Path(request.input_file),
@@ -274,12 +274,12 @@ async def execute_stage_chain(request: StageChainRequest):
             webhook_url=request.webhook_url,
             config=request.config or {}
         )
-        
+
         # Execute stage chain
         results = await stage_manager.execute_stage_chain(
             stage_types, [Path(request.input_file)], context
         )
-        
+
         # Convert results to response format
         stage_results = {}
         for stage_type, result in results.items():
@@ -296,14 +296,14 @@ async def execute_stage_chain(request: StageChainRequest):
             results=stage_results,
             overall_success=all(r.status == StageStatus.COMPLETED for r in results.values())
         )
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/status/{job_id}", response_model=StageStatusResponse)
 async def get_stage_status(job_id: str):
     """Get status of a stage execution job."""
-    
+
     # This would integrate with a job tracking system
     # For now, return a placeholder response
     return StageStatusResponse(
@@ -319,17 +319,17 @@ async def save_uploaded_file(file: UploadFile, prefix: str) -> Path:
     """Save uploaded file to temporary location."""
     import tempfile
     import shutil
-    
+
     # Create temporary file
     temp_dir = Path(tempfile.gettempdir()) / "morag_api"
     temp_dir.mkdir(exist_ok=True)
-    
+
     file_path = temp_dir / f"{prefix}_{file.filename}"
-    
+
     # Save file
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
-    
+
     return file_path
 ```
 
@@ -346,33 +346,33 @@ router = APIRouter(prefix="/api/v1/files", tags=["files"])
 @router.get("/download/{file_id}")
 async def download_file(file_id: str):
     """Download a stage output file by ID."""
-    
+
     # Decode file ID to get actual path
     try:
         file_path = decode_file_id(file_id)
-        
+
         if not file_path.exists():
             raise HTTPException(status_code=404, detail="File not found")
-        
+
         return FileResponse(
             path=str(file_path),
             filename=file_path.name,
             media_type='application/octet-stream'
         )
-        
+
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid file ID: {e}")
 
 @router.get("/list/{output_dir}")
 async def list_files(output_dir: str):
     """List all files in an output directory."""
-    
+
     try:
         dir_path = Path(output_dir)
-        
+
         if not dir_path.exists() or not dir_path.is_dir():
             raise HTTPException(status_code=404, detail="Directory not found")
-        
+
         files = []
         for file_path in dir_path.rglob('*'):
             if file_path.is_file():
@@ -383,26 +383,26 @@ async def list_files(output_dir: str):
                     "modified": file_path.stat().st_mtime,
                     "file_id": encode_file_id(file_path)
                 })
-        
+
         return {"files": files}
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.delete("/cleanup/{output_dir}")
 async def cleanup_files(output_dir: str, max_age_hours: int = 24):
     """Clean up old files in output directory."""
-    
+
     try:
         dir_path = Path(output_dir)
-        
+
         if not dir_path.exists():
             return {"message": "Directory not found", "files_deleted": 0}
-        
+
         import time
         current_time = time.time()
         max_age_seconds = max_age_hours * 3600
-        
+
         files_deleted = 0
         for file_path in dir_path.rglob('*'):
             if file_path.is_file():
@@ -410,9 +410,9 @@ async def cleanup_files(output_dir: str, max_age_hours: int = 24):
                 if file_age > max_age_seconds:
                     file_path.unlink()
                     files_deleted += 1
-        
+
         return {"message": f"Cleanup completed", "files_deleted": files_deleted}
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

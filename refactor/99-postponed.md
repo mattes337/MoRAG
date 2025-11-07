@@ -8,8 +8,8 @@ This document tracks refactoring tasks that were identified but postponed due to
 ## File Splitting Tasks
 
 ### 1. Complete markdown_conversion.py Refactoring
-**File**: `packages/morag-stages/src/morag_stages/stages/markdown_conversion.py`  
-**Current Size**: 1627 lines  
+**File**: `packages/morag-stages/src/morag_stages/stages/markdown_conversion.py`
+**Current Size**: 1627 lines
 **Status**: Partially completed (validators extracted)
 
 #### What Was Done
@@ -34,14 +34,14 @@ This document tracks refactoring tasks that were identified but postponed due to
 - Extensive error handling and fallback logic
 
 #### Estimated Effort
-**Time**: 4-6 hours  
+**Time**: 4-6 hours
 **Risk**: Medium (integration complexity)
 
 ---
 
 ### 2. Split markitdown_base.py Implementation
-**File**: `packages/morag-document/src/morag_document/converters/markitdown_base.py`  
-**Current Size**: 1149 lines  
+**File**: `packages/morag-document/src/morag_document/converters/markitdown_base.py`
+**Current Size**: 1149 lines
 **Status**: Not started
 
 #### Proposed Split
@@ -56,7 +56,7 @@ This document tracks refactoring tasks that were identified but postponed due to
 - Error handling for corrupted files
 
 #### Estimated Effort
-**Time**: 3-4 hours  
+**Time**: 3-4 hours
 **Risk**: Medium-High (breaking changes possible)
 
 ---
@@ -77,8 +77,8 @@ The following files still use the old `structlog.get_logger(__name__)` pattern a
 - `packages/morag/src/morag/ingest_tasks.py`
 
 #### Estimated Effort
-**Time**: 1-2 hours (systematic find/replace)  
-**Risk**: Low  
+**Time**: 1-2 hours (systematic find/replace)
+**Risk**: Low
 **Pattern**: Replace `import structlog; logger = structlog.get_logger(__name__)` with `from ..utils.logging import get_logger; logger = get_logger(__name__)`
 
 ---
@@ -88,42 +88,42 @@ The following files still use the old `structlog.get_logger(__name__)` pattern a
 ### Large Files Identified But Not Split
 
 #### 1. services.py (1144 lines)
-**Location**: `packages/morag/src/morag/services.py`  
+**Location**: `packages/morag/src/morag/services.py`
 **Proposed Split**:
 - `embedding_services.py` - Embedding-related services
-- `storage_services.py` - Storage and database services  
+- `storage_services.py` - Storage and database services
 - `processing_services.py` - Content processing services
 
 #### 2. webdav-processor.py (1119 lines)
-**Location**: `cli/webdav-processor.py`  
+**Location**: `cli/webdav-processor.py`
 **Proposed Split**:
 - `webdav_processor.py` - Core processing logic
 - `webdav_cli.py` - Command-line interface
 - `webdav_config.py` - Configuration handling
 
 #### 3. fact_generator.py (1061 lines)
-**Location**: `packages/morag-stages/src/morag_stages/stages/fact_generator.py`  
+**Location**: `packages/morag-stages/src/morag_stages/stages/fact_generator.py`
 **Proposed Split**:
 - `fact_generator.py` - Main stage logic
 - `fact_extraction.py` - Extraction algorithms
 - `fact_processing.py` - Post-processing and validation
 
 #### 4. fact_graph_builder.py (1042 lines)
-**Location**: `packages/morag-graph/src/morag_graph/fact_graph_builder.py`  
+**Location**: `packages/morag-graph/src/morag_graph/fact_graph_builder.py`
 **Proposed Split**:
 - `fact_graph_builder.py` - Main builder class
 - `graph_operations.py` - Graph manipulation operations
 - `graph_analytics.py` - Analysis and metrics
 
 #### 5. API stages.py (1035 lines)
-**Location**: `packages/morag/src/morag/api_models/endpoints/stages.py`  
+**Location**: `packages/morag/src/morag/api_models/endpoints/stages.py`
 **Proposed Split**:
 - `stage_endpoints.py` - Basic stage operations
 - `file_endpoints.py` - File processing endpoints
 - `status_endpoints.py` - Status and monitoring endpoints
 
 #### 6. qdrant_storage.py (1034 lines)
-**Location**: `packages/morag-services/src/morag_services/storage/qdrant_storage.py`  
+**Location**: `packages/morag-services/src/morag_services/storage/qdrant_storage.py`
 **Proposed Split**:
 - `qdrant_storage.py` - Core storage operations
 - `qdrant_documents.py` - Document-specific operations
@@ -152,7 +152,7 @@ The following test and CLI files still use `requests` and should be migrated to 
 - `scripts/test-docker.py`
 
 #### Estimated Effort
-**Time**: 2-3 hours (systematic replacement)  
+**Time**: 2-3 hours (systematic replacement)
 **Risk**: Low-Medium (test compatibility)
 
 ---
@@ -175,7 +175,7 @@ The following test and CLI files still use `requests` and should be migrated to 
 5. Storage services in `morag_services/storage/`
 
 #### Estimated Effort
-**Time**: 8-12 hours for comprehensive test coverage  
+**Time**: 8-12 hours for comprehensive test coverage
 **Risk**: Medium (requires understanding complex logic)
 
 ---
@@ -189,7 +189,7 @@ Create proper optional dependency groups in `setup.py` or `pyproject.toml`:
 [tool.setuptools.extras-require]
 audio-ml = [
     "torch>=2.1.0,<2.7.0",
-    "torchaudio>=2.1.0,<2.7.0", 
+    "torchaudio>=2.1.0,<2.7.0",
     "pyannote.audio>=3.3.0,<4.0.0",
     "sentence-transformers>=3.0.0,<5.0.0"
 ]
@@ -201,7 +201,7 @@ all-extras = ["morag[audio-ml,scientific]"]
 ```
 
 #### Estimated Effort
-**Time**: 1-2 hours  
+**Time**: 1-2 hours
 **Risk**: Low
 
 ---
@@ -210,12 +210,12 @@ all-extras = ["morag[audio-ml,scientific]"]
 
 ### Files That Need Documentation Updates
 1. **Installation guides** - Update with new optional dependencies
-2. **API documentation** - Reflect split file structure  
+2. **API documentation** - Reflect split file structure
 3. **Developer guides** - New module organization
 4. **Testing documentation** - Updated test commands and coverage expectations
 
 #### Estimated Effort
-**Time**: 2-3 hours  
+**Time**: 2-3 hours
 **Risk**: Low
 
 ---
@@ -230,12 +230,12 @@ all-extras = ["morag[audio-ml,scientific]"]
 
 ### Recommended Approach
 1. Create comprehensive integration test suite
-2. Set up automated testing pipeline  
+2. Set up automated testing pipeline
 3. Performance benchmarking before/after
 4. Gradual rollout with monitoring
 
 #### Estimated Effort
-**Time**: 4-6 hours for comprehensive testing  
+**Time**: 4-6 hours for comprehensive testing
 **Risk**: Medium
 
 ---
@@ -244,7 +244,7 @@ all-extras = ["morag[audio-ml,scientific]"]
 
 ### Total Postponed Work Estimate
 - **High Priority**: 8-12 hours (file splitting, testing)
-- **Medium Priority**: 6-8 hours (logger standardization, HTTP migration)  
+- **Medium Priority**: 6-8 hours (logger standardization, HTTP migration)
 - **Low Priority**: 3-4 hours (documentation, requirements optimization)
 - **Total**: 17-24 hours of additional refactoring work
 
@@ -256,7 +256,7 @@ all-extras = ["morag[audio-ml,scientific]"]
 
 ### Risk Assessment
 - **Low Risk**: Logger standardization, documentation updates
-- **Medium Risk**: File splitting, HTTP client migration  
+- **Medium Risk**: File splitting, HTTP client migration
 - **High Risk**: Large architectural changes, dependency restructuring
 
 All postponed tasks are **technically sound** and **beneficial**, but require careful planning and extensive testing to avoid breaking existing functionality.

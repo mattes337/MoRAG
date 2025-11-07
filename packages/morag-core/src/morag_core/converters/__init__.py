@@ -8,6 +8,6 @@ from .base import (
 
 __all__ = [
     "ConversionResult",
-    "ConversionQualityValidator", 
+    "ConversionQualityValidator",
     "BaseConverter",
 ]

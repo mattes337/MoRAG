@@ -31,15 +31,15 @@ def run_command(cmd: str) -> tuple[int, str, str]:
 
 def create_test_documents():
     """Create various test documents for demonstration."""
-    
+
     # Simple document
     simple_doc = """# Simple Test Document
 
-John Smith works at Microsoft Corporation in Seattle, Washington. 
+John Smith works at Microsoft Corporation in Seattle, Washington.
 He is a software engineer who develops cloud applications using Azure.
 Microsoft is headquartered in Redmond and was founded by Bill Gates and Paul Allen.
 """
-    
+
     # Complex document with multiple entity types
     complex_doc = """# Research Paper: AI in Healthcare
 
@@ -52,7 +52,7 @@ Dr. Sarah Johnson from Stanford University published groundbreaking research on 
 The research team, including Dr. Michael Chen (UCLA) and Dr. Emily Rodriguez (Mayo Clinic), analyzed 10,000 medical images using a convolutional neural network developed by Google DeepMind. The AI system, called MedNet-AI, was trained on data from three major hospitals:
 
 - Johns Hopkins Hospital (Baltimore, Maryland)
-- Massachusetts General Hospital (Boston, Massachusetts)  
+- Massachusetts General Hospital (Boston, Massachusetts)
 - Cleveland Clinic (Cleveland, Ohio)
 
 ## Results
@@ -63,7 +63,7 @@ The AI system achieved 95% accuracy in detecting lung cancer, significantly outp
 
 This breakthrough could revolutionize cancer diagnosis, potentially saving thousands of lives annually. The technology is being licensed to pharmaceutical companies including Pfizer and Johnson & Johnson for clinical trials.
 """
-    
+
     # German document
     german_doc = """# Forschungsbericht: KI in der Medizin
 
@@ -79,79 +79,79 @@ Das Forschungsteam, bestehend aus Dr. Anna Schmidt (Charité Berlin) und Dr. Tho
 
 Das KI-System erreichte eine Genauigkeit von 92% bei der Erkennung von Lungenkrebs. Die Studie wurde von der Deutschen Forschungsgemeinschaft (DFG) finanziert und im Deutschen Ärzteblatt veröffentlicht.
 """
-    
+
     # Write test documents
     test_docs = {
         "simple_test.md": simple_doc,
         "complex_test.md": complex_doc,
         "german_test.md": german_doc
     }
-    
+
     for filename, content in test_docs.items():
         with open(filename, 'w', encoding='utf-8') as f:
             f.write(content)
-    
+
     return list(test_docs.keys())
 
 
 def analyze_extraction_results(filename: str) -> Dict[str, Any]:
     """Analyze extraction results from a JSON file."""
     json_file = Path(filename).with_suffix('.graph.json')
-    
+
     if not json_file.exists():
         return {"error": f"Results file not found: {json_file}"}
-    
+
     try:
         with open(json_file, 'r', encoding='utf-8') as f:
             data = json.load(f)
-        
+
         analysis = data.get('analysis', {})
         extraction_results = data.get('extraction_results', {})
-        
+
         # Extract entity and relation details
         entities = extraction_results.get('entities', [])
         relations = extraction_results.get('relations', [])
-        
+
         # Analyze entity types and confidence
         entity_analysis = {}
         for entity in entities:
             entity_type = entity.get('type', 'UNKNOWN')
             confidence = entity.get('confidence', 0.0)
-            
+
             if entity_type not in entity_analysis:
                 entity_analysis[entity_type] = {
                     'count': 0,
                     'confidences': [],
                     'examples': []
                 }
-            
+
             entity_analysis[entity_type]['count'] += 1
             entity_analysis[entity_type]['confidences'].append(confidence)
             entity_analysis[entity_type]['examples'].append(entity.get('name', ''))
-        
+
         # Analyze relation types and confidence
         relation_analysis = {}
         for relation in relations:
             relation_type = relation.get('relation_type', 'UNKNOWN')
             confidence = relation.get('confidence', 0.0)
-            
+
             if relation_type not in relation_analysis:
                 relation_analysis[relation_type] = {
                     'count': 0,
                     'confidences': [],
                     'examples': []
                 }
-            
+
             relation_analysis[relation_type]['count'] += 1
             relation_analysis[relation_type]['confidences'].append(confidence)
-            
+
             # Create relation example
             source_id = relation.get('source_entity_id', '')
             target_id = relation.get('target_entity_id', '')
             source_name = next((e['name'] for e in entities if e['id'] == source_id), source_id)
             target_name = next((e['name'] for e in entities if e['id'] == target_id), target_id)
             relation_analysis[relation_type]['examples'].append(f"{source_name} -> {target_name}")
-        
+
         return {
             "filename": filename,
             "total_entities": len(entities),
@@ -162,7 +162,7 @@ def analyze_extraction_results(filename: str) -> Dict[str, Any]:
             "language": data.get('language'),
             "content_length": data.get('content_length', 0)
         }
-        
+
     except Exception as e:
         return {"error": f"Error analyzing {json_file}: {e}"}
 
@@ -225,7 +225,7 @@ def main():
     has_api_key = bool(os.getenv('GEMINI_API_KEY'))
     mode = "real extraction" if has_api_key else "dry-run mode"
     print(f"[MODE] Running in {mode}")
-    
+
     # Run extractions on each test document
     for test_file in test_files:
         print(f"\n[PROCESS] Processing {test_file}...")
@@ -262,7 +262,7 @@ def main():
                 print(f"[ERROR] Validation failed for {test_file}: {val_stderr}")
         else:
             print(f"[ERROR] Extraction failed for {test_file}: {stderr}")
-    
+
     print(f"\n[SUMMARY] Demo Summary:")
     print(f"   - Processed {len(test_files)} documents")
     print(f"   - Mode: {mode}")

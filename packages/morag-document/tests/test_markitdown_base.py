@@ -39,7 +39,7 @@ class TestMarkitdownConverter:
         """Test getting markitdown service instance."""
         service1 = await converter._get_markitdown_service()
         service2 = await converter._get_markitdown_service()
-        
+
         # Should return the same instance
         assert service1 is service2
 
@@ -47,11 +47,11 @@ class TestMarkitdownConverter:
     async def test_supports_format(self, converter, mock_markitdown_service):
         """Test format support checking."""
         converter._markitdown_service = mock_markitdown_service
-        
+
         # Test supported format
         result = await converter.supports_format('pdf')
         assert result is True
-        
+
         # Test unsupported format
         converter.supported_formats = {'pdf'}
         result = await converter.supports_format('docx')
@@ -63,7 +63,7 @@ class TestMarkitdownConverter:
         # Create test file
         test_file = tmp_path / "test.txt"
         test_file.write_text("Test content")
-        
+
         result = await converter.validate_input(test_file)
         assert result is True
 
@@ -84,7 +84,7 @@ class TestMarkitdownConverter:
         """Test validation with empty file."""
         test_file = tmp_path / "empty.txt"
         test_file.touch()
-        
+
         with pytest.raises(ConversionError, match="Empty file"):
             await converter.validate_input(test_file)
 
@@ -93,7 +93,7 @@ class TestMarkitdownConverter:
         """Test format detection."""
         test_file = tmp_path / "test.pdf"
         test_file.write_text("Test content")
-        
+
         with patch('morag_core.utils.file_handling.detect_format', return_value='pdf'):
             format_type = converter.detect_format(test_file)
             assert format_type == 'pdf'
@@ -114,21 +114,21 @@ class TestMarkitdownConverter:
         # Create test file
         test_file = tmp_path / "test.txt"
         test_file.write_text("Test content")
-        
+
         # Mock dependencies
         converter._markitdown_service = mock_markitdown_service
-        
+
         with patch('morag_core.utils.file_handling.get_file_info') as mock_get_file_info:
             mock_get_file_info.return_value = {
                 'file_name': 'test.txt',
                 'mime_type': 'text/plain',
                 'file_size': 12
             }
-            
+
             with patch('morag_core.utils.file_handling.detect_format', return_value='txt'):
                 options = ConversionOptions(chunking_strategy=ChunkingStrategy.NONE)
                 result = await converter.convert(test_file, options)
-                
+
                 assert result.success is True
                 assert result.content == "# Test Document\n\nThis is test content."
                 assert result.document.raw_text == "# Test Document\n\nThis is test content."
@@ -141,12 +141,12 @@ class TestMarkitdownConverter:
         # Create test file
         test_file = tmp_path / "test.txt"
         test_file.write_text("Test content")
-        
+
         # Mock settings with markitdown disabled
         mock_settings = Mock()
         mock_settings.markitdown_enabled = False
         converter.settings = mock_settings
-        
+
         with pytest.raises(ConversionError, match="Markitdown is disabled"):
             await converter.convert(test_file)
 
@@ -156,9 +156,9 @@ class TestMarkitdownConverter:
         # Create test file
         test_file = tmp_path / "test.unknown"
         test_file.write_text("Test content")
-        
+
         converter.supported_formats = {'pdf'}
-        
+
         with patch('morag_core.utils.file_handling.detect_format', return_value='unknown'):
             with pytest.raises(UnsupportedFormatError):
                 await converter.convert(test_file)
@@ -169,17 +169,17 @@ class TestMarkitdownConverter:
         # Create test file
         test_file = tmp_path / "test.txt"
         test_file.write_text("Test content")
-        
+
         # Mock dependencies
         converter._markitdown_service = mock_markitdown_service
-        
+
         with patch('morag_core.utils.file_handling.get_file_info') as mock_get_file_info:
             mock_get_file_info.return_value = {
                 'file_name': 'test.txt',
                 'mime_type': 'text/plain',
                 'file_size': 12
             }
-            
+
             with patch('morag_core.utils.file_handling.detect_format', return_value='txt'):
                 options = ConversionOptions(
                     chunking_strategy=ChunkingStrategy.PARAGRAPH,
@@ -187,7 +187,7 @@ class TestMarkitdownConverter:
                     chunk_overlap=20
                 )
                 result = await converter.convert(test_file, options)
-                
+
                 assert result.success is True
                 assert len(result.document.chunks) > 0
 
@@ -195,13 +195,13 @@ class TestMarkitdownConverter:
     async def test_assess_quality_no_content(self, converter):
         """Test quality assessment with no content."""
         from morag_core.models.document import Document, DocumentMetadata, DocumentType
-        
+
         metadata = DocumentMetadata(
             source_type=DocumentType.TEXT,
             source_name="test.txt"
         )
         document = Document(metadata=metadata)
-        
+
         quality = await converter.assess_quality(document)
         assert quality.overall_score == 0.0
         assert "No text content extracted" in quality.issues_detected
@@ -210,14 +210,14 @@ class TestMarkitdownConverter:
     async def test_assess_quality_short_content(self, converter):
         """Test quality assessment with short content."""
         from morag_core.models.document import Document, DocumentMetadata, DocumentType
-        
+
         metadata = DocumentMetadata(
             source_type=DocumentType.TEXT,
             source_name="test.txt"
         )
         document = Document(metadata=metadata)
         document.raw_text = "Short"
-        
+
         quality = await converter.assess_quality(document)
         assert quality.overall_score < 1.0
         assert "Very short text content" in quality.issues_detected
@@ -226,13 +226,13 @@ class TestMarkitdownConverter:
         """Test markitdown options mapping."""
         options = ConversionOptions()
         markitdown_options = converter._get_markitdown_options(options)
-        
+
         assert isinstance(markitdown_options, dict)
 
     def test_find_word_boundary_backward(self, converter):
         """Test finding word boundary in backward direction."""
         text = "This is a test sentence."
-        
+
         # Test finding boundary at space
         boundary = converter._find_word_boundary(text, 10, "backward")
         assert boundary <= 10
@@ -241,7 +241,7 @@ class TestMarkitdownConverter:
     def test_find_word_boundary_forward(self, converter):
         """Test finding word boundary in forward direction."""
         text = "This is a test sentence."
-        
+
         # Test finding boundary at space
         boundary = converter._find_word_boundary(text, 10, "forward")
         assert boundary >= 10
@@ -249,7 +249,7 @@ class TestMarkitdownConverter:
     def test_detect_sentence_boundaries(self, converter):
         """Test sentence boundary detection."""
         text = "This is sentence one. This is sentence two! Is this sentence three?"
-        
+
         boundaries = converter._detect_sentence_boundaries(text)
         assert len(boundaries) >= 2  # At least start and end
         assert boundaries[0] == 0

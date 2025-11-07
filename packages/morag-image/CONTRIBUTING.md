@@ -131,16 +131,16 @@ Example:
 ```python
 def function_name(param1: str, param2: int) -> bool:
     """Short description of the function.
-    
+
     Longer description explaining the function's purpose and behavior.
-    
+
     Args:
         param1: Description of param1
         param2: Description of param2
-        
+
     Returns:
         Description of return value
-        
+
     Raises:
         ExceptionType: When and why this exception is raised
     """

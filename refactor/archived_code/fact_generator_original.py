@@ -141,16 +141,16 @@ class FactGeneratorStage(Stage):
                 model_name=model_id,
                 api_key=api_key
             )
-    
-    async def execute(self, 
-                     input_files: List[Path], 
+
+    async def execute(self,
+                     input_files: List[Path],
                      context: StageContext) -> StageResult:
         """Execute fact generation on input chunk files.
-        
+
         Args:
             input_files: List of input chunk JSON files
             context: Stage execution context
-            
+
         Returns:
             Stage execution result
         """
@@ -160,32 +160,32 @@ class FactGeneratorStage(Stage):
                 stage_type=self.stage_type.value,
                 invalid_files=[str(f) for f in input_files]
             )
-        
+
         input_file = input_files[0]
 
         # Load configuration from environment variables with context overrides
         context_config = context.get_stage_config(self.stage_type)
         config = FactGeneratorConfig.from_env_and_overrides(context_config)
-        
+
         # Reinitialize services with runtime configuration
         await self._initialize_services_with_config(config, context)
 
         logger.info("Starting fact generation",
                    input_file=str(input_file),
                    config=config)
-        
+
         try:
             # Generate output filename
             output_file = context.output_dir / f"{input_file.stem.replace('.chunks', '')}.facts.json"
             context.output_dir.mkdir(parents=True, exist_ok=True)
-            
+
             # Read input chunks
             with open(input_file, 'r', encoding='utf-8') as f:
                 chunks_data = json.load(f)
-            
+
             chunks = chunks_data.get('chunks', [])
             source_metadata = chunks_data.get('metadata', {})
-            
+
             # Extract facts from chunks
             all_entities = []
             all_relations = []
@@ -216,17 +216,17 @@ class FactGeneratorStage(Stage):
                 all_relations.extend(chunk_results.get('relations', []))
                 all_facts.extend(chunk_results.get('facts', []))
                 all_keywords.update(chunk_results.get('keywords', []))
-            
+
             # Normalize and deduplicate entities
             if self.entity_normalizer:
                 all_entities = await self._normalize_entities(all_entities)
             else:
                 all_entities = self._basic_entity_deduplication(all_entities)
-            
+
             # Deduplicate relations and facts
             all_relations = self._deduplicate_relations(all_relations)
             all_facts = self._deduplicate_facts(all_facts)
-            
+
             # Create output data
             output_data = {
                 "entities": all_entities,
@@ -244,11 +244,11 @@ class FactGeneratorStage(Stage):
                     "created_at": datetime.now().isoformat()
                 }
             }
-            
+
             # Write to file
             with open(output_file, 'w', encoding='utf-8') as f:
                 json.dump(output_data, f, indent=2, ensure_ascii=False)
-            
+
             # Create metadata
             stage_metadata = StageMetadata(
                 execution_time=0.0,  # Will be set by manager
@@ -270,7 +270,7 @@ class FactGeneratorStage(Stage):
                     }
                 }
             )
-            
+
             return StageResult(
                 stage_type=self.stage_type,
                 status=StageStatus.COMPLETED,
@@ -283,38 +283,38 @@ class FactGeneratorStage(Stage):
                     "keywords_count": len(all_keywords)
                 }
             )
-            
+
         except Exception as e:
-            logger.error("Fact generation failed", 
-                        input_file=str(input_file), 
+            logger.error("Fact generation failed",
+                        input_file=str(input_file),
                         error=str(e))
             raise StageExecutionError(
                 f"Fact generation failed: {e}",
                 stage_type=self.stage_type.value,
                 original_error=e
             )
-    
+
     def validate_inputs(self, input_files: List[Path]) -> bool:
         """Validate input files for fact generation.
-        
+
         Args:
             input_files: List of input file paths
-            
+
         Returns:
             True if inputs are valid
         """
         if len(input_files) != 1:
             return False
-        
+
         input_file = input_files[0]
-        
+
         # Check if file exists and is JSON
         if not input_file.exists():
             return False
-        
+
         if not input_file.name.endswith('.chunks.json'):
             return False
-        
+
         # Try to parse JSON
         try:
             with open(input_file, 'r', encoding='utf-8') as f:
@@ -322,15 +322,15 @@ class FactGeneratorStage(Stage):
                 return 'chunks' in data
         except (json.JSONDecodeError, KeyError):
             return False
-    
+
     def get_dependencies(self) -> List[StageType]:
         """Get stage dependencies.
-        
+
         Returns:
             List containing chunker stage
         """
         return [StageType.CHUNKER]
-    
+
     def get_expected_outputs(self, input_files: List[Path], context: StageContext) -> List[Path]:
         """Get expected output file paths.
 
@@ -350,14 +350,14 @@ class FactGeneratorStage(Stage):
         sanitized_name = sanitize_filename(base_name)
         output_file = context.output_dir / f"{sanitized_name}.facts.json"
         return [output_file]
-    
+
     async def _extract_from_chunk(self, chunk: Dict[str, Any], config: FactGeneratorConfig) -> Dict[str, Any]:
         """Extract facts from a single chunk.
-        
+
         Args:
             chunk: Chunk data
             config: Stage configuration
-            
+
         Returns:
             Extraction results
         """
@@ -373,7 +373,7 @@ class FactGeneratorStage(Stage):
             'facts': [],
             'keywords': []
         }
-        
+
         # Use fact extractor if available
         if self.fact_extractor and SERVICES_AVAILABLE:
             try:
@@ -552,19 +552,19 @@ class FactGeneratorStage(Stage):
                 }
 
                 logger.debug(f"Extraction result relations count: {len(extraction_result.get('relations', []))}")
-                
+
                 # Add source chunk information
                 for entity in extraction_result.get('entities', []):
                     entity['source_chunks'] = [chunk_id]
-                
+
                 for relation in extraction_result.get('relations', []):
                     relation['source_chunks'] = [chunk_id]
-                
+
                 for fact in extraction_result.get('facts', []):
                     fact['source_chunk'] = chunk_id
-                
+
                 results.update(extraction_result)
-                
+
             except Exception as e:
                 logger.warning("Fact extractor failed, using LLM fallback",
                              error=str(e),
@@ -577,12 +577,12 @@ class FactGeneratorStage(Stage):
                         chunk_id=chunk_id,
                         reason="fact_extractor_not_available" if not self.fact_extractor else "services_not_available")
             results = await self._llm_extraction_fallback(content, chunk_id, config)
-        
+
         # Extract keywords if enabled
         if getattr(config, 'extract_keywords', True):
             keywords = self._extract_keywords(content)
             results['keywords'] = keywords
-        
+
         return results
 
     def _filter_metadata_content(self, content: str) -> str:

@@ -91,27 +91,27 @@ async def get_reasoning_status():
         path_finder = get_reasoning_path_finder()
         iterative_retriever = get_iterative_retriever()
         llm_client = get_llm_client()
-        
+
         components = {
             "reasoning_available": REASONING_AVAILABLE,
             "path_finder": path_finder is not None,
             "iterative_retriever": iterative_retriever is not None,
             "llm_client": llm_client is not None,
         }
-        
+
         configuration = {
             "max_paths_default": 50,
             "max_iterations_default": 5,
             "sufficiency_threshold_default": 0.8,
             "supported_strategies": ["forward_chaining", "backward_chaining", "bidirectional"]
         }
-        
+
         return ReasoningStatus(
             available=all(components.values()),
             components=components,
             configuration=configuration
         )
-        
+
     except Exception as e:
         logger.error("Error checking reasoning status", error=str(e))
         raise HTTPException(status_code=500, detail=f"Error checking reasoning status: {str(e)}")
@@ -126,16 +126,16 @@ async def multi_hop_reasoning(
     """Perform multi-hop reasoning to answer a complex query."""
     if not REASONING_AVAILABLE:
         raise HTTPException(
-            status_code=503, 
+            status_code=503,
             detail="Multi-hop reasoning not available. Please check reasoning components."
         )
-    
+
     if path_finder is None or iterative_retriever is None:
         raise HTTPException(
             status_code=503,
             detail="Reasoning components not properly initialized"
         )
-    
+
     start_time = time.time()
 
     try:
@@ -150,7 +150,7 @@ async def multi_hop_reasoning(
                    query=request.query,
                    strategy=request.strategy,
                    start_entities=request.start_entities)
-        
+
         # Step 1: Find reasoning paths
         reasoning_paths = await path_finder.find_reasoning_paths(
             query=request.query,
@@ -159,27 +159,27 @@ async def multi_hop_reasoning(
             strategy=request.strategy,
             max_paths=request.max_paths
         )
-        
+
         logger.info("Found reasoning paths", count=len(reasoning_paths))
-        
+
         # Step 2: Create initial context from paths
         from morag_reasoning import RetrievalContext
-        
+
         initial_context = RetrievalContext(
             paths=[path.path for path in reasoning_paths[:10]],  # Use top 10 paths
             entities={entity: {"name": entity, "type": "UNKNOWN"} for entity in request.start_entities},
             metadata={"query": request.query, "strategy": request.strategy}
         )
-        
+
         # Step 3: Refine context iteratively
         refined_context = await iterative_retriever.refine_context(
             request.query, initial_context
         )
-        
+
         # Step 4: Prepare response
         end_time = time.time()
         reasoning_time_ms = (end_time - start_time) * 1000
-        
+
         # Convert paths to response format
         selected_paths = []
         for i, path_score in enumerate(reasoning_paths[:10]):  # Return top 10 paths
@@ -192,13 +192,13 @@ async def multi_hop_reasoning(
                 reasoning=path_score.reasoning
             )
             selected_paths.append(path_info)
-        
+
         # Get final analysis
         final_analysis = refined_context.metadata.get('final_analysis')
         final_confidence = final_analysis.confidence if final_analysis else 0.5
         context_sufficient = final_analysis.is_sufficient if final_analysis else False
         iterations_used = refined_context.metadata.get('iterations_used', 0)
-        
+
         # Create context info
         context_info = ContextInfo(
             entity_count=len(refined_context.entities),
@@ -206,12 +206,12 @@ async def multi_hop_reasoning(
             document_count=len(refined_context.documents),
             path_count=len(refined_context.paths)
         )
-        
+
         # Generate reasoning summary
         reasoning_summary = _generate_reasoning_summary(
             request, reasoning_paths, refined_context, final_analysis
         )
-        
+
         result = ReasoningResult(
             query=request.query,
             strategy=request.strategy,
@@ -224,15 +224,15 @@ async def multi_hop_reasoning(
             context_sufficient=context_sufficient,
             reasoning_summary=reasoning_summary
         )
-        
+
         logger.info("Multi-hop reasoning completed",
                    paths_found=len(reasoning_paths),
                    iterations_used=iterations_used,
                    final_confidence=final_confidence,
                    reasoning_time_ms=reasoning_time_ms)
-        
+
         return result
-        
+
     except Exception as e:
         logger.error("Error in multi-hop reasoning", error=str(e))
         raise HTTPException(status_code=500, detail=f"Reasoning failed: {str(e)}")
@@ -245,7 +245,7 @@ def _generate_reasoning_summary(request, reasoning_paths, refined_context, final
         f"Found {len(reasoning_paths)} reasoning paths from {len(request.start_entities)} starting entities",
         f"Final context contains {len(refined_context.entities)} entities, {len(refined_context.relations)} relations, and {len(refined_context.documents)} documents"
     ]
-    
+
     if final_analysis:
         if final_analysis.is_sufficient:
             summary_parts.append(f"Context deemed sufficient with {final_analysis.confidence:.2f} confidence")
@@ -254,7 +254,7 @@ def _generate_reasoning_summary(request, reasoning_paths, refined_context, final
             if final_analysis.gaps:
                 gap_types = [gap.gap_type for gap in final_analysis.gaps]
                 summary_parts.append(f"Identified gaps: {', '.join(set(gap_types))}")
-    
+
     return ". ".join(summary_parts) + "."
 
 
@@ -270,7 +270,7 @@ async def get_reasoning_strategies():
             "best_for": "Exploring consequences and effects of starting entities"
         },
         "backward_chaining": {
-            "name": "Backward Chaining", 
+            "name": "Backward Chaining",
             "description": "Start from potential answers and work backward to query entities",
             "max_depth": 3,
             "bidirectional": False,
@@ -284,7 +284,7 @@ async def get_reasoning_strategies():
             "best_for": "Finding connections between specific start and target entities"
         }
     }
-    
+
     return {"strategies": strategies}
 
 

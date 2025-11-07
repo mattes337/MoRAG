@@ -8,6 +8,6 @@ from .keyword_extraction import KeywordExtractionAgent
 __all__ = [
     "FactExtractionAgent",
     "EntityExtractionAgent",
-    "RelationExtractionAgent", 
+    "RelationExtractionAgent",
     "KeywordExtractionAgent",
 ]

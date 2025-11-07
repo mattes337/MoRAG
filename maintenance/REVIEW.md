@@ -9,7 +9,7 @@ This review evaluates the maintenance scripts in the MoRAG project, focusing on 
 ## Scripts Reviewed
 
 1. **Keyword Deduplication** (`keyword_deduplication.py`)
-2. **Keyword Hierarchization** (`keyword_hierarchization.py`) 
+2. **Keyword Hierarchization** (`keyword_hierarchization.py`)
 3. **Keyword Linking** (`keyword_linking.py`)
 4. **Relationship Cleanup** (`relationship_cleanup.py`)
 5. **Relationship Merger** (`relationship_merger.py`)
@@ -70,7 +70,7 @@ This review evaluates the maintenance scripts in the MoRAG project, focusing on 
 - No validation of merge quality post-execution
 - Rotation logic could be simplified
 
-### Keyword Hierarchization  
+### Keyword Hierarchization
 **Strengths:**
 - Balanced fact reassignment prevents over-concentration
 - Configurable thresholds for different use cases

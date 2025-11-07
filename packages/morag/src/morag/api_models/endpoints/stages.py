@@ -103,10 +103,10 @@ async def send_webhook_notification(webhook_config, stage_result, job_id: Option
     """Send webhook notification for stage completion."""
     if not webhook_config:
         return False
-    
+
     try:
         import httpx
-        
+
         payload = {
             "job_id": job_id,
             "stage_type": stage_result.stage_type.value,
@@ -116,13 +116,13 @@ async def send_webhook_notification(webhook_config, stage_result, job_id: Option
             "execution_time": stage_result.metadata.execution_time,
             "timestamp": datetime.now().isoformat()
         }
-        
+
         headers = {"Content-Type": "application/json"}
         if webhook_config.auth_token:
             headers["Authorization"] = f"Bearer {webhook_config.auth_token}"
         if webhook_config.headers:
             headers.update(webhook_config.headers)
-        
+
         async with httpx.AsyncClient(timeout=webhook_config.timeout) as client:
             response = await client.post(
                 webhook_config.url,
@@ -131,7 +131,7 @@ async def send_webhook_notification(webhook_config, stage_result, job_id: Option
             )
             response.raise_for_status()
             return True
-            
+
     except Exception as e:
         logger.error("Failed to send webhook notification", error=str(e), webhook_url=webhook_config.url)
         return False
@@ -416,7 +416,7 @@ async def execute_stage(
         webhook_sent = False
         if parsed_request is not None and parsed_request.webhook_config:
             webhook_sent = await send_webhook_notification(parsed_request.webhook_config, result)
-        
+
         return StageExecutionResponse(
             success=result.status in [StageStatus.COMPLETED, StageStatus.SKIPPED],
             stage_type=stage_enum,
@@ -426,7 +426,7 @@ async def execute_stage(
             error_message=result.error_message,
             webhook_sent=webhook_sent
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -1045,6 +1045,3 @@ async def health_check():
     except Exception as e:
         logger.error("Health check failed", error=str(e))
         raise HTTPException(status_code=500, detail=str(e))
-
-
-

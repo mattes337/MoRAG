@@ -139,7 +139,7 @@ class AudioConverter:
         except Exception as e:
             logger.error("Audio conversion failed", error=str(e), file_path=str(file_path))
             raise ConversionError(f"Failed to convert audio file: {e}") from e
-    
+
     async def convert_to_json(self,
                              result: "AudioProcessingResult",
                              options: Optional[AudioConversionOptions] = None) -> Dict[str, Any]:
@@ -233,17 +233,17 @@ class AudioConverter:
                                 result: "AudioProcessingResult",
                                 options: Optional[AudioConversionOptions] = None) -> AudioConversionResult:
         """Convert audio processing result to structured markdown.
-        
+
         Args:
             result: Audio processing result
             options: Conversion options
-            
+
         Returns:
             AudioConversionResult with markdown content
         """
         start_time = time.time()
         options = options or AudioConversionOptions()
-        
+
         try:
             if not result.success:
                 raise ConversionError(f"Cannot convert unsuccessful processing result: {result.error_message}")
@@ -251,13 +251,13 @@ class AudioConverter:
             # Check if we have either segments or transcript
             if not result.segments and not result.transcript:
                 raise ConversionError("Cannot convert result: no segments or transcript available")
-            
+
             markdown_content = []
-            
+
             # Add title
             file_name = Path(result.file_path).name
             markdown_content.append(f"# Audio Transcription: {file_name}\n")
-            
+
             # Add metadata section if requested
             if options.include_metadata:
                 markdown_content.append("## Metadata\n")
@@ -271,7 +271,7 @@ class AudioConverter:
                             value = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
                         markdown_content.append(f"- **{field.replace('_', ' ').title()}**: {value}")
                 markdown_content.append("\n")
-            
+
             # Choose between Full Transcript and Detailed Transcript (mutually exclusive)
             # Prefer detailed transcript when segments are available, otherwise use full transcript
             if result.segments and len(result.segments) > 0:
@@ -358,19 +358,19 @@ class AudioConverter:
             # Clean up multiple consecutive empty lines
             import re
             content = re.sub(r'\n\s*\n\s*\n+', '\n\n', content)
-            
+
             processing_time = time.time() - start_time
-            
+
             return AudioConversionResult(
                 content=content,
                 metadata=result.metadata,
                 processing_time=processing_time,
                 success=True
             )
-            
+
         except Exception as e:
             logger.error("Audio conversion to markdown failed", error=str(e))
-            
+
             processing_time = time.time() - start_time
             return AudioConversionResult(
                 content="",
@@ -379,7 +379,7 @@ class AudioConverter:
                 success=False,
                 error_message=str(e)
             )
-    
+
     def _format_segments(self, segments: List["AudioSegment"], options: AudioConversionOptions) -> List[str]:
         """Format segments into markdown lines."""
         markdown_lines = []

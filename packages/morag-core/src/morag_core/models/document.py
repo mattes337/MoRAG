@@ -83,10 +83,10 @@ class DocumentChunk:
     chunk_index: int = 0
     page_number: Optional[int] = None
     section: Optional[str] = None
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary.
-        
+
         Returns:
             Dictionary representation
         """
@@ -109,14 +109,14 @@ class Document:
     chunks: List[DocumentChunk] = field(default_factory=list)
     raw_text: Optional[str] = None
     processed_at: datetime = field(default_factory=datetime.now)
-    
+
     def add_chunk(self, content: str, **kwargs) -> DocumentChunk:
         """Add a chunk to the document.
-        
+
         Args:
             content: Chunk content
             **kwargs: Additional chunk metadata
-            
+
         Returns:
             Created document chunk
         """
@@ -128,10 +128,10 @@ class Document:
         )
         self.chunks.append(chunk)
         return chunk
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary.
-        
+
         Returns:
             Dictionary representation
         """

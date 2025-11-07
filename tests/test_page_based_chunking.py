@@ -79,10 +79,10 @@ class TestPageBasedChunking:
         """Test basic page-based chunking functionality."""
         # Apply page-based chunking
         result = await document_processor._apply_page_based_chunking(sample_parse_result)
-        
+
         # Should have 3 chunks (one per page)
         assert len(result.chunks) == 3
-        
+
         # Check page 1 chunk
         page1_chunk = result.chunks[0]
         assert page1_chunk.page_number == 1
@@ -91,7 +91,7 @@ class TestPageBasedChunking:
         assert "This is the second paragraph on page 1." in page1_chunk.text
         assert page1_chunk.metadata["page_based_chunking"] is True
         assert page1_chunk.metadata["original_chunks_count"] == 2
-        
+
         # Check page 2 chunk
         page2_chunk = result.chunks[1]
         assert page2_chunk.page_number == 2
@@ -100,7 +100,7 @@ class TestPageBasedChunking:
         assert "This is content on page 2." in page2_chunk.text
         assert page2_chunk.metadata["page_based_chunking"] is True
         assert page2_chunk.metadata["original_chunks_count"] == 2
-        
+
         # Check page 3 chunk
         page3_chunk = result.chunks[2]
         assert page3_chunk.page_number == 3
@@ -114,7 +114,7 @@ class TestPageBasedChunking:
         """Test page-based chunking with a page that exceeds max size."""
         # Create a large chunk that exceeds max_page_chunk_size
         large_text = "This is a very long text. " * 500  # About 13,500 characters
-        
+
         large_chunks = [
             DocumentChunk(
                 text=large_text,
@@ -124,7 +124,7 @@ class TestPageBasedChunking:
                 metadata={"element_type": "Text"}
             )
         ]
-        
+
         parse_result = DocumentParseResult(
             chunks=large_chunks,
             metadata={"parser": "test"},
@@ -132,14 +132,14 @@ class TestPageBasedChunking:
             total_pages=1,
             word_count=1000
         )
-        
+
         # Mock settings to use a smaller max size for testing
         with patch.object(settings, 'max_page_chunk_size', 1000):
             result = await document_processor._apply_page_based_chunking(parse_result)
-        
+
         # Should split into multiple chunks
         assert len(result.chunks) > 1
-        
+
         # All chunks should be from page 1
         for chunk in result.chunks:
             assert chunk.page_number == 1
@@ -156,9 +156,9 @@ class TestPageBasedChunking:
             total_pages=0,
             word_count=0
         )
-        
+
         result = await document_processor._apply_page_based_chunking(empty_parse_result)
-        
+
         # Should return the same result
         assert len(result.chunks) == 0
         assert result.metadata == empty_parse_result.metadata
@@ -170,7 +170,7 @@ class TestPageBasedChunking:
         with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp_file:
             tmp_path = Path(tmp_file.name)
             tmp_file.write(b"dummy pdf content")
-        
+
         try:
             # Mock the parsing methods to return controlled results
             mock_chunks = [
@@ -187,7 +187,7 @@ class TestPageBasedChunking:
                     element_id="p1_chunk2"
                 )
             ]
-            
+
             mock_result = DocumentParseResult(
                 chunks=mock_chunks,
                 metadata={"parser": "mock"},
@@ -195,7 +195,7 @@ class TestPageBasedChunking:
                 total_pages=1,
                 word_count=10
             )
-            
+
             with patch.object(document_processor, '_parse_with_unstructured', return_value=mock_result):
                 with patch.object(settings, 'default_chunking_strategy', 'page'):
                     with patch.object(settings, 'enable_page_based_chunking', True):
@@ -204,7 +204,7 @@ class TestPageBasedChunking:
                             use_docling=False,
                             chunking_strategy="page"
                         )
-            
+
             # Should have applied page-based chunking
             assert len(result.chunks) == 1  # Combined into one page chunk
             assert result.chunks[0].chunk_type == "page"
@@ -212,7 +212,7 @@ class TestPageBasedChunking:
             assert "Page 1 content" in result.chunks[0].text
             assert "More page 1 content" in result.chunks[0].text
             assert result.metadata["page_based_chunking_applied"] is True
-            
+
         finally:
             # Clean up
             tmp_path.unlink()
@@ -223,11 +223,11 @@ class TestPageBasedChunking:
         assert hasattr(settings, 'default_chunking_strategy')
         assert hasattr(settings, 'enable_page_based_chunking')
         assert hasattr(settings, 'max_page_chunk_size')
-        
+
         # Test that page strategy is available
         from morag_services.processing import SemanticChunker
         chunker = SemanticChunker()
-        
+
         # This should not raise an exception
         assert hasattr(chunker, '_page_chunking')
 

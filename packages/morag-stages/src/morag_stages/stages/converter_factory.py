@@ -34,7 +34,7 @@ except ImportError:
 
 class ConverterFactory:
     """Factory for creating and managing content converters."""
-    
+
     def __init__(self):
         """Initialize converter factory."""
         self.services = None
@@ -44,7 +44,7 @@ class ConverterFactory:
         """Initialize converter services."""
         if self._initialized:
             return
-            
+
         try:
             if SERVICES_AVAILABLE:
                 self.services = MoRAGServices()
@@ -52,9 +52,9 @@ class ConverterFactory:
                 logger.info("Converter services initialized successfully")
             else:
                 logger.warning("MoRAG services not available, using fallback converters")
-            
+
             self._initialized = True
-            
+
         except Exception as e:
             logger.error("Failed to initialize converter services", error=str(e))
             # Continue without services - use fallback methods
@@ -67,51 +67,51 @@ class ConverterFactory:
                 content_type_str = content_type.value.lower()
             else:
                 content_type_str = str(content_type).lower()
-            
+
             # Get file extension
             if hasattr(file_path, 'suffix'):
                 file_ext = file_path.suffix.lower()
             else:
                 file_ext = Path(str(file_path)).suffix.lower()
-            
+
             # Markitdown is good for documents and structured data
             document_types = ['document', 'pdf', 'doc', 'docx', 'txt', 'md', 'html']
             structured_types = ['csv', 'xlsx', 'xls', 'json', 'xml']
             image_types = ['image', 'jpg', 'jpeg', 'png', 'gif', 'bmp']
-            
+
             # Use markitdown for documents and structured data
             if any(dt in content_type_str for dt in document_types):
                 return True
-                
+
             if any(st in content_type_str for st in structured_types):
                 return True
-                
+
             # Use markitdown for images (OCR)
             if any(it in content_type_str for it in image_types):
                 return True
-            
+
             # Check by file extension
             markitdown_extensions = {
                 '.pdf', '.doc', '.docx', '.txt', '.md', '.html', '.htm',
                 '.csv', '.xlsx', '.xls', '.json', '.xml',
                 '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp'
             }
-            
+
             if file_ext in markitdown_extensions:
                 return True
-            
+
             # Don't use markitdown for media files
             media_types = ['audio', 'video', 'youtube']
             if any(mt in content_type_str for mt in media_types):
                 return False
-            
+
             # Don't use markitdown for web content (use scrapers instead)
             if 'web' in content_type_str:
                 return False
-            
+
             # Default to markitdown for unknown types
             return True
-            
+
         except Exception as e:
             logger.warning("Error determining markitdown usage", file=str(file_path), error=str(e))
             return True  # Default to markitdown
@@ -123,13 +123,13 @@ class ConverterFactory:
             if not content or len(content.strip()) < 10:
                 logger.warning("Conversion produced very short content", file=str(file_path))
                 return False
-            
+
             # Get file extension for format-specific validation
             if hasattr(file_path, 'suffix'):
                 file_ext = file_path.suffix.lower()
             else:
                 file_ext = Path(str(file_path)).suffix.lower()
-            
+
             # Validate based on file type
             if file_ext in ['.pdf', '.doc', '.docx', '.ppt', '.pptx']:
                 return self._validate_document_conversion(content)
@@ -147,7 +147,7 @@ class ConverterFactory:
                 return self._validate_media_conversion(content)
             else:
                 return self._validate_general_conversion(content)
-                
+
         except Exception as e:
             logger.warning("Error validating conversion quality", file=str(file_path), error=str(e))
             return True  # Assume valid if validation fails
@@ -271,7 +271,7 @@ class ConverterFactory:
                 content_type_str = content_type.value.lower()
             else:
                 content_type_str = str(content_type).lower()
-            
+
             # Determine converter type based on content
             if 'youtube' in content_type_str:
                 return 'youtube'
@@ -288,7 +288,7 @@ class ConverterFactory:
             else:
                 # Default to markitdown for most content
                 return 'markitdown'
-                
+
         except Exception as e:
             logger.warning("Error determining converter type", file=str(file_path), error=str(e))
             return 'markitdown'

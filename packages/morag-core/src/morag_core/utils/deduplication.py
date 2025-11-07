@@ -16,14 +16,14 @@ class Deduplicator:
     ) -> List[T]:
         """
         Deduplicate items by a key function.
-        
+
         Args:
             items: List of items to deduplicate
             key_func: Function to extract key for comparison
             merge_func: Optional function to merge duplicate items.
                        If provided, duplicates will be merged using this function.
                        If not provided, first occurrence is kept.
-        
+
         Returns:
             List of deduplicated items
         """
@@ -51,18 +51,18 @@ class Deduplicator:
     ) -> List[T]:
         """
         Deduplicate items by multiple key functions (composite key).
-        
+
         Args:
             items: List of items to deduplicate
             key_funcs: List of functions to extract keys for comparison
             merge_func: Optional function to merge duplicate items
-        
+
         Returns:
             List of deduplicated items
         """
         def composite_key(item: T) -> tuple:
             return tuple(func(item) for func in key_funcs)
-        
+
         return Deduplicator.deduplicate_by_key(items, composite_key, merge_func)
 
     @staticmethod
@@ -73,18 +73,18 @@ class Deduplicator:
     ) -> List[T]:
         """
         Deduplicate items by a specific attribute.
-        
+
         Args:
             items: List of items to deduplicate
             attribute: Attribute name to use for comparison
             merge_func: Optional function to merge duplicate items
-        
+
         Returns:
             List of deduplicated items
         """
         def attr_key(item: T) -> Any:
             return getattr(item, attribute)
-        
+
         return Deduplicator.deduplicate_by_key(items, attr_key, merge_func)
 
     @staticmethod
@@ -95,18 +95,18 @@ class Deduplicator:
     ) -> List[Dict[str, Any]]:
         """
         Deduplicate dictionaries by a specific key.
-        
+
         Args:
             items: List of dictionaries to deduplicate
             key: Dictionary key to use for comparison
             merge_func: Optional function to merge duplicate dictionaries
-        
+
         Returns:
             List of deduplicated dictionaries
         """
         def dict_key(item: Dict[str, Any]) -> Any:
             return item.get(key)
-        
+
         return Deduplicator.deduplicate_by_key(items, dict_key, merge_func)
 
     @staticmethod

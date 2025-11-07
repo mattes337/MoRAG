@@ -182,8 +182,8 @@ class DecisionNode:
         self.id = id
         self.instruction = instruction
         self.options = options
-    
-    async def decide(self, tree_data: TreeData, base_lm: LM, 
+
+    async def decide(self, tree_data: TreeData, base_lm: LM,
                     available_tools: list) -> Decision:
         # Context-aware decision making logic
         pass
@@ -192,7 +192,7 @@ class Tree:
     def __init__(self, branch_initialisation: str = "default"):
         self.decision_nodes = {}
         self.tools = {}
-        
+
     def add_tool(self, tool, branch_id: str = None, **kwargs):
         # Dynamic tool registration
         pass
@@ -214,7 +214,7 @@ class WeaviateProcessor:
     async def preprocess_collection(self, collection_name: str):
         # Collection analysis and optimization
         pass
-    
+
     async def query_collection(self, query: str, collection: str):
         # Optimized Weaviate querying
         pass

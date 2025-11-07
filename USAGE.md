@@ -12,15 +12,15 @@ from morag import MoRAGAPI
 
 async def main():
     api = MoRAGAPI()
-    
+
     # Process different content types
     web_result = await api.process_web_page("https://example.com")
     youtube_result = await api.process_youtube_video("https://youtube.com/watch?v=...")
     doc_result = await api.process_document("document.pdf")
-    
+
     # Search for similar content
     results = await api.search("machine learning", limit=5)
-    
+
     await api.cleanup()
 
 asyncio.run(main())
@@ -36,7 +36,7 @@ from morag_core.models import Document, DocumentChunk
 from morag_core.interfaces.processor import BaseProcessor
 ```
 
-#### morag-services  
+#### morag-services
 Unified service layer with AI services (Gemini), vector storage (Qdrant), and processing pipelines.
 
 ```python
@@ -409,7 +409,7 @@ MORAG_WORKER_MAX_CONCURRENT_JOBS=2
 ```json
 {
   "gemini_api_key": "your-api-key",
-  "qdrant_host": "localhost", 
+  "qdrant_host": "localhost",
   "qdrant_port": 6333,
   "redis_url": "redis://localhost:6379/0",
   "max_workers": 4,
@@ -490,7 +490,7 @@ cd packages/morag-web
 docker build -t morag-web .
 docker run -p 8001:8001 morag-web
 
-# Build and run YouTube processing service  
+# Build and run YouTube processing service
 cd packages/morag-youtube
 docker build -t morag-youtube .
 docker run -p 8002:8002 morag-youtube
@@ -499,7 +499,7 @@ docker run -p 8002:8002 morag-youtube
 ## Supported Formats
 
 - **Documents**: PDF, Word, PowerPoint, text files
-- **Audio**: MP3, WAV, FLAC, M4A, OGG  
+- **Audio**: MP3, WAV, FLAC, M4A, OGG
 - **Video**: MP4, AVI, MKV, MOV, WebM
 - **Web**: HTML pages, web scraping
 - **YouTube**: Video downloads and processing
@@ -513,7 +513,7 @@ docker run -p 8002:8002 morag-youtube
 # Old import
 from morag.processors.web import WebProcessor
 
-# New import  
+# New import
 from morag_web import WebProcessor
 ```
 

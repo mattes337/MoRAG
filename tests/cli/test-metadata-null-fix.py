@@ -59,11 +59,11 @@ endstream
 endobj
 xref
 0 5
-0000000000 65535 f 
-0000000009 00000 n 
-0000000074 00000 n 
-0000000120 00000 n 
-0000000179 00000 n 
+0000000000 65535 f
+0000000009 00000 n
+0000000074 00000 n
+0000000120 00000 n
+0000000179 00000 n
 trailer
 <<
 /Size 5
@@ -72,7 +72,7 @@ trailer
 startxref
 274
 %%EOF"""
-    
+
     temp_file = tempfile.NamedTemporaryFile(suffix='.pdf', delete=False)
     temp_file.write(test_content)
     temp_file.close()
@@ -82,13 +82,13 @@ startxref
 def test_metadata_null_fix():
     """Test that metadata null reference error is fixed."""
     print_section("Testing Metadata Null Reference Fix")
-    
+
     # Create test PDF
     test_file = create_test_pdf()
-    
+
     try:
         print("🔄 Testing document ingestion that previously caused metadata null error...")
-        
+
         # Test file ingestion with document that might return None metadata
         with open(test_file, 'rb') as f:
             files = {'file': ('test_metadata_fix.pdf', f, 'application/pdf')}
@@ -99,14 +99,14 @@ def test_metadata_null_fix():
                     'description': 'Testing fix for NoneType metadata mapping error'
                 })
             }
-            
+
             response = requests.post(
                 'http://localhost:8000/api/v1/ingest/file',
                 files=files,
                 data=data,
                 timeout=60
             )
-        
+
         if response.status_code == 200:
             result = response.json()
             print_result("✅ File upload successful", f"Task ID: {result['task_id']}")
@@ -117,7 +117,7 @@ def test_metadata_null_fix():
             print_result("❌ File upload failed", f"Status: {response.status_code}")
             print_result("Error", response.text)
             return None
-            
+
     finally:
         test_file.unlink(missing_ok=True)
 
@@ -126,39 +126,39 @@ def monitor_task_for_metadata_error(task_id):
     """Monitor task specifically looking for metadata-related errors."""
     if not task_id:
         return None
-    
+
     print(f"\n🔍 Monitoring task for metadata errors ({task_id})...")
-    
+
     for attempt in range(60):  # 60 attempts, 2 seconds each = 2 minutes max
         try:
             response = requests.get(f'http://localhost:8000/api/v1/status/{task_id}')
-            
+
             if response.status_code == 200:
                 status = response.json()
                 print(f"  Status: {status['status']} (Progress: {status.get('progress', 0):.1%})")
-                
+
                 if status['status'] in ['SUCCESS', 'FAILURE']:
                     if status['status'] == 'SUCCESS':
                         print_result("✅ Task completed successfully", "No metadata errors!")
-                        
+
                         # Check if vector storage worked
                         if status.get('result') and status['result'].get('metadata'):
                             metadata = status['result']['metadata']
                             if 'vector_point_ids' in metadata:
-                                print_result("✅ Vector storage successful", 
+                                print_result("✅ Vector storage successful",
                                            f"Stored {len(metadata['vector_point_ids'])} chunks")
                             if 'stored_in_vector_db' in metadata:
-                                print_result("✅ Vector DB flag set", 
+                                print_result("✅ Vector DB flag set",
                                            metadata['stored_in_vector_db'])
-                        
+
                         return True
                     else:
                         error_msg = status.get('error', 'Unknown error')
                         print_result("❌ Task failed", error_msg)
-                        
+
                         # Check if it's the metadata error we're trying to fix
                         if "'NoneType' object is not a mapping" in error_msg:
-                            print_result("❌ METADATA NULL ERROR STILL EXISTS", 
+                            print_result("❌ METADATA NULL ERROR STILL EXISTS",
                                        "The fix did not work!")
                             return False
                         elif "metadata" in error_msg.lower():
@@ -167,13 +167,13 @@ def monitor_task_for_metadata_error(task_id):
                         else:
                             print_result("❌ Different error", error_msg)
                             return False
-                    
+
             time.sleep(2)
-            
+
         except Exception as e:
             print(f"  Error checking status: {e}")
             time.sleep(2)
-    
+
     print_result("⏰ Task timeout", "Task did not complete within 2 minutes")
     return None
 

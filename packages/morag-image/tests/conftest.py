@@ -30,7 +30,7 @@ def pytest_runtest_setup(item):
     # Skip tests requiring API key
     if "requires_api_key" in item.keywords and not os.environ.get("GOOGLE_API_KEY"):
         pytest.skip("Test requires GOOGLE_API_KEY environment variable")
-    
+
     # Skip tests requiring Tesseract
     if "requires_tesseract" in item.keywords:
         try:
@@ -38,7 +38,7 @@ def pytest_runtest_setup(item):
             pytesseract.get_tesseract_version()
         except (ImportError, Exception):
             pytest.skip("Test requires Tesseract OCR to be installed")
-    
+
     # Skip tests requiring EasyOCR
     if "requires_easyocr" in item.keywords:
         try:

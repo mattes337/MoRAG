@@ -12,10 +12,10 @@ logger = logging.getLogger(__name__)
 
 class GraphOperations(BaseOperations):
     """Handles graph-level operations and statistics."""
-    
+
     async def store_graph(self, graph: Graph) -> None:
         """Store an entire graph.
-        
+
         Args:
             graph: Graph to store
         """
@@ -25,13 +25,13 @@ class GraphOperations(BaseOperations):
             # This creates a circular import, so we'll use direct queries
             for entity in graph.entities.values():
                 await self._store_entity_direct(entity)
-        
+
         # Then store relations
         if graph.relations:
             # Similarly for relations
             for relation in graph.relations.values():
                 await self._store_relation_direct(relation)
-    
+
     async def _store_entity_direct(self, entity: Entity) -> str:
         """Store entity directly without using EntityOperations."""
         # Get the normalized Neo4j label from the entity type
@@ -81,7 +81,7 @@ class GraphOperations(BaseOperations):
         })
 
         return result[0]["id"] if result else entity.id
-    
+
     async def _store_relation_direct(self, relation: Relation) -> str:
         """Store relation directly without using RelationOperations."""
         # Get the normalized Neo4j relationship type
@@ -114,21 +114,21 @@ class GraphOperations(BaseOperations):
         })
 
         return result[0]["id"] if result else relation.id
-    
+
     async def get_graph(
-        self, 
+        self,
         entity_ids: Optional[List[EntityId]] = None
     ) -> Graph:
         """Get a graph or subgraph.
-        
+
         Args:
             entity_ids: Optional list of entity IDs to include (if None, gets all)
-            
+
         Returns:
             Graph containing the requested entities and their relations
         """
         graph = Graph()
-        
+
         # Get entities
         if entity_ids:
             entity_query = """
@@ -140,7 +140,7 @@ class GraphOperations(BaseOperations):
         else:
             entity_query = "MATCH (e:Entity) RETURN e"
             entity_result = await self._execute_query(entity_query)
-        
+
         # Parse entities
         for record in entity_result:
             try:
@@ -148,7 +148,7 @@ class GraphOperations(BaseOperations):
                 graph.entities[entity.id] = entity
             except Exception as e:
                 logger.warning(f"Failed to parse entity: {e}")
-        
+
         # Get relations between the entities
         if graph.entities:
             entity_id_list = list(graph.entities.keys())
@@ -158,7 +158,7 @@ class GraphOperations(BaseOperations):
             RETURN r, source.id as source_id, target.id as target_id
             """
             relation_result = await self._execute_query(relation_query, {"entity_ids": entity_id_list})
-            
+
             # Parse relations
             for record in relation_result:
                 try:
@@ -174,23 +174,23 @@ class GraphOperations(BaseOperations):
                     graph.relations[relation.id] = relation
                 except Exception as e:
                     logger.warning(f"Failed to parse relation: {e}")
-        
+
         return graph
-    
+
     async def clear(self) -> None:
         """Clear all data from the storage."""
         query = "MATCH (n) DETACH DELETE n"
         await self._execute_query(query)
         logger.info("Cleared all data from Neo4J database")
-    
+
     async def get_statistics(self) -> Dict[str, Any]:
         """Get storage statistics.
-        
+
         Returns:
             Dictionary containing statistics
         """
         stats = {}
-        
+
         # Define all statistics queries
         stat_queries = {
             "entity_count": "MATCH (e:Entity) RETURN count(e) as count",
@@ -198,13 +198,13 @@ class GraphOperations(BaseOperations):
             "document_count": "MATCH (d:Document) RETURN count(d) as count",
             "chunk_count": "MATCH (c:DocumentChunk) RETURN count(c) as count",
             "entity_types": """
-                MATCH (e:Entity) 
-                RETURN e.type as type, count(*) as count 
+                MATCH (e:Entity)
+                RETURN e.type as type, count(*) as count
                 ORDER BY count DESC
             """,
             "relation_types": """
-                MATCH ()-[r:RELATION]->() 
-                RETURN r.type as type, count(*) as count 
+                MATCH ()-[r:RELATION]->()
+                RETURN r.type as type, count(*) as count
                 ORDER BY count DESC
             """,
             "avg_entity_connections": """
@@ -221,12 +221,12 @@ class GraphOperations(BaseOperations):
                 RETURN e.id as entity_id, e.name as name, connections
             """
         }
-        
+
         # Execute each query and collect results
         for stat_name, query in stat_queries.items():
             try:
                 result = await self._execute_query(query)
-                
+
                 if stat_name in ["entity_count", "relation_count", "document_count", "chunk_count"]:
                     stats[stat_name] = result[0]["count"] if result else 0
                 elif stat_name == "avg_entity_connections":
@@ -241,39 +241,39 @@ class GraphOperations(BaseOperations):
                             "connections": r["connections"]
                         } for r in result
                     ]
-                    
+
             except Exception as e:
                 logger.warning(f"Failed to get {stat_name}: {e}")
                 stats[stat_name] = 0 if "count" in stat_name else {}
-        
+
         return stats
-    
+
     async def get_graph_metrics(self) -> Dict[str, Any]:
         """Get advanced graph metrics.
-        
+
         Returns:
             Dictionary containing graph metrics
         """
         metrics = {}
-        
+
         try:
             # Graph density
             entity_count_query = "MATCH (e:Entity) RETURN count(e) as count"
             relation_count_query = "MATCH ()-[r:RELATION]->() RETURN count(r) as count"
-            
+
             entity_result = await self._execute_query(entity_count_query)
             relation_result = await self._execute_query(relation_count_query)
-            
+
             entity_count = entity_result[0]["count"] if entity_result else 0
             relation_count = relation_result[0]["count"] if relation_result else 0
-            
+
             if entity_count > 1:
                 max_possible_relations = entity_count * (entity_count - 1)
                 density = relation_count / max_possible_relations
                 metrics["graph_density"] = density
             else:
                 metrics["graph_density"] = 0.0
-            
+
             # Average clustering coefficient (simplified)
             clustering_query = """
                 MATCH (e:Entity)-[:RELATION]-(neighbor:Entity)
@@ -284,25 +284,25 @@ class GraphOperations(BaseOperations):
                 WITH e, n1, n2
                 WHERE n1 <> n2
                 OPTIONAL MATCH (n1)-[:RELATION]-(n2)
-                WITH e, count(DISTINCT [n1, n2]) as possible_connections, 
+                WITH e, count(DISTINCT [n1, n2]) as possible_connections,
                      count(DISTINCT CASE WHEN (n1)-[:RELATION]-(n2) THEN [n1, n2] END) as actual_connections
                 WHERE possible_connections > 0
                 RETURN avg(toFloat(actual_connections) / possible_connections) as avg_clustering
             """
-            
+
             clustering_result = await self._execute_query(clustering_query)
             metrics["avg_clustering_coefficient"] = float(clustering_result[0]["avg_clustering"]) if clustering_result and clustering_result[0]["avg_clustering"] else 0.0
-            
+
             # Connected components count (simplified)
             components_query = """
                 MATCH (e:Entity)
                 WHERE NOT (e)-[:RELATION]-()
                 RETURN count(e) as isolated_entities
             """
-            
+
             components_result = await self._execute_query(components_query)
             metrics["isolated_entities"] = components_result[0]["isolated_entities"] if components_result else 0
-            
+
         except Exception as e:
             logger.warning(f"Failed to calculate graph metrics: {e}")
             metrics = {
@@ -310,17 +310,17 @@ class GraphOperations(BaseOperations):
                 "avg_clustering_coefficient": 0.0,
                 "isolated_entities": 0
             }
-        
+
         return metrics
-    
+
     async def optimize_database(self) -> Dict[str, Any]:
         """Optimize database performance by creating indexes and constraints.
-        
+
         Returns:
             Dictionary with optimization results
         """
         optimization_results = {}
-        
+
         # Define indexes and constraints to create
         optimizations = [
             {
@@ -328,7 +328,7 @@ class GraphOperations(BaseOperations):
                 "query": "CREATE INDEX entity_id_index IF NOT EXISTS FOR (e:Entity) ON (e.id)"
             },
             {
-                "name": "entity_name_index", 
+                "name": "entity_name_index",
                 "query": "CREATE INDEX entity_name_index IF NOT EXISTS FOR (e:Entity) ON (e.name)"
             },
             {
@@ -348,7 +348,7 @@ class GraphOperations(BaseOperations):
                 "query": "CREATE INDEX chunk_document_id_index IF NOT EXISTS FOR (c:DocumentChunk) ON (c.document_id)"
             }
         ]
-        
+
         for optimization in optimizations:
             try:
                 await self._execute_query(optimization["query"])
@@ -357,5 +357,5 @@ class GraphOperations(BaseOperations):
             except Exception as e:
                 optimization_results[optimization["name"]] = f"failed: {str(e)}"
                 logger.warning(f"Failed to create {optimization['name']}: {e}")
-        
+
         return optimization_results

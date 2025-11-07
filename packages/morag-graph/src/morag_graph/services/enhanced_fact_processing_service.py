@@ -15,7 +15,7 @@ from .entity_categorization_service import EntityCategorizationService
 
 class EnhancedFactProcessingService:
     """Service for enhanced fact processing with entity creation and relationship management."""
-    
+
     def __init__(self, neo4j_storage: Neo4jStorage, entity_normalizer: Optional[LLMEntityNormalizer] = None,
                  llm_service=None):
         """Initialize the enhanced fact processing service.
@@ -30,7 +30,7 @@ class EnhancedFactProcessingService:
         self.llm_service = llm_service
         self.categorization_service = EntityCategorizationService(llm_service=llm_service)
         self.logger = structlog.get_logger(__name__)
-    
+
     async def process_facts_with_entities(
         self,
         facts: List[Fact],
@@ -38,26 +38,26 @@ class EnhancedFactProcessingService:
         create_mandatory_relations: bool = True
     ) -> Dict[str, Any]:
         """Process facts and create associated entities and relationships.
-        
+
         Args:
             facts: List of facts to process
             create_keyword_entities: Whether to create entities from keywords
             create_mandatory_relations: Whether to create mandatory fact-entity relations
-            
+
         Returns:
             Dictionary with processing results
         """
         try:
             self.logger.info(f"Processing {len(facts)} facts with entity creation")
-            
+
             # Step 1: Create entities from fact components
             created_entities = await self._create_entities_from_facts(facts)
-            
+
             # Step 2: Create keyword entities if requested
             keyword_entities = []
             if create_keyword_entities:
                 keyword_entities = await self._create_keyword_entities(facts)
-            
+
             # Step 3: Check which facts already exist and only store new ones
             existing_facts, new_facts = await self._identify_existing_and_new_facts(facts)
             stored_facts = []
@@ -104,18 +104,18 @@ class EnhancedFactProcessingService:
                 'entities': created_entities + keyword_entities,
                 'relations': created_relations
             }
-            
+
             self.logger.info(
                 "Enhanced fact processing completed",
                 **{k: v for k, v in result.items() if isinstance(v, (int, str))}
             )
-            
+
             return result
-            
+
         except Exception as e:
             self.logger.error(f"Enhanced fact processing failed: {e}")
             raise
-    
+
     async def _create_entities_from_facts(self, facts: List[Fact]) -> List[Entity]:
         """Create normalized entities from fact subjects and objects.
 
@@ -240,7 +240,7 @@ class EnhancedFactProcessingService:
                 'source_component': component_type,
                 'normalization_confidence': normalization_confidence
             }
-    
+
     async def _create_keyword_entities(self, facts: List[Fact]) -> List[Entity]:
         """Create normalized entities from fact keywords.
 
@@ -327,29 +327,29 @@ class EnhancedFactProcessingService:
 
         self.logger.info(f"Created {len(created_keyword_entities)} normalized keyword entities")
         return created_keyword_entities
-    
+
     async def _create_fact_entity_relations(
         self,
         facts: List[Fact],
         entities: List[Entity]
     ) -> List[Relation]:
         """Create mandatory relationships between facts and related entities.
-        
+
         Args:
             facts: List of facts
             entities: List of entities to relate to facts
-            
+
         Returns:
             List of created relations
         """
         created_relations = []
-        
+
         # Create entity name lookup for faster matching using normalized names
         entity_lookup = {}
         for entity in entities:
             # Entity names are already normalized, so use them directly
             entity_lookup[entity.name] = entity
-        
+
         for fact in facts:
             try:
                 # Create semantic relations from fact to primary entities
@@ -398,7 +398,7 @@ class EnhancedFactProcessingService:
             except Exception as e:
                 self.logger.warning(f"Failed to create relations for fact {fact.id}: {e}")
                 continue
-        
+
         self.logger.info(f"Created {len(created_relations)} fact-entity relations")
         return created_relations
 
@@ -717,7 +717,7 @@ Return only the relationship type in uppercase, no explanation."""
         except Exception as e:
             self.logger.error(f"Failed to generate embeddings: {e}")
             return {'entities_embedded': 0, 'facts_embedded': 0}
-    
+
     async def _create_fact_entity_relation(
         self,
         fact: Fact,
@@ -845,15 +845,15 @@ Return only the relationship type in uppercase, no explanation."""
 
     async def _store_facts(self, facts: List[Fact]) -> List[Fact]:
         """Store facts in the database.
-        
+
         Args:
             facts: List of facts to store
-            
+
         Returns:
             List of successfully stored facts
         """
         stored_facts = []
-        
+
         for fact in facts:
             try:
                 await self.neo4j_storage.store_fact(fact)
@@ -861,6 +861,6 @@ Return only the relationship type in uppercase, no explanation."""
             except Exception as e:
                 self.logger.warning(f"Failed to store fact {fact.id}: {e}")
                 continue
-        
+
         self.logger.info(f"Stored {len(stored_facts)} facts")
         return stored_facts

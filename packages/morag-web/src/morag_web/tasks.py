@@ -54,7 +54,7 @@ def run_async(coroutine):
 
 class WebProcessingTask(BaseTask):
     """Base class for web processing tasks."""
-    
+
     def __init__(self):
         super().__init__()
         self.web_processor = WebProcessor()
@@ -62,7 +62,7 @@ class WebProcessingTask(BaseTask):
 
 class ProcessWebUrlTask(WebProcessingTask):
     """Task for processing a single web URL."""
-    
+
     async def execute(
         self,
         url: str,
@@ -70,7 +70,7 @@ class ProcessWebUrlTask(WebProcessingTask):
         task_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """Process a single web URL and extract content."""
-        
+
         logger.info("Starting web URL processing task",
                    task_id=task_id,
                    url=url)
@@ -146,7 +146,7 @@ class ProcessWebUrlTask(WebProcessingTask):
 
 class ProcessWebUrlsBatchTask(WebProcessingTask):
     """Task for processing multiple web URLs in batch."""
-    
+
     async def execute(
         self,
         urls: List[str],
@@ -247,17 +247,17 @@ async def process_web_urls_batch(
 # For backward compatibility with Celery-based systems
 def create_celery_tasks(celery_app):
     """Create Celery task wrappers for web processing."""
-    
+
     @celery_app.task(bind=True)
     def process_web_url_celery(self, url: str, config: Optional[Dict[str, Any]] = None):
         """Celery wrapper for web URL processing."""
         return run_async(process_web_url(url, config, self.request.id))
-    
+
     @celery_app.task(bind=True)
     def process_web_urls_batch_celery(self, urls: List[str], config: Optional[Dict[str, Any]] = None):
         """Celery wrapper for batch web URL processing."""
         return run_async(process_web_urls_batch(urls, config, self.request.id))
-    
+
     return {
         'process_web_url': process_web_url_celery,
         'process_web_urls_batch': process_web_urls_batch_celery

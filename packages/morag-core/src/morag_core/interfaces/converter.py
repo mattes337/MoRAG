@@ -69,12 +69,12 @@ class ConversionOptions:
 
     # Format-specific options
     format_options: Dict[str, Any] = field(default_factory=dict)
-    
+
     @classmethod
     def for_format(cls, format_type: str) -> 'ConversionOptions':
         """Create format-specific conversion options."""
         options = cls()
-        
+
         if format_type == 'pdf':
             options.extract_images = True
             options.extract_tables = True
@@ -91,7 +91,7 @@ class ConversionOptions:
             options.extract_images = True
             options.extract_tables = True
             options.extract_links = True
-        
+
         return options
 
 
@@ -127,75 +127,75 @@ class ConversionResult:
 
 class BaseConverter(ABC):
     """Base class for document converters."""
-    
+
     @abstractmethod
     async def convert(self, file_path: Union[str, Path], options: ConversionOptions) -> ConversionResult:
         """Convert document to markdown.
-        
+
         Args:
             file_path: Path to document to convert
             options: Conversion options
-            
+
         Returns:
             ConversionResult with markdown content and metadata
-            
+
         Raises:
             ConversionError: If conversion fails
             UnsupportedFormatError: If format is not supported
         """
         pass
-    
+
     @abstractmethod
     def supports_format(self, format_type: str) -> bool:
         """Check if converter supports the given format.
-        
+
         Args:
             format_type: Format type to check
-            
+
         Returns:
             True if format is supported, False otherwise
         """
         pass
-    
+
     def assess_quality(self, content: str, metadata: Dict[str, Any]) -> QualityScore:
         """Assess quality of conversion result.
-        
+
         Args:
             content: Converted content
             metadata: Extracted metadata
-            
+
         Returns:
             QualityScore with quality assessment
         """
         # Basic quality assessment
         score = QualityScore()
-        
+
         # Text quality based on content length and word count
         if content:
             word_count = len(content.split())
             score.text_quality = min(1.0, word_count / 1000)
-        
+
         # Metadata quality based on number of metadata fields
         if metadata:
             score.metadata_quality = min(1.0, len(metadata) / 10)
-        
+
         # Overall score is average of individual scores
         score.overall_score = (score.text_quality + score.metadata_quality) / 2
-        
+
         return score
-    
+
     def detect_format(self, file_path: Union[str, Path]) -> str:
         """Detect format from file extension.
-        
+
         Args:
             file_path: Path to document
-            
+
         Returns:
             Format type string
         """
         file_path = Path(file_path)
         extension = file_path.suffix.lower().lstrip('.')
-        
+
         # Map common extensions to format types
         format_map = {
             # Documents
@@ -207,7 +207,7 @@ class BaseConverter(ABC):
             'xml': 'xml',
             'json': 'json',
             'csv': 'csv',
-            
+
             # Office
             'doc': 'word',
             'docx': 'word',
@@ -215,21 +215,21 @@ class BaseConverter(ABC):
             'xlsx': 'excel',
             'ppt': 'powerpoint',
             'pptx': 'powerpoint',
-            
+
             # Audio
             'mp3': 'audio',
             'wav': 'audio',
             'ogg': 'audio',
             'flac': 'audio',
             'm4a': 'audio',
-            
+
             # Video
             'mp4': 'video',
             'avi': 'video',
             'mov': 'video',
             'mkv': 'video',
             'webm': 'video',
-            
+
             # Images
             'jpg': 'image',
             'jpeg': 'image',
@@ -238,29 +238,29 @@ class BaseConverter(ABC):
             'bmp': 'image',
             'webp': 'image',
         }
-        
+
         return format_map.get(extension, 'unknown')
-    
+
     def validate_input(self, file_path: Union[str, Path]) -> None:
         """Validate input file.
-        
+
         Args:
             file_path: Path to document
-            
+
         Raises:
             ConversionError: If file does not exist or is not a file
             UnsupportedFormatError: If format is not supported
         """
         file_path = Path(file_path)
-        
+
         # Check if file exists
         if not file_path.exists():
             raise ConversionError(f"File not found: {file_path}")
-        
+
         # Check if path is a file
         if not file_path.is_file():
             raise ConversionError(f"Not a file: {file_path}")
-        
+
         # Check if format is supported
         format_type = self.detect_format(file_path)
         if not self.supports_format(format_type):

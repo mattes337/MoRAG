@@ -26,11 +26,11 @@ class IServiceCoordinator(ABC):
     @abstractmethod
     async def get_service(self, service_type: str) -> Any:
         pass
-    
+
     @abstractmethod
     async def initialize_services(self) -> None:
         pass
-    
+
     @abstractmethod
     async def cleanup_services(self) -> None:
         pass

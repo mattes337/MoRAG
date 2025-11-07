@@ -35,12 +35,12 @@ class SyntaxChecker:
         self.verbose = verbose
         self.errors = []
         self.warnings = []
-        
+
     def log(self, message: str, level: str = "INFO"):
         """Log message if verbose mode is enabled."""
         if self.verbose or level in ["ERROR", "WARNING"]:
             print(f"[{level}] {message}")
-    
+
     def find_python_files(self, path: Path = None) -> List[Path]:
         """Find all Python files in the project."""
         search_path = path or self.project_root
@@ -66,18 +66,18 @@ class SyntaxChecker:
                     python_files.append(Path(root) / file)
 
         return sorted(python_files)
-    
+
     def check_syntax(self, file_path: Path) -> bool:
         """Check Python syntax by attempting to compile the file."""
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 source = f.read()
-            
+
             # Try to parse the AST
             ast.parse(source, filename=str(file_path))
             self.log(f"✓ Syntax OK: {file_path}")
             return True
-            
+
         except SyntaxError as e:
             error_msg = f"Syntax Error in {file_path}:{e.lineno}:{e.offset} - {e.msg}"
             self.errors.append(error_msg)
@@ -88,7 +88,7 @@ class SyntaxChecker:
             self.errors.append(error_msg)
             self.log(error_msg, "ERROR")
             return False
-    
+
     def check_imports(self, file_path: Path) -> bool:
         """Check if all imports in the file can be resolved."""
         try:
@@ -162,7 +162,7 @@ class SyntaxChecker:
         finally:
             # Restore original sys.path
             sys.path[:] = original_path
-    
+
     def run_flake8(self, files: List[Path]) -> bool:
         """Run flake8 on the specified files."""
         try:
@@ -206,7 +206,7 @@ class SyntaxChecker:
             self.warnings.append(warning_msg)
             self.log(warning_msg, "WARNING")
             return True  # Don't fail if flake8 has issues
-    
+
     def run_mypy(self, files: List[Path]) -> bool:
         """Run mypy type checking on the specified files."""
         try:
@@ -250,7 +250,7 @@ class SyntaxChecker:
             self.warnings.append(warning_msg)
             self.log(warning_msg, "WARNING")
             return True
-    
+
     def run_isort_check(self, files: List[Path], fix: bool = False) -> bool:
         """Check import sorting with isort."""
         try:
@@ -302,29 +302,29 @@ class SyntaxChecker:
             self.warnings.append(warning_msg)
             self.log(warning_msg, "WARNING")
             return True
-    
+
     def check_all(self, path: Path = None, fix: bool = False) -> bool:
         """Run all syntax checks."""
         self.log("Starting comprehensive Python syntax check...")
-        
+
         files = self.find_python_files(path)
         self.log(f"Found {len(files)} Python files to check")
-        
+
         if not files:
             self.log("No Python files found!")
             return True
-        
+
         # 1. Check syntax for each file
         syntax_ok = True
         for file_path in files:
             if not self.check_syntax(file_path):
                 syntax_ok = False
-        
+
         # 2. Check imports (only if syntax is OK)
         if syntax_ok:
             for file_path in files:
                 self.check_imports(file_path)
-        
+
         # 3. Run code quality tools in batches to avoid command line length limits
         batch_size = 50  # Process files in batches to avoid command line length issues
         for i in range(0, len(files), batch_size):
@@ -333,24 +333,24 @@ class SyntaxChecker:
             self.run_flake8(batch)
             self.run_mypy(batch)
             self.run_isort_check(batch, fix=fix)
-        
+
         # Summary
         self.log("\n" + "="*50)
         self.log("SYNTAX CHECK SUMMARY")
         self.log("="*50)
-        
+
         if self.errors:
             self.log(f"❌ {len(self.errors)} ERRORS found:", "ERROR")
             for error in self.errors:
                 self.log(f"  - {error}", "ERROR")
         else:
             self.log("✅ No syntax errors found!")
-        
+
         if self.warnings:
             self.log(f"⚠️  {len(self.warnings)} WARNINGS found:", "WARNING")
             for warning in self.warnings:
                 self.log(f"  - {warning}", "WARNING")
-        
+
         return len(self.errors) == 0
 
 
@@ -359,17 +359,17 @@ def main():
     parser.add_argument("--fix", action="store_true", help="Automatically fix issues where possible")
     parser.add_argument("--verbose", "-v", action="store_true", help="Show detailed output")
     parser.add_argument("--path", type=str, help="Check specific path instead of entire project")
-    
+
     args = parser.parse_args()
-    
+
     # Get project root (assuming script is in scripts/ directory)
     project_root = Path(__file__).parent.parent
-    
+
     checker = SyntaxChecker(project_root, verbose=args.verbose)
-    
+
     check_path = Path(args.path) if args.path else None
     success = checker.check_all(path=check_path, fix=args.fix)
-    
+
     sys.exit(0 if success else 1)
 
 

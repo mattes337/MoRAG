@@ -7,7 +7,7 @@ from .entity_types import get_agent_entity_types
 
 class DefaultConfigs:
     """Default configurations for all agents."""
-    
+
     @staticmethod
     def get_fact_extraction_config() -> AgentConfig:
         """Get default configuration for fact extraction agent."""
@@ -41,7 +41,7 @@ class DefaultConfigs:
                 "filter_generic_advice": True
             }
         )
-    
+
     @staticmethod
     def get_entity_extraction_config() -> AgentConfig:
         """Get default configuration for entity extraction agent."""
@@ -68,7 +68,7 @@ class DefaultConfigs:
                 "min_entity_length": 2
             }
         )
-    
+
     @staticmethod
     def get_query_analysis_config() -> AgentConfig:
         """Get default configuration for query analysis agent."""
@@ -95,7 +95,7 @@ class DefaultConfigs:
                 "detect_temporal_context": True
             }
         )
-    
+
     @staticmethod
     def get_summarization_config() -> AgentConfig:
         """Get default configuration for summarization agent."""
@@ -121,7 +121,7 @@ class DefaultConfigs:
                 "compression_ratio": 0.3
             }
         )
-    
+
     @staticmethod
     def get_path_selection_config() -> AgentConfig:
         """Get default configuration for path selection agent."""
@@ -147,7 +147,7 @@ class DefaultConfigs:
                 "consider_path_length": True
             }
         )
-    
+
     @staticmethod
     def get_relation_extraction_config() -> AgentConfig:
         """Get default configuration for relation extraction agent."""

@@ -13,15 +13,14 @@ except ImportError:
     lx = None
 
 from ..models import Entity, Relation
-from ..utils.retry_utils import retry_with_exponential_backoff
-from ..utils.quota_retry import never_fail_extraction, retry_with_quota_handling
+from ..utils.quota_retry import never_fail_extraction
 
 logger = structlog.get_logger(__name__)
 
 
 class RelationExtractor:
     """LangExtract-based relation extractor that replaces the PydanticAI implementation."""
-    
+
     def __init__(
         self,
         min_confidence: float = 0.5,  # Lower threshold for better recall
@@ -51,7 +50,7 @@ class RelationExtractor:
         """
         if not LANGEXTRACT_AVAILABLE:
             raise ImportError("LangExtract is not available. Please install it with: pip install langextract")
-        
+
         self.min_confidence = min_confidence
         self.chunk_size = chunk_size
         self.dynamic_types = dynamic_types
@@ -63,19 +62,19 @@ class RelationExtractor:
         self.extraction_passes = extraction_passes
         self.domain = domain
         self.logger = logger.bind(component="langextract_relation_extractor")
-        
+
         # Thread pool for async execution
         self._executor = ThreadPoolExecutor(max_workers=2)
-        
+
         # Create examples for relation extraction
         self._examples = self._create_relation_examples()
         self._prompt = self._create_relation_prompt()
-    
+
     def _get_api_key(self) -> Optional[str]:
         """Get API key from environment variables."""
         import os
         return os.getenv("LANGEXTRACT_API_KEY") or os.getenv("GOOGLE_API_KEY")
-    
+
     def _get_domain_relation_types(self, domain: str) -> Dict[str, str]:
         """Get relation types for the specified domain."""
         # Return generic relation types to avoid domain-specific bias
@@ -87,7 +86,7 @@ class RelationExtractor:
             "created_by": "Authorship or creation relationship",
             "used_for": "Purpose or function relationship"
         }
-    
+
     def _create_relation_prompt(self) -> str:
         """Create prompt for enhanced relation extraction."""
         base_prompt = """Extract relationships between entities in the text with enhanced context assessment.
@@ -123,7 +122,7 @@ class RelationExtractor:
             base_prompt += f"\n\nProcess text in {self.language} language."
 
         return base_prompt
-    
+
     def _create_relation_examples(self) -> List[Any]:
         """Create few-shot examples for relation extraction."""
         # Use minimal generic examples to avoid domain-specific bias
@@ -147,7 +146,7 @@ class RelationExtractor:
                     ]
                 )
             ]
-    
+
     async def extract(
         self,
         text: str,
@@ -164,14 +163,14 @@ class RelationExtractor:
         Returns:
             List of Relation objects
         """
-        
+
         if not text or not text.strip():
             return []
-        
+
         if not self.api_key:
             self.logger.warning("No API key found for LangExtract. Set LANGEXTRACT_API_KEY or GOOGLE_API_KEY.")
             return []
-        
+
         # Define the main extraction function
         async def main_extraction():
             return await asyncio.get_event_loop().run_in_executor(
@@ -236,7 +235,7 @@ class RelationExtractor:
             )
             # Return basic relations as last resort
             return self._create_basic_relations_from_entities(entities, text, source_doc_id)
-    
+
     def _extract_sync(self, text: str, source_doc_id: Optional[str]) -> Any:
         """Synchronous extraction using LangExtract with robust error handling."""
         try:
@@ -381,17 +380,17 @@ class RelationExtractor:
         )
 
     def _convert_to_relations(
-        self, 
-        result: Any, 
-        entities: Optional[List[Entity]], 
+        self,
+        result: Any,
+        entities: Optional[List[Entity]],
         source_doc_id: Optional[str]
     ) -> List[Relation]:
         """Convert LangExtract results to MoRAG Relation objects."""
         relations = []
-        
+
         if not result or not hasattr(result, 'extractions'):
             return relations
-        
+
         # Create comprehensive entity lookup for ID resolution
         # Include both normalized names and original names to handle entity normalization
         entity_lookup = {}
@@ -409,7 +408,7 @@ class RelationExtractor:
                             f"Added entity lookup mapping: '{original_name}' -> '{entity.name}' (ID: {entity.id})",
                             component="langextract_relation_extractor"
                         )
-        
+
         for extraction in result.extractions:
             try:
                 attrs = extraction.attributes or {}
@@ -466,7 +465,7 @@ class RelationExtractor:
                     error=str(e)
                 )
                 continue
-        
+
         return relations
 
     def _resolve_entity_id(self, entity_name: str, entity_lookup: Dict[str, str]) -> Optional[str]:
@@ -692,11 +691,11 @@ class RelationExtractor:
     def get_system_prompt(self) -> str:
         """Get the system prompt used by LangExtract."""
         return self._prompt
-    
+
     async def __aenter__(self):
         """Async context manager entry."""
         return self
-    
+
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """Async context manager exit."""
         if hasattr(self, '_executor'):

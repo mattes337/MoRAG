@@ -36,12 +36,12 @@ class Fact(BaseModel):
     approach: Optional[str] = Field(description="How something is done/achieved")
     solution: Optional[str] = Field(description="What solves a problem/achieves goal")
     remarks: Optional[str] = Field(description="Additional context/qualifications")
-    
+
     # Provenance
     source_chunk_id: str = Field(description="Source document chunk")
     source_document: str = Field(description="Source document identifier")
     extraction_confidence: float = Field(description="Confidence in extraction")
-    
+
     # Metadata
     domain: Optional[str] = Field(description="Domain/topic area")
     fact_type: str = Field(description="Type of fact (research, process, definition, etc.)")
@@ -97,13 +97,13 @@ class Fact(BaseModel):
 class FactExtractor:
     def extract_facts(self, chunk: str, context: Dict) -> List[Fact]:
         """Extract structured facts from document chunk."""
-        
+
     def _identify_fact_candidates(self, text: str) -> List[str]:
         """Identify sentences/passages that contain factual information."""
-        
+
     def _structure_fact(self, candidate: str, context: Dict) -> Optional[Fact]:
         """Structure candidate text into fact schema."""
-        
+
     def _validate_fact(self, fact: Fact) -> bool:
         """Validate that extracted fact meets quality criteria."""
 ```
@@ -113,10 +113,10 @@ class FactExtractor:
 class FactGraphBuilder:
     def build_fact_graph(self, facts: List[Fact]) -> GraphResult:
         """Build knowledge graph from extracted facts."""
-        
+
     def _create_fact_relationships(self, facts: List[Fact]) -> List[Relation]:
         """Create semantic relationships between facts."""
-        
+
     def _index_facts(self, facts: List[Fact]) -> None:
         """Create keyword and domain indexes for facts."""
 ```

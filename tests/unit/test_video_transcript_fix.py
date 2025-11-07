@@ -1,11 +1,8 @@
 """Test video transcription format fixes."""
 
 import pytest
-from unittest.mock import Mock, patch
-from pathlib import Path
 
 from morag_video import VideoConverter
-from morag_core.interfaces.converter import ConversionOptions
 from morag_audio import AudioProcessingResult, AudioTranscriptSegment
 from morag_audio.services import DiarizationResult, SpeakerSegment, SpeakerInfo
 from morag_audio.services import TopicSegmentationResult, TopicSegment
@@ -170,13 +167,13 @@ class TestVideoTranscriptFix:
         markdown_lines = video_converter._create_enhanced_audio_markdown(
             mock_audio_result, 80.0
         )
-        
+
         markdown_content = "\n".join(markdown_lines)
-        
+
         # Check for proper speaker format
         assert "SPEAKER_00:" in markdown_content
         assert "SPEAKER_01:" in markdown_content
-        
+
         # Should not have generic Speaker_00 format
         assert "Speaker_00:" not in markdown_content
 
@@ -185,19 +182,19 @@ class TestVideoTranscriptFix:
         markdown_lines = video_converter._create_enhanced_audio_markdown(
             mock_audio_result, 80.0
         )
-        
+
         markdown_content = "\n".join(markdown_lines)
-        
+
         # Check that sentences don't repeat
         lines = [line.strip() for line in markdown_content.split('\n') if line.strip()]
-        
+
         # Count occurrences of each line
         line_counts = {}
         for line in lines:
             if ": " in line:  # Only check dialogue lines
                 text_part = line.split(": ", 1)[1]
                 line_counts[text_part] = line_counts.get(text_part, 0) + 1
-        
+
         # No text should appear more than once
         repeated_texts = [text for text, count in line_counts.items() if count > 1]
         assert len(repeated_texts) == 0, f"Found repeated texts: {repeated_texts}"
@@ -224,17 +221,17 @@ class TestVideoTranscriptFix:
         markdown_lines = video_converter._create_enhanced_audio_markdown(
             mock_audio_result, 80.0
         )
-        
+
         markdown_content = "\n".join(markdown_lines)
-        
+
         # Check for proper dialogue format
         dialogue_lines = [line for line in markdown_content.split('\n') if ': ' in line]
-        
+
         for line in dialogue_lines:
             # Each dialogue line should have format "SPEAKER_XX: text"
             assert line.startswith('SPEAKER_'), f"Invalid dialogue format: {line}"
             assert ': ' in line, f"Missing colon separator: {line}"
-            
+
             # Text part should not be empty
             text_part = line.split(': ', 1)[1].strip()
             assert len(text_part) > 0, f"Empty text in dialogue: {line}"

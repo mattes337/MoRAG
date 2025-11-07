@@ -94,59 +94,59 @@ class PromptExample:
 
 class PromptTemplate(ABC):
     """Base class for prompt templates."""
-    
+
     def __init__(self, config: PromptConfig):
         """Initialize the prompt template.
-        
+
         Args:
             config: Prompt configuration
         """
         self.config = config
         self.env = Environment(loader=BaseLoader())
         self.logger = logger.bind(template=self.__class__.__name__)
-    
+
     @abstractmethod
     def get_system_prompt(self, **kwargs) -> str:
         """Generate the system prompt.
-        
+
         Returns:
             The system prompt string
         """
         pass
-    
+
     @abstractmethod
     def get_user_prompt(self, **kwargs) -> str:
         """Generate the user prompt.
-        
+
         Returns:
             The user prompt string
         """
         pass
-    
+
     def get_examples(self) -> List[PromptExample]:
         """Get few-shot examples for this template.
-        
+
         Returns:
             List of examples
         """
         return []
-    
+
     def format_examples(self, examples: Optional[List[PromptExample]] = None) -> str:
         """Format examples for inclusion in prompts.
-        
+
         Args:
             examples: Optional custom examples, uses default if None
-            
+
         Returns:
             Formatted examples string
         """
         if not self.config.include_examples:
             return ""
-        
+
         examples = examples or self.get_examples()
         if not examples:
             return ""
-        
+
         formatted = ["## Examples\n"]
         for i, example in enumerate(examples, 1):
             formatted.append(f"### Example {i}")
@@ -155,64 +155,64 @@ class PromptTemplate(ABC):
             if example.explanation:
                 formatted.append(f"**Explanation:** {example.explanation}")
             formatted.append("")
-        
+
         return "\n".join(formatted)
-    
+
     def format_instructions(self, instructions: str) -> str:
         """Format instructions section.
-        
+
         Args:
             instructions: Raw instructions
-            
+
         Returns:
             Formatted instructions
         """
         if not self.config.include_instructions:
             return ""
-        
+
         formatted = ["## Instructions\n", instructions]
-        
+
         if self.config.custom_instructions:
             formatted.extend(["\n### Additional Instructions", self.config.custom_instructions])
-        
+
         return "\n".join(formatted)
-    
+
     def format_output_requirements(self) -> str:
         """Format output requirements section.
-        
+
         Returns:
             Formatted output requirements
         """
         requirements = ["## Output Requirements\n"]
-        
+
         if self.config.output_format == "json":
             requirements.append("- Respond with valid JSON only")
             if self.config.strict_json:
                 requirements.append("- Do not include any text outside the JSON structure")
                 requirements.append("- Ensure all JSON keys are properly quoted")
-        
+
         if self.config.include_confidence:
             requirements.append("- Include confidence scores (0.0-1.0) for all outputs")
             requirements.append(f"- Minimum confidence threshold: {self.config.min_confidence}")
-        
+
         if self.config.max_output_length:
             requirements.append(f"- Maximum output length: {self.config.max_output_length} characters")
-        
+
         requirements.append(f"- Target language: {self.config.language}")
         requirements.append(f"- Domain context: {self.config.domain}")
-        
+
         return "\n".join(requirements)
-    
+
     def render_template(self, template_str: str, **kwargs) -> str:
         """Render a Jinja2 template with the given variables.
-        
+
         Args:
             template_str: Template string
             **kwargs: Template variables
-            
+
         Returns:
             Rendered template
-            
+
         Raises:
             PromptGenerationError: If template rendering fails
         """
@@ -221,58 +221,58 @@ class PromptTemplate(ABC):
             return template.render(**kwargs)
         except Exception as e:
             raise PromptGenerationError(f"Template rendering failed: {e}") from e
-    
+
     def validate_prompt(self, prompt: str) -> bool:
         """Validate a generated prompt.
-        
+
         Args:
             prompt: The prompt to validate
-            
+
         Returns:
             True if valid, False otherwise
         """
         if not prompt or not prompt.strip():
             return False
-        
+
         # Check for template variables that weren't replaced
         if re.search(r'\{\{.*?\}\}', prompt):
             self.logger.warning("Prompt contains unreplaced template variables")
             return False
-        
+
         return True
-    
+
     def generate_full_prompt(self, user_input: str, **kwargs) -> Dict[str, str]:
         """Generate the complete prompt with system and user parts.
-        
+
         Args:
             user_input: The user input/query
             **kwargs: Additional template variables
-            
+
         Returns:
             Dictionary with 'system' and 'user' prompt parts
-            
+
         Raises:
             PromptGenerationError: If prompt generation fails
         """
         try:
             # Generate system prompt
             system_prompt = self.get_system_prompt(**kwargs)
-            
+
             # Generate user prompt with input
             user_prompt = self.get_user_prompt(input=user_input, **kwargs)
-            
+
             # Validate prompts
             if not self.validate_prompt(system_prompt):
                 raise PromptGenerationError("Invalid system prompt generated")
-            
+
             if not self.validate_prompt(user_prompt):
                 raise PromptGenerationError("Invalid user prompt generated")
-            
+
             return {
                 "system": system_prompt,
                 "user": user_prompt
             }
-            
+
         except Exception as e:
             if isinstance(e, PromptGenerationError):
                 raise
@@ -295,7 +295,7 @@ class ConfigurablePromptTemplate(PromptTemplate):
         self.system_template = system_template
         self.user_template = user_template
         self.agent_config = agent_config or {}
-    
+
     def get_system_prompt(self, **kwargs) -> str:
         """Generate system prompt from template."""
         # Create a config object that includes agent_config for template access
@@ -311,7 +311,7 @@ class ConfigurablePromptTemplate(PromptTemplate):
             **kwargs
         }
         return self.render_template(self.system_template, **context)
-    
+
     def get_user_prompt(self, **kwargs) -> str:
         """Generate user prompt from template."""
         # Create a config object that includes agent_config for template access

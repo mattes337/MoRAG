@@ -7,7 +7,7 @@ from pathlib import Path
 import json
 import structlog
 
-from .processor import YouTubeProcessor, YouTubeConfig
+from .processor import YouTubeConfig
 from .service import YouTubeService
 
 logger = structlog.get_logger(__name__)

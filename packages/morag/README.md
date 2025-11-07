@@ -54,20 +54,20 @@ from morag import MoRAGAPI
 
 async def main():
     api = MoRAGAPI()
-    
+
     # Process a web page
     result = await api.process_web_page("https://example.com")
     print(f"Extracted content: {result.content[:100]}...")
-    
+
     # Process a YouTube video
     result = await api.process_youtube_video("https://youtube.com/watch?v=...")
     print(f"Video title: {result.metadata['title']}")
-    
+
     # Search for similar content
     results = await api.search("machine learning", limit=5)
     for result in results:
         print(f"Score: {result['score']:.3f} - {result['text'][:50]}...")
-    
+
     await api.cleanup()
 
 asyncio.run(main())

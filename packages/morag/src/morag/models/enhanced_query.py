@@ -38,22 +38,22 @@ class EnhancedQueryRequest(BaseModel):
     query: str = Field(..., description="The user's query text")
     query_type: QueryType = Field(default=QueryType.SIMPLE, description="Type of query processing")
     max_results: int = Field(default=10, ge=1, le=100, description="Maximum number of results")
-    
+
     # Graph-specific parameters
     expansion_strategy: ExpansionStrategy = Field(default=ExpansionStrategy.ADAPTIVE, description="Context expansion strategy")
     expansion_depth: int = Field(default=2, ge=1, le=5, description="Maximum expansion depth")
     fusion_strategy: FusionStrategy = Field(default=FusionStrategy.ADAPTIVE, description="Result fusion strategy")
-    
+
     # Filtering and constraints
     entity_types: Optional[List[str]] = Field(default=None, description="Filter by entity types")
     relation_types: Optional[List[str]] = Field(default=None, description="Filter by relation types")
     time_range: Optional[Dict[str, datetime]] = Field(default=None, description="Time range filter")
-    
+
     # Advanced options
     include_graph_context: bool = Field(default=True, description="Include graph context in response")
     include_reasoning_path: bool = Field(default=False, description="Include reasoning path")
     enable_multi_hop: bool = Field(default=True, description="Enable multi-hop reasoning")
-    
+
     # Quality and performance
     min_relevance_score: float = Field(default=0.1, ge=0.0, le=1.0, description="Minimum relevance threshold")
     timeout_seconds: int = Field(default=30, ge=1, le=300, description="Query timeout")
@@ -113,7 +113,7 @@ class EnhancedResult(BaseModel):
     source_type: str  # "vector", "graph", "hybrid"
     document_id: str
     metadata: Dict[str, Any] = Field(default_factory=dict)
-    
+
     # Graph-specific fields
     connected_entities: List[str] = Field(default_factory=list)
     relation_context: List[RelationInfo] = Field(default_factory=list)

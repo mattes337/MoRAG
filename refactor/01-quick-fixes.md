@@ -16,14 +16,14 @@ This task addresses immediate code quality issues that can be fixed quickly with
 ```bash
 # Files using requests (38 files):
 - API_USAGE_GUIDE.md, test files, tools/remote-converter, packages/morag-youtube
-# Files using httpx (15 files): 
+# Files using httpx (15 files):
 - packages/morag-reasoning, packages/morag-web, packages/morag-stages
 ```
 
 **Action Items**:
 1. **Standardize on httpx**: Replace all `requests` usage with `httpx` for consistency
 2. **Remove requests dependency**: Update requirements.txt to remove `requests>=2.32.0`
-3. **Update import statements**: 
+3. **Update import statements**:
    ```python
    # Replace:
    import requests
@@ -58,7 +58,7 @@ This task addresses immediate code quality issues that can be fixed quickly with
    torch>=2.1.0,<2.7.0
    torchaudio>=2.1.0,<2.7.0
    pyannote.audio>=3.3.0,<4.0.0
-   
+
    # Move to [scientific] extra:
    scipy>=1.13.0,<1.15.0
    scikit-learn>=1.5.0,<1.6.0
@@ -118,7 +118,7 @@ find . -name "*.py" -exec sed -i 's/import requests/import httpx/g' {} \;
 find . -name "*.py" -exec sed -i 's/requests\./httpx\./g' {} \;
 
 # 2. Update requirements.txt
-# Remove: requests>=2.32.0  
+# Remove: requests>=2.32.0
 # Keep: httpx==0.28.1
 
 # 3. Test imports
@@ -147,7 +147,7 @@ python -c "import httpx; print('httpx import successful')"
 
 ### Immediate Wins
 - [ ] Single HTTP client library (httpx only)
-- [ ] Heavy dependencies made optional  
+- [ ] Heavy dependencies made optional
 - [ ] Standardized logging across all files
 - [ ] Top 3 largest files split to <800 lines each
 - [ ] No import errors after changes
@@ -172,7 +172,7 @@ time python -c "from morag import api"
 ## Next Steps
 After completing quick fixes, proceed to:
 1. `02-file-splitting.md` - Address remaining oversized files
-2. `03-deduplication.md` - Remove duplicate code patterns  
+2. `03-deduplication.md` - Remove duplicate code patterns
 3. `04-dependency-cleanup.md` - Full dependency audit
 4. `05-testing-strategy.md` - Comprehensive test coverage
 

@@ -148,59 +148,59 @@ def main():
     """Demonstrate the video transcription format fixes."""
     print("🎥 Video Transcription Format Fixes Demo")
     print("=" * 50)
-    
+
     # Create mock data
     audio_result = create_mock_audio_result()
     video_converter = VideoConverter()
-    
+
     # Generate the improved markdown
     print("\n✅ IMPROVED OUTPUT (After Fixes):")
     print("-" * 30)
-    
+
     markdown_lines = video_converter._create_enhanced_audio_markdown(audio_result, 80.0)
     improved_output = "\n".join(markdown_lines)
-    
+
     print(improved_output)
-    
+
     print("\n🔍 KEY IMPROVEMENTS:")
     print("-" * 20)
-    
+
     # Check improvements
     improvements = []
-    
+
     # 1. Timestamp format
     if "[0]" in improved_output and "[45]" in improved_output:
         improvements.append("✅ Proper timestamps: [0] and [45] instead of [0] for all topics")
-    
+
     # 2. Speaker format
     if "SPEAKER_00:" in improved_output and "SPEAKER_01:" in improved_output:
         improvements.append("✅ Consistent speaker format: SPEAKER_00, SPEAKER_01")
-    
+
     # 3. No unwanted headers
     unwanted_headers = ["## Speakers", "## transcript", "## processing details"]
     if not any(header in improved_output for header in unwanted_headers):
         improvements.append("✅ Clean structure: No unwanted headers")
-    
+
     # 4. Meaningful topic titles
     if "Erklärung zum Fukuda-Test" in improved_output and "Physiotherapie und Behandlung" in improved_output:
         improvements.append("✅ Meaningful topic titles: Uses actual topic names when available")
-    
+
     # 5. No text repetition
     lines = [line.strip() for line in improved_output.split('\n') if ': ' in line]
     texts = [line.split(': ', 1)[1] for line in lines]
     unique_texts = set(texts)
     if len(texts) == len(unique_texts):
         improvements.append("✅ No text repetition: Each sentence appears only once")
-    
+
     for improvement in improvements:
         print(improvement)
-    
+
     print(f"\n📊 STATISTICS:")
     print(f"   • Total lines: {len(improved_output.split(chr(10)))}")
     print(f"   • Dialogue lines: {len([l for l in improved_output.split(chr(10)) if ': ' in l])}")
     print(f"   • Topics: {improved_output.count('# ')}")
     print(f"   • Speakers detected: {len(set([l.split(':')[0] for l in improved_output.split(chr(10)) if ': ' in l]))}")
-    
+
     print("\n🎯 SUMMARY:")
     print("The video transcription format has been significantly improved with:")
     print("• Proper timestamp formatting in [seconds] format")

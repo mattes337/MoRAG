@@ -1,8 +1,7 @@
 """Data models for generation agents."""
 
-from typing import List, Optional, Dict, Any
+from typing import List, Dict, Any
 from pydantic import BaseModel, Field
-from enum import Enum
 
 
 class ConfidenceLevelExamples:

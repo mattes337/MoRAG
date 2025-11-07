@@ -65,26 +65,26 @@ name = "morag"
 dependencies = [
     # Core API and Processing
     "fastapi>=0.115.4,<0.116.0",
-    "uvicorn>=0.32.1,<0.33.0", 
+    "uvicorn>=0.32.1,<0.33.0",
     "pydantic>=2.10.0,<2.11.2",
     "pydantic-ai>=0.3.4,<1.0.0",
-    
+
     # Task Processing
     "celery>=5.3.6,<5.4.0",
     "redis>=5.2.1,<5.3.0",
-    
+
     # Storage and AI
     "qdrant-client>=1.12.1,<1.13.0",
     "google-genai>=1.15.0,<1.18.0",
     "httpx>=0.28.1,<0.29.0",
-    
+
     # Text Processing
     "markitdown>=0.1.2",
     "beautifulsoup4>=4.13.0,<5.0.0",
     "python-dotenv>=1.0.1,<1.1.0",
     "structlog>=24.4.0,<24.5.0",
-    
-    # Basic Document Processing  
+
+    # Basic Document Processing
     "pypdf>=5.6.0,<6.0.0",
     "python-docx>=1.1.2",
     "openpyxl>=3.1.5",
@@ -94,7 +94,7 @@ dependencies = [
 # Audio processing with ML
 audio-ml = [
     "torch>=2.1.0,<2.7.0",
-    "torchaudio>=2.1.0,<2.7.0", 
+    "torchaudio>=2.1.0,<2.7.0",
     "pyannote.audio>=3.3.0,<4.0.0",
     "faster-whisper>=1.1.0",
     "pydub>=0.25.1",
@@ -103,7 +103,7 @@ audio-ml = [
 
 # Basic audio without heavy ML
 audio = [
-    "faster-whisper>=1.1.0", 
+    "faster-whisper>=1.1.0",
     "pydub>=0.25.1",
     "ffmpeg-python>=0.2.0",
     "soundfile>=0.13.0",
@@ -112,7 +112,7 @@ audio = [
 # Video processing
 video = [
     "opencv-python>=4.10.0,<4.11.0",
-    "moviepy>=2.1.0,<2.2.0", 
+    "moviepy>=2.1.0,<2.2.0",
     "imageio>=2.35.0,<2.37.0",
 ]
 
@@ -125,7 +125,7 @@ web = [
 # Scientific computing
 scientific = [
     "numpy>=2.1.0,<2.2.0",
-    "scipy>=1.13.0,<1.15.0", 
+    "scipy>=1.13.0,<1.15.0",
     "scikit-learn>=1.5.0,<1.6.0",
 ]
 
@@ -140,7 +140,7 @@ ml-advanced = [
 dev = [
     "pytest>=8.3.0",
     "pytest-asyncio>=1.0.0",
-    "black>=25.1.0", 
+    "black>=25.1.0",
     "isort>=6.0.0",
     "mypy>=1.16.0",
 ]
@@ -168,14 +168,14 @@ import warnings
 
 class OptionalDependency:
     """Manages optional dependencies with graceful fallbacks."""
-    
+
     def __init__(self, package_name: str, feature_name: str = None):
         self.package_name = package_name
         self.feature_name = feature_name or package_name
         self._module = None
         self._available = None
-    
-    @property 
+
+    @property
     def available(self) -> bool:
         if self._available is None:
             try:
@@ -184,7 +184,7 @@ class OptionalDependency:
             except ImportError:
                 self._available = False
         return self._available
-    
+
     @property
     def module(self) -> Any:
         if not self.available:
@@ -196,7 +196,7 @@ class OptionalDependency:
 
 # Define optional dependencies
 TORCH = OptionalDependency("torch", "audio-ml")
-OPENCV = OptionalDependency("cv2", "video") 
+OPENCV = OptionalDependency("cv2", "video")
 NUMPY = OptionalDependency("numpy", "scientific")
 PLAYWRIGHT = OptionalDependency("playwright", "web")
 
@@ -206,7 +206,7 @@ def require_torch():
     return TORCH.module
 
 def require_opencv():
-    """Ensure OpenCV is available for video processing.""" 
+    """Ensure OpenCV is available for video processing."""
     return OPENCV.module
 
 def require_numpy():
@@ -236,7 +236,7 @@ class SpeakerDiarizationService:
     def __init__(self, config: Dict[str, Any]):
         self.config = config
         self.ml_available = TORCH.available
-        
+
         if not self.ml_available:
             warnings.warn(
                 "Speaker diarization requires torch. "
@@ -244,25 +244,25 @@ class SpeakerDiarizationService:
                 "Falling back to basic timestamp segmentation.",
                 UserWarning
             )
-    
+
     async def diarize_speakers(self, audio_path: Path) -> List[Dict]:
         if self.ml_available:
             return await self._ml_diarization(audio_path)
         else:
             return await self._basic_segmentation(audio_path)
-    
+
     async def _ml_diarization(self, audio_path: Path) -> List[Dict]:
         """Advanced ML-based speaker diarization."""
         torch = require_torch()
         # Use torch-based processing
-        
+
     async def _basic_segmentation(self, audio_path: Path) -> List[Dict]:
-        """Fallback: basic timestamp-based segmentation.""" 
+        """Fallback: basic timestamp-based segmentation."""
         # Simple time-based segmentation without ML
 ```
 
 #### Video Processing Example:
-```python  
+```python
 # packages/morag-video/src/morag_video/processor.py
 
 from morag_core.optional_deps import OPENCV, require_opencv
@@ -270,7 +270,7 @@ from morag_core.optional_deps import OPENCV, require_opencv
 class VideoProcessor:
     def __init__(self):
         self.opencv_available = OPENCV.available
-        
+
     async def extract_frames(self, video_path: Path) -> List[Path]:
         if self.opencv_available:
             return await self._opencv_extraction(video_path)
@@ -287,7 +287,7 @@ class VideoProcessor:
    ```bash
    # Create dependency usage report
    python scripts/analyze_dependencies.py > dependency_usage_report.txt
-   
+
    # Find unused imports
    python scripts/check_imports.py --unused-only
    ```
@@ -335,7 +335,7 @@ class VideoProcessor:
 pip install -e . # ~2.5GB with all ML dependencies
 
 # After optimization:
-pip install -e .                    # ~200MB (core only)  
+pip install -e .                    # ~200MB (core only)
 pip install -e '.[audio]'           # ~400MB (basic audio)
 pip install -e '.[audio-ml]'        # ~2.2GB (with ML)
 pip install -e '.[all]'             # ~2.5GB (everything)
@@ -352,7 +352,7 @@ import morag  # ~0.5-1 seconds
 
 ### Dependency Reduction Summary
 - **Core requirements**: 30 packages (was 50+)
-- **Optional audio-ml**: 15 packages  
+- **Optional audio-ml**: 15 packages
 - **Optional video**: 8 packages
 - **Optional web**: 5 packages
 - **Optional scientific**: 8 packages
@@ -364,19 +364,19 @@ import morag  # ~0.5-1 seconds
 ```bash
 # Test each optional dependency group:
 python -m venv test-core && source test-core/bin/activate
-pip install -e . 
+pip install -e .
 python -c "import morag; print('Core works')"
 
-python -m venv test-audio && source test-audio/bin/activate  
+python -m venv test-audio && source test-audio/bin/activate
 pip install -e '.[audio]'
 python tests/cli/test-audio.py sample.mp3
 
 python -m venv test-video && source test-video/bin/activate
-pip install -e '.[video]'  
+pip install -e '.[video]'
 python tests/cli/test-video.py sample.mp4
 ```
 
-### Functionality Testing  
+### Functionality Testing
 ```bash
 # Test graceful degradation:
 python -c """
@@ -388,7 +388,7 @@ processor = AudioProcessor()
 # Test full functionality with optional deps:
 pip install -e '.[audio-ml]'
 python -c """
-from morag_audio.services.speaker_diarization import SpeakerDiarizationService  
+from morag_audio.services.speaker_diarization import SpeakerDiarizationService
 service = SpeakerDiarizationService({})
 # Should work with full ML capabilities
 """
@@ -398,7 +398,7 @@ service = SpeakerDiarizationService({})
 
 ### Quantitative Goals
 - [ ] Core installation size <300MB (vs current ~2.5GB)
-- [ ] Core import time <1 second (vs current ~3-5 seconds)  
+- [ ] Core import time <1 second (vs current ~3-5 seconds)
 - [ ] ≥60% reduction in required dependencies (30 vs 50+)
 - [ ] All optional features work when dependencies installed
 
@@ -415,7 +415,7 @@ service = SpeakerDiarizationService({})
 # Minimal installation (basic document processing):
 pip install morag
 
-# With audio processing (no ML):  
+# With audio processing (no ML):
 pip install 'morag[audio]'
 
 # With advanced audio (ML features):
@@ -425,7 +425,7 @@ pip install 'morag[audio-ml]'
 pip install 'morag[video]'
 
 # Web scraping capabilities:
-pip install 'morag[web]'  
+pip install 'morag[web]'
 
 # Scientific computing features:
 pip install 'morag[scientific]'
@@ -446,7 +446,7 @@ features = get_available_features()
 if features['audio_ml']:
     # Use advanced audio processing
     pass
-elif features['audio_basic']: 
+elif features['audio_basic']:
     # Use basic audio processing
     pass
 else:
@@ -465,7 +465,7 @@ Test all combinations of optional dependencies:
 ```bash
 # Core functionality matrix:
 pytest tests/core/ # No optional deps
-pytest tests/core/ --optional=audio  
+pytest tests/core/ --optional=audio
 pytest tests/core/ --optional=video
 pytest tests/core/ --optional=web
 pytest tests/core/ --optional=all
@@ -473,7 +473,7 @@ pytest tests/core/ --optional=all
 
 ### Gradual Rollout
 1. Phase 1: Core + optional infrastructure (this task)
-2. Phase 2: Update documentation and examples  
+2. Phase 2: Update documentation and examples
 3. Phase 3: Community feedback and refinement
 
 ## Documentation Updates Required

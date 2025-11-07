@@ -6,7 +6,7 @@ from .utils import create_agent, get_agent, register_agent
 
 __all__ = [
     "AgentFactory",
-    "AgentRegistry", 
+    "AgentRegistry",
     "create_agent",
     "get_agent",
     "register_agent",

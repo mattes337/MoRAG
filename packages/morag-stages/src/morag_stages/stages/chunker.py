@@ -38,14 +38,14 @@ logger = structlog.get_logger(__name__)
 
 class ChunkerStage(Stage):
     """Stage that creates chunks and embeddings from markdown content."""
-    
+
     def __init__(self, stage_type: StageType = StageType.CHUNKER):
         """Initialize chunker stage."""
         super().__init__(stage_type)
-        
+
         if not SERVICES_AVAILABLE:
             logger.warning("Services not available for chunking")
-        
+
         # Initialize embedding service with API key from environment
         if SERVICES_AVAILABLE and GeminiEmbeddingService is not None:
             import os
@@ -67,7 +67,7 @@ class ChunkerStage(Stage):
             return config.get(key, default)
         else:
             return default
-    
+
     @stage_error_handler("chunker_execute")
     async def execute(self,
                      input_files: List[Path],
@@ -89,7 +89,7 @@ class ChunkerStage(Stage):
                 stage_type=self.stage_type.value,
                 invalid_files=[str(f) for f in input_files]
             )
-        
+
         input_file = input_files[0]
 
         # Load configuration from environment variables with context overrides
@@ -99,7 +99,7 @@ class ChunkerStage(Stage):
         else:
             # Fallback to dictionary config
             config = context_config
-        
+
         # Store model override for agent creation from context config
         self._model_override = context_config.get('model') if context_config else None
 
@@ -121,33 +121,33 @@ class ChunkerStage(Stage):
         logger.info("Starting chunking",
                    input_file=str(input_file),
                    config=config)
-        
+
         try:
             # Generate output filename
             output_file = context.output_dir / f"{input_file.stem}.chunks.json"
             context.output_dir.mkdir(parents=True, exist_ok=True)
-            
+
             # Read input markdown
             markdown_content = input_file.read_text(encoding='utf-8')
-            
+
             # Extract metadata and content
             metadata, content = self._extract_metadata_and_content(markdown_content)
-            
+
             # Generate document summary
             summary = ""
             if self._get_config_value(config, 'generate_summary', True):
                 summary = await self._generate_summary(content, metadata, config)
-            
+
             # Create chunks based on strategy
             chunks = await self._create_chunks(content, metadata, config)
-            
+
             # Generate embeddings for chunks
             if self.embedding_service:
                 chunks = await self._add_embeddings(chunks, config)
-            
+
             # Add contextual information
             chunks = self._add_context_to_chunks(chunks, config)
-            
+
             # Create output data
             output_data = {
                 "summary": summary,
@@ -163,11 +163,11 @@ class ChunkerStage(Stage):
                     "created_at": datetime.now().isoformat()
                 }
             }
-            
+
             # Write to file
             with open(output_file, 'w', encoding='utf-8') as f:
                 json.dump(output_data, f, indent=2, ensure_ascii=False)
-            
+
             # Create metadata
             # Convert config to dict if it's a config object
             config_dict = config.model_dump() if hasattr(config, 'model_dump') else config
@@ -186,7 +186,7 @@ class ChunkerStage(Stage):
                     "has_embeddings": any('embedding' in chunk for chunk in chunks)
                 }
             )
-            
+
             return StageResult(
                 stage_type=self.stage_type,
                 status=StageStatus.COMPLETED,
@@ -198,49 +198,49 @@ class ChunkerStage(Stage):
                     "chunk_strategy": self._get_config_value(config, 'chunk_strategy', 'semantic')
                 }
             )
-            
+
         except Exception as e:
-            logger.error("Chunking failed", 
-                        input_file=str(input_file), 
+            logger.error("Chunking failed",
+                        input_file=str(input_file),
                         error=str(e))
             raise StageExecutionError(
                 f"Chunking failed: {e}",
                 stage_type=self.stage_type.value,
                 original_error=e
             )
-    
+
     @validation_error_handler("chunker_validate_inputs")
     def validate_inputs(self, input_files: List[Path]) -> bool:
         """Validate input files for chunking.
-        
+
         Args:
             input_files: List of input file paths
-            
+
         Returns:
             True if inputs are valid
         """
         if len(input_files) != 1:
             return False
-        
+
         input_file = input_files[0]
-        
+
         # Check if file exists and is markdown
         if not input_file.exists():
             return False
-        
+
         if input_file.suffix.lower() not in ['.md', '.markdown']:
             return False
-        
+
         return True
-    
+
     def get_dependencies(self) -> List[StageType]:
         """Get stage dependencies.
-        
+
         Returns:
             List containing markdown-conversion stage (markdown-optimizer is optional)
         """
         return [StageType.MARKDOWN_CONVERSION]
-    
+
     def get_expected_outputs(self, input_files: List[Path], context: StageContext) -> List[Path]:
         """Get expected output file paths.
 
@@ -259,7 +259,7 @@ class ChunkerStage(Stage):
         sanitized_name = sanitize_filename(input_file.stem)
         output_file = context.output_dir / f"{sanitized_name}.chunks.json"
         return [output_file]
-    
+
     def _extract_metadata_and_content(self, markdown: str) -> tuple[Dict[str, Any], str]:
         """Extract metadata and content from markdown (supports both YAML frontmatter and H1+H2 format).
 
@@ -363,7 +363,7 @@ class ChunkerStage(Stage):
             return metadata, content
 
         return {}, markdown
-    
+
     async def _generate_summary(self, content: str, metadata: Dict[str, Any], config: Dict[str, Any]) -> str:
         """Generate document summary using LLM.
 
@@ -403,7 +403,7 @@ class ChunkerStage(Stage):
             else:
                 if not self.summarization_agent:
                     self.summarization_agent = get_agent("summarization")
-            
+
             # Create summarization using the agents framework
             content_type = metadata.get('type', 'text')
 
@@ -413,26 +413,26 @@ class ChunkerStage(Stage):
             )
             # The agents framework returns a SummarizationResult
             return response.summary if hasattr(response, 'summary') else str(response)
-            
+
         except Exception as e:
             logger.warning("Summary generation failed", error=str(e))
             return ""
-    
+
     async def _create_chunks(self, content: str, metadata: Dict[str, Any], config: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Create chunks from content based on strategy.
-        
+
         Args:
             content: Document content
             metadata: Document metadata
             config: Stage configuration
-            
+
         Returns:
             List of chunk dictionaries
         """
         strategy = self._get_config_value(config, 'chunk_strategy', 'semantic')
         chunk_size = self._get_config_value(config, 'chunk_size', 4000)
         overlap = self._get_config_value(config, 'overlap', 200)
-        
+
         if strategy == 'semantic':
             return await self._semantic_chunking(content, metadata, chunk_size, overlap)
         elif strategy == 'page-level':
@@ -441,31 +441,31 @@ class ChunkerStage(Stage):
             return self._topic_based_chunking(content, metadata, chunk_size)
         else:  # fixed-size
             return self._fixed_size_chunking(content, chunk_size, overlap)
-    
+
     def _fixed_size_chunking(self, content: str, chunk_size: int, overlap: int) -> List[Dict[str, Any]]:
         """Create fixed-size chunks with overlap.
-        
+
         Args:
             content: Content to chunk
             chunk_size: Target chunk size in characters
             overlap: Overlap between chunks
-            
+
         Returns:
             List of chunk dictionaries
         """
         chunks = []
         start = 0
         chunk_id = 1
-        
+
         while start < len(content):
             end = min(start + chunk_size, len(content))
-            
+
             # Try to break at word boundary
             if end < len(content):
                 last_space = content.rfind(' ', start, end)
                 if last_space > start:
                     end = last_space
-            
+
             chunk_content = content[start:end].strip()
             if chunk_content:
                 chunks.append({
@@ -478,9 +478,9 @@ class ChunkerStage(Stage):
                     }
                 })
                 chunk_id += 1
-            
+
             start = max(start + 1, end - overlap)
-        
+
         return chunks
 
     async def _semantic_chunking(self, content: str, metadata: Dict[str, Any], chunk_size: int, overlap: int) -> List[Dict[str, Any]]:

@@ -1,6 +1,6 @@
 """Explanation agent."""
 
-from typing import Type, Optional, List
+from typing import Type, Optional
 import structlog
 
 from ..base.agent import BaseAgent

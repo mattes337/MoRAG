@@ -174,7 +174,7 @@ class DualLevelRetriever:
         # 3. Classify as LOW_LEVEL (specific) or HIGH_LEVEL (abstract)
         # 4. Return appropriate retrieval strategy
         pass
-    
+
     async def low_level_retrieve(self, query: str) -> List[EntityResult]:
         # 1. Extract specific entities from query
         # 2. Match entities in knowledge graph

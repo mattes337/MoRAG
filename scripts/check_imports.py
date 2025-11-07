@@ -20,7 +20,7 @@ import argparse
 
 class ImportChecker(ast.NodeVisitor):
     """AST visitor to check for import issues."""
-    
+
     def __init__(self, filepath: str):
         self.filepath = filepath
         self.imports: Dict[str, str] = {}  # name -> module
@@ -29,14 +29,14 @@ class ImportChecker(ast.NodeVisitor):
         self.defined_names: Set[str] = set()
         self.errors: List[str] = []
         self.warnings: List[str] = []
-        
+
     def visit_Import(self, node):
         """Handle 'import module' statements."""
         for alias in node.names:
             name = alias.asname if alias.asname else alias.name
             self.imports[name] = alias.name
         self.generic_visit(node)
-    
+
     def visit_ImportFrom(self, node):
         """Handle 'from module import name' statements."""
         module = node.module or ''
@@ -48,7 +48,7 @@ class ImportChecker(ast.NodeVisitor):
                 name = alias.asname if alias.asname else alias.name
                 self.from_imports[name] = module
         self.generic_visit(node)
-    
+
     def visit_Name(self, node):
         """Handle name usage."""
         if isinstance(node.ctx, ast.Load):
@@ -56,7 +56,7 @@ class ImportChecker(ast.NodeVisitor):
         elif isinstance(node.ctx, ast.Store):
             self.defined_names.add(node.id)
         self.generic_visit(node)
-    
+
     def visit_FunctionDef(self, node):
         """Handle function definitions."""
         self.defined_names.add(node.name)
@@ -77,7 +77,7 @@ class ImportChecker(ast.NodeVisitor):
         """Handle class definitions."""
         self.defined_names.add(node.name)
         self.generic_visit(node)
-    
+
     def visit_Attribute(self, node):
         """Handle attribute access like 're.sub'."""
         if isinstance(node.value, ast.Name):
@@ -114,7 +114,7 @@ class ImportChecker(ast.NodeVisitor):
         if isinstance(node.target, ast.Name):
             self.defined_names.add(node.target.id)
         self.generic_visit(node)
-    
+
     def check_missing_imports(self):
         """Check for missing imports."""
         # Built-in names that don't need imports
@@ -134,26 +134,26 @@ class ImportChecker(ast.NodeVisitor):
             'True', 'False', 'None', '__name__', '__file__', '__doc__', '__package__',
             '__spec__', '__loader__', '__cached__', '__builtins__', 'self', 'cls'
         }
-        
+
         # Names that are imported or defined locally
         available_names = (
-            set(self.imports.keys()) | 
-            set(self.from_imports.keys()) | 
-            self.defined_names | 
+            set(self.imports.keys()) |
+            set(self.from_imports.keys()) |
+            self.defined_names |
             builtins
         )
-        
+
         # Find missing imports
         missing = self.used_names - available_names
-        
+
         for name in missing:
             self.errors.append(f"Missing import for '{name}' used in {self.filepath}")
-    
+
     def check_unused_imports(self):
         """Check for unused imports."""
         all_imported = set(self.imports.keys()) | set(self.from_imports.keys())
         unused = all_imported - self.used_names
-        
+
         for name in unused:
             self.warnings.append(f"Unused import '{name}' in {self.filepath}")
 
@@ -163,15 +163,15 @@ def check_file(filepath: Path) -> Tuple[List[str], List[str]]:
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
             content = f.read()
-        
+
         tree = ast.parse(content, filename=str(filepath))
         checker = ImportChecker(str(filepath))
         checker.visit(tree)
         checker.check_missing_imports()
         checker.check_unused_imports()
-        
+
         return checker.errors, checker.warnings
-    
+
     except SyntaxError as e:
         return [f"Syntax error in {filepath}: {e}"], []
     except Exception as e:
@@ -191,25 +191,25 @@ def find_python_files(directory: Path, exclude_patterns: List[str] = None) -> Li
             'node_modules',
             '.mypy_cache'
         ]
-    
+
     python_files = []
-    
+
     for root, dirs, files in os.walk(directory):
         # Remove excluded directories
         dirs[:] = [d for d in dirs if not any(pattern in d for pattern in exclude_patterns)]
-        
+
         for file in files:
             if file.endswith('.py'):
                 filepath = Path(root) / file
                 python_files.append(filepath)
-    
+
     return python_files
 
 
 def main():
     """Main function."""
     parser = argparse.ArgumentParser(description='Check Python files for import issues')
-    parser.add_argument('paths', nargs='*', default=['.'], 
+    parser.add_argument('paths', nargs='*', default=['.'],
                        help='Paths to check (files or directories)')
     parser.add_argument('--exclude', action='append', default=[],
                        help='Patterns to exclude from checking')
@@ -217,15 +217,15 @@ def main():
                        help='Only show errors, not warnings')
     parser.add_argument('--exit-on-error', action='store_true',
                        help='Exit with non-zero code if errors found')
-    
+
     args = parser.parse_args()
-    
+
     all_errors = []
     all_warnings = []
-    
+
     for path_str in args.paths:
         path = Path(path_str)
-        
+
         if path.is_file() and path.suffix == '.py':
             files_to_check = [path]
         elif path.is_dir():
@@ -233,31 +233,31 @@ def main():
         else:
             print(f"Skipping {path}: not a Python file or directory")
             continue
-        
+
         for filepath in files_to_check:
             errors, warnings = check_file(filepath)
             all_errors.extend(errors)
             all_warnings.extend(warnings)
-    
+
     # Print results
     if all_errors:
         print("ERRORS:")
         for error in all_errors:
             print(f"  {error}")
         print()
-    
+
     if all_warnings and not args.errors_only:
         print("WARNINGS:")
         for warning in all_warnings:
             print(f"  {warning}")
         print()
-    
+
     # Summary
     print(f"Found {len(all_errors)} errors and {len(all_warnings)} warnings")
-    
+
     if args.exit_on_error and all_errors:
         sys.exit(1)
-    
+
     return len(all_errors)
 
 

@@ -13,7 +13,7 @@ class TestQdrantPerformance:
         """Create a mock service for performance testing."""
         service = QdrantService()
         service.collection_name = "performance_test"
-        
+
         # Mock client with performance simulation
         mock_client = MagicMock()
         mock_client.get_collections.return_value = MagicMock(collections=[])
@@ -36,7 +36,7 @@ class TestQdrantPerformance:
         mock_client.upsert = MagicMock()
         mock_client.search.return_value = []
         mock_client.close = MagicMock()
-        
+
         service.client = mock_client
         return service
 
@@ -68,7 +68,7 @@ class TestQdrantPerformance:
 
         with patch('asyncio.to_thread', new_callable=AsyncMock) as mock_to_thread:
             mock_to_thread.side_effect = mock_upsert
-            
+
             # Measure insertion time
             start_time = time.time()
             point_ids = await service.store_chunks(chunks, embeddings)
@@ -109,7 +109,7 @@ class TestQdrantPerformance:
 
         with patch('asyncio.to_thread', new_callable=AsyncMock) as mock_to_thread:
             mock_to_thread.side_effect = mock_search
-            
+
             # Measure search time
             start_time = time.time()
             results = await service.search_similar(
@@ -145,7 +145,7 @@ class TestQdrantPerformance:
                 "metadata": {"index": index}
             }
             embedding = [float(index) / 100] * 768
-            
+
             with patch('asyncio.to_thread', new_callable=AsyncMock) as mock_to_thread:
                 mock_to_thread.side_effect = mock_store_operation
                 return await service.store_chunks([chunk], [embedding])
@@ -194,7 +194,7 @@ class TestQdrantPerformance:
 
         with patch('asyncio.to_thread', new_callable=AsyncMock) as mock_to_thread:
             mock_to_thread.side_effect = mock_batch_upsert
-            
+
             start_time = time.time()
             point_ids = await service.store_chunks(chunks, embeddings)
             end_time = time.time()
@@ -236,7 +236,7 @@ class TestQdrantPerformance:
 
         with patch('asyncio.to_thread', new_callable=AsyncMock) as mock_to_thread:
             mock_to_thread.side_effect = mock_memory_operation
-            
+
             start_time = time.time()
             point_ids = await service.store_chunks(large_chunks, large_embeddings)
             end_time = time.time()
@@ -255,15 +255,15 @@ class TestQdrantPerformance:
 
         # Simulate operations with intermittent failures
         call_count = 0
-        
+
         async def mock_unreliable_operation(*args, **kwargs):
             nonlocal call_count
             call_count += 1
-            
+
             # Fail every 3rd call to simulate network issues
             if call_count % 3 == 0:
                 raise Exception("Simulated network error")
-            
+
             await asyncio.sleep(0.01)
             return None
 
@@ -282,15 +282,15 @@ class TestQdrantPerformance:
 
         # Test error handling performance
         start_time = time.time()
-        
+
         with patch('asyncio.to_thread', new_callable=AsyncMock) as mock_to_thread:
             mock_to_thread.side_effect = mock_unreliable_operation
-            
+
             try:
                 await service.store_chunks(chunks, embeddings)
             except Exception:
                 pass  # Expected to fail
-        
+
         end_time = time.time()
         error_handling_time = end_time - start_time
 
@@ -305,32 +305,32 @@ class TestPerformanceBenchmarks:
     def test_embedding_dimension_performance(self):
         """Test performance with different embedding dimensions."""
         dimensions = [384, 768, 1536]
-        
+
         for dim in dimensions:
             # Create test embedding
             embedding = [0.1] * dim
-            
+
             # Measure creation time
             start_time = time.time()
             test_embeddings = [embedding] * 100
             end_time = time.time()
-            
+
             creation_time = end_time - start_time
-            
+
             assert creation_time < 1.0  # Should be fast
             assert len(test_embeddings) == 100
             assert len(test_embeddings[0]) == dim
-            
+
             print(f"Dimension {dim}: {creation_time:.4f}s for 100 embeddings")
 
     def test_batch_size_optimization(self):
         """Test optimal batch sizes for operations."""
         batch_sizes = [10, 50, 100, 200, 500]
-        
+
         for batch_size in batch_sizes:
             # Simulate batch processing time
             start_time = time.time()
-            
+
             # Simulate batch creation
             batch = []
             for i in range(batch_size):
@@ -339,34 +339,34 @@ class TestPerformanceBenchmarks:
                     "vector": [0.1] * 768,
                     "payload": {"index": i}
                 })
-            
+
             end_time = time.time()
             batch_creation_time = end_time - start_time
-            
+
             assert batch_creation_time < 5.0
             assert len(batch) == batch_size
-            
+
             print(f"Batch size {batch_size}: {batch_creation_time:.4f}s creation time")
 
     @pytest.mark.asyncio
     async def test_connection_pool_performance(self):
         """Test connection pooling performance simulation."""
         from morag_services.storage import QdrantService
-        
+
         # Test multiple service instances
         services = [QdrantService() for _ in range(5)]
-        
+
         start_time = time.time()
-        
+
         # Simulate connection setup
         for service in services:
             assert service.client is None
             assert service.collection_name is not None
-        
+
         end_time = time.time()
         setup_time = end_time - start_time
-        
+
         assert setup_time < 1.0  # Should be very fast
         assert len(services) == 5
-        
+
         print(f"Service pool setup: {setup_time:.4f}s for 5 instances")

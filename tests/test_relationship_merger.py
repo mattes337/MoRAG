@@ -93,9 +93,9 @@ class TestRelationshipMergerConfig:
             batch_size=0,  # Invalid
             min_confidence=-0.1  # Invalid
         )
-        
+
         config.ensure_defaults()
-        
+
         assert config.similarity_threshold == 1.0
         assert config.batch_size == 1
         assert config.min_confidence == 0.0
@@ -108,10 +108,10 @@ class TestRelationshipMerger:
     async def test_find_duplicate_relationships(self, config, mock_neo4j_storage, mock_llm_client, sample_relationships):
         """Test finding exact duplicate relationships."""
         merger = RelationshipMerger(config, mock_neo4j_storage, mock_llm_client)
-        
+
         # Test with relationships that have exact duplicates
         duplicates = await merger._find_duplicate_relationships(sample_relationships[:2])
-        
+
         assert len(duplicates) == 1
         assert duplicates[0].primary_relationship.id == "rel1"  # Higher confidence
         assert len(duplicates[0].duplicate_relationships) == 1
@@ -140,7 +140,7 @@ class TestRelationshipMerger:
     async def test_get_merger_candidates(self, config, mock_neo4j_storage, mock_llm_client):
         """Test getting merger candidates from database."""
         merger = RelationshipMerger(config, mock_neo4j_storage, mock_llm_client)
-        
+
         # Mock database response
         mock_neo4j_storage._connection_ops._execute_query.return_value = [
             {
@@ -152,9 +152,9 @@ class TestRelationshipMerger:
                 "metadata": "{}"
             }
         ]
-        
+
         candidates = await merger._get_merger_candidates()
-        
+
         assert len(candidates) == 1
         assert candidates[0].id == "rel1"
         assert candidates[0].type == "WORKS_FOR"
@@ -165,20 +165,20 @@ class TestRelationshipMerger:
         """Test merge application in dry run mode."""
         config.dry_run = True
         merger = RelationshipMerger(config, mock_neo4j_storage, mock_llm_client)
-        
+
         primary = RelationshipCandidate("rel1", "e1", "e2", "WORKS_FOR", 0.9, {})
         duplicate = RelationshipCandidate("rel2", "e1", "e2", "WORKS_FOR", 0.8, {})
-        
+
         merge_candidate = MergeCandidate(
             primary_relationship=primary,
             duplicate_relationships=[duplicate],
             merge_reason="duplicate_exact",
             confidence_score=1.0
         )
-        
+
         # Should not call any database operations in dry run
         await merger._apply_merge(merge_candidate)
-        
+
         # Verify no database calls were made
         mock_neo4j_storage._connection_ops._execute_query.assert_not_called()
 
@@ -187,20 +187,20 @@ class TestRelationshipMerger:
         """Test merge application in real mode."""
         config.dry_run = False
         merger = RelationshipMerger(config, mock_neo4j_storage, mock_llm_client)
-        
+
         primary = RelationshipCandidate("rel1", "e1", "e2", "WORKS_FOR", 0.9, {})
         duplicate = RelationshipCandidate("rel2", "e1", "e2", "WORKS_FOR", 0.8, {})
-        
+
         merge_candidate = MergeCandidate(
             primary_relationship=primary,
             duplicate_relationships=[duplicate],
             merge_reason="duplicate_exact",
             confidence_score=1.0
         )
-        
+
         # Should call database operations
         await merger._apply_merge(merge_candidate)
-        
+
         # Verify database calls were made (update + delete)
         assert mock_neo4j_storage._connection_ops._execute_query.call_count == 2
 
@@ -208,12 +208,12 @@ class TestRelationshipMerger:
     async def test_run_merger_empty_result(self, config, mock_neo4j_storage, mock_llm_client):
         """Test merger with no relationships to process."""
         merger = RelationshipMerger(config, mock_neo4j_storage, mock_llm_client)
-        
+
         # Mock empty database response
         mock_neo4j_storage._connection_ops._execute_query.return_value = []
-        
+
         result = await merger.run_merger()
-        
+
         assert result.total_relationships == 0
         assert result.processed_relationships == 0
         assert result.total_merges == 0
@@ -232,29 +232,29 @@ class TestRunRelationshipMerger:
             "dry_run": False,
             "limit_relations": 500
         }
-        
+
         with patch('morag_graph.maintenance.relationship_merger.Neo4jStorage') as mock_storage_class, \
              patch('morag_graph.maintenance.relationship_merger.Neo4jConfig') as mock_config_class, \
              patch('morag_graph.maintenance.relationship_merger.LLMClient') as mock_llm_class:
-            
+
             # Setup mocks
             mock_storage = AsyncMock()
             mock_storage_class.return_value = mock_storage
             mock_config_class.from_env.return_value = MagicMock()
             mock_llm = MagicMock()
             mock_llm_class.return_value = mock_llm
-            
+
             # Mock the merger run method
             with patch.object(RelationshipMerger, 'run_merger') as mock_run:
                 mock_result = MagicMock()
                 mock_run.return_value = mock_result
-                
+
                 result = await run_relationship_merger(overrides)
 
                 # Verify the merger was called
                 mock_run.assert_called_once()
                 assert result == mock_result.to_dict()
-                
+
                 # Verify storage connection lifecycle
                 mock_storage.connect.assert_called_once()
                 mock_storage.disconnect.assert_called_once()

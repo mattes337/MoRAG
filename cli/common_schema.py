@@ -74,63 +74,63 @@ class IntermediateJSON:
     source_path: str
     title: str
     text_content: str
-    
+
     # Processing metadata
     metadata: ProcessingMetadata
-    
+
     # Graph extraction results
     entities: List[Entity]
     relations: List[Relation]
-    
+
     # Content-specific data
     segments: Optional[List[Dict[str, Any]]] = None  # For audio/video
     pages: Optional[List[Dict[str, Any]]] = None     # For documents
     frames: Optional[List[Dict[str, Any]]] = None    # For video/images
     links: Optional[List[Dict[str, Any]]] = None     # For web content
-    
+
     # Additional metadata
     custom_metadata: Optional[Dict[str, Any]] = None
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
         return asdict(self)
-    
+
     def to_json(self, file_path: Union[str, Path], indent: int = 2) -> None:
         """Save to JSON file."""
         with open(file_path, 'w', encoding='utf-8') as f:
             json.dump(self.to_dict(), f, indent=indent, ensure_ascii=False, default=str)
-    
+
     @classmethod
     def from_json(cls, file_path: Union[str, Path]) -> 'IntermediateJSON':
         """Load from JSON file."""
         with open(file_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
-        
+
         # Convert nested dictionaries back to dataclasses
         if 'metadata' in data:
             data['metadata'] = ProcessingMetadata(**data['metadata'])
-        
+
         if 'entities' in data:
             data['entities'] = [Entity(**entity) for entity in data['entities']]
-        
+
         if 'relations' in data:
             data['relations'] = [Relation(**relation) for relation in data['relations']]
-        
+
         return cls(**data)
 
 
 class MarkdownGenerator:
     """Generate standardized markdown from intermediate JSON."""
-    
+
     @staticmethod
     def generate(intermediate: IntermediateJSON) -> str:
         """Generate markdown content from intermediate JSON."""
         lines = []
-        
+
         # Header
         lines.append(f"# {intermediate.title}")
         lines.append("")
-        
+
         # Metadata section
         lines.append("## Metadata")
         lines.append("")
@@ -140,13 +140,13 @@ class MarkdownGenerator:
         lines.append(f"- **Processing Time**: {intermediate.metadata.processing_time:.2f}s")
         lines.append(f"- **Mode**: {intermediate.metadata.mode}")
         lines.append("")
-        
+
         # Main content
         lines.append("## Content")
         lines.append("")
         lines.append(intermediate.text_content)
         lines.append("")
-        
+
         # Entities section
         if intermediate.entities:
             lines.append("## Extracted Entities")
@@ -157,7 +157,7 @@ class MarkdownGenerator:
                     for key, value in entity.properties.items():
                         lines.append(f"  - {key}: {value}")
             lines.append("")
-        
+
         # Relations section
         if intermediate.relations:
             lines.append("## Extracted Relations")
@@ -171,7 +171,7 @@ class MarkdownGenerator:
                     for key, value in relation.properties.items():
                         lines.append(f"  - {key}: {value}")
             lines.append("")
-        
+
         # Content-specific sections
         if intermediate.segments:
             lines.append("## Segments")
@@ -185,7 +185,7 @@ class MarkdownGenerator:
                 if 'speaker' in segment:
                     lines.append(f"**Speaker**: {segment['speaker']}")
                 lines.append("")
-        
+
         if intermediate.pages:
             lines.append("## Pages")
             lines.append("")
@@ -195,7 +195,7 @@ class MarkdownGenerator:
                     preview = page['text'][:200] + "..." if len(page['text']) > 200 else page['text']
                     lines.append(preview)
                 lines.append("")
-        
+
         if intermediate.links:
             lines.append("## Links")
             lines.append("")
@@ -203,7 +203,7 @@ class MarkdownGenerator:
                 if 'url' in link and 'text' in link:
                     lines.append(f"- [{link['text']}]({link['url']})")
             lines.append("")
-        
+
         # Custom metadata
         if intermediate.custom_metadata:
             lines.append("## Additional Metadata")
@@ -211,9 +211,9 @@ class MarkdownGenerator:
             for key, value in intermediate.custom_metadata.items():
                 lines.append(f"- **{key}**: {value}")
             lines.append("")
-        
+
         return "\n".join(lines)
-    
+
     @staticmethod
     def save_markdown(intermediate: IntermediateJSON, file_path: Union[str, Path]) -> None:
         """Save markdown to file."""
@@ -249,7 +249,7 @@ def get_output_paths(input_path: Union[str, Path], mode: ProcessingMode) -> Dict
     input_path = Path(input_path)
     stem = input_path.stem
     parent = input_path.parent
-    
+
     if mode == ProcessingMode.PROCESSING:
         return {
             'intermediate_json': parent / f"{stem}_intermediate.json",

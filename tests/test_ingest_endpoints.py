@@ -23,7 +23,7 @@ def test_health():
 def test_ingest_url():
     """Test URL ingestion endpoint."""
     print("\n🔍 Testing URL ingestion...")
-    
+
     data = {
         "source_type": "web",
         "url": "https://httpbin.org/json",
@@ -32,13 +32,13 @@ def test_ingest_url():
             "category": "api_test"
         }
     }
-    
+
     response = requests.post(
         f"{BASE_URL}/api/v1/ingest/url",
         json=data,
         headers={"Content-Type": "application/json"}
     )
-    
+
     print(f"Status: {response.status_code}")
     if response.status_code == 200:
         result = response.json()
@@ -54,12 +54,12 @@ def test_task_status(task_id):
     """Test task status endpoint."""
     if not task_id:
         return
-        
+
     print(f"\n🔍 Testing task status for {task_id}...")
-    
+
     response = requests.get(f"{BASE_URL}/api/v1/status/{task_id}")
     print(f"Status: {response.status_code}")
-    
+
     if response.status_code == 200:
         result = response.json()
         print(f"✅ Task status retrieved")
@@ -74,10 +74,10 @@ def test_task_status(task_id):
 def test_list_active_tasks():
     """Test list active tasks endpoint."""
     print("\n🔍 Testing list active tasks...")
-    
+
     response = requests.get(f"{BASE_URL}/api/v1/status/")
     print(f"Status: {response.status_code}")
-    
+
     if response.status_code == 200:
         result = response.json()
         print(f"✅ Active tasks listed")
@@ -90,10 +90,10 @@ def test_list_active_tasks():
 def test_queue_stats():
     """Test queue statistics endpoint."""
     print("\n🔍 Testing queue statistics...")
-    
+
     response = requests.get(f"{BASE_URL}/api/v1/status/stats/queues")
     print(f"Status: {response.status_code}")
-    
+
     if response.status_code == 200:
         result = response.json()
         print(f"✅ Queue stats retrieved")
@@ -107,7 +107,7 @@ def test_queue_stats():
 def test_batch_ingest():
     """Test batch ingestion endpoint."""
     print("\n🔍 Testing batch ingestion...")
-    
+
     data = {
         "items": [
             {
@@ -115,19 +115,19 @@ def test_batch_ingest():
                 "url": "https://httpbin.org/json"
             },
             {
-                "source_type": "web", 
+                "source_type": "web",
                 "url": "https://httpbin.org/uuid"
             }
         ],
         "webhook_url": None
     }
-    
+
     response = requests.post(
         f"{BASE_URL}/api/v1/ingest/batch",
         json=data,
         headers={"Content-Type": "application/json"}
     )
-    
+
     print(f"Status: {response.status_code}")
     if response.status_code == 200:
         result = response.json()
@@ -143,10 +143,10 @@ def test_batch_ingest():
 def test_swagger_docs():
     """Test that Swagger docs are accessible."""
     print("\n🔍 Testing Swagger documentation...")
-    
+
     response = requests.get(f"{BASE_URL}/docs")
     print(f"Status: {response.status_code}")
-    
+
     if response.status_code == 200:
         print("✅ Swagger docs accessible")
         return True
@@ -157,21 +157,21 @@ def test_swagger_docs():
 def test_openapi_schema():
     """Test OpenAPI schema endpoint."""
     print("\n🔍 Testing OpenAPI schema...")
-    
+
     response = requests.get(f"{BASE_URL}/openapi.json")
     print(f"Status: {response.status_code}")
-    
+
     if response.status_code == 200:
         schema = response.json()
         print("✅ OpenAPI schema accessible")
-        
+
         # Check for ingest endpoints
         paths = schema.get('paths', {})
         ingest_endpoints = [path for path in paths.keys() if '/api/v1/ingest/' in path]
         print(f"Ingest endpoints found: {len(ingest_endpoints)}")
         for endpoint in ingest_endpoints:
             print(f"  - {endpoint}")
-        
+
         return True
     else:
         print("❌ OpenAPI schema not accessible")
@@ -181,33 +181,33 @@ def main():
     """Run all tests."""
     print("🚀 Testing MoRAG Ingest Endpoints")
     print("=" * 50)
-    
+
     # Test basic connectivity
     if not test_health():
         print("❌ Server not accessible. Make sure MoRAG server is running.")
         return
-    
+
     # Test documentation
     test_swagger_docs()
     test_openapi_schema()
-    
+
     # Test ingest endpoints
     task_id = test_ingest_url()
-    
+
     # Test task management
     test_task_status(task_id)
     test_list_active_tasks()
     test_queue_stats()
-    
+
     # Test batch processing
     batch_task_ids = test_batch_ingest()
-    
+
     print("\n" + "=" * 50)
     print("🎉 Test completed!")
     print("\nTo view the interactive API documentation:")
     print(f"  📖 Swagger UI: {BASE_URL}/docs")
     print(f"  📖 ReDoc: {BASE_URL}/redoc")
-    
+
     if task_id or batch_task_ids:
         print("\nTo monitor task progress:")
         if task_id:

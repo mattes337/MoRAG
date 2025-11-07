@@ -1,11 +1,9 @@
 """LLM-based entity normalization for converting entities to canonical forms."""
 
-import json
 import structlog
 from typing import Dict, List, Optional, Tuple, Any
 from dataclasses import dataclass
 import asyncio
-import re
 
 # Import agents framework - required dependency
 import sys
@@ -15,7 +13,7 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from agents.base import LLMResponseParser, LLMResponseParseError
+from agents.base import LLMResponseParser
 from agents import get_agent
 
 try:
@@ -39,7 +37,7 @@ class EntityVariation:
 
 class LLMEntityNormalizer:
     """LLM-based entity normalizer that converts entities to canonical forms."""
-    
+
     def __init__(
         self,
         model_name: str = "gemini-2.0-flash",
@@ -48,7 +46,7 @@ class LLMEntityNormalizer:
         cache_size: int = 1000
     ):
         """Initialize the LLM entity normalizer.
-        
+
         Args:
             model_name: Name of the LLM model to use
             api_key: API key for the LLM service
@@ -59,11 +57,11 @@ class LLMEntityNormalizer:
         self.api_key = api_key or self._get_api_key()
         self.language = language
         self.logger = logger.bind(component="llm_entity_normalizer")
-        
+
         # Cache for normalization results
         self.normalization_cache: Dict[str, Dict[str, Any]] = {}
         self.cache_size = cache_size
-        
+
         # Initialize Google AI if available
         if GOOGLE_AI_AVAILABLE and self.api_key:
             genai.configure(api_key=self.api_key)
@@ -71,19 +69,19 @@ class LLMEntityNormalizer:
         else:
             self.model = None
             self.logger.warning("Google AI not available or no API key provided")
-    
+
     def _get_api_key(self) -> Optional[str]:
         """Get API key from environment variables."""
         import os
         return os.getenv("GOOGLE_API_KEY") or os.getenv("LANGEXTRACT_API_KEY")
-    
+
     async def normalize_entity(self, entity_name: str, entity_type: Optional[str] = None) -> EntityVariation:
         """Normalize a single entity to its canonical form.
-        
+
         Args:
             entity_name: The entity name to normalize
             entity_type: Optional entity type for context
-            
+
         Returns:
             EntityVariation with normalization result
         """
@@ -94,7 +92,7 @@ class LLMEntityNormalizer:
                 confidence=0.0,
                 rule_applied="empty_input"
             )
-        
+
         # Check cache first
         cache_key = f"{entity_name.lower()}:{entity_type or 'unknown'}:{self.language}"
         if cache_key in self.normalization_cache:
@@ -105,10 +103,10 @@ class LLMEntityNormalizer:
                 confidence=cached['confidence'],
                 rule_applied=cached['rule_applied']
             )
-        
+
         # Apply basic normalization first
         basic_normalized = self._apply_basic_normalization(entity_name)
-        
+
         # Use entity extraction agent for normalization - ALWAYS
         try:
             # Pass model override to ensure consistent model usage
@@ -158,12 +156,12 @@ class LLMEntityNormalizer:
                 confidence=0.7,
                 rule_applied="basic_normalization"
             )
-        
+
         # Cache the result
         self._cache_result(cache_key, result)
-        
+
         return result
-    
+
     def _apply_basic_normalization(self, entity_name: str) -> str:
         """Apply comprehensive rule-based normalization to create canonical forms."""
         normalized = entity_name.strip()
@@ -240,11 +238,11 @@ class LLMEntityNormalizer:
             singular_words.append(singular)
 
         return ' '.join(singular_words)
-    
+
     async def _llm_normalize(self, entity_name: str, entity_type: Optional[str] = None) -> Tuple[str, float, str]:
         """Use LLM to normalize entity name."""
         prompt = self._create_normalization_prompt(entity_name, entity_type)
-        
+
         try:
             response = await asyncio.to_thread(
                 self.model.generate_content,
@@ -254,7 +252,7 @@ class LLMEntityNormalizer:
                     temperature=0.1
                 )
             )
-            
+
             # Parse JSON response using robust utility
             response_text = response.text if response.text else ""
 
@@ -271,13 +269,13 @@ class LLMEntityNormalizer:
                 fallback_value=fallback_result,
                 context=f"entity_normalization:{entity_name}"
             )
-            
+
             return (
                 result.get('normalized', entity_name),
                 float(result.get('confidence', 0.8)),
                 result.get('reasoning', 'llm_normalization')
             )
-            
+
         except Exception as e:
             self.logger.warning(
                 "LLM normalization failed",
@@ -285,11 +283,11 @@ class LLMEntityNormalizer:
                 error=str(e)
             )
             return entity_name, 0.5, f"llm_error: {str(e)}"
-    
+
     def _create_normalization_prompt(self, entity_name: str, entity_type: Optional[str] = None) -> str:
         """Create prompt for LLM normalization."""
         type_context = f" (Type: {entity_type})" if entity_type else ""
-        
+
         return f"""
 Normalize the following entity name to its canonical form. Follow these STRICT rules:
 
@@ -326,7 +324,7 @@ Respond with JSON:
     "reasoning": "brief explanation of changes made"
 }}
 """
-    
+
     def _cache_result(self, cache_key: str, result: EntityVariation) -> None:
         """Cache normalization result."""
         # Implement simple LRU cache
@@ -334,40 +332,40 @@ Respond with JSON:
             # Remove oldest entry
             oldest_key = next(iter(self.normalization_cache))
             del self.normalization_cache[oldest_key]
-        
+
         self.normalization_cache[cache_key] = {
             'normalized': result.normalized,
             'confidence': result.confidence,
             'rule_applied': result.rule_applied
         }
-    
+
     async def normalize_entities_batch(self, entities: List[str], entity_types: Optional[List[str]] = None) -> List[EntityVariation]:
         """Normalize multiple entities in batch.
-        
+
         Args:
             entities: List of entity names to normalize
             entity_types: Optional list of entity types (same length as entities)
-            
+
         Returns:
             List of EntityVariation results
         """
         if not entities:
             return []
-        
+
         # Ensure entity_types has same length as entities
         if entity_types is None:
             entity_types = [None] * len(entities)
         elif len(entity_types) != len(entities):
             entity_types = entity_types + [None] * (len(entities) - len(entity_types))
-        
+
         # Process entities concurrently
         tasks = [
             self.normalize_entity(entity, entity_type)
             for entity, entity_type in zip(entities, entity_types)
         ]
-        
+
         results = await asyncio.gather(*tasks, return_exceptions=True)
-        
+
         # Handle any exceptions
         normalized_results = []
         for i, result in enumerate(results):
@@ -385,5 +383,5 @@ Respond with JSON:
                 ))
             else:
                 normalized_results.append(result)
-        
+
         return normalized_results

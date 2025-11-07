@@ -331,10 +331,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Build CLI image
         run: docker build -f Dockerfile.cli -t morag-cli .
-      
+
       - name: Run CLI script
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}

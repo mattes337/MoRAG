@@ -19,90 +19,90 @@ The core class for processing images.
 class ImageProcessor:
     def __init__(self, api_key: Optional[str] = None):
         """Initialize the image processor.
-        
+
         Args:
             api_key: Google API key for Gemini Vision API (for captioning)
         """
-        
+
     async def process_image(self, image_path: str, config: ImageConfig) -> ImageProcessingResult:
         """Process a single image according to the provided configuration.
-        
+
         Args:
             image_path: Path to the image file
             config: Configuration for image processing
-            
+
         Returns:
             ImageProcessingResult object containing the processing results
-            
+
         Raises:
             ProcessingError: If an error occurs during processing
             FileNotFoundError: If the image file does not exist
         """
-        
-    async def process_batch(self, image_paths: List[str], configs: Optional[Dict[str, ImageConfig]] = None, 
+
+    async def process_batch(self, image_paths: List[str], configs: Optional[Dict[str, ImageConfig]] = None,
                            default_config: Optional[ImageConfig] = None, max_concurrency: int = 4) -> List[ImageProcessingResult]:
         """Process multiple images concurrently.
-        
+
         Args:
             image_paths: List of paths to image files
             configs: Optional dictionary mapping image paths to specific configurations
             default_config: Default configuration to use for images without specific configs
             max_concurrency: Maximum number of concurrent processing tasks
-            
+
         Returns:
             List of ImageProcessingResult objects
         """
-        
+
     async def extract_metadata(self, image_path: str) -> Dict[str, Any]:
         """Extract metadata from an image.
-        
+
         Args:
             image_path: Path to the image file
-            
+
         Returns:
             Dictionary containing image metadata
-            
+
         Raises:
             ProcessingError: If metadata extraction fails
         """
-        
+
     async def preprocess_image(self, image_path: str, max_dimension: Optional[int] = None) -> Tuple[Image.Image, str]:
         """Preprocess an image (resize if needed).
-        
+
         Args:
             image_path: Path to the image file
             max_dimension: Maximum dimension (width or height) for resizing
-            
+
         Returns:
             Tuple of (PIL Image object, temporary file path if created)
-            
+
         Raises:
             ProcessingError: If preprocessing fails
         """
-        
+
     async def generate_caption(self, image_path: str) -> str:
         """Generate a caption for an image using Gemini Vision API.
-        
+
         Args:
             image_path: Path to the image file
-            
+
         Returns:
             Generated caption string
-            
+
         Raises:
             ProcessingError: If caption generation fails
         """
-        
+
     async def extract_text(self, image_path: str, engine: str = "tesseract") -> str:
         """Extract text from an image using OCR.
-        
+
         Args:
             image_path: Path to the image file
             engine: OCR engine to use ("tesseract" or "easyocr")
-            
+
         Returns:
             Extracted text string
-            
+
         Raises:
             ProcessingError: If text extraction fails
         """
@@ -116,39 +116,39 @@ Service class for integrating with the Morag framework.
 class ImageService(BaseService):
     def __init__(self, config: ServiceConfig):
         """Initialize the image service.
-        
+
         Args:
             config: Service configuration object
         """
-        
+
     async def process_image(self, image_path: str, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Process a single image.
-        
+
         Args:
             image_path: Path to the image file
             config: Optional configuration dictionary
-            
+
         Returns:
             Dictionary containing processing results
         """
-        
+
     async def process_batch(self, image_paths: List[str], configs: Optional[Dict[str, Dict[str, Any]]] = None) -> List[Dict[str, Any]]:
         """Process multiple images.
-        
+
         Args:
             image_paths: List of paths to image files
             configs: Optional dictionary mapping image paths to configurations
-            
+
         Returns:
             List of dictionaries containing processing results
         """
-        
+
     def _result_to_dict(self, result: ImageProcessingResult) -> Dict[str, Any]:
         """Convert an ImageProcessingResult to a dictionary.
-        
+
         Args:
             result: ImageProcessingResult object
-            
+
         Returns:
             Dictionary representation of the result
         """

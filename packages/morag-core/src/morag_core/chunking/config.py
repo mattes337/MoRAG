@@ -17,7 +17,7 @@ class ChunkingStrategy(str, Enum):
 
 class ChunkingConfig(BaseModel):
     """Universal configuration for text chunking across all MoRAG components."""
-    
+
     # Core chunking parameters
     strategy: ChunkingStrategy = Field(
         default=ChunkingStrategy.SEMANTIC,
@@ -41,7 +41,7 @@ class ChunkingConfig(BaseModel):
         le=2000,
         description="Character overlap between chunks"
     )
-    
+
     # Semantic chunking parameters
     min_confidence: float = Field(
         default=0.6,
@@ -53,7 +53,7 @@ class ChunkingConfig(BaseModel):
         default=True,
         description="Whether to use AI for semantic analysis"
     )
-    
+
     # Content-specific parameters
     respect_sentence_boundaries: bool = Field(
         default=True,
@@ -71,7 +71,7 @@ class ChunkingConfig(BaseModel):
         default=True,
         description="Keep tables intact when possible"
     )
-    
+
     # Language and encoding
     language: Optional[str] = Field(
         default=None,
@@ -81,7 +81,7 @@ class ChunkingConfig(BaseModel):
         default="utf-8",
         description="Text encoding"
     )
-    
+
     # Performance parameters
     max_concurrent_chunks: int = Field(
         default=5,
@@ -95,7 +95,7 @@ class ChunkingConfig(BaseModel):
         le=300,
         description="Timeout for chunk processing"
     )
-    
+
     # Content type specific settings
     content_type: Optional[str] = Field(
         default=None,
@@ -105,7 +105,7 @@ class ChunkingConfig(BaseModel):
         default_factory=dict,
         description="Additional metadata for chunking"
     )
-    
+
     @classmethod
     def for_documents(
         cls,
@@ -131,7 +131,7 @@ class ChunkingConfig(BaseModel):
             defaults[key] = value
 
         return cls(**defaults)
-    
+
     @classmethod
     def for_audio_transcripts(
         cls,
@@ -152,7 +152,7 @@ class ChunkingConfig(BaseModel):
             content_type="audio",
             **kwargs
         )
-    
+
     @classmethod
     def for_video_transcripts(
         cls,
@@ -173,7 +173,7 @@ class ChunkingConfig(BaseModel):
             content_type="video",
             **kwargs
         )
-    
+
     @classmethod
     def for_web_content(
         cls,
@@ -193,7 +193,7 @@ class ChunkingConfig(BaseModel):
             content_type="web",
             **kwargs
         )
-    
+
     @classmethod
     def for_code(
         cls,
@@ -214,22 +214,22 @@ class ChunkingConfig(BaseModel):
             content_type="code",
             **kwargs
         )
-    
+
     def validate_config(self) -> None:
         """Validate the chunking configuration."""
         if self.min_chunk_size >= self.max_chunk_size:
             raise ValueError("min_chunk_size must be less than max_chunk_size")
-        
+
         if self.overlap_size >= self.min_chunk_size:
             raise ValueError("overlap_size must be less than min_chunk_size")
-        
+
         if self.max_concurrent_chunks < 1:
             raise ValueError("max_concurrent_chunks must be at least 1")
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert configuration to dictionary."""
         return self.model_dump()
-    
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ChunkingConfig":
         """Create configuration from dictionary."""

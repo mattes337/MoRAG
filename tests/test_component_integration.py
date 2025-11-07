@@ -14,11 +14,11 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 def test_storage_component():
     """Test QdrantVectorStorage component."""
     print("Testing QdrantVectorStorage component...")
-    
+
     try:
         sys.path.insert(0, 'packages/morag-services/src')
         from morag_services.storage import QdrantVectorStorage
-        
+
         # Test 1: Should fail with None
         try:
             storage = QdrantVectorStorage(collection_name=None)
@@ -30,7 +30,7 @@ def test_storage_component():
             else:
                 print(f"❌ Wrong error message: {e}")
                 return False
-        
+
         # Test 2: Should fail with empty string
         try:
             storage = QdrantVectorStorage(collection_name="")
@@ -42,7 +42,7 @@ def test_storage_component():
             else:
                 print(f"❌ Wrong error message: {e}")
                 return False
-        
+
         # Test 3: Should work with valid name
         try:
             storage = QdrantVectorStorage(collection_name="test_collection")
@@ -55,7 +55,7 @@ def test_storage_component():
         except Exception as e:
             print(f"❌ Unexpected error with valid collection name: {e}")
             return False
-            
+
     except ImportError as e:
         print(f"⏭️  Skipping storage test - import error: {e}")
         return True
@@ -64,16 +64,16 @@ def test_storage_component():
 def test_services_component():
     """Test MoRAGServices component."""
     print("Testing MoRAGServices component...")
-    
+
     try:
         sys.path.insert(0, 'packages/morag-services/src')
         from morag_services.services import MoRAGServices
-        
+
         # Test 1: Should fail without environment variable
         with patch.dict(os.environ, {}, clear=True):
             if 'QDRANT_COLLECTION_NAME' in os.environ:
                 del os.environ['QDRANT_COLLECTION_NAME']
-            
+
             try:
                 services = MoRAGServices()
                 services._initialize_search_services()
@@ -85,7 +85,7 @@ def test_services_component():
                 else:
                     print(f"❌ Wrong error message: {e}")
                     return False
-        
+
         # Test 2: Should work with environment variable
         with patch.dict(os.environ, {'QDRANT_COLLECTION_NAME': 'test_collection'}):
             try:
@@ -105,7 +105,7 @@ def test_services_component():
             except Exception as e:
                 print(f"❌ Unexpected error with valid environment variable: {e}")
                 return False
-                
+
     except ImportError as e:
         print(f"⏭️  Skipping services test - import error: {e}")
         return True
@@ -114,10 +114,10 @@ def test_services_component():
 def test_ingest_validation():
     """Test ingest task validation."""
     print("Testing ingest task validation...")
-    
+
     try:
         sys.path.insert(0, 'packages/morag/src')
-        
+
         # Test the validation logic directly
         def validate_ingest_environment():
             qdrant_host = os.getenv('QDRANT_HOST', 'localhost')
@@ -127,12 +127,12 @@ def test_ingest_validation():
             if not collection_name_env:
                 raise ValueError("QDRANT_COLLECTION_NAME environment variable is required")
             return collection_name_env
-        
+
         # Test 1: Should fail without environment variable
         with patch.dict(os.environ, {}, clear=True):
             if 'QDRANT_COLLECTION_NAME' in os.environ:
                 del os.environ['QDRANT_COLLECTION_NAME']
-            
+
             try:
                 validate_ingest_environment()
                 print("❌ Expected ValueError for missing QDRANT_COLLECTION_NAME")
@@ -143,7 +143,7 @@ def test_ingest_validation():
                 else:
                     print(f"❌ Wrong error message: {e}")
                     return False
-        
+
         # Test 2: Should work with environment variable
         with patch.dict(os.environ, {'QDRANT_COLLECTION_NAME': 'test_collection'}):
             try:
@@ -157,7 +157,7 @@ def test_ingest_validation():
             except Exception as e:
                 print(f"❌ Unexpected error with valid environment variable: {e}")
                 return False
-                
+
     except ImportError as e:
         print(f"⏭️  Skipping ingest test - import error: {e}")
         return True
@@ -167,16 +167,16 @@ def main():
     """Run all component integration tests."""
     print("Testing component integration with unified collection name...")
     print("=" * 60)
-    
+
     tests = [
         test_storage_component,
         test_services_component,
         test_ingest_validation
     ]
-    
+
     passed = 0
     failed = 0
-    
+
     for test_func in tests:
         try:
             if test_func():
@@ -187,10 +187,10 @@ def main():
             print(f"❌ {test_func.__name__} failed with exception: {e}")
             failed += 1
         print()
-    
+
     print("=" * 60)
     print(f"Test Results: {passed} passed, {failed} failed")
-    
+
     if failed == 0:
         print("✅ All component integration tests passed!")
         return True

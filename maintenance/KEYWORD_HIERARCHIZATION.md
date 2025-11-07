@@ -234,4 +234,3 @@ for k in find_keywords_over_threshold(params['threshold_min_facts']):
 - Unit: scoring (affinity), balancing, proposal ranking, normalization
 - Integration: dry-run plan generation on a fixture graph; verify counts and constraints (min_per, max_move_ratio) are upheld
 - Property tests: small random graphs to ensure no keyword is left with zero facts unless intended
-
