@@ -218,14 +218,8 @@ class FactGeneratorStage(Stage):
         # Get configuration from context
         context_config = context.config.get("fact-generator", {})
 
-        # Import FactGeneratorConfig from morag_core
-        try:
-            from morag_core.config import FactGeneratorConfig as CoreFactGeneratorConfig
-            config = CoreFactGeneratorConfig.from_env_and_overrides(context_config)
-            self.config.update(config.model_dump())
-        except ImportError:
-            # Fallback if morag_core is not available
-            self.config.update(context_config)
+        # Merge context config into self.config (preserving defaults)
+        self.config.update(context_config)
 
         start_time = datetime.now()
         output_files_list = []
