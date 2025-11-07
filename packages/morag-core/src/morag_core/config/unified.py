@@ -304,6 +304,14 @@ class FactGeneratorConfig(BaseModel, ConfigMixin):
         default=15, ge=1, description="Maximum relations per chunk"
     )
 
+    # Processing settings
+    enable_batch_processing: bool = Field(
+        default=True, description="Enable batch processing of chunks"
+    )
+    max_chunks_per_batch: int = Field(
+        default=10, ge=1, description="Maximum chunks per batch"
+    )
+
     @classmethod
     def from_env_and_overrides(
         cls, overrides: Optional[Dict[str, Any]] = None, prefix: Optional[str] = None
