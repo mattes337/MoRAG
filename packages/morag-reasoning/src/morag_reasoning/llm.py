@@ -267,15 +267,13 @@ class LLMClient:
             },
         }
 
-        # Use v1 endpoint (stable) instead of v1beta
+        # Use v1beta endpoint for Gemini API
         base_url = (
-            self.config.base_url or "https://generativelanguage.googleapis.com/v1"
+            self.config.base_url or "https://generativelanguage.googleapis.com/v1beta"
         )
 
-        # Normalize model name - add -latest suffix if needed for flash models
+        # Use model name as-is (no transformation needed)
         model_name = self.config.model
-        if model_name in ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash"]:
-            model_name = f"{model_name}-latest"
 
         url = f"{base_url}/models/{model_name}:generateContent?key={self.config.api_key}"
 
