@@ -97,14 +97,14 @@ class FactGeneratorStage(Stage):
 
     def __init__(
         self,
-        coordinator: Optional[IServiceCoordinator] = None,
         stage_type: StageType = StageType.FACT_GENERATOR,
+        coordinator: Optional[IServiceCoordinator] = None,
     ):
         """Initialize fact generator stage.
 
         Args:
-            coordinator: Service coordinator implementing IServiceCoordinator (None for backward compatibility)
             stage_type: Type of stage
+            coordinator: Service coordinator implementing IServiceCoordinator (None for backward compatibility)
         """
         super().__init__(stage_type)
 
