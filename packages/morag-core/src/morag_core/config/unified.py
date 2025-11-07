@@ -311,6 +311,31 @@ class FactGeneratorConfig(BaseModel, ConfigMixin):
     max_chunks_per_batch: int = Field(
         default=10, ge=1, description="Maximum chunks per batch"
     )
+    chunk_size_threshold: int = Field(
+        default=100, ge=1, description="Minimum chunk size to process"
+    )
+
+    # Feature toggles
+    enable_fact_deduplication: bool = Field(
+        default=True, description="Enable fact deduplication"
+    )
+    enable_relation_deduplication: bool = Field(
+        default=True, description="Enable relation deduplication"
+    )
+    enable_entity_normalization: bool = Field(
+        default=True, description="Enable entity normalization"
+    )
+    enable_keyword_extraction: bool = Field(
+        default=True, description="Enable keyword extraction"
+    )
+    use_llm_fallback: bool = Field(
+        default=True, description="Use LLM fallback for extraction"
+    )
+
+    # Confidence thresholds
+    min_relation_confidence: float = Field(
+        default=0.2, ge=0.0, le=1.0, description="Minimum confidence for relations"
+    )
 
     @classmethod
     def from_env_and_overrides(
